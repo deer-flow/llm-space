@@ -41,12 +41,14 @@ const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REASONING: ReasoningLevel = "off";
 
 function ParamField({
+  className,
   label,
   enabled,
   readonly,
   onEnabledChange,
   children,
 }: {
+  className?: string;
   label: string;
   enabled: boolean;
   readonly?: boolean;
@@ -55,7 +57,7 @@ function ParamField({
   children: ReactNode;
 }) {
   return (
-    <div className="border-t pt-3">
+    <div className={cn("border-t pt-3", className)}>
       <div className="flex items-center justify-between gap-2">
         <span className={cn("text-sm", !enabled && "text-muted-foreground")}>
           {label}
@@ -127,7 +129,7 @@ export function ModelParamsPopover({ readonly }: { readonly?: boolean }) {
               });
             }}
           >
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <div className="flex justify-end">
                 <span className="text-muted-foreground tabular-nums">
                   {temperature}
@@ -159,10 +161,10 @@ export function ModelParamsPopover({ readonly }: { readonly?: boolean }) {
             }}
           >
             <Input
+              className="mt-2 w-full"
               type="number"
               min={1}
               max={resolvedModel?.maxTokens}
-              className="w-full"
               value={maxTokens ?? ""}
               disabled={readonly}
               onChange={(event) => {
@@ -191,7 +193,7 @@ export function ModelParamsPopover({ readonly }: { readonly?: boolean }) {
                 updateModelParams({ reasoning: value as ReasoningLevel });
               }}
             >
-              <SelectTrigger size="sm" className="w-full">
+              <SelectTrigger size="sm" className="mt-2 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
