@@ -1,6 +1,17 @@
 import CodeMirror, { type BasicSetupOptions } from "@uiw/react-codemirror";
 import { useTheme } from "next-themes";
-import { memo, useMemo, type ClipboardEvent, type KeyboardEvent } from "react";
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -14,37 +25,104 @@ const BASIC_SETUP: BasicSetupOptions = {
   lineNumbers: false,
 };
 
-function _CodeEditor({
-  className,
-  autoFocus,
-  placeholder,
-  hideBorder,
-  hideFocusRing,
-  language,
-  value,
-  streaming,
-  readonly,
-  onChange,
-  onKeyDown,
-  onPaste,
-}: {
-  className?: string;
-  autoFocus?: boolean;
-  placeholder?: string;
-  hideBorder?: boolean;
-  hideFocusRing?: boolean;
-  language?: "markdown" | "json";
-  streaming?: boolean;
-  value: string;
-  readonly?: boolean;
-  // eslint-disable-next-line no-unused-vars
-  onChange?: (value: string) => void;
-  // eslint-disable-next-line no-unused-vars
-  onKeyDown?: (e: KeyboardEvent) => void;
-  // eslint-disable-next-line no-unused-vars
-  onPaste?: (e: ClipboardEvent) => void;
-}) {
+export interface CodeEditorHandle {
+  commit: () => void;
+  getValue: () => string;
+}
+
+function _CodeEditor(
+  {
+    className,
+    autoFocus,
+    placeholder,
+    hideBorder,
+    hideFocusRing,
+    language,
+    value,
+    streaming,
+    readonly,
+    onChange,
+    onKeyDown,
+    onPaste,
+  }: {
+    className?: string;
+    autoFocus?: boolean;
+    placeholder?: string;
+    hideBorder?: boolean;
+    hideFocusRing?: boolean;
+    language?: "markdown" | "json";
+    streaming?: boolean;
+    value: string;
+    readonly?: boolean;
+    // eslint-disable-next-line no-unused-vars
+    onChange?: (value: string) => void;
+    // eslint-disable-next-line no-unused-vars
+    onKeyDown?: (e: KeyboardEvent) => void;
+    // eslint-disable-next-line no-unused-vars
+    onPaste?: (e: ClipboardEvent) => void;
+  },
+  ref: React.ForwardedRef<CodeEditorHandle>
+) {
   const { resolvedTheme } = useTheme();
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(value);
+  const committedRef = useRef(value);
+  const isFocusedRef = useRef(false);
+
+  const setDraftValue = useCallback((next: string) => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
+
+  useEffect(() => {
+    if (!isFocusedRef.current || readonly) {
+      setDraftValue(value);
+      committedRef.current = value;
+    }
+  }, [value, readonly, setDraftValue]);
+
+  const commit = useCallback(() => {
+    if (onChange && draftRef.current !== committedRef.current) {
+      onChange(draftRef.current);
+      committedRef.current = draftRef.current;
+    }
+  }, [onChange]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      commit,
+      getValue: () => draftRef.current,
+    }),
+    [commit]
+  );
+
+  const handleChange = useCallback(
+    (next: string) => {
+      setDraftValue(next);
+    },
+    [setDraftValue]
+  );
+
+  const handleBlur = useCallback(() => {
+    isFocusedRef.current = false;
+    commit();
+  }, [commit]);
+
+  const handleFocus = useCallback(() => {
+    isFocusedRef.current = true;
+  }, []);
+
+  const handleKeyDownCapture = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Enter" && e.metaKey) {
+        commit();
+      }
+      onKeyDown?.(e);
+    },
+    [commit, onKeyDown]
+  );
+
   const resolvedLanguage = useMemo(() => {
     if (streaming) {
       return "markdown";
@@ -52,12 +130,12 @@ function _CodeEditor({
     if (language) {
       return language;
     }
-    if (value.startsWith("{") || value.startsWith("[")) {
+    if (draft.startsWith("{") || draft.startsWith("[")) {
       return "json";
     } else {
       return "markdown";
     }
-  }, [value, language]);
+  }, [draft, language, streaming]);
   const extensions = useMemo(
     () => createExtensions(resolvedLanguage),
     [resolvedLanguage]
@@ -91,13 +169,15 @@ function _CodeEditor({
         basicSetup={BASIC_SETUP}
         placeholder={placeholder}
         extensions={extensions}
-        value={value}
-        onChange={onChange}
-        onKeyDownCapture={onKeyDown}
+        value={draft}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onFocus={handleFocus}
+        onKeyDownCapture={handleKeyDownCapture}
         onPaste={onPaste}
       />
     </div>
   );
 }
 
-export const CodeEditor = memo(_CodeEditor);
+export const CodeEditor = memo(forwardRef(_CodeEditor));
