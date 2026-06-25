@@ -186,7 +186,7 @@ function _MessageListItem({
             />
           )}
           {message.role === "assistant" && message.toolCalls && (
-            <div className="mb-3 flex w-full flex-col gap-2 px-3">
+            <div className="mb-3 flex w-full flex-col gap-3 px-3">
               {message.toolCalls.map((toolCall) => (
                 <ToolCallListItem
                   key={toolCall.id}
