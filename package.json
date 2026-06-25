@@ -8,9 +8,12 @@
     "apps/*"
   ],
   "scripts": {
+    "check": "bun run typecheck && eslint .",
     "dev": "cd packages/web && bun run dev",
     "lint": "eslint --fix",
-    "typecheck": "cd packages/web && bun run typecheck"
+    "lint:check": "eslint .",
+    "typecheck": "cd packages/web && bun run typecheck",
+    "prepare": "husky"
   },
   "catalog": {
     "@earendil-works/pi-ai": "latest",
@@ -29,6 +32,7 @@
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.6.0",
+    "husky": "^9.1.7",
     "prettier": "^3.8.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "^6.0.3",
