@@ -21,7 +21,7 @@ export const ThreadContext = Type.Object({
   /**
    * The messages of the thread.
    */
-  messages: Type.Array(Message),
+  messages: Type.Optional(Type.Array(Message)),
 });
 export type ThreadContext = Static<typeof ThreadContext>;
 
@@ -42,6 +42,6 @@ export const Thread = Type.Object({
   /**
    * The context of the thread, including the system prompt, messages, and tools.
    */
-  context: ThreadContext,
+  context: Type.Optional(ThreadContext),
 });
 export type Thread = Static<typeof Thread>;

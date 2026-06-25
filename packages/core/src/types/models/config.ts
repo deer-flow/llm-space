@@ -32,6 +32,6 @@ export const ModelConfig = Type.Object({
   /**
    * The runtime parameters of the model.
    */
-  params: ModelConfigParams,
+  params: Type.Optional(ModelConfigParams),
 });
 export type ModelConfig = Static<typeof ModelConfig>;

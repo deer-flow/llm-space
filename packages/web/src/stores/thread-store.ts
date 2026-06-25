@@ -76,7 +76,7 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
 
       /** Replace the messages array; skips the update if nothing changed. */
       const updateMessages = (updater: (messages: Message[]) => Message[]) => {
-        const messages = get().thread.context.messages;
+        const messages = get().thread.context?.messages ?? [];
         const next = updater(messages);
         if (next !== messages) {
           setMessages(next);
@@ -84,7 +84,9 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
       };
 
       const getMessage = (id: string) =>
-        get().thread.context.messages.find((message) => message.id === id);
+        (get().thread.context?.messages ?? []).find(
+          (message) => message.id === id
+        );
 
       /** Replace a single message by id; no-op (same array ref) if not found. */
       const updateMessage = (
@@ -250,18 +252,18 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
         },
         addTool(tool) {
           const { thread } = get();
-          if (thread.context.tools?.some((t) => t.name === tool.name)) {
+          if (thread.context?.tools?.some((t) => t.name === tool.name)) {
             toast.error(`Tool "${tool.name}" already exists`);
             return false;
           }
           if (!validateTool(tool)) {
             return false;
           }
-          patchContext({ tools: [...(thread.context.tools ?? []), tool] });
+          patchContext({ tools: [...(thread.context?.tools ?? []), tool] });
           return true;
         },
         updateTool(name, tool) {
-          const tools = get().thread.context.tools ?? [];
+          const tools = get().thread.context?.tools ?? [];
           const index = tools.findIndex((t) => t.name === name);
           if (index === -1) {
             return false;
@@ -280,7 +282,7 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
         },
         removeTool(name) {
           patchContext({
-            tools: get().thread.context.tools?.filter((t) => t.name !== name),
+            tools: get().thread.context?.tools?.filter((t) => t.name !== name),
           });
         },
         updateToolCallOutputTextContent(messageId, toolCallId, text) {
@@ -332,7 +334,7 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
           set({ status: "running", abortController });
 
           // Truncate trailing messages when re-running from a given message.
-          let messages = [...get().thread.context.messages];
+          let messages = [...(get().thread.context?.messages ?? [])];
           if (fromMessageId) {
             const index = messages.findIndex((m) => m.id === fromMessageId);
             if (index !== -1 && index !== messages.length - 1) {

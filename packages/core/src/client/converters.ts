@@ -10,8 +10,10 @@ export function convertToPiContext(
 ) {
   const result = {
     systemPrompt: context.systemPrompt,
-    messages: _convertToPiMessages(context.messages, model),
-    tools: context.tools ? _convertToPiTools(context.tools) : undefined,
+    messages: context.messages
+      ? _convertToPiMessages(context.messages, model)
+      : [],
+    tools: context.tools ? _convertToPiTools(context.tools) : [],
   };
   return result;
 }

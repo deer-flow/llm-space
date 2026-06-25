@@ -104,7 +104,7 @@ export function ToolListView({
   className?: string;
   readonly?: boolean;
 }) {
-  const tools = useThreadStore((s) => s.thread.context.tools || []);
+  const tools = useThreadStore((s) => s.thread.context?.tools);
   const { removeTool } = useThreadStoreActions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
@@ -130,7 +130,7 @@ export function ToolListView({
     <>
       <div className={cn("group flex w-full", className)}>
         <div className="flex min-w-0 grow flex-wrap gap-2">
-          {tools.length === 0 && (
+          {(!tools || tools.length === 0) && (
             <Button
               className="hover:bg-transparent! -ml-1 px-0"
               variant="ghost"
@@ -142,7 +142,7 @@ export function ToolListView({
               Add tool
             </Button>
           )}
-          {tools.map((t) => (
+          {tools?.map((t) => (
             <ToolListItem
               key={t.name}
               tool={t}
@@ -155,7 +155,7 @@ export function ToolListView({
         <div
           className={cn(
             "flex shrink-0 items-center px-1 opacity-0 transition-opacity group-hover:opacity-100",
-            (readonly || tools.length === 0) && "invisible"
+            (readonly || !tools || tools.length === 0) && "invisible"
           )}
         >
           <Tooltip content="Add tool">

@@ -30,16 +30,16 @@ export function ModelConfigEditor({
   }, [model]);
 
   const paramSummary: { label: string; value: string | number }[] = [];
-  if (model.params.temperature !== undefined) {
+  if (model.params?.temperature !== undefined) {
     paramSummary.push({
       label: "temperature",
       value: model.params.temperature,
     });
   }
-  if (model.params.maxTokens !== undefined) {
+  if (model.params?.maxTokens !== undefined) {
     paramSummary.push({ label: "max_tokens", value: model.params.maxTokens });
   }
-  if (resolvedModel?.reasoning && model.params.reasoning !== undefined) {
+  if (resolvedModel?.reasoning && model.params?.reasoning !== undefined) {
     paramSummary.push({ label: "reasoning", value: model.params.reasoning });
   }
 

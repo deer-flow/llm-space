@@ -29,7 +29,7 @@ import { ToolListView } from "./tool/tool-list-view";
 
 export interface ThreadPlaygroundProps {
   className?: string;
-  initialThread: Thread;
+  initialThread?: Thread;
   readonly?: boolean;
 }
 
@@ -124,7 +124,7 @@ function ThreadPlaygroundContent({
 }
 
 export function ThreadPlayground({
-  initialThread,
+  initialThread = _createBlankThread(),
   ...props
 }: ThreadPlaygroundProps) {
   const [store] = useState(() => createThreadStore(initialThread));
@@ -133,4 +133,13 @@ export function ThreadPlayground({
       <ThreadPlaygroundContent {...props} />
     </ThreadStoreContext.Provider>
   );
+}
+
+function _createBlankThread(): Thread {
+  return {
+    model: {
+      provider: "deepseek",
+      id: "deepseek-v4-flash",
+    },
+  };
 }

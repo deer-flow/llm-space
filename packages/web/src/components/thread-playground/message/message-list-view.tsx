@@ -25,7 +25,7 @@ export function MessageListView({
 }) {
   const status = useThreadStore((s) => s.status);
   const collapsedMessageIds = useThreadStore((s) => s.collapsedMessageIds);
-  const messages = useThreadStore((s) => s.thread.context.messages);
+  const messages = useThreadStore((s) => s.thread.context?.messages);
   const { appendMessage, insertMessageBefore, moveMessage } =
     useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
@@ -51,7 +51,7 @@ export function MessageListView({
               ref={droppableProvided.innerRef}
               {...droppableProvided.droppableProps}
             >
-              {messages.map((message, index) => (
+              {(messages ?? []).map((message, index) => (
                 <Draggable
                   key={message.id}
                   draggableId={message.id}

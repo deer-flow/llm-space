@@ -13,7 +13,6 @@ const thread: Thread = {
     // id: "gpt-5.5",
     provider: "deepseek",
     id: "deepseek-v4-flash",
-    params: {},
   },
   context: {
     systemPrompt: "",
@@ -56,10 +55,7 @@ const thread: Thread = {
 export default function HomePage() {
   return (
     <div className="h-screen w-screen">
-      <ThreadPlayground
-        className="bg-background size-full shadow-lg"
-        initialThread={thread}
-      />
+      <ThreadPlayground className="bg-background size-full shadow-lg" />
     </div>
   );
 }

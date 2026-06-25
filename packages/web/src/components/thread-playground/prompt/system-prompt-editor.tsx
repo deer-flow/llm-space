@@ -12,7 +12,9 @@ function _SystemPromptEditor({
   className?: string;
   readonly?: boolean;
 }) {
-  const systemPrompt = useThreadStore((s) => s.thread.context.systemPrompt);
+  const systemPrompt = useThreadStore(
+    (s) => s.thread.context?.systemPrompt ?? ""
+  );
   const { updateSystemPrompt } = useThreadStoreActions();
   const handleChange = useCallback(
     (value: string) => {

@@ -86,13 +86,14 @@ export function ModelParamsPopover({ readonly }: { readonly?: boolean }) {
     [setPopoverOpen]
   );
 
-  const hasTemperature = model.params.temperature !== undefined;
-  const hasReasoning = model.params.reasoning !== undefined;
-  const hasMaxTokens = model.params.maxTokens !== undefined;
+  const params = model.params ?? {};
+  const hasTemperature = params.temperature !== undefined;
+  const hasReasoning = params.reasoning !== undefined;
+  const hasMaxTokens = params.maxTokens !== undefined;
 
-  const temperature = model.params.temperature ?? DEFAULT_TEMPERATURE;
-  const reasoning = model.params.reasoning ?? DEFAULT_REASONING;
-  const maxTokens = model.params.maxTokens;
+  const temperature = params.temperature ?? DEFAULT_TEMPERATURE;
+  const reasoning = params.reasoning ?? DEFAULT_REASONING;
+  const maxTokens = params.maxTokens;
 
   return (
     <div
