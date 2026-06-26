@@ -4,6 +4,9 @@ import * as ResizablePrimitive from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
 
+const panelCollapseTransitionClassName =
+  "[&_[data-panel]]:motion-safe:transition-[flex-grow,flex-basis,flex-shrink] [&_[data-panel]]:motion-safe:duration-200 [&_[data-panel]]:motion-safe:ease-in-out has-[[data-separator=active]]:[&_[data-panel]]:motion-safe:transition-none"
+
 function ResizablePanelGroup({
   className,
   ...props
@@ -13,6 +16,7 @@ function ResizablePanelGroup({
       data-slot="resizable-panel-group"
       className={cn(
         "flex h-full w-full aria-[orientation=vertical]:flex-col",
+        panelCollapseTransitionClassName,
         className
       )}
       {...props}
