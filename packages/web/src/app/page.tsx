@@ -1,68 +1,40 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ThreadPlayground } from "@/components/thread-playground";
-
-const thread: Thread = {
-  model: {
-    // provider: "doubao",
-    // id: "doubao-seed-2.0-pro",
-    // provider: "openai-codex",
-    // id: "gpt-5.5",
-    provider: "deepseek",
-    id: "deepseek-v4-flash",
-  },
-  context: {
-    systemPrompt: "",
-    tools: [
-      {
-        name: "weather_report",
-        description: "Get the weather report for a given location",
-        parameters: {
-          type: "object",
-          properties: {
-            location: {
-              type: "string",
-              description: "The location to get the weather report for",
-            },
-          },
-          required: ["location"],
-        },
-      },
-    ],
-    messages: [
-      {
-        id: "70c75bc2-5509-42fb-857a-49f6acf1f5f0",
-        role: "user",
-        content: [{ type: "text", text: "Hello, how are you?" }],
-      },
-      {
-        id: "70c75bc2-5509-42fb-857a-49f6acf1f5f1",
-        role: "assistant",
-        content: [{ type: "text", text: "Hello. How can I help you today?" }],
-      },
-      {
-        id: "70c75bc2-5509-42fb-857a-49f6acf1f5f2",
-        role: "user",
-        content: [{ type: "text", text: "Is it raining in Tokyo?" }],
-      },
-    ],
-  },
-};
 
 export default function HomePage() {
   const handleChange = useCallback((thread: Thread) => {
     console.info("thread changed", thread);
   }, []);
+  const { data: thread, loading } = useQueryThread("thread");
   return (
     <div className="h-screen w-screen">
       <ThreadPlayground
         className="bg-background size-full shadow-lg"
+        loading={loading}
         initialValue={thread}
         onChange={handleChange}
       />
     </div>
   );
+}
+
+function useQueryThread(filename: string) {
+  const [thread, setThread] = useState<Thread | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    void fetch(`/data/${filename}.json?t=` + Date.now())
+      .then((res) => res.json())
+      .then(setThread)
+      .catch((error: unknown) => {
+        console.error("Failed to load thread", error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [filename]);
+  return { data: thread, loading };
 }
