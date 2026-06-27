@@ -35,7 +35,7 @@ export function ToolCallListItem({
       <hr />
       <div className="flex w-full flex-col gap-1">
         <div className="flex w-full flex-col">
-          <div className="text-sm text-[#9a7cd1]">Response</div>
+          <div className="text-sm text-purple-400">Response</div>
         </div>
         <div className="flex w-full flex-col">
           <CodeEditor
@@ -59,13 +59,13 @@ function _ToolCallInputView({ input }: { input: ToolCallInput }) {
   const keys = Object.keys(input.arguments);
   return (
     <div className="block w-full overflow-x-auto font-mono">
-      <span className="text-[#9a7cd1]">{input.name}(</span>
+      <span className="text-purple-400">{input.name}(</span>
       {keys.length > 0 && (
         <span className="whitespace-pre">
           {JSON.stringify(input.arguments, null, 2)}
         </span>
       )}
-      <span className="text-[#9a7cd1]">{")"}</span>
+      <span className="text-purple-400">{")"}</span>
     </div>
   );
 }

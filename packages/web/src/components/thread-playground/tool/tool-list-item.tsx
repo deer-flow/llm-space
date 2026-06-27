@@ -44,15 +44,17 @@ function _ToolListItem({
         content={
           <div>
             <div className="font-mono">
-              <span className="font-bold">{tool.name}</span>
+              <span className="font-bold text-purple-400">{tool.name}</span>
               <span>(</span>
-              <span>
+              <span className="whitespace-pre-wrap">
                 {keys.length > 0
-                  ? "{ " +
+                  ? "{\n" +
                     keys
-                      .map((key) => (required.includes(key) ? key : `[${key}]`))
+                      .map((key) =>
+                        required.includes(key) ? `  ${key}` : `  [${key}]`
+                      )
                       .join(", ") +
-                    " }"
+                    "\n}"
                   : ""}
               </span>
               <span>)</span>

@@ -25,7 +25,7 @@ function _SystemPromptEditor({
   return (
     <CodeEditor
       className={cn(
-        "hover:border-accent-foreground/33 transition-[border-color]",
+        "hover:border-accent-foreground/20 transition-[border-color]",
         className
       )}
       value={systemPrompt ?? ""}

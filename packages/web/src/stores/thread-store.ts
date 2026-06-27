@@ -138,9 +138,10 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
       const validateTool = (tool: FunctionTool): boolean => {
         if (!toolValidator.Check(tool)) {
           const errors = [...toolValidator.Errors(tool)];
-          toast.error(
-            errors.map((e) => e.message).join(", ") || "Invalid tool"
-          );
+          toast.error("Error", {
+            description:
+              errors.map((e) => e.message).join(", ") || "Invalid tool",
+          });
           return false;
         }
         return true;
@@ -277,7 +278,9 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
         addTool(tool) {
           const { thread } = get();
           if (thread.context?.tools?.some((t) => t.name === tool.name)) {
-            toast.error(`Tool "${tool.name}" already exists`);
+            toast.error("Error", {
+              description: `Tool "${tool.name}" already exists`,
+            });
             return false;
           }
           if (!validateTool(tool)) {
@@ -296,7 +299,9 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
             return false;
           }
           if (tool.name !== name && tools.some((t) => t.name === tool.name)) {
-            toast.error(`Tool "${tool.name}" already exists`);
+            toast.error("Error", {
+              description: `Tool "${tool.name}" already exists`,
+            });
             return false;
           }
           const next = [...tools];
@@ -409,7 +414,7 @@ export function createThreadStore(initialThread: Thread): ThreadStore {
             } else {
               console.error(error);
               if (error instanceof Error) {
-                toast.error(error.message);
+                toast.error("Error", { description: error.message });
               }
             }
           } finally {

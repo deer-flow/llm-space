@@ -1,9 +1,9 @@
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
-import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
@@ -41,10 +41,8 @@ export default function RootLayout({
           forcedTheme="dark"
           disableTransitionOnChange
         >
-          <TooltipProvider>
-            {children}
-            <Toaster position="top-center" />
-          </TooltipProvider>
+          <Toaster theme="dark" position="top-center" />
+          <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

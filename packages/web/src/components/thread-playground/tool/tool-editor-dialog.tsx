@@ -64,7 +64,7 @@ export function ToolEditorDialog({
     try {
       parsed = parseJSON<FunctionTool>(text);
     } catch {
-      toast.error("Invalid JSON");
+      toast.error("Error", { description: "Invalid JSON" });
       return;
     }
 

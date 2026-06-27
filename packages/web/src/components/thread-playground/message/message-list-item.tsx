@@ -113,7 +113,7 @@ function _MessageListItem({
   return (
     <div
       className={cn(
-        "bg-(--textarea) hover:border-accent-foreground/33 focus-within:border-ring! group relative flex size-full flex-col items-center rounded-lg border transition-[padding-bottom,border-color]",
+        "bg-(--textarea) hover:border-accent-foreground/20 focus-within:border-ring! group relative flex size-full flex-col items-center rounded-lg border transition-[padding-bottom,border-color]",
         collapsed && "pb-2.5",
         className
       )}
@@ -128,7 +128,7 @@ function _MessageListItem({
         <div className="insert-line absolute left-0 right-2 top-1.5 border-b border-dashed opacity-0 transition-[opacity,border-color,border-style] group-hover:opacity-100"></div>
         <Tooltip content="Insert message here">
           <Button
-            className="text-muted-foreground hover:border-primary hover:bg-primary! hover:text-primary-foreground absolute -right-3 -top-0.5 z-10 size-4 -rotate-90 rounded-full opacity-0 transition-[opacity,background-color,color,border-color] group-hover:opacity-100"
+            className="text-muted-foreground hover:border-primary hover:bg-primary! hover:text-primary-foreground absolute -right-3 -top-0.5 z-10 size-4 rounded-full opacity-0 transition-[opacity,background-color,color,border-color] group-hover:opacity-100"
             variant="outline"
             size="icon-xs"
             onClick={() => insertMessageBefore(message.id)}
