@@ -66,7 +66,7 @@ function _RunHistoryListView() {
               }}
             >
               <ItemContent className="w-full">
-                <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 w-full">
+                <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 w-full font-mono">
                   {_summarizeRun(run.thread)}
                 </ItemDescription>
               </ItemContent>

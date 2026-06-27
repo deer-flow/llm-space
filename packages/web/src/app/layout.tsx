@@ -1,5 +1,5 @@
 import { type Metadata } from "next";
-import { Geist, Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
 
@@ -8,8 +8,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
 export const metadata: Metadata = {
   title: "LLM Space",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
@@ -17,7 +15,7 @@ export const metadata: Metadata = {
 
 const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
 });
 
 export default function RootLayout({
@@ -26,12 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        "overscroll-none",
-        geist.variable,
-        "font-sans",
-        inter.variable
-      )}
+      className={cn("overscroll-none", geist.variable, "font-sans")}
       suppressHydrationWarning
     >
       <head>
