@@ -5,6 +5,7 @@ import { HistoryIcon, PlayIcon, Redo2Icon, Undo2Icon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
+import { getDefaultModelConfig } from "@/lib/models";
 import { cn } from "@/lib/utils";
 import { canRedo, canUndo } from "@/stores/thread-history";
 import {
@@ -93,10 +94,7 @@ const RUN_HISTORY_PANEL_SIZE = "16rem";
 
 function _createBlankThread(): Thread {
   return {
-    model: {
-      provider: "deepseek",
-      id: "deepseek-v4-flash",
-    },
+    model: getDefaultModelConfig(),
   };
 }
 

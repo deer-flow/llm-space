@@ -6,6 +6,8 @@ import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { localFs } from "@/client";
+import { useModels } from "@/components/model-provider";
+import { defaultModelFromGroups } from "@/lib/model-types";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {
@@ -89,6 +91,7 @@ export interface FileSystemTree {
  */
 export function useFileSystemTree(): FileSystemTree {
   const qc = useQueryClient();
+  const modelGroups = useModels();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   // Root ("") is always queried; each expanded directory adds one query.
@@ -162,7 +165,7 @@ export function useFileSystemTree(): FileSystemTree {
         path = joinPath(parent, name);
         await localFs.write(path, {
           title,
-          model: { provider: "", id: "" },
+          model: defaultModelFromGroups(modelGroups),
         });
       } catch (err) {
         toast.error((err as Error).message);
@@ -171,7 +174,7 @@ export function useFileSystemTree(): FileSystemTree {
       void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
       return path;
     },
-    [qc]
+    [modelGroups, qc]
   );
 
   const remove = useCallback(
