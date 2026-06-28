@@ -37,7 +37,9 @@
       {
         "id": "70c75bc2-5509-42fb-857a-49f6acf1f5f2",
         "role": "user",
-        "content": [{ "type": "text", "text": "Is it raining in Tokyo?" }]
+        "content": [
+          { "type": "text", "text": "Is it raining in Tokyo and Kyoto?" }
+        ]
       }
     ]
   }
