@@ -29,7 +29,14 @@ import {
   useFileSystemTree,
 } from "./use-file-system-tree";
 
-export function FileSystemTreeView({ className }: { className?: string }) {
+export function FileSystemTreeView({
+  className,
+  onSelectFile,
+}: {
+  className?: string;
+  /** Fired with a file's path when it is selected (folders aren't selectable). */
+  onSelectFile?: (path: string) => void;
+}) {
   const {
     nodesByPath,
     loadingByPath,
@@ -222,6 +229,9 @@ export function FileSystemTreeView({ className }: { className?: string }) {
             expandedIds={[...expanded]}
             renderItem={renderItem}
             onDocumentDrag={onDocumentDrag}
+            onSelectChange={(item) => {
+              if (item) onSelectFile?.(item.id);
+            }}
           />
         )}
       </div>

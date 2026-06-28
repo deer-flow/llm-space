@@ -27,7 +27,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("overscroll-none", geist.variable, "font-sans")}
+      className={cn(
+        "h-screen w-screen overscroll-none",
+        geist.variable,
+        "font-sans"
+      )}
       suppressHydrationWarning
     >
       <head>
@@ -37,7 +41,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className="bg-[#202124]">
+      <body className="size-full bg-[#202124]">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
