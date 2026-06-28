@@ -2,13 +2,13 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
 
-import { ModelProvider } from "@/components/model-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThreadPlaygroundSkeleton } from "@/components/thread-playground/misc/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
+
+import { ModelProviderRoot } from "./model-provider-root";
 
 export const metadata: Metadata = {
   title: "LLM Space",
@@ -45,7 +45,7 @@ export default function RootLayout({
         >
           <Toaster theme="dark" position="top-center" />
           <TooltipProvider delayDuration={1000}>
-            <ModelProvider models={null}>{children}</ModelProvider>
+            <ModelProviderRoot>{children}</ModelProviderRoot>
           </TooltipProvider>
         </ThemeProvider>
       </body>

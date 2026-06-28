@@ -1,6 +1,7 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ModelConfig } from "@llm-space/core";
 import type { ReactNode } from "react";
 
+import { useModel } from "@/components/model-provider";
 import { cn } from "@/lib/utils";
 
 function formatTokenCount(value: number) {
@@ -45,32 +46,40 @@ export function ModelCard({
   model,
   className,
 }: {
-  model: Model<Api>;
+  model: ModelConfig;
   className?: string;
 }) {
-  const supportsImageInput = model.input.includes("image");
-
+  const resolvedModel = useModel({
+    id: model.id,
+    provider: model.provider,
+  });
+  if (!resolvedModel) {
+    return null;
+  }
+  const supportsImageInput = resolvedModel.input.includes("image");
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <main className="flex flex-col">
-        <ModelCardField label="Model" value={model.id} />
-        <ModelCardField label="Provider" value={model.provider} />
-        <ModelCardField label="API type" value={model.api} />
+        <ModelCardField label="Model" value={resolvedModel.id} />
+        <ModelCardField label="Provider" value={resolvedModel.provider} />
+        <ModelCardField label="API type" value={resolvedModel?.api} />
         <ModelCardField
           label="Base URL"
-          value={<span className="break-all text-left">{model.baseUrl}</span>}
+          value={
+            <span className="break-all text-left">{resolvedModel.baseUrl}</span>
+          }
         />
         <ModelCardField
           label="Context window"
-          value={formatTokenCount(model.contextWindow)}
+          value={formatTokenCount(resolvedModel.contextWindow)}
         />
         <ModelCardField
           label="Max tokens"
-          value={formatTokenCount(model.maxTokens)}
+          value={formatTokenCount(resolvedModel.maxTokens)}
         />
         <ModelCardField
           label="Reasoning"
-          value={<BoolValue value={model.reasoning} />}
+          value={<BoolValue value={resolvedModel.reasoning} />}
         />
         <ModelCardField
           label="Image input"
@@ -78,11 +87,11 @@ export function ModelCard({
         />
         <ModelCardField
           label="Input cost"
-          value={formatCostPerMillion(model.cost.input)}
+          value={formatCostPerMillion(resolvedModel.cost.input)}
         />
         <ModelCardField
           label="Output cost"
-          value={formatCostPerMillion(model.cost.output)}
+          value={formatCostPerMillion(resolvedModel.cost.output)}
         />
       </main>
     </div>

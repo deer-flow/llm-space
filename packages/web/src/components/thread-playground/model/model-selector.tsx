@@ -1,7 +1,7 @@
 "use client";
 
 import { type ModelConfig } from "@llm-space/core";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { useModels } from "@/components/model-provider";
 import {
@@ -65,6 +65,17 @@ export function ModelSelector({
     return labels;
   }, [providers]);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        inputRef.current?.blur();
+      }
+      onOpenChange?.(open);
+    },
+    [onOpenChange]
+  );
+
   const selectedValue = toModelKey(value);
 
   return (
@@ -77,7 +88,7 @@ export function ModelSelector({
         const label = modelLabels.get(itemValue) ?? itemValue;
         return label.toLocaleLowerCase().includes(query.toLocaleLowerCase());
       }}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       onValueChange={(nextValue) => {
         if (!nextValue || readonly) {
           return;
@@ -90,6 +101,7 @@ export function ModelSelector({
       }}
     >
       <ComboboxInput
+        ref={inputRef}
         className={cn(
           "bg-transparent! h-6! hover:bg-secondary! group/model-select w-75 border-0 font-mono",
           !readonly && "cursor:pointer hover:bg-secondary"

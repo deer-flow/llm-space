@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReasoningLevel } from "@llm-space/core";
-import { SlidersHorizontal } from "lucide-react";
+import { InfoIcon, SlidersHorizontal } from "lucide-react";
 import {
   type ReactNode,
   useCallback,
@@ -10,6 +10,11 @@ import {
   useState,
 } from "react";
 
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { useThreadStore, useThreadStoreActions } from "@/stores/thread-store";
 
@@ -32,6 +37,8 @@ import {
 } from "../../ui/select";
 import { Slider } from "../../ui/slider";
 import { Switch } from "../../ui/switch";
+
+import { ModelCard } from "./model-card";
 
 const REASONING_LEVELS: { value: ReasoningLevel; label: string }[] = [
   { value: "off", label: "Off" },
@@ -130,12 +137,22 @@ export function ModelParamsPopover({
     <div
       className={cn(
         cn(
-          "shrink-0 opacity-0 transition-opacity group-hover:opacity-100",
+          "flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100",
           popoverOpen && "opacity-100"
         ),
         readonly && "invisible"
       )}
     >
+      <HoverCard>
+        <HoverCardTrigger asChild>
+          <Button variant="ghost" size="icon-xs">
+            <InfoIcon className="size-4" />
+          </Button>
+        </HoverCardTrigger>
+        <HoverCardContent>
+          <ModelCard model={model} />
+        </HoverCardContent>
+      </HoverCard>
       <Popover onOpenChange={handleOpenChange}>
         <Tooltip content="Configure model settings">
           <PopoverTrigger asChild>

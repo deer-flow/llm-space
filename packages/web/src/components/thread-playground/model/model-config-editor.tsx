@@ -1,17 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
-
 import { useModel } from "@/components/model-provider";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { useThreadStore } from "@/stores/thread-store";
 
-import { ModelCard } from "./model-card";
 import { ModelParamsPopover } from "./model-params-popover";
 import { ModelSelector } from "./model-selector";
 
@@ -27,14 +19,6 @@ export function ModelConfigEditor({
     id: model.id,
     provider: model.provider,
   });
-
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-  const handleModelSelectorOpen = useCallback(
-    (open: boolean) => {
-      setModelSelectorOpen(open);
-    },
-    [setModelSelectorOpen]
-  );
 
   const paramSummary: { label: string; value: string | number }[] = [];
   if (model.params?.temperature !== undefined) {
@@ -54,21 +38,7 @@ export function ModelConfigEditor({
     <div className={cn("group flex w-full", className)}>
       <div className="flex min-w-0 grow flex-col gap-2">
         <div className="flex cursor-default items-center text-sm">
-          <HoverCard
-            openDelay={1000}
-            open={modelSelectorOpen ? false : undefined}
-          >
-            <HoverCardTrigger>
-              <ModelSelector
-                value={model}
-                readonly={readonly}
-                onOpenChange={handleModelSelectorOpen}
-              />
-            </HoverCardTrigger>
-            <HoverCardContent>
-              {resolvedModel && <ModelCard model={resolvedModel} />}
-            </HoverCardContent>
-          </HoverCard>
+          <ModelSelector value={model} readonly={readonly} />
         </div>
         {paramSummary.length > 0 ? (
           <div className="text-muted-foreground pl-2 text-xs">

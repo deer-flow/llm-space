@@ -12,8 +12,6 @@ import {
 
 import type { ModelProviderGroup } from "@/lib/model-types";
 
-export type { ModelProviderGroup };
-
 interface ModelContextValue {
   providers: ModelProviderGroup[];
   // eslint-disable-next-line no-unused-vars
@@ -33,32 +31,23 @@ function buildModelIndex(providers: ModelProviderGroup[]) {
 }
 
 export function ModelProvider({
-  models,
+  fetcher,
   children,
   fallback = null,
 }: {
-  models: ModelProviderGroup[] | null;
+  fetcher: () => Promise<ModelProviderGroup[]>;
   children: ReactNode;
   fallback?: ReactNode;
 }) {
-  const [fetched, setFetched] = useState<ModelProviderGroup[] | null>(null);
+  const [providers, setProviders] = useState<ModelProviderGroup[] | null>(null);
 
   useEffect(() => {
-    if (models !== null) {
-      return;
-    }
-
     let cancelled = false;
-    void fetch("/api/models")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch models: ${res.statusText}`);
-        }
-        return res.json() as Promise<ModelProviderGroup[]>;
-      })
+
+    void fetcher()
       .then((data) => {
         if (!cancelled) {
-          setFetched(data);
+          setProviders(data);
         }
       })
       .catch((error: unknown) => {
@@ -68,20 +57,18 @@ export function ModelProvider({
     return () => {
       cancelled = true;
     };
-  }, [models]);
-
-  const resolved = models ?? fetched;
+  }, [fetcher]);
 
   const contextValue = useMemo((): ModelContextValue | null => {
-    if (!resolved) {
+    if (!providers) {
       return null;
     }
-    const index = buildModelIndex(resolved);
+    const index = buildModelIndex(providers);
     return {
-      providers: resolved,
+      providers,
       getModel: (ref) => index.get(`${ref.provider}:${ref.id}`) ?? null,
     };
-  }, [resolved]);
+  }, [providers]);
 
   if (!contextValue) {
     return fallback;
