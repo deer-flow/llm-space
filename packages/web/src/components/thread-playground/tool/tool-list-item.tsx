@@ -55,7 +55,7 @@ function _ToolListItem({
                       .map((key) =>
                         required.includes(key) ? `  ${key}` : `  [${key}]`
                       )
-                      .join(", ") +
+                      .join(", \n") +
                     "\n}"
                   : ""}
               </span>
@@ -85,7 +85,7 @@ function _ToolListItem({
           disabled={readonly}
           className={cn(
             "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pl-1 pr-1 outline-none transition-opacity hover:opacity-100 focus-visible:ring-2",
-            readonly ? "opacity-0!" : "opacity-100"
+            readonly ? "opacity-0!" : "opacity-0 group-hover/tool:opacity-100"
           )}
           onClick={handleRemove}
         >
