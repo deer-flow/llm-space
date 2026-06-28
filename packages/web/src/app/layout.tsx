@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
 
 import { ModelProviderRoot } from "./model-provider-root";
+import { QueryProvider } from "./query-provider";
 
 export const metadata: Metadata = {
   title: "LLM Space",
@@ -45,7 +46,9 @@ export default function RootLayout({
         >
           <Toaster theme="dark" position="top-center" />
           <TooltipProvider delayDuration={1000}>
-            <ModelProviderRoot>{children}</ModelProviderRoot>
+            <QueryProvider>
+              <ModelProviderRoot>{children}</ModelProviderRoot>
+            </QueryProvider>
           </TooltipProvider>
         </ThemeProvider>
       </body>
