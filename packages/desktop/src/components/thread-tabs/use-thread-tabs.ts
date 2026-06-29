@@ -18,6 +18,10 @@ export interface ThreadTabs {
   open: (path: string) => void;
   /** Close `path`; if it was active, focus its left (else right) neighbor. */
   close: (path: string) => void;
+  /** Close every open tab except `keep`, which becomes active. */
+  closeOthers: (keep: string) => void;
+  /** Close every open tab. */
+  closeAll: () => void;
   /** Move the tab at `from` to `to` within the tab order. */
   reorder: (from: number, to: number) => void;
   /** Focus an already-open tab. */
@@ -58,6 +62,16 @@ export function useThreadTabs(): ThreadTabs {
       );
       return next;
     });
+  }, []);
+
+  const closeOthers = useCallback((keep: string) => {
+    setTabs((prev) => (prev.includes(keep) ? [keep] : prev));
+    setActivePath((current) => (current === keep ? current : keep));
+  }, []);
+
+  const closeAll = useCallback(() => {
+    setTabs([]);
+    setActivePath(null);
   }, []);
 
   const reorder = useCallback((from: number, to: number) => {
@@ -110,6 +124,8 @@ export function useThreadTabs(): ThreadTabs {
     activePath,
     open,
     close,
+    closeOthers,
+    closeAll,
     reorder,
     activate,
     handleRemove,

@@ -56,6 +56,10 @@ export interface DesktopRPCType {
     // Messages the bun side SENDS and the webview handles.
     messages: {
       receiveStreamThreadResponse: StreamThreadResponsePayload;
+      // Native File-menu commands, forwarded into the webview's tab state.
+      closeActiveTab: Record<string, never>;
+      closeOtherTabs: Record<string, never>;
+      closeAllTabs: Record<string, never>;
     };
   }>;
 }

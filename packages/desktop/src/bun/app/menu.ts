@@ -1,5 +1,7 @@
 import { ApplicationMenu, type BrowserWindow } from "electrobun/bun";
 
+import { mainWindowRPC } from "../rpc";
+
 import { saveZoom } from "./window-state";
 
 ApplicationMenu.setApplicationMenu([
@@ -8,9 +10,39 @@ ApplicationMenu.setApplicationMenu([
       { label: "About LLM Space", role: "about" },
       { type: "divider" },
       {
+        role: "hide",
+        accelerator: "CommandOrControl+H",
+      },
+      {
+        role: "hideOthers",
+        accelerator: "CommandOrControl+Shift+H",
+      },
+      {
+        role: "showAll",
+      },
+      { type: "divider" },
+      {
         label: "Quit LLM Space",
         role: "quit",
         accelerator: "CommandOrControl+Q",
+      },
+    ],
+  },
+  {
+    label: "File",
+    submenu: [
+      {
+        label: "Close Tab",
+        action: "closeTab",
+        accelerator: "CommandOrControl+W",
+      },
+      {
+        label: "Close Others",
+        action: "closeOtherTabs",
+      },
+      {
+        label: "Close All Tabs",
+        action: "closeAllTabs",
       },
     ],
   },
@@ -31,8 +63,12 @@ ApplicationMenu.setApplicationMenu([
   {
     label: "View",
     submenu: [
-      // Electrobun has no built-in zoom role; these drive WKWebView's native
-      // page zoom via `setPageZoom` (see registerMenuActions).
+      {
+        label: "Reload",
+        action: "reload",
+        accelerator: "CommandOrControl+Shift+R",
+      },
+      { type: "separator" },
       {
         label: "Zoom In",
         action: "zoomIn",
@@ -43,11 +79,50 @@ ApplicationMenu.setApplicationMenu([
         action: "zoomOut",
         accelerator: "CommandOrControl+-",
       },
-      { type: "separator" },
       {
         label: "Reset Zoom",
         action: "resetZoom",
         accelerator: "CommandOrControl+0",
+      },
+      {
+        type: "separator",
+      },
+      {
+        label: "Toggle Developer Tools",
+      },
+    ],
+  },
+  {
+    label: "Window",
+    role: "window",
+    submenu: [
+      {
+        role: "minimize",
+      },
+      {
+        role: "bringAllToFront",
+      },
+      {
+        type: "separator",
+      },
+      {
+        role: "toggleFullScreen",
+        accelerator: "CommandOrControl+Control+F",
+      },
+    ],
+  },
+  {
+    label: "Help",
+    submenu: [
+      {
+        label: "Report Bug",
+      },
+      {
+        type: "separator",
+      },
+      {
+        label: "View Documentation",
+        role: "showHelp",
       },
     ],
   },
@@ -60,27 +135,48 @@ const clampZoom = (zoom: number) =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 
 /**
- * Wire the View-menu zoom actions to a window's WebKit page zoom. Called after
- * the window exists (the menu itself is set at import time above).
+ * Wire View-menu actions to the main window. Called after the window exists
+ * (the menu itself is set at import time above).
  */
 export function registerMenuActions(window: BrowserWindow) {
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
-    let zoom: number;
     switch (action) {
-      case "zoomIn":
-        zoom = clampZoom(window.getPageZoom() + ZOOM_STEP);
-        break;
-      case "zoomOut":
-        zoom = clampZoom(window.getPageZoom() - ZOOM_STEP);
-        break;
-      case "resetZoom":
-        zoom = 1;
-        break;
+      case "reload": {
+        window.webview?.executeJavascript("location.reload()");
+        return;
+      }
+      case "zoomIn": {
+        const zoom = clampZoom(window.getPageZoom() + ZOOM_STEP);
+        window.setPageZoom(zoom);
+        saveZoom(zoom);
+        return;
+      }
+      case "zoomOut": {
+        const zoom = clampZoom(window.getPageZoom() - ZOOM_STEP);
+        window.setPageZoom(zoom);
+        saveZoom(zoom);
+        return;
+      }
+      case "resetZoom": {
+        window.setPageZoom(1);
+        saveZoom(1);
+        return;
+      }
+      case "closeTab": {
+        mainWindowRPC.send.closeActiveTab({});
+        return;
+      }
+      case "closeOtherTabs": {
+        mainWindowRPC.send.closeOtherTabs({});
+        return;
+      }
+      case "closeAllTabs": {
+        mainWindowRPC.send.closeAllTabs({});
+        return;
+      }
       default:
         return;
     }
-    window.setPageZoom(zoom);
-    saveZoom(zoom);
   });
 }
