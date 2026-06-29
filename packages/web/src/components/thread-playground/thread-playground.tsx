@@ -5,7 +5,6 @@ import { HistoryIcon, PlayIcon, Redo2Icon, Undo2Icon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
-import { getDefaultModelConfig } from "@/lib/models";
 import { cn } from "@/lib/utils";
 import { canRedo, canUndo } from "@/stores/thread-history";
 import {
@@ -39,7 +38,7 @@ export interface ThreadPlaygroundProps {
   className?: string;
   initialValue: Thread;
   readonly?: boolean;
-   
+
   onChange?: (thread: Thread) => void;
   onStreamingStart?: () => void;
   onStreamingEnd?: () => void;
@@ -70,7 +69,7 @@ export function ThreadPlayground({
 }
 
 function _ThreadPlayground({
-  initialValue = _createBlankThread(),
+  initialValue,
   onChange,
   onStreamingStart,
   onStreamingEnd,
@@ -91,12 +90,6 @@ function _ThreadPlayground({
 
 /** Size the Run history panel expands to when toggled open. */
 const RUN_HISTORY_PANEL_SIZE = "16rem";
-
-function _createBlankThread(): Thread {
-  return {
-    model: getDefaultModelConfig(),
-  };
-}
 
 function ThreadPlaygroundContent({
   className,

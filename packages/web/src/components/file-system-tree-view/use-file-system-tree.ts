@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { localFs } from "@/client";
 import { useModels } from "@/components/model-provider";
-import { defaultModelFromGroups } from "@/lib/model-types";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {
@@ -165,9 +164,13 @@ export function useFileSystemTree(): FileSystemTree {
         const { name, index } = uniqueUntitled(names, ".json");
         const title = index === 0 ? "Untitled" : `Untitled ${index}`;
         path = joinPath(parent, name);
+        const model = modelGroups[0]?.models[0];
+        if (!model) {
+          throw new Error("No models configured");
+        }
         await localFs.write(path, {
           title,
-          model: defaultModelFromGroups(modelGroups),
+          model,
         });
       } catch (err) {
         toast.error((err as Error).message);

@@ -1,5 +1,6 @@
-import type { ModelProviderGroup } from "@/lib/model-types";
-import { availableModels } from "@/lib/models";
+import type { ModelProviderGroup } from "@llm-space/core";
+
+import { availableModels } from "@/server/models";
 
 export function GET() {
   const providers = availableModels.getProviders();

@@ -1,4 +1,3 @@
-import type { ModelConfig } from "@llm-space/core";
 import {
   createModels,
   createProvider,
@@ -7,19 +6,16 @@ import {
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
-
-import { defaultModelFromGroups } from "./model-types";
+import type { ModelConfig } from "@llm-space/core";
 
 export const availableModels = setupModels();
 
 export function getDefaultModelConfig(): Pick<ModelConfig, "id" | "provider"> {
-  return defaultModelFromGroups(
-    availableModels.getProviders().map((provider) => ({
-      id: provider.id,
-      name: provider.name,
-      models: provider.getModels(),
-    }))
-  );
+  const firstModel = availableModels.getProviders()[0]?.getModels()[0];
+  if (!firstModel) {
+    throw new Error("No models configured");
+  }
+  return { provider: firstModel.provider, id: firstModel.id };
 }
 
 function setupModels() {

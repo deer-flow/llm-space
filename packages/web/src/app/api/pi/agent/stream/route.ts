@@ -7,7 +7,7 @@ import type { Model, Message, Api, Tool } from "@earendil-works/pi-ai";
 import type { ModelConfig, ModelConfigParams } from "@llm-space/core";
 import type { NextRequest } from "next/server";
 
-import { availableModels } from "@/lib/models";
+import { availableModels } from "@/server/models";
 
 function convertToLlm(messages: AgentMessage[]): Message[] {
   return messages.filter(

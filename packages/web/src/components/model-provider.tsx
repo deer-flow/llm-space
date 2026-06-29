@@ -1,6 +1,7 @@
 "use client";
 
 import type * as pi from "@earendil-works/pi-ai";
+import type { ModelProviderGroup } from "@llm-space/core";
 import {
   createContext,
   useContext,
@@ -10,11 +11,9 @@ import {
   type ReactNode,
 } from "react";
 
-import type { ModelProviderGroup } from "@/lib/model-types";
-
 interface ModelContextValue {
   providers: ModelProviderGroup[];
-   
+
   getModel: (ref: { id: string; provider: string }) => pi.Model<pi.Api> | null;
 }
 
@@ -75,7 +74,9 @@ export function ModelProvider({
   }
 
   return (
-    <ModelContext.Provider value={contextValue}>{children}</ModelContext.Provider>
+    <ModelContext.Provider value={contextValue}>
+      {children}
+    </ModelContext.Provider>
   );
 }
 
@@ -96,8 +97,5 @@ export function useModel(ref: {
   provider: string;
 }): pi.Model<pi.Api> | null {
   const ctx = useModelProvider();
-  return useMemo(
-    () => ctx.getModel(ref),
-    [ctx, ref.id, ref.provider]
-  );
+  return useMemo(() => ctx.getModel(ref), [ctx, ref.id, ref.provider]);
 }
