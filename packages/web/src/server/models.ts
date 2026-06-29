@@ -243,7 +243,7 @@ function setupModels() {
   });
   const arkForAuroraProvider = createProvider({
     id: "ark",
-    name: "VolcEngine Ark",
+    name: "VolcEngine Ark for Aurora",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     auth: {
       apiKey: envApiKeyAuth("AURORA_ARK_API_KEY", ["AURORA_ARK_API_KEY"]),
