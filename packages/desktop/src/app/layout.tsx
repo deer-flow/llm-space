@@ -15,7 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <QueryProvider>
       <ModelProvider fetcher={fetchModels}>
         <TooltipProvider delayDuration={1000}>
-          <div className="bg-background flex size-full flex-col">
+          <div className="flex size-full flex-col">
             <Toaster theme="dark" position="top-center" offset={28} />
             {children}
           </div>
