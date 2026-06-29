@@ -10,11 +10,7 @@ import { BrowserWindow, Updater } from "electrobun/bun";
 import { mainWindowRPC } from "../rpc";
 
 import { registerMenuActions } from "./menu";
-import {
-  attachFullScreenSync,
-  attachWindowStatePersistence,
-  attachZoomPersistence,
-} from "./window-state";
+import { attachWindowStates } from "./window-state";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -53,11 +49,11 @@ export const mainWindow = new BrowserWindow({
   frame: savedFrame,
 });
 
-attachWindowStatePersistence(mainWindow, {
+attachWindowStates(mainWindow, {
   isMaximized: getWindowMaximized(windowState),
-});
-attachZoomPersistence(mainWindow, savedZoom);
-attachFullScreenSync(mainWindow, (fullScreen) => {
-  mainWindowRPC.send.fullScreenChanged({ fullScreen });
+  zoom: savedZoom,
+  onFullScreenChange: (fullScreen) => {
+    mainWindowRPC.send.fullScreenChanged({ fullScreen });
+  },
 });
 registerMenuActions(mainWindow);

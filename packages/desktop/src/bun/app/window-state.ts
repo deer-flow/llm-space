@@ -15,7 +15,7 @@ function persistWindowState(win: BrowserWindow) {
   }
 }
 
-export function attachWindowStatePersistence(
+function attachWindowStatePersistence(
   win: BrowserWindow,
   options?: { isMaximized?: boolean },
 ) {
@@ -49,7 +49,7 @@ export function attachWindowStatePersistence(
  * window, so we re-check `isFullScreen()` on resize and fire on change. The
  * initial state is reported immediately.
  */
-export function attachFullScreenSync(
+function attachFullScreenSync(
   win: BrowserWindow,
   onChange: (fullScreen: boolean) => void,
 ) {
@@ -74,7 +74,7 @@ let zoomTimer: ReturnType<typeof setTimeout> | undefined;
  * Restore a saved zoom level onto the window and keep re-applying it: WebKit
  * page zoom can reset on (re)load, so we re-set it once the DOM is ready.
  */
-export function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
+function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
   desiredZoom = initialZoom;
   if (initialZoom !== 1) {
     win.setPageZoom(initialZoom);
@@ -84,6 +84,19 @@ export function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
       win.setPageZoom(desiredZoom);
     }
   });
+}
+
+export function attachWindowStates(
+  win: BrowserWindow,
+  options: {
+    isMaximized?: boolean;
+    zoom?: number;
+    onFullScreenChange: (fullScreen: boolean) => void;
+  },
+) {
+  attachWindowStatePersistence(win, { isMaximized: options.isMaximized });
+  attachZoomPersistence(win, options.zoom ?? 1);
+  attachFullScreenSync(win, options.onFullScreenChange);
 }
 
 /** Record a new zoom level (e.g. from the View menu) and persist it. */

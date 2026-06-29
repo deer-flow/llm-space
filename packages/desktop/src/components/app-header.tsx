@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { Tooltip } from "./tooltip";
 import { Button } from "./ui/button";
+import { Kbd, KbdGroup } from "./ui/kbd";
 
 export function AppHeader({
   sidebarOpen = true,
@@ -33,7 +34,16 @@ export function AppHeader({
           fullScreen ? "left-2" : "left-18"
         )}
       >
-        <Tooltip content={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
+        <Tooltip
+          content={
+            <>
+              {sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}{" "}
+              <KbdGroup>
+                <Kbd className="text-foreground!">⌘ B</Kbd>
+              </KbdGroup>
+            </>
+          }
+        >
           <Button size="icon-sm" variant="ghost" onClick={onToggleSidebar}>
             {sidebarOpen ? (
               <SidebarCloseIcon className="size-4" />

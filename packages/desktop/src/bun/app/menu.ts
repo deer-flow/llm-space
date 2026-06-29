@@ -72,6 +72,12 @@ ApplicationMenu.setApplicationMenu([
     label: "View",
     submenu: [
       {
+        label: "Toggle Sidebar",
+        action: "toggleSidebar",
+        accelerator: "CommandOrControl+B",
+      },
+      { type: "separator" },
+      {
         label: "Reload",
         action: "reload",
         accelerator: "CommandOrControl+Shift+R",
@@ -91,12 +97,6 @@ ApplicationMenu.setApplicationMenu([
         label: "Reset Zoom",
         action: "resetZoom",
         accelerator: "CommandOrControl+0",
-      },
-      {
-        type: "separator",
-      },
-      {
-        label: "Toggle Developer Tools",
       },
     ],
   },
@@ -169,6 +169,10 @@ export function registerMenuActions(window: BrowserWindow) {
       case "resetZoom": {
         window.setPageZoom(1);
         saveZoom(1);
+        return;
+      }
+      case "toggleSidebar": {
+        mainWindowRPC.send.toggleSidebar({});
         return;
       }
       case "newThread": {

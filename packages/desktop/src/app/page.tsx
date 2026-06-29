@@ -59,6 +59,14 @@ export function Page() {
     else panel.collapse();
   }, [sidebarPanelRef]);
 
+  // The View > Toggle Sidebar menu (⌘B) drives the same toggle over RPC.
+  useEffect(() => {
+    const rpc = electrobun.rpc;
+    if (!rpc) return;
+    rpc.addMessageListener("toggleSidebar", toggleSidebar);
+    return () => rpc.removeMessageListener("toggleSidebar", toggleSidebar);
+  }, [toggleSidebar]);
+
   const fullScreen = useFullScreen();
 
   return (
