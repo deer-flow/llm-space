@@ -27,6 +27,10 @@ export const mainWindowRPC: MainWindowRPC =
           }
           return { maximized: mainWindow.isMaximized() };
         },
+        isFullScreen: async () => {
+          const { mainWindow } = await import("../app/window");
+          return { fullScreen: mainWindow.isFullScreen() };
+        },
         fsLs: ({ path }) => localFs.ls(path),
         fsMkdir: async ({ path }) => {
           await localFs.mkdir(path);

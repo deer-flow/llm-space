@@ -115,7 +115,7 @@ ApplicationMenu.setApplicationMenu([
       },
       {
         role: "toggleFullScreen",
-        accelerator: "CommandOrControl+Control+F",
+        accelerator: "CommandOrControl+Shift+F",
       },
     ],
   },

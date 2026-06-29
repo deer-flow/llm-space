@@ -2,7 +2,6 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import { ModelProviderGroup } from "@llm-space/core";
 
-import { AppHeader } from "@/components/app-header";
 import { ModelProvider } from "@/components/model-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,8 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <TooltipProvider delayDuration={1000}>
           <div className="bg-background flex size-full flex-col">
             <Toaster theme="dark" position="top-center" offset={28} />
-            <AppHeader />
-            <main className="min-h-0 flex-1">{children}</main>
+            {children}
           </div>
         </TooltipProvider>
       </ModelProvider>

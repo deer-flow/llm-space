@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePanelRef } from "react-resizable-panels";
 
+import { AppHeader } from "@/components/app-header";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import {
@@ -8,6 +10,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { electrobun } from "@/lib/electrobun";
+import { useFullScreen } from "@/lib/use-full-screen";
 
 export function Page() {
   const tabs = useThreadTabs();
@@ -46,28 +49,56 @@ export function Page() {
   }, []);
   const handleNewFile = useCallback(() => newThreadRef.current?.(), []);
 
+  // Collapse / expand the left side panel from the title-bar button.
+  const sidebarPanelRef = usePanelRef();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const toggleSidebar = useCallback(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  }, [sidebarPanelRef]);
+
+  const fullScreen = useFullScreen();
+
   return (
-    <ResizablePanelGroup className="size-full">
-      <ResizablePanel className="bg-background" defaultSize="16.7%">
-        <FileSystemTreeView
-          className="size-full"
-          onSelectFile={tabs.open}
-          onRemove={tabs.handleRemove}
-          onMove={tabs.handleMove}
-          registerNewThread={registerNewThread}
-        />
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel>
-        <ThreadTabs
-          tabs={tabs.tabs}
-          activePath={tabs.activePath}
-          activate={tabs.activate}
-          close={tabs.close}
-          reorder={tabs.reorder}
-          onNewFile={handleNewFile}
-        />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <div className="flex size-full flex-col">
+      <AppHeader
+        sidebarOpen={sidebarOpen}
+        fullScreen={fullScreen}
+        onToggleSidebar={toggleSidebar}
+      />
+      <main className="min-h-0 grow">
+        <ResizablePanelGroup className="size-full">
+          <ResizablePanel
+            className="bg-background"
+            panelRef={sidebarPanelRef}
+            collapsible
+            collapsedSize={0}
+            defaultSize="16.7%"
+            onResize={(size) => setSidebarOpen(size.inPixels > 0)}
+          >
+            <FileSystemTreeView
+              className="size-full"
+              onSelectFile={tabs.open}
+              onRemove={tabs.handleRemove}
+              onMove={tabs.handleMove}
+              registerNewThread={registerNewThread}
+            />
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel minSize={640}>
+            <ThreadTabs
+              tabs={tabs.tabs}
+              activePath={tabs.activePath}
+              activate={tabs.activate}
+              close={tabs.close}
+              reorder={tabs.reorder}
+              onNewFile={handleNewFile}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </main>
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import { mainWindowRPC } from "../rpc";
 
 import { registerMenuActions } from "./menu";
 import {
+  attachFullScreenSync,
   attachWindowStatePersistence,
   attachZoomPersistence,
 } from "./window-state";
@@ -56,4 +57,7 @@ attachWindowStatePersistence(mainWindow, {
   isMaximized: getWindowMaximized(windowState),
 });
 attachZoomPersistence(mainWindow, savedZoom);
+attachFullScreenSync(mainWindow, (fullScreen) => {
+  mainWindowRPC.send.fullScreenChanged({ fullScreen });
+});
 registerMenuActions(mainWindow);

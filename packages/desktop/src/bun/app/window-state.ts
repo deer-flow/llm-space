@@ -43,6 +43,27 @@ export function attachWindowStatePersistence(
   win.on("resize", scheduleSave);
 }
 
+/**
+ * Watch for OS-level fullscreen transitions and report each change. There is no
+ * dedicated fullscreen event, but entering/exiting fullscreen resizes the
+ * window, so we re-check `isFullScreen()` on resize and fire on change. The
+ * initial state is reported immediately.
+ */
+export function attachFullScreenSync(
+  win: BrowserWindow,
+  onChange: (fullScreen: boolean) => void,
+) {
+  let last = win.isFullScreen();
+  onChange(last);
+  win.on("resize", () => {
+    const next = win.isFullScreen();
+    if (next !== last) {
+      last = next;
+      onChange(next);
+    }
+  });
+}
+
 // --- page zoom -------------------------------------------------------------
 
 /** The zoom level we want applied; kept in sync by {@link saveZoom}. */

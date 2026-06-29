@@ -35,6 +35,10 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { maximized: boolean };
       };
+      isFullScreen: {
+        params: Record<string, never>;
+        response: { fullScreen: boolean };
+      };
       // Local filesystem / thread storage, mirroring the web `/api/fs/local/*`
       // routes. Void operations resolve to `null`.
       fsLs: { params: { path: string }; response: FileNode[] };
@@ -56,6 +60,8 @@ export interface DesktopRPCType {
     // Messages the bun side SENDS and the webview handles.
     messages: {
       receiveStreamThreadResponse: StreamThreadResponsePayload;
+      // OS-level fullscreen state changed (entered/exited).
+      fullScreenChanged: { fullScreen: boolean };
       // Native File-menu commands, forwarded into the webview.
       newThread: Record<string, never>;
       closeActiveTab: Record<string, never>;

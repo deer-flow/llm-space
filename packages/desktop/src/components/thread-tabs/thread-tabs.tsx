@@ -3,7 +3,7 @@
 import { Tabs } from "@sinm/react-chrome-tabs";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
-import { ArrowUpRightIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
+import { ArrowUpRightIcon, PlusIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
@@ -62,12 +62,15 @@ export function ThreadTabs({
   if (tabs.length === 0) {
     return (
       <div
-        className={cn("flex size-full items-center justify-center", className)}
+        className={cn(
+          "flex size-full items-center justify-center bg-[#202124]",
+          className
+        )}
       >
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <FolderOpenIcon />
+              <SparklesIcon className="size-8" />
             </EmptyMedia>
             <EmptyTitle>Welcome to LLM Space</EmptyTitle>
             <EmptyDescription>
