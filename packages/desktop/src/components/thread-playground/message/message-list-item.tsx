@@ -142,7 +142,7 @@ function _MessageListItem({
         <ShineBorder
           shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
           duration={8}
-          borderWidth={2}
+          borderWidth={3}
         />
       )}
       <MessageListItemHeader
