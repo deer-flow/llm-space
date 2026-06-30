@@ -5,7 +5,7 @@ import type {
   StreamThreadRequestPayload,
   StreamThreadResponsePayload,
 } from "../../shared/rpc";
-import { availableModels } from "../models";
+import { modelManager } from "../models";
 
 /** Abort controllers for in-flight streams, keyed by `streamId`. */
 const activeStreams = new Map<string, AbortController>();
@@ -23,7 +23,8 @@ export async function runStreamThread(
   activeStreams.set(streamId, abortController);
   try {
     for await (const event of streamAgent(request, {
-      models: availableModels,
+      models: await modelManager.getAvailableModels(),
+      getApiKey: modelManager.getApiKey.bind(modelManager),
       signal: abortController.signal,
     })) {
       send({ streamId, type: "event", event });
@@ -45,6 +46,8 @@ export async function runStreamThread(
 }
 
 /** Abort an in-flight stream started by {@link runStreamThread}. */
-export function abortStreamThread({ streamId }: AbortStreamThreadPayload): void {
+export function abortStreamThread({
+  streamId,
+}: AbortStreamThreadPayload): void {
   activeStreams.get(streamId)?.abort();
 }

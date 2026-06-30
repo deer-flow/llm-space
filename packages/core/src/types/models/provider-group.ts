@@ -4,4 +4,5 @@ export interface ModelProviderGroup {
   id: string;
   name: string;
   models: readonly pi.Model<pi.Api>[];
+  apiKeyDetected?: boolean;
 }

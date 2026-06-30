@@ -2,7 +2,7 @@ import { BrowserView } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
 import { moveToTrash, revealInFileManager } from "../fs";
-import { getAvailableModelGroups } from "../models";
+import { modelManager } from "../models";
 import { localFs } from "../storage";
 import { abortStreamThread, runStreamThread } from "../streaming";
 
@@ -18,7 +18,14 @@ export const mainWindowRPC: MainWindowRPC =
     maxRequestTime: 10_000,
     handlers: {
       requests: {
-        availableModels: () => getAvailableModelGroups(),
+        availableModels: async () => {
+          const models = await modelManager.getAvailableModels();
+          return models.getProviders().map((provider) => ({
+            id: provider.id,
+            name: provider.name,
+            models: provider.getModels(),
+          }));
+        },
         toggleMaximized: async () => {
           const { mainWindow } = await import("../app/window");
           if (mainWindow.isMaximized()) {

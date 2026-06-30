@@ -1,0 +1,111 @@
+import type { Model } from "@earendil-works/pi-ai";
+
+const BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+
+export const ARK_MODELS = {
+  "doubao-seed-2-1-pro-260628": {
+    id: "doubao-seed-2-1-pro-260628",
+    provider: "ark",
+    name: "Doubao-Seed-2.1-pro",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
+  "doubao-seed-2-1-turbo-260628": {
+    id: "doubao-seed-2-1-turbo-260628",
+    provider: "ark",
+    name: "Doubao-Seed-2.1-turbo",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
+  "doubao-seed-2-1-evolving": {
+    id: "doubao-seed-2-1-evolving",
+    provider: "ark",
+    name: "Doubao-Seed-Evolving",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
+  "doubao-seed-2.0-pro": {
+    id: "doubao-seed-2.0-pro",
+    provider: "ark",
+    name: "Doubao-Seed-2.0-pro",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
+  "doubao-seed-2.0-code": {
+    id: "doubao-seed-2.0-code",
+    provider: "ark",
+    name: "Doubao-Seed-2.0-code",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
+};

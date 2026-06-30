@@ -77,6 +77,14 @@ export function ModelSelector({
     [onOpenChange]
   );
 
+  const filterItems = useCallback(
+    (itemValue: string, query: string) => {
+      const label = modelLabels.get(itemValue) ?? itemValue;
+      return label.toLocaleLowerCase().includes(query.toLocaleLowerCase());
+    },
+    [modelLabels]
+  );
+
   const selectedValue = toModelKey(value);
 
   return (
@@ -85,10 +93,7 @@ export function ModelSelector({
       value={selectedValue}
       disabled={readonly}
       itemToStringLabel={(itemValue) => modelLabels.get(itemValue) ?? itemValue}
-      filter={(itemValue: string, query) => {
-        const label = modelLabels.get(itemValue) ?? itemValue;
-        return label.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-      }}
+      filter={filterItems}
       onOpenChange={handleOpenChange}
       onValueChange={(nextValue) => {
         if (!nextValue || readonly) {

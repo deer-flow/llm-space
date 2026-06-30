@@ -18,9 +18,19 @@ import type { AgentStreamRequest } from "../../types/agent";
  */
 export async function* streamAgent(
   request: AgentStreamRequest,
-  options: { models: Models; signal: AbortSignal }
+  options: {
+    models: Models;
+    signal: AbortSignal;
+    /**
+     * Resolve a provider's API key (e.g. from user config). Returns `undefined`
+     * to fall back to the provider's own `auth` resolution.
+     */
+    getApiKey?: (
+      provider: string
+    ) => Promise<string | undefined> | string | undefined;
+  }
 ): AsyncGenerator<AgentEvent> {
-  const { models, signal } = options;
+  const { models, signal, getApiKey } = options;
 
   if (request.context.messages.length > 0) {
     const lastMessage =
@@ -51,6 +61,7 @@ export async function* streamAgent(
     {
       model,
       convertToLlm: _convertToLlm,
+      getApiKey,
       maxTokens: request.config?.model?.maxTokens,
       temperature: request.config?.model?.temperature,
       reasoning:
