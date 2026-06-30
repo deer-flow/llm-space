@@ -52,6 +52,14 @@ ApplicationMenu.setApplicationMenu([
         label: "Close All Tabs",
         action: "closeAllTabs",
       },
+      {
+        type: "separator",
+      },
+      {
+        label: "Reopen Closed Tabs",
+        action: "reopenClosedTabs",
+        accelerator: "CommandOrControl+Shift+T",
+      },
     ],
   },
   {
@@ -189,6 +197,10 @@ export function registerMenuActions(window: BrowserWindow) {
       }
       case "closeAllTabs": {
         mainWindowRPC.send.closeAllTabs({});
+        return;
+      }
+      case "reopenClosedTabs": {
+        mainWindowRPC.send.reopenClosedTabs({});
         return;
       }
       default:

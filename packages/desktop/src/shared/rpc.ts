@@ -69,6 +69,7 @@ export interface DesktopRPCType {
       closeActiveTab: Record<string, never>;
       closeOtherTabs: Record<string, never>;
       closeAllTabs: Record<string, never>;
+      reopenClosedTabs: Record<string, never>;
     };
   }>;
 }

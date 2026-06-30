@@ -20,7 +20,7 @@ export function Page() {
   // read through a ref so the listener never goes stale.
   const activePathRef = useRef(tabs.activePath);
   activePathRef.current = tabs.activePath;
-  const { close, closeOthers, closeAll } = tabs;
+  const { close, closeOthers, closeAll, reopenClosed } = tabs;
   useEffect(() => {
     const rpc = electrobun.rpc;
     if (!rpc) return;
@@ -31,15 +31,18 @@ export function Page() {
       if (activePathRef.current) closeOthers(activePathRef.current);
     };
     const onCloseAllTabs = () => closeAll();
+    const onReopenClosedTabs = () => void reopenClosed();
     rpc.addMessageListener("closeActiveTab", onCloseActiveTab);
     rpc.addMessageListener("closeOtherTabs", onCloseOtherTabs);
     rpc.addMessageListener("closeAllTabs", onCloseAllTabs);
+    rpc.addMessageListener("reopenClosedTabs", onReopenClosedTabs);
     return () => {
       rpc.removeMessageListener("closeActiveTab", onCloseActiveTab);
       rpc.removeMessageListener("closeOtherTabs", onCloseOtherTabs);
       rpc.removeMessageListener("closeAllTabs", onCloseAllTabs);
+      rpc.removeMessageListener("reopenClosedTabs", onReopenClosedTabs);
     };
-  }, [close, closeOthers, closeAll]);
+  }, [close, closeOthers, closeAll, reopenClosed]);
 
   // The "New file" tab button reuses the tree's create-thread flow: the tree
   // registers it here, and the button (and ⌘N menu) trigger the same handler.
