@@ -20,6 +20,7 @@ import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../../ui/button";
+import { ScrollArea } from "../../ui/scroll-area";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import { MessageListItem } from "./message-list-item";
@@ -49,38 +50,62 @@ export function MessageListView({
     if (!destination || source.index === destination.index) return;
     moveMessage(source.index, destination.index);
   }, []);
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollToBottom = useCallback(() => {
+    const viewport = contentRef.current?.closest<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]'
+    );
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+  }, []);
+
+  // Jump to the latest messages when a run starts so the streaming reply is
+  // in view. Fires on the idle → running transition (status only flips here).
+  useEffect(() => {
+    if (status === "running") {
+      scrollToBottom();
+    }
+  }, [status, scrollToBottom]);
+
   return (
-    <div className={cn("flex flex-col p-3 pt-0.5", className)}>
-      <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <Droppable droppableId="message-list">
-          {(droppableProvided) => (
-            <DroppableMessageList
-              droppableProvided={droppableProvided}
-              messages={messages ?? []}
-              dragging={dragging}
-              readonly={readonly}
-              collapsedMessageIds={collapsedMessageIds}
-            />
+    <ScrollArea className={cn("size-full", className)}>
+      <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
+        <DragDropContext
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <Droppable droppableId="message-list">
+            {(droppableProvided) => (
+              <DroppableMessageList
+                droppableProvided={droppableProvided}
+                messages={messages ?? []}
+                dragging={dragging}
+                readonly={readonly}
+                collapsedMessageIds={collapsedMessageIds}
+              />
+            )}
+          </Droppable>
+        </DragDropContext>
+        <StreamingMessageListItem streaming={status === "running"} />
+        <Button
+          className={cn(
+            "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5",
+            dragging && "invisible",
+            readonly && "hidden",
+            !messages || messages?.length === 0 ? "" : "mt-3.5"
           )}
-        </Droppable>
-      </DragDropContext>
-      <StreamingMessageListItem streaming={status === "running"} />
-      <Button
-        className={cn(
-          "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5",
-          dragging && "invisible",
-          readonly && "hidden",
-          !messages || messages?.length === 0 ? "" : "mt-3.5"
-        )}
-        disabled={readonly}
-        variant="secondary"
-        size="lg"
-        onClick={appendMessage}
-      >
-        <PlusIcon className="size-4" />
-        Add Message
-      </Button>
-    </div>
+          disabled={readonly}
+          variant="secondary"
+          size="lg"
+          onClick={appendMessage}
+        >
+          <PlusIcon className="size-4" />
+          Add Message
+        </Button>
+      </div>
+    </ScrollArea>
   );
 }
 
