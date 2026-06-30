@@ -57,7 +57,7 @@ export function ToolCallListItem({
 function _ToolCallInputView({ input }: { input: ToolCallInput }) {
   const keys = Object.keys(input.arguments);
   return (
-    <div className="block w-full overflow-x-auto font-mono">
+    <div className="block w-full overflow-x-auto font-mono select-auto">
       <span className="text-purple-400">{input.name}(</span>
       {keys.length > 0 && (
         <span className="whitespace-pre">
