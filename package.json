@@ -10,6 +10,7 @@
   "scripts": {
     "check": "eslint .",
     "dev": "cd apps/desktop && bun run dev:hmr",
+    "build:canary": "cd apps/desktop && bun run build:canary",
     "lint": "eslint --fix",
     "lint:check": "eslint .",
     "prepare": "husky"
