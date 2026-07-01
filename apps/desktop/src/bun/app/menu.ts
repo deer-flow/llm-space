@@ -154,22 +154,29 @@ ApplicationMenu.setApplicationMenu([
     label: "Help",
     submenu: [
       {
+        label: "View Documentation",
+        action: "openDocument",
+      },
+      {
+        type: "divider",
+      },
+      {
+        label: "Visit GitHub Project",
+        action: "openGitHubProject",
+      },
+      {
         label: "Report Bug",
         action: "reportBugs",
       },
       {
-        type: "divider",
-      },
-      {
-        label: "View Documentation",
-        action: "openDocument",
-        role: "showHelp",
+        label: "Donate",
+        action: "donate",
       },
       {
         type: "divider",
       },
       {
-        label: "Onboard...",
+        label: "Onboard",
         action: "onboard",
       },
     ],
@@ -198,7 +205,15 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
   closeAllTabs: { type: "closeAllTabs", args: {} },
   reopenClosedTabs: { type: "reopenClosedTab", args: {} },
   openDocument: { type: "openDocument", args: {} },
+  openGitHubProject: {
+    type: "openLink",
+    args: { url: "https://github.com/llm-space/llm-space/tree/main" },
+  },
   reportBugs: { type: "reportBugs", args: {} },
+  donate: {
+    type: "openLink",
+    args: { url: "https://my.feishu.cn/wiki/OvLBwVuSkiCR1ik5wGEcBXZfnye" },
+  },
   onboard: { type: "openOnboard", args: {} },
 };
 
