@@ -48,7 +48,11 @@ export interface DesktopRPCType {
         response: ModelProviderGroup[];
       };
       updateProvider: {
-        params: { providerId: string; apiKey: string | null };
+        params: {
+          providerId: string;
+          apiKey?: string | null;
+          baseUrl?: string | null;
+        };
         response: ModelProviderGroup[];
       };
       setModelEnabled: {

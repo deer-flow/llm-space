@@ -28,9 +28,16 @@ export async function* streamAgent(
     getApiKey?: (
       provider: string
     ) => Promise<string | undefined> | string | undefined;
+    /**
+     * Resolve a provider's custom base URL (e.g. from user config). Returns
+     * `undefined`/empty to keep the provider's default endpoint.
+     */
+    getBaseUrl?: (
+      provider: string
+    ) => Promise<string | undefined> | string | undefined;
   }
 ): AsyncGenerator<AgentEvent> {
-  const { models, signal, getApiKey } = options;
+  const { models, signal, getApiKey, getBaseUrl } = options;
 
   if (request.context.messages.length > 0) {
     const lastMessage =
@@ -51,7 +58,16 @@ export async function* streamAgent(
       `Model "${request.model.provider}/${request.model.id}" not found`
     );
   }
-  // model.baseUrl = "https://www.example.com";
+  // Apply a user-configured base URL override for THIS run only. pi keeps a
+  // process-global model registry, so `models.getModel()` hands back a shared
+  // object; mutating its `baseUrl` permanently would leak across runs (e.g.
+  // clearing the override later would keep using the old URL). We restore it in
+  // the `finally` below so the shared model always returns to its default.
+  const originalBaseUrl = model.baseUrl;
+  const baseUrl = await getBaseUrl?.(request.model.provider);
+  if (baseUrl) {
+    model.baseUrl = baseUrl;
+  }
 
   const agentStream = agentLoopContinue(
     {
@@ -79,8 +95,13 @@ export async function* streamAgent(
       models.streamSimple(streamModel, streamContext, streamOptions)
   );
 
-  for await (const event of agentStream) {
-    yield event;
+  try {
+    for await (const event of agentStream) {
+      yield event;
+    }
+  } finally {
+    // Undo the per-run override on the shared model object (see above).
+    model.baseUrl = originalBaseUrl;
   }
 }
 

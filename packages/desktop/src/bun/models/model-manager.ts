@@ -73,13 +73,17 @@ export class ModelManager {
   }
 
   /**
-   * Update a configured provider's fields. A `null` `apiKey` clears the key
-   * (drops it from the entry); a string sets it verbatim. Throws when the
-   * provider is not configured.
+   * Update a configured provider's fields. Only fields that are present are
+   * touched: a `null` value clears that field (drops it from the entry), a
+   * string sets it verbatim, and `undefined` leaves it unchanged. Throws when
+   * the provider is not configured.
    */
   updateProvider(
     providerId: string,
-    { apiKey }: { apiKey: string | null }
+    {
+      apiKey,
+      baseUrl,
+    }: { apiKey?: string | null; baseUrl?: string | null }
   ): void {
     const entry = this._config.providers.find(
       (provider) => provider.id === providerId
@@ -87,13 +91,24 @@ export class ModelManager {
     if (!entry) {
       throw new Error(`Provider not configured: ${providerId}`);
     }
-    if (apiKey === null) {
-      delete entry.apiKey;
-    } else {
-      entry.apiKey = apiKey;
+    if (apiKey !== undefined) {
+      if (apiKey === null) delete entry.apiKey;
+      else entry.apiKey = apiKey;
     }
+    if (baseUrl !== undefined) {
+      if (baseUrl === null) delete entry.baseUrl;
+      else entry.baseUrl = baseUrl;
+    }
+    // Rebuild the registry so a cleared baseUrl restores the model's default
+    // (the cached model instance would otherwise keep the mutated value).
     this._models = null;
     this._saveConfig();
+  }
+
+  /** The custom base URL override for a provider, if configured. */
+  getBaseUrl(providerId: string): string | undefined {
+    return this._config.providers.find((entry) => entry.id === providerId)
+      ?.baseUrl;
   }
 
   /** The model ids the user has disabled for a provider (empty by default). */

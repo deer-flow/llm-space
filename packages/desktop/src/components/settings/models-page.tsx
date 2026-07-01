@@ -359,6 +359,9 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
+    Boolean(provider?.baseUrl)
+  );
   const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
     "all"
   );
@@ -377,6 +380,26 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     const current = provider.apiKey ?? null;
     if (next !== current) {
       void updateProvider(provider.id, { apiKey: next });
+    }
+  };
+
+  // Persist the custom base URL on blur when changed. Empty ⇒ use the default.
+  const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (!provider) return;
+    const value = event.target.value.trim();
+    const next = value === "" ? null : value;
+    const current = provider.baseUrl ?? null;
+    if (next !== current) {
+      void updateProvider(provider.id, { baseUrl: next });
+    }
+  };
+
+  // The switch reveals/hides the base URL input; turning it off clears the
+  // stored value (⇒ use the provider default).
+  const handleBaseUrlToggle = (enabled: boolean) => {
+    setBaseUrlEnabled(enabled);
+    if (!enabled && provider) {
+      void updateProvider(provider.id, { baseUrl: null });
     }
   };
 
@@ -421,7 +444,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
 
           {provider.id !== "openai-codex" && (
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">API Key</label>
+              <label className="text-sm font-medium">API key</label>
               <div className="relative">
                 <Input
                   type={apiKeyVisible ? "text" : "password"}
@@ -456,6 +479,28 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               </div>
             </div>
           )}
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Custom base URL</label>
+              <Switch
+                checked={baseUrlEnabled}
+                onCheckedChange={handleBaseUrlToggle}
+              />
+            </div>
+            {baseUrlEnabled && (
+              <>
+                <Input
+                  defaultValue={provider.baseUrl ?? ""}
+                  placeholder="https://api.example.com/v1"
+                  onBlur={handleBaseUrlBlur}
+                />
+                <div className="text-muted-foreground text-xs">
+                  Leave empty to use the default endpoint.
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -521,31 +566,33 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                 </div>
               ) : (
                 visibleModels.map((model) => {
-                const enabled = !disabledModels.has(model.id);
-                return (
-                  <Item key={model.id} variant="muted" size="sm">
-                    <ItemMedia>
-                      <ModelAvatar id={model.id} name={model.name} />
-                    </ItemMedia>
-                    <ItemContent className={cn(!enabled && "opacity-50")}>
-                      <ItemTitle className="font-mono">{model.name}</ItemTitle>
-                    </ItemContent>
-                    <ItemActions>
-                      <Switch
-                        size="sm"
-                        checked={enabled}
-                        onCheckedChange={(next) =>
-                          void setModelEnabled(provider.id, model.id, next)
-                        }
-                        aria-label={
-                          enabled
-                            ? `Disable ${model.name}`
-                            : `Enable ${model.name}`
-                        }
-                      />
-                    </ItemActions>
-                  </Item>
-                );
+                  const enabled = !disabledModels.has(model.id);
+                  return (
+                    <Item key={model.id} variant="muted" size="sm">
+                      <ItemMedia>
+                        <ModelAvatar id={model.id} name={model.name} />
+                      </ItemMedia>
+                      <ItemContent className={cn(!enabled && "opacity-50")}>
+                        <ItemTitle className="font-mono">
+                          {model.name}
+                        </ItemTitle>
+                      </ItemContent>
+                      <ItemActions>
+                        <Switch
+                          size="sm"
+                          checked={enabled}
+                          onCheckedChange={(next) =>
+                            void setModelEnabled(provider.id, model.id, next)
+                          }
+                          aria-label={
+                            enabled
+                              ? `Disable ${model.name}`
+                              : `Enable ${model.name}`
+                          }
+                        />
+                      </ItemActions>
+                    </Item>
+                  );
                 })
               )}
             </div>

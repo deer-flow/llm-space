@@ -20,7 +20,7 @@ interface ModelContextValue {
   addProvider: (providerId: string) => Promise<void>;
   updateProvider: (
     providerId: string,
-    fields: { apiKey: string | null }
+    fields: { apiKey?: string | null; baseUrl?: string | null }
   ) => Promise<void>;
   setModelEnabled: (
     providerId: string,
@@ -95,7 +95,10 @@ export function ModelProvider({
   }, []);
 
   const updateProvider = useCallback(
-    async (providerId: string, fields: { apiKey: string | null }) => {
+    async (
+      providerId: string,
+      fields: { apiKey?: string | null; baseUrl?: string | null }
+    ) => {
       if (!electrobun.rpc) {
         throw new Error("Electrobun RPC is not initialized");
       }
@@ -226,7 +229,7 @@ export function useFetchBuiltinProviders(): () => Promise<ModelProviderGroup[]> 
 
 export function useUpdateProvider(): (
   providerId: string,
-  fields: { apiKey: string | null }
+  fields: { apiKey?: string | null; baseUrl?: string | null }
 ) => Promise<void> {
   return useModelProvider().updateProvider;
 }

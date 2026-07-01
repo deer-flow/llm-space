@@ -25,6 +25,7 @@ export async function runStreamThread(
     for await (const event of streamAgent(request, {
       models: await modelManager.getAvailableModels(),
       getApiKey: modelManager.getApiKey.bind(modelManager),
+      getBaseUrl: modelManager.getBaseUrl.bind(modelManager),
       signal: abortController.signal,
     })) {
       send({ streamId, type: "event", event });
