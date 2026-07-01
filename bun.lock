@@ -51,7 +51,7 @@
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "codemirror": "^6.0.2",
-        "electrobun": "1.18.1",
+        "electrobun": "^1.18.1",
         "lucide-react": "^1.22.0",
         "radix-ui": "^1.6.0",
         "react": "catalog:",
