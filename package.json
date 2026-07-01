@@ -39,15 +39,10 @@
   },
   "packageManager": "bun",
   "dependencies": {
-    "@codemirror/lang-json": "^6.0.2",
-    "@codemirror/lang-markdown": "^6.5.0",
+    "@earendil-works/pi-agent-core": "^0.80.3",
     "@earendil-works/pi-ai": "^0.80.2",
-    "@formkit/auto-animate": "^0.9.0",
-    "@hello-pangea/dnd": "^18.0.1",
-    "react-resizable-panels": "^4.12.0",
-    "sonner": "^2.0.7",
-    "timeago.js": "^4.0.2",
-    "typebox": "catalog:",
-    "zustand": "^5.0.14"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typebox": "catalog:"
   }
 }
