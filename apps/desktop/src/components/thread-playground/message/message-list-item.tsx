@@ -132,6 +132,7 @@ function _MessageListItem({
             className="text-muted-foreground hover:border-primary hover:bg-primary! hover:text-primary-foreground absolute -top-0.5 -right-3 z-10 size-4 rounded-full opacity-0 transition-[opacity,background-color,color,border-color] group-hover:opacity-100"
             variant="outline"
             size="icon-xs"
+            aria-label="Insert message before this message"
             onClick={() => insertMessageBefore(message.id)}
           >
             <PlusIcon className="size-3" />

@@ -104,6 +104,7 @@ function ProviderList({
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
         <Input
           className="h-8 pl-7"
+          aria-label="Search providers"
           placeholder="Search providers"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -304,6 +305,7 @@ function ProviderListItem({
     <div
       role="button"
       tabIndex={0}
+      aria-label={`Select ${provider.name} provider`}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -324,8 +326,8 @@ function ProviderListItem({
           <span
             role="button"
             tabIndex={0}
-            aria-label="Provider actions"
-            title="Provider actions"
+            aria-label={`${provider.name} provider actions`}
+            title={`${provider.name} provider actions`}
             className={cn(
               "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded transition-opacity",
               menuOpen
@@ -461,6 +463,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                   defaultValue={provider.apiKey ?? ""}
                   placeholder={`Input API Key for ${provider.name}.`}
                   className="pr-9"
+                  aria-label={`${provider.name} API key`}
                   onBlur={handleApiKeyBlur}
                 />
                 <button
@@ -494,6 +497,11 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Custom base URL</label>
               <Switch
+                aria-label={
+                  baseUrlEnabled
+                    ? `Disable custom base URL for ${provider.name}`
+                    : `Enable custom base URL for ${provider.name}`
+                }
                 checked={baseUrlEnabled}
                 onCheckedChange={handleBaseUrlToggle}
               />
@@ -503,6 +511,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                 <Input
                   defaultValue={provider.baseUrl ?? ""}
                   placeholder="https://api.example.com/v1"
+                  aria-label={`${provider.name} custom base URL`}
                   onBlur={handleBaseUrlBlur}
                 />
                 <div className="text-muted-foreground text-xs">
@@ -524,7 +533,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    aria-label="Model list actions"
+                    aria-label={`Model list actions for ${provider.name}`}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-6 items-center justify-center rounded transition-colors"
                   >
                     <MoreHorizontal className="size-4" />

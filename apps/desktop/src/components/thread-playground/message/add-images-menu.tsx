@@ -92,12 +92,18 @@ export function AddImagesMenu({
         type="file"
         accept="image/*"
         multiple
+        aria-label="Image files"
         className="hidden"
         onChange={handleFilesSelected}
       />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" disabled={disabled}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Add image to message"
+            disabled={disabled}
+          >
             <ImagePlusIcon className="size-4" />
           </Button>
         </DropdownMenuTrigger>

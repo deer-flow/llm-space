@@ -477,6 +477,9 @@ const TreeLeaf = React.forwardRef<
       <div
         ref={ref}
         data-tree-id={item.id}
+        role="button"
+        tabIndex={item.disabled ? -1 : 0}
+        aria-label={item.name}
         className={cn(
           "cursor-pointer py-2 text-left",
           treeVariants(),
@@ -491,6 +494,14 @@ const TreeLeaf = React.forwardRef<
           if (item.disabled) return;
           handleSelectChange(item);
           item.onClick?.();
+        }}
+        onKeyDown={(event) => {
+          if (item.disabled) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleSelectChange(item);
+            item.onClick?.();
+          }
         }}
         draggable={!!item.draggable && !item.disabled}
         onDragStart={onDragStart}
@@ -564,7 +575,7 @@ const AccordionContent = React.forwardRef<
     )}
     {...props}
   >
-    <div className="pb-1 pt-0">{children}</div>
+    <div className="pt-0 pb-1">{children}</div>
   </AccordionPrimitive.Content>
 ));
 AccordionContent.displayName = AccordionPrimitive.Content.displayName;

@@ -228,6 +228,7 @@ function ThreadPlaygroundContent({
                 <Button
                   variant="ghost"
                   size="icon-lg"
+                  aria-label="Undo last edit"
                   disabled={readonly || !undoable}
                   onClick={undo}
                 >
@@ -238,6 +239,7 @@ function ThreadPlaygroundContent({
                 <Button
                   variant="ghost"
                   size="icon-lg"
+                  aria-label="Redo last edit"
                   disabled={readonly || !redoable}
                   onClick={redo}
                 >
@@ -248,6 +250,9 @@ function ThreadPlaygroundContent({
                 <Button
                   variant="ghost"
                   size="icon-lg"
+                  aria-label={
+                    historyOpen ? "Hide run history" : "View run history"
+                  }
                   aria-expanded={historyOpen}
                   onClick={toggleHistory}
                 >
@@ -271,6 +276,9 @@ function ThreadPlaygroundContent({
                     "w-20 px-3 py-3.5",
                     readonlyFromProps && "hidden"
                   )}
+                  aria-label={
+                    status === "running" ? "Stop running thread" : "Run thread"
+                  }
                   disabled={
                     readonlyFromProps || (status !== "running" && !hasModel)
                   }

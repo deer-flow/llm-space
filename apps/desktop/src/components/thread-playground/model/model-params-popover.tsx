@@ -79,6 +79,7 @@ function ParamField({
         </span>
         <Switch
           size="sm"
+          aria-label={`${enabled ? "Disable" : "Enable"} ${label}`}
           checked={enabled}
           disabled={readonly}
           onCheckedChange={onEnabledChange}
@@ -157,7 +158,12 @@ export function ModelParamsPopover({
     >
       <HoverCard>
         <HoverCardTrigger asChild>
-          <Button variant="ghost" size="icon-xs" disabled={!model}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Show model details"
+            disabled={!model}
+          >
             <InfoIcon className="size-4" />
           </Button>
         </HoverCardTrigger>
@@ -172,6 +178,8 @@ export function ModelParamsPopover({
               variant="ghost"
               disabled={readonly || !model}
               size="icon-xs"
+              aria-label="Configure model parameters"
+              aria-expanded={popoverOpen}
             >
               <SlidersHorizontal className="size-4" />
             </Button>
@@ -186,6 +194,7 @@ export function ModelParamsPopover({
                   <Button
                     variant="ghost"
                     size="icon-xs"
+                    aria-label="Open model provider settings"
                     onClick={handleConfigModelSettings}
                   >
                     <SettingsIcon className="size-3.5" />
@@ -211,6 +220,7 @@ export function ModelParamsPopover({
                 </span>
               </div>
               <Slider
+                aria-label="Temperature"
                 min={0}
                 max={2}
                 step={0.1}
@@ -238,6 +248,7 @@ export function ModelParamsPopover({
             <Input
               className="mt-2 w-full font-mono"
               type="number"
+              aria-label="Max tokens"
               min={1}
               max={maxTokensFromProps}
               value={draftMaxTokens}
@@ -277,7 +288,11 @@ export function ModelParamsPopover({
                 updateModelParams({ reasoning: value as ReasoningLevel });
               }}
             >
-              <SelectTrigger size="sm" className="mt-2 w-full">
+              <SelectTrigger
+                size="sm"
+                className="mt-2 w-full"
+                aria-label="Thinking effort"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="font-mono">

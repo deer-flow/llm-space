@@ -2,7 +2,7 @@
 
 import { type ModelConfig } from "@llm-space/core";
 import { SettingsIcon } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCommands } from "@/commands";
 import { cn } from "@/lib/utils";
@@ -110,6 +110,13 @@ export function ModelSelector({
 
   const selectedValue = value ? toModelKey(value) : "";
 
+  useEffect(() => {
+    const trigger = inputRef.current
+      ?.closest<HTMLElement>('[data-slot="input-group"]')
+      ?.querySelector<HTMLElement>('[data-slot="input-group-button"]');
+    trigger?.setAttribute("aria-label", "Open model selector");
+  }, []);
+
   return (
     <Combobox
       items={items}
@@ -132,6 +139,7 @@ export function ModelSelector({
     >
       <ComboboxInput
         ref={inputRef}
+        aria-label="Model selector"
         className={cn(
           "hover:bg-secondary! group/model-select h-6! w-75 border-0 bg-transparent! font-mono",
           !readonly && "cursor:pointer hover:bg-secondary"

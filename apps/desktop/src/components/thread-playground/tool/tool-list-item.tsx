@@ -72,6 +72,7 @@ function _ToolListItem({
         <button
           type="button"
           className="focus-visible:ring-ring/30 text-muted-foreground group-hover/tool:text-foreground inline-flex h-full items-center gap-1 rounded-l-md pl-2 outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50"
+          aria-label={`Edit ${tool.name} tool`}
           disabled={readonly}
           onClick={() => onEdit(tool)}
         >
@@ -83,6 +84,7 @@ function _ToolListItem({
         <button
           type="button"
           disabled={readonly}
+          aria-label={`Remove ${tool.name} tool`}
           className={cn(
             "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 transition-opacity outline-none hover:opacity-100 focus-visible:ring-2",
             readonly ? "opacity-0!" : "opacity-0 group-hover/tool:opacity-100"

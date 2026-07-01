@@ -91,14 +91,14 @@ function IconAction({
  * trigger, and stops pointer/click propagation so opening the menu doesn't drag
  * or toggle the row. Default behavior is left intact so Radix can open the menu.
  */
-function MoreActionsTrigger() {
+function MoreActionsTrigger({ label }: { label: string }) {
   return (
     <DropdownMenuTrigger asChild>
       <span
         role="button"
         tabIndex={0}
-        aria-label="More actions"
-        title="More actions"
+        aria-label={label}
+        title={label}
         className={actionClass}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
@@ -122,7 +122,7 @@ export function NodeActions({ node }: { node: FileNode }) {
       {isDir && (
         <>
           <IconAction
-            label="New file"
+            label={`New file in ${node.name}`}
             onClick={() =>
               executeCommand({
                 type: "newFile",
@@ -133,7 +133,7 @@ export function NodeActions({ node }: { node: FileNode }) {
             <FilePlus className="size-4" />
           </IconAction>
           <IconAction
-            label="New folder"
+            label={`New folder in ${node.name}`}
             onClick={() =>
               executeCommand({
                 type: "newFolder",
@@ -146,7 +146,7 @@ export function NodeActions({ node }: { node: FileNode }) {
         </>
       )}
       <DropdownMenu>
-        <MoreActionsTrigger />
+        <MoreActionsTrigger label={`More actions for ${node.name}`} />
         <DropdownMenuContent
           align="end"
           onClick={(e) => e.stopPropagation()}
@@ -206,7 +206,7 @@ export function RootActions() {
   return (
     <span className="flex items-center gap-1">
       <IconAction
-        label="New file"
+        label="New file in workspace root"
         onClick={() =>
           executeCommand({
             type: "newFile",
@@ -217,7 +217,7 @@ export function RootActions() {
         <FilePlus className="size-4" />
       </IconAction>
       <IconAction
-        label="New folder"
+        label="New folder in workspace root"
         onClick={() =>
           executeCommand({ type: "newFolder", args: { parent: "" } })
         }
@@ -231,7 +231,7 @@ export function RootActions() {
         <SettingsIcon className="size-4" />
       </IconAction>
       <DropdownMenu>
-        <MoreActionsTrigger />
+        <MoreActionsTrigger label="More actions for workspace root" />
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             onSelect={() =>

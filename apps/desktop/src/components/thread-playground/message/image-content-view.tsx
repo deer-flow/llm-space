@@ -61,6 +61,13 @@ function _ImageContentView({
         onClick={handleOpenPreview}
         role="button"
         tabIndex={0}
+        aria-label="Open image preview"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleOpenPreview();
+          }
+        }}
       >
         <img
           src={imageSrc}
@@ -78,6 +85,7 @@ function _ImageContentView({
               variant="ghost"
               size="icon-sm"
               className="bg-background/80 absolute top-1 right-1 rounded-full border opacity-0 transition-opacity group-hover/image:opacity-100"
+              aria-label="Remove image"
               onClick={handleRemove}
             >
               <XIcon className="size-4" />

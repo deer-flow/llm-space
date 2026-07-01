@@ -56,6 +56,7 @@ function _MessageListItemHeader({
       <Tooltip content="Drag to reorder">
         <div
           {...dragHandleProps}
+          aria-label={`${message.role === "user" ? "User" : "Assistant"} message drag handle`}
           className={cn(
             "text-muted-foreground hover:text-foreground -ml-3.5 flex shrink-0 cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing",
             readonly ? "invisible" : ""
@@ -70,6 +71,7 @@ function _MessageListItemHeader({
             className="-translate-x-0.5 px-2"
             variant="outline"
             size="sm"
+            aria-label={`Change message role from ${message.role}`}
             disabled={readonly}
             onClick={handleToggleMessageRole}
           >
@@ -110,6 +112,11 @@ function _MessageListItemHeader({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label={
+              runnable
+                ? "Run from this message"
+                : "Cannot run from this message"
+            }
             disabled={readonly || !runnable}
             onClick={handleRun}
           >
@@ -120,6 +127,7 @@ function _MessageListItemHeader({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label="Remove message"
             disabled={readonly}
             onClick={handleRemove}
           >
@@ -129,6 +137,8 @@ function _MessageListItemHeader({
         <Button
           variant="ghost"
           size="icon-sm"
+          aria-label={collapsed ? "Expand message" : "Collapse message"}
+          aria-expanded={!collapsed}
           disabled={readonly}
           onClick={handleToggleMessageCollapse}
         >

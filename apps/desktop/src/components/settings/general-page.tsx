@@ -34,7 +34,7 @@ export function GeneralPage() {
     <SettingsPage title="General">
       <SettingsRow label="Appearance">
         <Select defaultValue="dark" disabled>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" aria-label="Appearance">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -47,7 +47,7 @@ export function GeneralPage() {
 
       <SettingsRow label="Primary color">
         <Select defaultValue="default" disabled>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" aria-label="Primary color">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -63,7 +63,7 @@ export function GeneralPage() {
 
       <SettingsRow label="Language">
         <Select defaultValue="en-US" disabled>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" aria-label="Language">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

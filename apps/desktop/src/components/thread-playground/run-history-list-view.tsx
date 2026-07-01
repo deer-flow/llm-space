@@ -45,7 +45,12 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       <div className="text-muted-foreground flex h-12 shrink-0 items-center justify-between border-b pl-3 text-sm">
         <div>Run history</div>
         <div className="pr-2">
-          <Button variant="ghost" size="icon-sm" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close run history"
+            onClick={onClose}
+          >
             <XIcon className="size-3" />
           </Button>
         </div>
@@ -59,30 +64,42 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             No runs yet
           </div>
         ) : (
-          runs.map((run, index) => (
-            <Item
-              key={run.timestamp}
-              size="sm"
-              variant="muted"
-              className={cn(
-                "hover:bg-foreground/8! group cursor-pointer flex-col items-start gap-1",
-                // Flash the newest run's background, fading to the resting color.
-                index === 0 && "animate-run-history-enter"
-              )}
-              onClick={() => {
-                restoreThread(run.thread);
-              }}
-            >
-              <ItemContent className="w-full">
-                <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 w-full font-mono">
-                  {_summarizeRun(run.thread)}
-                </ItemDescription>
-              </ItemContent>
-              <span className="text-muted-foreground text-[0.625rem]">
-                {format(run.timestamp)}
-              </span>
-            </Item>
-          ))
+          runs.map((run, index) => {
+            const summary = _summarizeRun(run.thread);
+            return (
+              <Item
+                key={run.timestamp}
+                size="sm"
+                variant="muted"
+                role="button"
+                tabIndex={0}
+                aria-label={`Restore run: ${summary}`}
+                className={cn(
+                  "hover:bg-foreground/8! group cursor-pointer flex-col items-start gap-1",
+                  // Flash the newest run's background, fading to the resting color.
+                  index === 0 && "animate-run-history-enter"
+                )}
+                onClick={() => {
+                  restoreThread(run.thread);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    restoreThread(run.thread);
+                  }
+                }}
+              >
+                <ItemContent className="w-full">
+                  <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 w-full font-mono">
+                    {summary}
+                  </ItemDescription>
+                </ItemContent>
+                <span className="text-muted-foreground text-[0.625rem]">
+                  {format(run.timestamp)}
+                </span>
+              </Item>
+            );
+          })
         )}
       </ItemGroup>
     </div>

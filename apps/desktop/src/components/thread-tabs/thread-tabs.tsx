@@ -3,11 +3,7 @@
 import { Tabs } from "@sinm/react-chrome-tabs";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
-import {
-  PlusIcon,
-  SidebarCloseIcon,
-  SidebarOpenIcon,
-} from "lucide-react";
+import { PlusIcon, SidebarCloseIcon, SidebarOpenIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import { electrobun } from "@/lib/electrobun";
@@ -59,7 +55,17 @@ export function ThreadTabs({
       .querySelectorAll<HTMLElement>(".chrome-tab[data-tab-id]")
       .forEach((el) => {
         const id = el.getAttribute("data-tab-id");
-        if (id) el.title = id;
+        if (!id) return;
+        const label = tabLabel(id);
+        el.title = id;
+        el.tabIndex = 0;
+        el.setAttribute("role", "tab");
+        el.setAttribute("aria-selected", String(id === activePath));
+        el.setAttribute("aria-label", `Open ${label}`);
+        const closeButton = el.querySelector<HTMLElement>(".chrome-tab-close");
+        closeButton?.setAttribute("role", "button");
+        closeButton?.setAttribute("tabindex", "0");
+        closeButton?.setAttribute("aria-label", `Close ${label}`);
       });
   }, [tabs, activePath]);
 
@@ -123,7 +129,12 @@ export function ThreadTabs({
               </>
             }
           >
-            <Button size="icon-sm" variant="ghost" onClick={onToggleSidebar}>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              onClick={onToggleSidebar}
+            >
               {sidebarOpen ? (
                 <SidebarCloseIcon className="size-4" />
               ) : (
@@ -148,6 +159,7 @@ export function ThreadTabs({
                   className="hover:bg-primary! rounded-full"
                   size="icon-sm"
                   variant="ghost"
+                  aria-label="New file"
                   onClick={onNewFile}
                 >
                   <PlusIcon className="size-3.5" />

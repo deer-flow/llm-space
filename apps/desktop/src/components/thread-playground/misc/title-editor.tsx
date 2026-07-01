@@ -56,6 +56,7 @@ function _TitleEditor({
     return (
       <Input
         autoFocus
+        aria-label="Thread title"
         className={cn(
           "h-8 border-transparent bg-transparent! text-sm font-medium shadow-none focus-visible:ring-0",
           className
@@ -86,7 +87,16 @@ function _TitleEditor({
     <div className={cn("group flex w-full items-center gap-1", className)}>
       <div
         className="min-w-0 truncate text-sm font-medium"
+        role="button"
+        tabIndex={0}
+        aria-label="Edit thread title"
         onClick={startEditing}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            startEditing();
+          }
+        }}
       >
         <Tooltip content="Click to edit title">
           {title ? (
@@ -98,7 +108,12 @@ function _TitleEditor({
       </div>
       <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
         <Tooltip content="Edit title">
-          <Button variant="ghost" size="icon-xs" onClick={startEditing}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Edit thread title"
+            onClick={startEditing}
+          >
             <PencilIcon className="size-3" />
           </Button>
         </Tooltip>
