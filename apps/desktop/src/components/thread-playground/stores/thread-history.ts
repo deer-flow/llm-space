@@ -302,8 +302,23 @@ export function recordRun(
     : next;
 }
 
+/** Check whether two left/right run IDs describe the same comparison pair. */
+function _isSameRunPair(
+  leftRunId: string,
+  rightRunId: string,
+  otherLeftRunId: string,
+  otherRightRunId: string
+): boolean {
+  return (
+    (leftRunId === otherLeftRunId && rightRunId === otherRightRunId) ||
+    (leftRunId === otherRightRunId && rightRunId === otherLeftRunId)
+  );
+}
+
 /**
- * Create or update an evaluation for an exact left/right run pair.
+ * Create or update an evaluation for a run pair. The persisted left/right
+ * orientation follows the latest save, but matching is order-insensitive so a
+ * reversed A/B selection updates the existing comparison instead of duplicating it.
  */
 export function upsertEvaluation(
   evaluations: EvaluationRecord[],
@@ -328,8 +343,12 @@ export function upsertEvaluation(
   }
   const existingIndex = normalized.findIndex(
     (evaluation) =>
-      evaluation.leftRunId === input.leftRunId &&
-      evaluation.rightRunId === input.rightRunId
+      _isSameRunPair(
+        evaluation.leftRunId,
+        evaluation.rightRunId,
+        input.leftRunId,
+        input.rightRunId
+      )
   );
   const existing =
     existingIndex === -1 ? undefined : normalized[existingIndex];

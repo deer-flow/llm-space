@@ -1,4 +1,4 @@
 interface:
   display_name: "Kaizen Loop"
   short_description: "Plan the next product capability"
-  default_prompt: "Use $kaizen-loop to inspect the product, recommend one v1 capability with alternatives, and plan it around a product north-star metric."
+  default_prompt: "Use $kaizen-loop to inspect the current product surface, refresh the capability map, recommend one v1 capability with alternatives, and plan it around a product north-star metric."
