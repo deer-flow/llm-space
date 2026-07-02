@@ -1,8 +1,10 @@
 import type {
   Thread,
+  ThreadEvaluation,
   ThreadRunSnapshot,
   ThreadSnapshot,
 } from "@llm-space/core";
+import { uuid } from "@llm-space/core";
 
 /** Maximum number of snapshots retained, including the current state. */
 export const MAX_HISTORY = 100;
@@ -21,6 +23,9 @@ export const MAX_HISTORY_IMAGE_BYTES = 64 * 1024 * 1024;
 
 /** Maximum number of run snapshots retained in `runHistory`. */
 export const MAX_RUN_HISTORY = 20;
+
+/** Maximum number of manual evaluation records retained per thread. */
+export const MAX_EVALUATIONS = 50;
 
 /**
  * Undo/redo history for a thread, kept separate from the thread object itself.
@@ -134,7 +139,8 @@ export function recordSnapshot(
   return { snapshots, index: snapshots.length - 1 };
 }
 
-export type RunSnapshot = ThreadRunSnapshot;
+export type RunSnapshot = ThreadRunSnapshot & { id: string };
+export type EvaluationRecord = ThreadEvaluation;
 
 /**
  * Create a de-nested thread snapshot for durable run history. The returned
@@ -155,6 +161,11 @@ export function snapshotThread(thread: Thread): ThreadSnapshot {
   return snapshot;
 }
 
+/** Build a deterministic ID for old timestamp-only runs. */
+function _fallbackRunId(run: ThreadRunSnapshot, index: number): string {
+  return `run-${Math.trunc(run.timestamp)}-${index}`;
+}
+
 /**
  * Normalize persisted run history read from a thread file, trimming malformed
  * timestamps and enforcing the same recent-run cap used for newly recorded runs.
@@ -165,12 +176,17 @@ export function normalizeRunHistory(
   if (!Array.isArray(runHistory)) {
     return [];
   }
-  const normalized = runHistory.flatMap((run): RunSnapshot[] => {
+  const normalized = runHistory.flatMap((run, index): RunSnapshot[] => {
     if (!Number.isFinite(run.timestamp)) {
       return [];
     }
+    const id =
+      typeof run.id === "string" && run.id.trim()
+        ? run.id
+        : _fallbackRunId(run, index);
     return [
       {
+        id,
         timestamp: run.timestamp,
         thread: snapshotThread(run.thread),
       },
@@ -181,19 +197,89 @@ export function normalizeRunHistory(
     : normalized;
 }
 
+/** Check whether a value is a supported persisted evaluation verdict. */
+function _isEvaluationVerdict(
+  value: unknown
+): value is EvaluationRecord["verdict"] {
+  return (
+    value === "leftBetter" ||
+    value === "rightBetter" ||
+    value === "tie" ||
+    value === "pass" ||
+    value === "fail"
+  );
+}
+
 /**
- * Attach a durable run history to a thread while omitting the field when it is
- * empty. This keeps old thread files tidy until the user actually records runs.
+ * Normalize persisted evaluations and drop records whose compared runs no
+ * longer exist in the bounded run history.
+ */
+export function normalizeEvaluations(
+  evaluations: Thread["evaluations"],
+  runHistory: RunSnapshot[]
+): EvaluationRecord[] {
+  if (!Array.isArray(evaluations)) {
+    return [];
+  }
+  const runIds = new Set(runHistory.map((run) => run.id));
+  const normalized = evaluations.flatMap((evaluation, index) => {
+    if (
+      typeof evaluation.leftRunId !== "string" ||
+      typeof evaluation.rightRunId !== "string" ||
+      !_isEvaluationVerdict(evaluation.verdict) ||
+      !Number.isFinite(evaluation.createdAt) ||
+      !Number.isFinite(evaluation.updatedAt) ||
+      !runIds.has(evaluation.leftRunId) ||
+      !runIds.has(evaluation.rightRunId)
+    ) {
+      return [];
+    }
+    const id =
+      typeof evaluation.id === "string" && evaluation.id.trim()
+        ? evaluation.id
+        : `evaluation-${evaluation.leftRunId}-${evaluation.rightRunId}-${index}`;
+    return [
+      {
+        id,
+        leftRunId: evaluation.leftRunId,
+        rightRunId: evaluation.rightRunId,
+        verdict: evaluation.verdict,
+        note:
+          typeof evaluation.note === "string" && evaluation.note.trim()
+            ? evaluation.note
+            : undefined,
+        createdAt: evaluation.createdAt,
+        updatedAt: evaluation.updatedAt,
+      },
+    ];
+  });
+  return normalized.length > MAX_EVALUATIONS
+    ? normalized.slice(normalized.length - MAX_EVALUATIONS)
+    : normalized;
+}
+
+/**
+ * Attach durable run/evaluation records to a thread while omitting empty fields.
+ * This keeps old thread files tidy until the user creates these records.
  */
 export function withRunHistory(
   thread: Thread,
-  runHistory: RunSnapshot[]
+  runHistory: RunSnapshot[],
+  evaluations: EvaluationRecord[] = normalizeEvaluations(
+    thread.evaluations,
+    normalizeRunHistory(runHistory)
+  )
 ): Thread {
   const normalized = normalizeRunHistory(runHistory);
-  if (normalized.length === 0) {
-    return snapshotThread(thread);
+  const normalizedEvaluations = normalizeEvaluations(evaluations, normalized);
+  const next: Thread = snapshotThread(thread);
+  if (normalized.length > 0) {
+    next.runHistory = normalized;
   }
-  return { ...thread, runHistory: normalized };
+  if (normalizedEvaluations.length > 0) {
+    next.evaluations = normalizedEvaluations;
+  }
+  return next;
 }
 
 /**
@@ -204,14 +290,67 @@ export function withRunHistory(
 export function recordRun(
   runHistory: RunSnapshot[],
   thread: Thread,
-  timestamp: number
+  timestamp: number,
+  id: string = uuid()
 ): RunSnapshot[] {
   const next = [
     ...normalizeRunHistory(runHistory),
-    { thread: snapshotThread(thread), timestamp },
+    { id, thread: snapshotThread(thread), timestamp },
   ];
   return next.length > MAX_RUN_HISTORY
     ? next.slice(next.length - MAX_RUN_HISTORY)
+    : next;
+}
+
+/**
+ * Create or update an evaluation for an exact left/right run pair.
+ */
+export function upsertEvaluation(
+  evaluations: EvaluationRecord[],
+  runHistory: RunSnapshot[],
+  input: {
+    leftRunId: string;
+    rightRunId: string;
+    verdict: EvaluationRecord["verdict"];
+    note?: string;
+  },
+  timestamp: number = Date.now()
+): EvaluationRecord[] {
+  const normalizedRunHistory = normalizeRunHistory(runHistory);
+  const normalized = normalizeEvaluations(evaluations, normalizedRunHistory);
+  const runIds = new Set(normalizedRunHistory.map((run) => run.id));
+  if (
+    input.leftRunId === input.rightRunId ||
+    !runIds.has(input.leftRunId) ||
+    !runIds.has(input.rightRunId)
+  ) {
+    return normalized;
+  }
+  const existingIndex = normalized.findIndex(
+    (evaluation) =>
+      evaluation.leftRunId === input.leftRunId &&
+      evaluation.rightRunId === input.rightRunId
+  );
+  const existing =
+    existingIndex === -1 ? undefined : normalized[existingIndex];
+  const nextEvaluation: EvaluationRecord = {
+    id: existing?.id ?? uuid(),
+    leftRunId: input.leftRunId,
+    rightRunId: input.rightRunId,
+    verdict: input.verdict,
+    note: input.note?.trim() || undefined,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+
+  const next =
+    existingIndex === -1
+      ? [...normalized, nextEvaluation]
+      : normalized.map((evaluation, index) =>
+          index === existingIndex ? nextEvaluation : evaluation
+        );
+  return next.length > MAX_EVALUATIONS
+    ? next.slice(next.length - MAX_EVALUATIONS)
     : next;
 }
 

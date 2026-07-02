@@ -24,13 +24,16 @@ import { useShallow } from "zustand/shallow";
 
 import {
   createInitialHistory,
+  normalizeEvaluations,
   normalizeRunHistory,
   recordRun,
   recordSnapshot,
   redo as redoHistory,
   undo as undoHistory,
+  upsertEvaluation,
   withRunHistory,
   type ChangeHistory,
+  type EvaluationRecord,
   type RunSnapshot,
 } from "./thread-history";
 
@@ -53,12 +56,20 @@ export interface ThreadState {
   changeHistory: ChangeHistory;
   /** Thread snapshot + completion time after each run; most recent last. */
   runHistory: RunSnapshot[];
+  /** Manual verdicts comparing durable run snapshots. */
+  evaluations: EvaluationRecord[];
 
   run(fromMessageId?: string): Promise<void>;
   undo(): void;
   redo(): void;
   restoreThread(thread: Thread): void;
   removeRun(run: RunSnapshot): void;
+  saveEvaluation(input: {
+    leftRunId: string;
+    rightRunId: string;
+    verdict: EvaluationRecord["verdict"];
+    note?: string;
+  }): void;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
@@ -99,9 +110,14 @@ export function createThreadStore(
   } = {}
 ): ThreadStore {
   const initialRunHistory = normalizeRunHistory(initialThread.runHistory);
+  const initialEvaluations = normalizeEvaluations(
+    initialThread.evaluations,
+    initialRunHistory
+  );
   const normalizedInitialThread = withRunHistory(
     initialThread,
-    initialRunHistory
+    initialRunHistory,
+    initialEvaluations
   );
 
   return createStore<ThreadState>()(
@@ -199,6 +215,7 @@ export function createThreadStore(
         autoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
         runHistory: initialRunHistory,
+        evaluations: initialEvaluations,
 
         appendMessage() {
           const message = createUserMessage();
@@ -412,7 +429,8 @@ export function createThreadStore(
           }
           // Resolve the model to run with: the thread's own, else the first
           // available. A thread with no resolvable model cannot run.
-          const model = get().thread.model ?? options.getFallbackModel?.() ?? null;
+          const model =
+            get().thread.model ?? options.getFallbackModel?.() ?? null;
           if (!model) {
             toast.error("Select a model to run");
             return;
@@ -524,11 +542,16 @@ export function createThreadStore(
               finalThread,
               Date.now()
             );
-            const thread = withRunHistory(finalThread, runHistory);
+            const evaluations = normalizeEvaluations(
+              get().evaluations,
+              runHistory
+            );
+            const thread = withRunHistory(finalThread, runHistory, evaluations);
             set({
               thread,
               changeHistory: recordSnapshot(get().changeHistory, thread),
               runHistory,
+              evaluations,
             });
           }
         },
@@ -540,7 +563,11 @@ export function createThreadStore(
           if (!result) {
             return;
           }
-          const thread = withRunHistory(result.thread, get().runHistory);
+          const thread = withRunHistory(
+            result.thread,
+            get().runHistory,
+            get().evaluations
+          );
           set({
             thread,
             changeHistory: {
@@ -559,7 +586,11 @@ export function createThreadStore(
           if (!result) {
             return;
           }
-          const thread = withRunHistory(result.thread, get().runHistory);
+          const thread = withRunHistory(
+            result.thread,
+            get().runHistory,
+            get().evaluations
+          );
           set({
             thread,
             changeHistory: {
@@ -574,7 +605,11 @@ export function createThreadStore(
           if (get().status === "running") {
             return;
           }
-          const next = withRunHistory(thread, get().runHistory);
+          const next = withRunHistory(
+            thread,
+            get().runHistory,
+            get().evaluations
+          );
           if (next === get().thread) {
             return;
           }
@@ -593,18 +628,51 @@ export function createThreadStore(
           if (runHistory.length === current.length) {
             return;
           }
+          const evaluations = normalizeEvaluations(
+            get().evaluations,
+            runHistory
+          );
           // Deleting a run is not an undoable edit — undo/redo re-attach the
           // live runHistory anyway — so update the current snapshot in place
           // instead of recording a new step.
-          const thread = withRunHistory(get().thread, runHistory);
+          const thread = withRunHistory(get().thread, runHistory, evaluations);
           const history = get().changeHistory;
           set({
             thread,
             runHistory,
+            evaluations,
             changeHistory: {
               ...history,
               snapshots: history.snapshots.map((snapshot, index) =>
                 index === history.index ? thread : snapshot
+              ),
+            },
+          });
+        },
+        saveEvaluation(input) {
+          if (get().status === "running") {
+            return;
+          }
+          const evaluations = upsertEvaluation(
+            get().evaluations,
+            get().runHistory,
+            input
+          );
+          const thread = withRunHistory(
+            get().thread,
+            get().runHistory,
+            evaluations
+          );
+          // Evaluation records are durable run metadata, not a text-edit undo
+          // step; replace the current history tip so undo stays content-focused.
+          const changeHistory = get().changeHistory;
+          set({
+            thread,
+            evaluations,
+            changeHistory: {
+              ...changeHistory,
+              snapshots: changeHistory.snapshots.map((snapshot, index) =>
+                index === changeHistory.index ? thread : snapshot
               ),
             },
           });
@@ -644,6 +712,7 @@ const selectActions = (s: ThreadState) => ({
   redo: s.redo,
   restoreThread: s.restoreThread,
   removeRun: s.removeRun,
+  saveEvaluation: s.saveEvaluation,
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,

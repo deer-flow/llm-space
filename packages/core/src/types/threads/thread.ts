@@ -56,6 +56,12 @@ export type ThreadSnapshot = Static<typeof ThreadSnapshot>;
  */
 export const ThreadRunSnapshot = Type.Object({
   /**
+   * Stable ID for referencing this run from evaluation records. Older files may
+   * not have one; the desktop store backfills a deterministic ID on load.
+   */
+  id: Type.Optional(Type.String()),
+
+  /**
    * Thread state captured when the run completed.
    */
   thread: ThreadSnapshot,
@@ -66,6 +72,58 @@ export const ThreadRunSnapshot = Type.Object({
   timestamp: Type.Number(),
 });
 export type ThreadRunSnapshot = Static<typeof ThreadRunSnapshot>;
+
+export const ThreadEvaluationVerdict = Type.Union([
+  Type.Literal("leftBetter"),
+  Type.Literal("rightBetter"),
+  Type.Literal("tie"),
+  Type.Literal("pass"),
+  Type.Literal("fail"),
+]);
+export type ThreadEvaluationVerdict = Static<
+  typeof ThreadEvaluationVerdict
+>;
+
+/**
+ * A manual evaluation verdict comparing two durable run snapshots.
+ */
+export const ThreadEvaluation = Type.Object({
+  /**
+   * Stable ID for updating this evaluation record.
+   */
+  id: Type.String(),
+
+  /**
+   * The run shown on the left side of the comparison.
+   */
+  leftRunId: Type.String(),
+
+  /**
+   * The run shown on the right side of the comparison.
+   */
+  rightRunId: Type.String(),
+
+  /**
+   * User's verdict for this comparison.
+   */
+  verdict: ThreadEvaluationVerdict,
+
+  /**
+   * Optional human note explaining the decision.
+   */
+  note: Type.Optional(Type.String()),
+
+  /**
+   * Epoch milliseconds when the evaluation was created.
+   */
+  createdAt: Type.Number(),
+
+  /**
+   * Epoch milliseconds when the evaluation was last updated.
+   */
+  updatedAt: Type.Number(),
+});
+export type ThreadEvaluation = Static<typeof ThreadEvaluation>;
 
 /**
  * The definition of a thread.
@@ -78,5 +136,10 @@ export const Thread = Type.Object({
    * desktop store and store de-nested thread snapshots.
    */
   runHistory: Type.Optional(Type.Array(ThreadRunSnapshot)),
+
+  /**
+   * Manual evaluations created by comparing durable run snapshots.
+   */
+  evaluations: Type.Optional(Type.Array(ThreadEvaluation)),
 });
 export type Thread = Static<typeof Thread>;
