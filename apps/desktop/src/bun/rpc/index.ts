@@ -13,6 +13,7 @@ async function getModelProviderGroups() {
     models.getProviders().map(async (provider) => ({
       id: provider.id,
       name: provider.name,
+      builtin: modelManager.isBuiltin(provider.id),
       models: provider.getModels(),
       apiKey: await modelManager.getApiKey(provider.id, false),
       baseUrl: modelManager.getBaseUrl(provider.id),
@@ -45,8 +46,12 @@ export const mainWindowRPC: MainWindowRPC =
           modelManager.addBuiltInProvider({ id: providerId });
           return getModelProviderGroups();
         },
-        updateProvider: async ({ providerId, apiKey, baseUrl }) => {
-          modelManager.updateProvider(providerId, { apiKey, baseUrl });
+        addCustomProvider: async ({ id, name, baseUrl }) => {
+          modelManager.addCustomProvider({ id, name, baseUrl });
+          return getModelProviderGroups();
+        },
+        updateProvider: async ({ providerId, apiKey, baseUrl, name }) => {
+          modelManager.updateProvider(providerId, { apiKey, baseUrl, name });
           return getModelProviderGroups();
         },
         setModelEnabled: async ({ providerId, modelId, enabled }) => {

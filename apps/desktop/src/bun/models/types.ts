@@ -11,6 +11,8 @@ export type CustomModelConfig = CustomModel;
 /** One provider entry in `settings/models.json`. */
 export interface ProviderConfig {
   id: string;
+  /** User-facing name for a custom provider. Builtins use the shipped name. */
+  name?: string;
   /** Whether this is a builtin provider shipped with the app. */
   builtin?: boolean;
   apiKey?: string;

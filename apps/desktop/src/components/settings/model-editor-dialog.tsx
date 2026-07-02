@@ -28,12 +28,6 @@ import { useUpsertCustomModel } from "../model-provider";
 /** The selectable API types, ordered alphabetically by label. */
 const API_TYPES: { value: Api; label: string }[] = [
   { value: "anthropic-messages", label: "Anthropic Messages" },
-  { value: "azure-openai-responses", label: "Azure OpenAI Responses" },
-  { value: "bedrock-converse-stream", label: "Bedrock Converse Stream" },
-  { value: "google-generative-ai", label: "Google Generative AI" },
-  { value: "google-vertex", label: "Google Vertex" },
-  { value: "mistral-conversations", label: "Mistral Conversations" },
-  { value: "openai-codex-responses", label: "OpenAI Codex Responses" },
   { value: "openai-completions", label: "OpenAI Completion" },
   { value: "openai-responses", label: "OpenAI Responses" },
 ];
@@ -147,9 +141,15 @@ export function ModelEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit model" : "Add custom model"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Edit model" : "Add custom model"}
+          </DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update this custom model's configuration."

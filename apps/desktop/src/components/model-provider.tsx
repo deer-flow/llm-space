@@ -6,6 +6,7 @@ import type {
   ModelConfig,
   ModelProviderGroup,
 } from "@llm-space/core";
+import { uuid } from "@llm-space/core";
 import {
   createContext,
   useCallback,
@@ -22,19 +23,21 @@ interface ModelContextValue {
   providers: ModelProviderGroup[];
   removeProvider: (providerId: string) => Promise<void>;
   addProvider: (providerId: string) => Promise<void>;
+  addCustomProvider: (name: string, baseUrl: string) => Promise<string>;
   updateProvider: (
     providerId: string,
-    fields: { apiKey?: string | null; baseUrl?: string | null }
+    fields: {
+      apiKey?: string | null;
+      baseUrl?: string | null;
+      name?: string | null;
+    }
   ) => Promise<void>;
   setModelEnabled: (
     providerId: string,
     modelId: string,
     enabled: boolean
   ) => Promise<void>;
-  setAllModelsEnabled: (
-    providerId: string,
-    enabled: boolean
-  ) => Promise<void>;
+  setAllModelsEnabled: (providerId: string, enabled: boolean) => Promise<void>;
   removeCustomModel: (providerId: string, modelId: string) => Promise<void>;
   upsertCustomModel: (
     providerId: string,
@@ -104,10 +107,31 @@ export function ModelProvider({
     setProviders(updated);
   }, []);
 
+  const addCustomProvider = useCallback(
+    async (name: string, baseUrl: string) => {
+      if (!electrobun.rpc) {
+        throw new Error("Electrobun RPC is not initialized");
+      }
+      const id = uuid();
+      const updated = await electrobun.rpc.request.addCustomProvider({
+        id,
+        name,
+        baseUrl,
+      });
+      setProviders(updated);
+      return id;
+    },
+    []
+  );
+
   const updateProvider = useCallback(
     async (
       providerId: string,
-      fields: { apiKey?: string | null; baseUrl?: string | null }
+      fields: {
+        apiKey?: string | null;
+        baseUrl?: string | null;
+        name?: string | null;
+      }
     ) => {
       if (!electrobun.rpc) {
         throw new Error("Electrobun RPC is not initialized");
@@ -203,6 +227,7 @@ export function ModelProvider({
       providers,
       removeProvider,
       addProvider,
+      addCustomProvider,
       updateProvider,
       setModelEnabled,
       setAllModelsEnabled,
@@ -215,6 +240,7 @@ export function ModelProvider({
     providers,
     removeProvider,
     addProvider,
+    addCustomProvider,
     updateProvider,
     setModelEnabled,
     setAllModelsEnabled,
@@ -260,8 +286,17 @@ export function useAddProvider(): (providerId: string) => Promise<void> {
   return useModelProvider().addProvider;
 }
 
+export function useAddCustomProvider(): (
+  name: string,
+  baseUrl: string
+) => Promise<string> {
+  return useModelProvider().addCustomProvider;
+}
+
 /** Fetch the builtin providers (with `apiKeyDetected` flags) from the main process. */
-export function useFetchBuiltinProviders(): () => Promise<ModelProviderGroup[]> {
+export function useFetchBuiltinProviders(): () => Promise<
+  ModelProviderGroup[]
+> {
   return useCallback(async () => {
     if (!electrobun.rpc) {
       throw new Error("Electrobun RPC is not initialized");
@@ -272,7 +307,11 @@ export function useFetchBuiltinProviders(): () => Promise<ModelProviderGroup[]> 
 
 export function useUpdateProvider(): (
   providerId: string,
-  fields: { apiKey?: string | null; baseUrl?: string | null }
+  fields: {
+    apiKey?: string | null;
+    baseUrl?: string | null;
+    name?: string | null;
+  }
 ) => Promise<void> {
   return useModelProvider().updateProvider;
 }

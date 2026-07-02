@@ -17,6 +17,7 @@ import {
   BUILTIN_PROVIDER_META,
   BUILTIN_PROVIDERS,
 } from "./providers/builtin-providers";
+import { createCustomProvider } from "./providers/custom-provider";
 import type { CustomModelConfig, ModelsConfig, ProviderConfig } from "./types";
 
 /**
@@ -79,6 +80,26 @@ export class ModelManager {
     this._saveConfig();
   }
 
+  /** Add a user-defined provider to `settings/models.json`. */
+  addCustomProvider({
+    id,
+    name,
+    baseUrl,
+  }: {
+    id: string;
+    name: string;
+    baseUrl: string;
+  }): void {
+    if (this._config.providers.some((entry) => entry.id === id)) {
+      throw new Error(`Provider already configured: ${id}`);
+    }
+
+    this._config.providers.push({ id, name, baseUrl });
+
+    this._models = null;
+    this._saveConfig();
+  }
+
   /**
    * Update a configured provider's fields. Only fields that are present are
    * touched: a `null` value clears that field (drops it from the entry), a
@@ -90,7 +111,12 @@ export class ModelManager {
     {
       apiKey,
       baseUrl,
-    }: { apiKey?: string | null; baseUrl?: string | null }
+      name,
+    }: {
+      apiKey?: string | null;
+      baseUrl?: string | null;
+      name?: string | null;
+    }
   ): void {
     const entry = this._config.providers.find(
       (provider) => provider.id === providerId
@@ -105,6 +131,10 @@ export class ModelManager {
     if (baseUrl !== undefined) {
       if (baseUrl === null) delete entry.baseUrl;
       else entry.baseUrl = baseUrl;
+    }
+    if (name !== undefined) {
+      if (name === null) delete entry.name;
+      else entry.name = name;
     }
     // Rebuild the registry so a cleared baseUrl restores the model's default
     // (the cached model instance would otherwise keep the mutated value).
@@ -131,6 +161,14 @@ export class ModelManager {
     return (
       this._config.providers.find((entry) => entry.id === providerId)
         ?.customModels ?? []
+    );
+  }
+
+  /** Whether a configured provider is one of the shipped builtin providers. */
+  isBuiltin(providerId: string): boolean {
+    return (
+      this._config.providers.find((entry) => entry.id === providerId)
+        ?.builtin === true
     );
   }
 
@@ -308,7 +346,9 @@ export class ModelManager {
    */
   private _providerModelIds(providerId: string): string[] {
     const provider = BUILTIN_PROVIDERS[providerId];
-    const builtin = provider ? provider.getModels().map((model) => model.id) : [];
+    const builtin = provider
+      ? provider.getModels().map((model) => model.id)
+      : [];
     return [...builtin, ...this.getCustomModels(providerId)];
   }
 
@@ -322,31 +362,39 @@ export class ModelManager {
   }
 
   /**
-   * Instantiate the builtin (`builtin: true`) providers named in the config,
-   * deduped and sorted by id. Providers carrying user-added `models` are wrapped
-   * so their catalog includes those custom models.
+   * Instantiate the configured providers, deduped and sorted by id. Builtin
+   * providers carrying user-added `models` are wrapped so their catalog includes
+   * those custom models; custom providers are built from their saved metadata.
    */
   private _buildProviders(): Provider[] {
     const seen = new Set<string>();
     return this._config.providers
-      .filter(
-        (entry) => entry.builtin === true && entry.id in BUILTIN_PROVIDERS
-      )
       .filter((entry) =>
         seen.has(entry.id) ? false : (seen.add(entry.id), true)
       )
       .sort((a, b) => a.id.localeCompare(b.id))
-      .map((entry) => this._buildProvider(entry));
+      .map((entry) => this._buildProvider(entry))
+      .filter((provider): provider is Provider => provider !== null);
   }
 
   /**
-   * The runtime provider for a config entry: the builtin provider as-is, or —
-   * when the entry defines custom `models` — a wrapper whose `getModels()`
-   * appends those models. The builtin's stream/auth are reused verbatim, so a
-   * custom model must target an API the provider implements.
+   * The runtime provider for a config entry. Builtins use the shipped provider
+   * and optionally append custom models; custom providers expose only their
+   * user-defined models through the supported compatible APIs.
    */
-  private _buildProvider(entry: ProviderConfig): Provider {
+  private _buildProvider(entry: ProviderConfig): Provider | null {
     const base = BUILTIN_PROVIDERS[entry.id];
+    if (entry.builtin !== true) {
+      return createCustomProvider({
+        id: entry.id,
+        name: entry.name ?? entry.id,
+        baseUrl: entry.baseUrl ?? "",
+        models: this._customModelsFor(entry),
+      });
+    }
+    if (!base) {
+      return null;
+    }
     const custom = this._customModelsFor(entry);
     if (custom.length === 0) {
       return base;
@@ -365,7 +413,7 @@ export class ModelManager {
     return (entry.models ?? []).map((model) => ({
       ...model,
       provider: entry.id,
-      baseUrl: model.baseUrl ?? base?.baseUrl ?? "",
+      baseUrl: model.baseUrl ?? base?.baseUrl ?? entry.baseUrl ?? "",
     }));
   }
 

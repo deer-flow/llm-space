@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "../confirm-dialog";
 import { Link } from "../link";
 import {
+  useAddCustomProvider,
   useAddProvider,
   useFetchBuiltinProviders,
   useModels,
@@ -166,6 +167,7 @@ const RECOMMENDED_PROVIDER_IDS = new Set([
 function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
   const configured = useModels();
   const addProvider = useAddProvider();
+  const addCustomProvider = useAddCustomProvider();
   const fetchBuiltins = useFetchBuiltinProviders();
   const [open, setOpen] = useState(false);
   const [builtins, setBuiltins] = useState<ModelProviderGroup[] | null>(null);
@@ -247,6 +249,16 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
         align="start"
         className="max-h-80 w-72 overflow-y-auto"
       >
+        <DropdownMenuLabel>User custom provider</DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={() =>
+            void addCustomProvider("Custom provider", "").then(onAdd)
+          }
+        >
+          <ProviderAvatar id="custom-provider" name="Custom provider" />
+          <span className="line-clamp-1 grow">User custom provider</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {builtins && groups.length === 0 ? (
           <div className="text-muted-foreground px-2 py-1.5 text-xs">
             No providers available
@@ -262,9 +274,7 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
                 <DropdownMenuItem
                   key={provider.id}
                   onSelect={() =>
-                    void addProvider(provider.id).then(() =>
-                      onAdd(provider.id)
-                    )
+                    void addProvider(provider.id).then(() => onAdd(provider.id))
                   }
                 >
                   <ProviderAvatar id={provider.id} name={provider.name} />
@@ -416,6 +426,15 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     }
   };
 
+  const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (!provider) return;
+    const value = event.target.value.trim();
+    if (value === "" || value === provider.name) {
+      return;
+    }
+    void updateProvider(provider.id, { name: value });
+  };
+
   // Persist the custom base URL on blur when changed. Empty ⇒ use the default.
   const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
     if (!provider) return;
@@ -454,6 +473,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     if (modelView === "disabled") return disabledModels.has(model.id);
     return true;
   });
+  const isBuiltin = provider.builtin === true;
 
   return (
     <div className="flex min-w-0 grow flex-col">
@@ -463,7 +483,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             <h3 className="font-heading text-lg font-medium">
               {provider.name}
             </h3>
-            {provider.websiteLink ? (
+            {isBuiltin && provider.websiteLink ? (
               <Tooltip content={`Learn more about ${provider.name}`}>
                 <Link
                   href={provider.websiteLink}
@@ -474,6 +494,18 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               </Tooltip>
             ) : null}
           </div>
+
+          {!isBuiltin && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input
+                defaultValue={provider.name}
+                placeholder="Custom provider"
+                aria-label="Custom provider name"
+                onBlur={handleNameBlur}
+              />
+            </div>
+          )}
 
           {provider.id !== "openai-codex" && (
             <div className="flex flex-col gap-2">
@@ -514,33 +546,46 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Custom base URL</label>
-              <Switch
-                aria-label={
-                  baseUrlEnabled
-                    ? `Disable custom base URL for ${provider.name}`
-                    : `Enable custom base URL for ${provider.name}`
-                }
-                checked={baseUrlEnabled}
-                onCheckedChange={handleBaseUrlToggle}
+          {isBuiltin ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Custom base URL</label>
+                <Switch
+                  aria-label={
+                    baseUrlEnabled
+                      ? `Disable custom base URL for ${provider.name}`
+                      : `Enable custom base URL for ${provider.name}`
+                  }
+                  checked={baseUrlEnabled}
+                  onCheckedChange={handleBaseUrlToggle}
+                />
+              </div>
+              {baseUrlEnabled && (
+                <>
+                  <Input
+                    defaultValue={provider.baseUrl ?? ""}
+                    placeholder="https://api.example.com/v1"
+                    aria-label={`${provider.name} custom base URL`}
+                    onBlur={handleBaseUrlBlur}
+                  />
+                  <div className="text-muted-foreground text-xs">
+                    Leave empty to use the default endpoint.
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Base URL</label>
+              <Input
+                required
+                defaultValue={provider.baseUrl ?? ""}
+                placeholder="https://api.example.com/v1"
+                aria-label={`${provider.name} base URL`}
+                onBlur={handleBaseUrlBlur}
               />
             </div>
-            {baseUrlEnabled && (
-              <>
-                <Input
-                  defaultValue={provider.baseUrl ?? ""}
-                  placeholder="https://api.example.com/v1"
-                  aria-label={`${provider.name} custom base URL`}
-                  onBlur={handleBaseUrlBlur}
-                />
-                <div className="text-muted-foreground text-xs">
-                  Leave empty to use the default endpoint.
-                </div>
-              </>
-            )}
-          </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -571,42 +616,44 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                       <MoreHorizontal className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void setAllModelsEnabled(provider.id, false)
-                    }
-                  >
-                    <Ban />
-                    Disable All
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => void setAllModelsEnabled(provider.id, true)}
-                  >
-                    <CheckCheck />
-                    Enable All
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {(
-                    [
-                      ["enabled", "Show Enabled Only"],
-                      ["disabled", "Show Disabled Only"],
-                      ["all", "Show All"],
-                    ] as const
-                  ).map(([value, label]) => (
+                  <DropdownMenuContent align="end" className="w-44">
                     <DropdownMenuItem
-                      key={value}
-                      onSelect={() => setModelView(value)}
+                      onSelect={() =>
+                        void setAllModelsEnabled(provider.id, false)
+                      }
                     >
-                      <Check
-                        className={cn(
-                          "size-3.5",
-                          modelView !== value && "invisible"
-                        )}
-                      />
-                      {label}
+                      <Ban />
+                      Disable All
                     </DropdownMenuItem>
-                  ))}
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void setAllModelsEnabled(provider.id, true)
+                      }
+                    >
+                      <CheckCheck />
+                      Enable All
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {(
+                      [
+                        ["enabled", "Show Enabled Only"],
+                        ["disabled", "Show Disabled Only"],
+                        ["all", "Show All"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <DropdownMenuItem
+                        key={value}
+                        onSelect={() => setModelView(value)}
+                      >
+                        <Check
+                          className={cn(
+                            "size-3.5",
+                            modelView !== value && "invisible"
+                          )}
+                        />
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -705,7 +752,9 @@ function ModelListItem({
           size="sm"
           checked={enabled}
           onCheckedChange={onToggle}
-          aria-label={enabled ? `Disable ${model.name}` : `Enable ${model.name}`}
+          aria-label={
+            enabled ? `Disable ${model.name}` : `Enable ${model.name}`
+          }
         />
       </ItemActions>
       {isCustom && (

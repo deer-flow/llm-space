@@ -48,11 +48,16 @@ export interface DesktopRPCType {
         params: { providerId: string };
         response: ModelProviderGroup[];
       };
+      addCustomProvider: {
+        params: { id: string; name: string; baseUrl: string };
+        response: ModelProviderGroup[];
+      };
       updateProvider: {
         params: {
           providerId: string;
           apiKey?: string | null;
           baseUrl?: string | null;
+          name?: string | null;
         };
         response: ModelProviderGroup[];
       };
