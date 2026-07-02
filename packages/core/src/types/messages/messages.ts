@@ -71,3 +71,17 @@ export type AssistantMessage = Static<typeof AssistantMessage>;
  */
 export const Message = Type.Union([UserMessage, AssistantMessage]);
 export type Message = UserMessage | AssistantMessage;
+
+/**
+ * The plain text of a message: its text content parts joined by newlines.
+ * Non-text content (e.g. images) is ignored.
+ */
+export function getMessageText(message: Message): string {
+  const parts: string[] = [];
+  for (const c of message.content) {
+    if (c.type === "text") {
+      parts.push(c.text);
+    }
+  }
+  return parts.join("\n");
+}

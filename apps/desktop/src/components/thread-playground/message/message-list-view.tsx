@@ -90,11 +90,12 @@ export function MessageListView({
         </DragDropContext>
         <StreamingMessageListItem streaming={status === "running"} />
         <Button
+          // No top margin: the preceding message / streaming item (or, in the
+          // empty state, the list's own top padding) already provides the gap.
           className={cn(
             "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5",
             dragging && "invisible",
-            readonly && "hidden",
-            !messages || messages?.length === 0 ? "" : "mt-3.5"
+            readonly && "hidden"
           )}
           disabled={readonly}
           variant="secondary"
@@ -152,7 +153,7 @@ function DroppableMessageList({
 
   return (
     <div
-      className="flex flex-col gap-3.5 pt-3"
+      className="flex flex-col pt-3"
       ref={setContainerRef}
       {...droppableProvided.droppableProps}
     >
@@ -170,6 +171,11 @@ function DroppableMessageList({
               <div
                 ref={draggableProvided.innerRef}
                 {...draggableProps}
+                // Spacing lives on the draggable as a margin (not a flex `gap`
+                // on the list) because @hello-pangea/dnd measures item margins
+                // to size the placeholder and compute drag displacement — a
+                // `gap` is invisible to it and offsets every item mid-drag.
+                className="mb-3.5"
                 style={style as CSSProperties}
               >
                 <MessageListItem
@@ -204,7 +210,7 @@ function StreamingMessageListItem({ streaming }: { streaming: boolean }) {
   }
   return (
     <MessageListItem
-      className="mt-3.5"
+      className="mb-3.5"
       message={streamingMessage}
       readonly
       streaming

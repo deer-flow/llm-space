@@ -1,9 +1,9 @@
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
-import type { Message } from "@llm-space/core";
+import { getMessageText, type Message } from "@llm-space/core";
 import {
   BotIcon,
   ChevronDownIcon,
-  GripVerticalIcon,
+  GripHorizontalIcon,
   MinusCircle,
   PlayCircleIcon,
   UserIcon,
@@ -39,6 +39,22 @@ function _MessageListItemHeader({
         message.toolCalls.length > 0),
     [message]
   );
+  // A one-line preview shown beside the role tag while collapsed: the text
+  // content, or a summary of tool calls when there is no text. Only computed
+  // while collapsed — an expanded message re-renders on every streamed token.
+  const preview = useMemo(() => {
+    if (!collapsed) {
+      return "";
+    }
+    const text = getMessageText(message).replace(/\s+/g, " ").trim();
+    if (text) {
+      return text;
+    }
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      return message.toolCalls.map((tc) => `${tc.input.name}()`).join(", ");
+    }
+    return "";
+  }, [collapsed, message]);
   const handleRun = useCallback(async () => {
     await run(message.id);
   }, [run, message.id]);
@@ -52,23 +68,30 @@ function _MessageListItemHeader({
     toggleMessageCollapsed(message.id);
   }, [toggleMessageCollapsed, message.id]);
   return (
-    <header className="flex w-full shrink-0 items-center px-3 pt-2">
+    <header className="relative flex w-full shrink-0 items-center px-2 pt-2">
       <Tooltip content="Drag to reorder">
         <div
           {...dragHandleProps}
           aria-label={`${message.role === "user" ? "User" : "Assistant"} message drag handle`}
           className={cn(
-            "text-muted-foreground hover:text-foreground -ml-3.5 flex shrink-0 cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing",
-            readonly ? "invisible" : ""
+            // A small grab affordance near the top edge, centered (out of
+            // flow, so nothing else moves). `z-20` keeps it above the
+            // positioned collapse-toggle spacer, which is a later sibling and
+            // would otherwise capture the clicks.
+            "text-muted-foreground hover:text-foreground hover:bg-foreground/8 absolute top-0.5 left-1/2 z-20 flex h-4 w-9 -translate-x-1/2 cursor-grab items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-70 active:cursor-grabbing",
+            // Hidden while collapsed: the row shows a content preview instead,
+            // and the centered handle would sit on top of it.
+            collapsed && "hidden",
+            readonly && "invisible"
           )}
         >
-          <GripVerticalIcon className="size-4" />
+          <GripHorizontalIcon className="size-3" />
         </div>
       </Tooltip>
       <div className="flex shrink-0 items-center">
         <Tooltip content="Toggle role">
           <Button
-            className="-translate-x-0.5 px-2"
+            className="px-2"
             variant="outline"
             size="sm"
             aria-label={`Change message role from ${message.role}`}
@@ -92,10 +115,19 @@ function _MessageListItemHeader({
         </Tooltip>
       </div>
       <div
-        className="h-full min-h-full min-w-0 grow"
+        className="relative h-full min-h-full min-w-0 grow"
         onClick={handleToggleMessageCollapse}
       >
         &nbsp;
+        {collapsed && preview && (
+          // Absolutely positioned so the (nowrap) preview never contributes to
+          // the intrinsic width of the surrounding ScrollArea's `display:table`
+          // viewport — otherwise it would grow the whole list instead of
+          // truncating. Its width is bounded by this in-flow grow cell.
+          <span className="text-muted-foreground absolute top-1/2 right-0 left-2 -translate-y-1/2 truncate text-sm">
+            {preview}
+          </span>
+        )}
       </div>
       <div
         className={cn(

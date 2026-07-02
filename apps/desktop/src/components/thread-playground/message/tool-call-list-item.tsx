@@ -12,9 +12,12 @@ function _ToolCallListItem({
   toolCall: ToolCall;
 }) {
   const { run, updateToolCallOutputText } = useThreadStoreActions();
-  const handleOutputChange = useCallback((value: string) => {
-    updateToolCallOutputText(messageId, toolCall.id, value);
-  }, []);
+  const handleOutputChange = useCallback(
+    (value: string) => {
+      updateToolCallOutputText(messageId, toolCall.id, value);
+    },
+    [messageId, toolCall.id, updateToolCallOutputText]
+  );
   const handleRun = useCallback(async () => {
     await run(messageId);
   }, [run, messageId]);
@@ -33,22 +36,16 @@ function _ToolCallListItem({
       <ToolCallInputView input={toolCall.input} />
       <hr />
       <div className="flex w-full flex-col gap-1">
-        <div className="flex w-full flex-col">
-          <div className="text-sm text-[#888cf5]">Response</div>
-        </div>
-        <div className="flex w-full flex-col">
-          <CodeEditor
-            className="max-h-96 min-h-9.5 px-0!"
-            hideBorder
-            hideFocusRing
-            placeholder={`Enter the response of ${toolCall.input.name}()`}
-            value={
-              toolCall.output?.content?.map((c) => c.text).join("\n") ?? ""
-            }
-            onChange={handleOutputChange}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
+        <div className="text-muted-foreground text-xs font-medium">Response</div>
+        <CodeEditor
+          className="max-h-96 min-h-9.5 px-0!"
+          hideBorder
+          hideFocusRing
+          placeholder={`Enter the response of ${toolCall.input.name}()`}
+          value={toolCall.output?.content?.map((c) => c.text).join("\n") ?? ""}
+          onChange={handleOutputChange}
+          onKeyDown={handleKeyDown}
+        />
       </div>
     </div>
   );
@@ -59,13 +56,14 @@ function _ToolCallInputView({ input }: { input: ToolCallInput }) {
   const keys = Object.keys(input.arguments);
   return (
     <div className="block w-full overflow-x-auto font-mono text-sm select-auto">
-      <span className="text-[#888cf5]">{input.name}(</span>
+      <span className="text-primary">{input.name}</span>
+      <span className="text-muted-foreground">(</span>
       {keys.length > 0 && (
         <span className="whitespace-pre">
           {JSON.stringify(input.arguments, null, 2)}
         </span>
       )}
-      <span className="text-[#888cf5]">{")"}</span>
+      <span className="text-muted-foreground">{")"}</span>
     </div>
   );
 }

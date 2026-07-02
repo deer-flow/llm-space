@@ -1,4 +1,7 @@
-import CodeMirror, { type BasicSetupOptions } from "@uiw/react-codemirror";
+import CodeMirror, {
+  type BasicSetupOptions,
+  type ReactCodeMirrorRef,
+} from "@uiw/react-codemirror";
 import {
   forwardRef,
   memo,
@@ -10,6 +13,7 @@ import {
   useState,
   type ClipboardEvent,
   type KeyboardEvent,
+  type MouseEvent,
 } from "react";
 
 import { cn } from "@/lib/utils";
@@ -63,6 +67,7 @@ function _CodeEditor(
   ref: React.ForwardedRef<CodeEditorHandle>
 ) {
   const { resolvedTheme } = { resolvedTheme: "dark" };
+  const cmRef = useRef<ReactCodeMirrorRef>(null);
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(value);
   const committedRef = useRef(value);
@@ -112,6 +117,21 @@ function _CodeEditor(
     isFocusedRef.current = true;
   }, []);
 
+  const handleContainerMouseDown = useCallback(
+    (e: MouseEvent) => {
+      const view = cmRef.current?.view;
+      // Clicks inside CodeMirror are handled by CodeMirror itself; this covers
+      // the container's padding / min-height area so the whole box is clickable.
+      if (readonly || !view || view.dom.contains(e.target as Node)) {
+        return;
+      }
+      e.preventDefault();
+      view.focus();
+      view.dispatch({ selection: { anchor: view.state.doc.length } });
+    },
+    [readonly]
+  );
+
   const handleKeyDownCapture = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Enter" && e.metaKey) {
@@ -149,11 +169,15 @@ function _CodeEditor(
         readonly && "opacity-67",
         className
       )}
+      onMouseDown={handleContainerMouseDown}
     >
       <CodeMirror
+        ref={cmRef}
         className={cn(
           "h-full overflow-auto font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
-          "p-0 px-2 py-1 [&_.cm-line]:p-0!"
+          // Horizontal padding lives on .cm-content (inside the scroller) so
+          // the caret at column 0 is not clipped by the scroller's overflow.
+          "p-0 py-1 [&_.cm-content]:px-2! [&_.cm-line]:p-0!"
         )}
         theme={resolvedTheme === "dark" ? themes.dark : themes.light}
         autoFocus={autoFocus}

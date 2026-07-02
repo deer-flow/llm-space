@@ -1,5 +1,5 @@
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
-import type { ImageDataContent, Message } from "@llm-space/core";
+import { getMessageText, type ImageDataContent, type Message } from "@llm-space/core";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 
@@ -35,15 +35,7 @@ function _MessageListItem({
   collapsed?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
-  const text = useMemo(() => {
-    const result: string[] = [];
-    for (const c of message.content) {
-      if (c.type === "text") {
-        result.push(c.text);
-      }
-    }
-    return result.join("\n");
-  }, [message.content]);
+  const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageDataContent; contentIndex: number }[] = [];
     message.content.forEach((content, contentIndex) => {
@@ -153,7 +145,7 @@ function _MessageListItem({
         dragHandleProps={dragHandleProps}
       />
       <CollapsibleContent collapsed={collapsed}>
-        <main className="flex w-full flex-col">
+        <main className="flex w-full flex-col pb-2">
           {message.role === "assistant" &&
             streaming &&
             !message.thinking &&
@@ -188,7 +180,7 @@ function _MessageListItem({
             />
           )}
           {message.role === "assistant" && message.toolCalls && (
-            <div className="mb-3 flex w-full flex-col gap-3 px-3">
+            <div className="flex w-full flex-col gap-3 px-2">
               {message.toolCalls.map((toolCall) => (
                 <ToolCallListItem
                   key={toolCall.id}

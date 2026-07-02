@@ -46,7 +46,7 @@ function _ToolListItem({
         content={
           <div>
             <div className="font-mono">
-              <span className="font-bold text-[#888cf5]">{tool.name}</span>
+              <span className="text-primary font-bold">{tool.name}</span>
               <span>(</span>
               <span className="whitespace-pre-wrap">
                 {keys.length > 0
