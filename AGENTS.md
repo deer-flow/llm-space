@@ -30,6 +30,20 @@ skill at `./.agents/skills/electrobun-cdp-debug/SKILL.md`. Do **not** mock
 Start with `bun run dev:cef`; normal `bun dev` keeps the native WebView renderer
 and does not expose CDP.
 
+When CEF/CDP verification needs an isolated app data root, put runtime sandbox
+data in the system temporary directory by default, not under `.agents/` or the
+repo:
+
+```sh
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
+LLM_SPACE_ROOT="$TMP_ROOT" bun run dev:cef
+```
+
+Only keep durable evidence in the repo, such as audit screenshots, notes, logs,
+and small redacted JSON snippets. Do not commit or leave routine `workspace/`,
+`settings/`, caches, or generated app data under `.agents/kaizen-loop/` unless a
+fixture is intentionally preserved for review and the reason is documented.
+
 ## Architecture
 
 Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
