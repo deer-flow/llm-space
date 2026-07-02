@@ -259,7 +259,18 @@ function PageInner() {
           <ResizablePanel minSize={640}>
             {tabs.tabs.length === 0 ? (
               <Welcome
-                onNewFile={() => executeCommand({ type: "newFile", args: {} })}
+                onNewStarter={() =>
+                  executeCommand({
+                    type: "newFile",
+                    args: { template: "starter" },
+                  })
+                }
+                onNewFile={() =>
+                  executeCommand({
+                    type: "newFile",
+                    args: { template: "blank" },
+                  })
+                }
                 onModels={() =>
                   executeCommand({
                     type: "openSettings",

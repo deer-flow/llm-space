@@ -228,12 +228,12 @@ export function ThreadTabs({
               }))}
               pinnedRight={
                 <div className="flex h-full items-center pt-0.5 pl-1.5">
-                  <Tooltip content="New file">
+                  <Tooltip content="New blank thread">
                     <Button
                       className="hover:bg-primary! rounded-full"
                       size="icon-sm"
                       variant="ghost"
-                      aria-label="New file"
+                      aria-label="New blank thread"
                       onMouseDown={_preventFocusSteal}
                       onClick={onNewFile}
                     >

@@ -20,10 +20,12 @@ export interface GenericCommand<T extends string, A = Record<string, never>> {
  * `rename` is true the tree starts an in-place rename on the new file (used by
  * the tree/root "New file" icons); otherwise it is auto-named and opened
  * immediately (used by the ⌘N menu, the tab-bar "+", and the welcome screen).
+ * `template` defaults to `"blank"`; `"starter"` creates the first-use example
+ * thread used by the empty workspace welcome state.
  */
 export interface NewFileCommand extends GenericCommand<
   "newFile",
-  { parent?: string; rename?: boolean }
+  { parent?: string; rename?: boolean; template?: "blank" | "starter" }
 > {}
 
 /** Create a new folder (with in-place rename). `parent` defaults to the root. */

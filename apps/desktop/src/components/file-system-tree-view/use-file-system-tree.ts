@@ -1,6 +1,6 @@
 "use client";
 
-import { uuid, type FileNode } from "@llm-space/core";
+import type { FileNode } from "@llm-space/core";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +13,12 @@ import {
   parentOf,
   threadTitleFromPath,
 } from "@/lib/thread-file";
+import {
+  createBlankThread,
+  createStarterThread,
+  STARTER_THREAD_STEM,
+  type ThreadTemplate,
+} from "@/shared/thread-starters";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {
@@ -78,6 +84,28 @@ function uniqueUntitled(
 }
 
 /**
+ * Pick an unused name for a preferred file stem, preserving a predictable first
+ * name (`agent-starter.json`) while avoiding collisions beside existing files.
+ */
+function _uniquePreferredName(
+  names: Set<string>,
+  stem: string,
+  ext: string
+): string {
+  const preferred = `${stem}${ext}`;
+  if (!names.has(preferred)) {
+    return preferred;
+  }
+  let n = 1;
+  let candidate = `${stem}-${n}${ext}`;
+  while (names.has(candidate)) {
+    n += 1;
+    candidate = `${stem}-${n}${ext}`;
+  }
+  return candidate;
+}
+
+/**
  * The collision-free `_copy` name for duplicating `name` in a directory:
  * `foo_copy`, then `foo_copy_2`, `foo_copy_3`, … A `.json` extension (the only
  * file kind shown in the tree) is preserved on the stem.
@@ -119,8 +147,11 @@ export interface FileSystemTree {
   refresh: () => void;
   /** Create an auto-named `untitled` folder under `parent`; returns its path. */
   createFolder: (parent: string) => Promise<string | null>;
-  /** Create an auto-named `untitled.json` thread under `parent`; returns its path. */
-  createFile: (parent: string) => Promise<string | null>;
+  /** Create an auto-named thread under `parent`; returns its path. */
+  createFile: (
+    parent: string,
+    options?: { template?: ThreadTemplate }
+  ) => Promise<string | null>;
   /** Delete a file or directory; resolves to whether it succeeded. */
   remove: (path: string) => Promise<boolean>;
   /** Copy a file/directory beside itself as `<name>_copy`; returns the new path. */
@@ -250,22 +281,27 @@ export function useFileSystemTree(): FileSystemTree {
   );
 
   const createFile = useCallback(
-    async (parent: string): Promise<string | null> => {
+    async (
+      parent: string,
+      options: { template?: ThreadTemplate } = {}
+    ): Promise<string | null> => {
       let path: string;
       try {
         const names = new Set((await localFs.ls(parent)).map((n) => n.name));
-        const { name } = uniqueUntitled(names, ".json");
+        const template = options.template ?? "blank";
+        const name =
+          template === "starter"
+            ? _uniquePreferredName(names, STARTER_THREAD_STEM, ".json")
+            : uniqueUntitled(names, ".json").name;
         path = joinPath(parent, name);
+        const title = threadTitleFromPath(path);
         // Model-less by default; the UI resolves a fallback model at run time.
-        // Seed a single empty user message to edit.
-        await localFs.write(path, {
-          title: threadTitleFromPath(path),
-          context: {
-            messages: [
-              { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
-            ],
-          },
-        });
+        await localFs.write(
+          path,
+          template === "starter"
+            ? createStarterThread(title)
+            : createBlankThread(title)
+        );
       } catch (err) {
         toast.error((err as Error).message);
         return null;

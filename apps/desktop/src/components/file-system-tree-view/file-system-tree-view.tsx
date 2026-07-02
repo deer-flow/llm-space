@@ -26,6 +26,7 @@ import {
 } from "@/lib/thread-file";
 import { useFullScreen } from "@/lib/use-full-screen";
 import { cn } from "@/lib/utils";
+import type { ThreadTemplate } from "@/shared/thread-starters";
 
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree } from "./use-file-system-tree";
@@ -92,11 +93,11 @@ export function FileSystemTreeView({
     onSelectFile?.(path);
   }
 
-  // Quick "new thread" flow (⌘N menu, tab-bar "+", welcome screen): create an
-  // auto-named thread in `parent` (root by default), no in-place rename.
+  // Quick thread flow (⌘N/menu/tab-bar/welcome): create an auto-named thread in
+  // `parent` (root by default), no in-place rename, then open it.
   const createThread = useCallback(
-    async (parent = "") => {
-      const path = await createFile(parent);
+    async (parent = "", template: ThreadTemplate = "blank") => {
+      const path = await createFile(parent, { template });
       if (path) setPendingThread(path);
     },
     [createFile]
@@ -107,9 +108,9 @@ export function FileSystemTreeView({
   // auto-named flow; the tree/root "New file" icons pass `rename: true` for the
   // in-place rename flow.
   useRegisterCommands({
-    newFile: ({ parent = "", rename }) => {
+    newFile: ({ parent = "", rename, template = "blank" }) => {
       if (rename) void create(parent, "file");
-      else void createThread(parent);
+      else void createThread(parent, template);
     },
     newFolder: ({ parent = "" }) => void create(parent, "folder"),
     renameFile: ({ path }) => startRenameByPath(path),

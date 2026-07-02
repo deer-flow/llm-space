@@ -24,11 +24,17 @@ import {
 
 interface WelcomeProps {
   className?: string;
+  onNewStarter?: () => void;
   onNewFile?: () => void;
   onModels?: () => void;
 }
 
-export function Welcome({ className, onNewFile, onModels }: WelcomeProps) {
+export function Welcome({
+  className,
+  onNewStarter,
+  onNewFile,
+  onModels,
+}: WelcomeProps) {
   const { executeCommand } = useCommands();
 
   const handleHeaderDoubleClick = useCallback(() => {
@@ -61,14 +67,18 @@ export function Welcome({ className, onNewFile, onModels }: WelcomeProps) {
           </EmptyMedia>
           <EmptyTitle>Welcome to LLM Space</EmptyTitle>
           <EmptyDescription>
-            Create a new thread file to get started. Or open an existing one
-            from the left side panel.
+            Start with a ready agent thread, create a blank one, or open an
+            existing file from the left side panel.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center gap-2">
-          <Button onClick={onNewFile}>
+          <Button onClick={onNewStarter}>
+            <SparklesIcon />
+            Start from Example
+          </Button>
+          <Button variant="outline" onClick={onNewFile}>
             <PlusIcon />
-            New thread
+            Blank thread
           </Button>
           <Button variant="outline" onClick={onModels}>
             <SettingsIcon />
