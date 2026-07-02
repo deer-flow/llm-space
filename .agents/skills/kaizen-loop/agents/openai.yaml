@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kaizen Loop"
+  short_description: "Ship one measured project improvement"
+  default_prompt: "Use $kaizen-loop to find, complete, verify, and log one scoped improvement with a north-star metric."
