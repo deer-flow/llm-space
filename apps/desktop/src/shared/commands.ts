@@ -173,36 +173,35 @@ export type CommandArgs<T extends CommandType> = Extract<
 /**
  * Where a command executes: `"webview"` commands run in the renderer (tab /
  * tree / sidebar state); `"bun"` commands run in the main process (window
- * zoom / reload). `label` is the human-facing name in sentence case (e.g. for a
- * command palette or context menu); the native menu keeps its own Title-Case
- * wording independently.
+ * zoom / reload). `label` is the human-facing name in Title Case (e.g. for a
+ * command palette or context menu), matching dropdown/context/native menus.
  */
 export const COMMAND_META: Record<
   CommandType,
   { label: string; target: "webview" | "bun" }
 > = {
-  newFile: { label: "New file", target: "webview" },
-  newFolder: { label: "New folder", target: "webview" },
+  newFile: { label: "New File", target: "webview" },
+  newFolder: { label: "New Folder", target: "webview" },
   renameFile: { label: "Rename", target: "webview" },
   duplicateFile: { label: "Duplicate", target: "webview" },
-  deleteFile: { label: "Move to trash", target: "webview" },
+  deleteFile: { label: "Move to Trash", target: "webview" },
   revealFile: { label: "Reveal in Finder", target: "webview" },
   refreshTree: { label: "Refresh", target: "webview" },
-  closeTab: { label: "Close tab", target: "webview" },
-  closeOtherTabs: { label: "Close other tabs", target: "webview" },
-  closeAllTabs: { label: "Close all tabs", target: "webview" },
-  reopenClosedTab: { label: "Reopen closed tab", target: "webview" },
-  toggleSidebar: { label: "Toggle sidebar", target: "webview" },
+  closeTab: { label: "Close Tab", target: "webview" },
+  closeOtherTabs: { label: "Close Other Tabs", target: "webview" },
+  closeAllTabs: { label: "Close All Tabs", target: "webview" },
+  reopenClosedTab: { label: "Reopen Closed Tab", target: "webview" },
+  toggleSidebar: { label: "Toggle Sidebar", target: "webview" },
   openSettings: { label: "Settings", target: "webview" },
-  openModelSettings: { label: "Configure model settings", target: "webview" },
-  openCommandPalette: { label: "Command palette", target: "webview" },
+  openModelSettings: { label: "Configure Model Settings", target: "webview" },
+  openCommandPalette: { label: "Command Palette", target: "webview" },
   openOnboard: { label: "Onboard...", target: "webview" },
-  runThread: { label: "Run thread", target: "webview" },
-  zoomIn: { label: "Zoom in", target: "bun" },
-  zoomOut: { label: "Zoom out", target: "bun" },
-  resetZoom: { label: "Reset zoom", target: "bun" },
+  runThread: { label: "Run Thread", target: "webview" },
+  zoomIn: { label: "Zoom In", target: "bun" },
+  zoomOut: { label: "Zoom Out", target: "bun" },
+  resetZoom: { label: "Reset Zoom", target: "bun" },
   reload: { label: "Reload", target: "bun" },
-  openLink: { label: "Open link", target: "bun" },
+  openLink: { label: "Open Link", target: "bun" },
   openDocument: { label: "Documents", target: "bun" },
-  reportBugs: { label: "Report bug", target: "bun" },
+  reportBugs: { label: "Report Bug", target: "bun" },
 };

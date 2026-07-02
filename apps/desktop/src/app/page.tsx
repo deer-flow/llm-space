@@ -150,6 +150,18 @@ function PageInner() {
                 close={(path) =>
                   executeCommand({ type: "closeTab", args: { path } })
                 }
+                closeOthers={(path) =>
+                  executeCommand({ type: "closeOtherTabs", args: { path } })
+                }
+                closeAll={() =>
+                  executeCommand({ type: "closeAllTabs", args: {} })
+                }
+                reveal={(path) =>
+                  executeCommand({ type: "revealFile", args: { path } })
+                }
+                moveToTrash={(path) =>
+                  executeCommand({ type: "deleteFile", args: { path } })
+                }
                 reorder={tabs.reorder}
                 onNewFile={() => executeCommand({ type: "newFile", args: {} })}
                 onMove={tabs.handleMove}

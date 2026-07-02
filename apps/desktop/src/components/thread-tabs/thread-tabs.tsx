@@ -4,17 +4,40 @@ import { Tabs } from "@sinm/react-chrome-tabs";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
 import { PlusIcon, SidebarCloseIcon, SidebarOpenIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 
 import { electrobun } from "@/lib/electrobun";
 import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../ui/context-menu";
 import { Kbd, KbdGroup } from "../ui/kbd";
 
 import { ThreadTabPane } from "./thread-tab-pane";
 import { tabLabel, type ThreadTab } from "./use-thread-tabs";
+
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
+
+const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
+const MOVE_TO_TRASH_LABEL = _isWindows
+  ? "Move to Recycle Bin"
+  : "Move to Trash";
 
 interface ThreadTabsProps {
   className?: string;
@@ -24,6 +47,10 @@ interface ThreadTabsProps {
   fullScreen?: boolean;
   activate: (path: string) => void;
   close: (path: string) => void;
+  closeOthers: (path: string) => void;
+  closeAll: () => void;
+  reveal: (path: string) => void;
+  moveToTrash: (path: string) => void;
   reorder: (from: number, to: number) => void;
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
@@ -39,6 +66,10 @@ export function ThreadTabs({
   fullScreen = false,
   activate,
   close,
+  closeOthers,
+  closeAll,
+  reveal,
+  moveToTrash,
   reorder,
   onNewFile,
   onMove,
@@ -50,6 +81,7 @@ export function ThreadTabs({
   // lib's own updateTab never touches `title`, so this survives label/active
   // updates; we re-apply whenever the tab set changes (covers adds/reorders).
   const containerRef = useRef<HTMLDivElement>(null);
+  const [contextMenuPath, setContextMenuPath] = useState<string | null>(null);
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
@@ -109,71 +141,131 @@ export function ThreadTabs({
     };
   }, [tabs.length, handleTabsHeaderDoubleClick]);
 
+  const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      setContextMenuPath(null);
+      event.preventDefault();
+      return;
+    }
+
+    const tab = target.closest<HTMLElement>(".chrome-tab[data-tab-id]");
+    const path = tab?.getAttribute("data-tab-id") ?? null;
+    setContextMenuPath(path);
+    if (path === null) {
+      event.preventDefault();
+    }
+  }, []);
+
+  const hasOtherTabs =
+    contextMenuPath !== null && tabs.some((tab) => tab.path !== contextMenuPath);
+
   return (
     <div
       ref={containerRef}
       className={cn("flex size-full flex-col", className)}
     >
-      <div className="bg-tabs relative flex w-full">
-        <div
-          className={cn(
-            "flex h-full items-center border-b-4 pt-1 transition-[width]",
-            fullScreen ? "w-6 pl-1" : sidebarOpen ? "w-6 pl-1" : "w-23 pl-18"
-          )}
-        >
-          <Tooltip
-            content={
-              <>
-                {sidebarOpen ? "Hide sidebar" : "Show sidebar"}{" "}
-                <KbdGroup>
-                  <Kbd className="text-foreground!">⌘ B</Kbd>
-                </KbdGroup>
-              </>
-            }
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className="bg-tabs relative flex w-full"
+            onContextMenu={handleContextMenu}
           >
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-              onClick={onToggleSidebar}
-            >
-              {sidebarOpen ? (
-                <SidebarCloseIcon className="size-4" />
-              ) : (
-                <SidebarOpenIcon className="size-4" />
+            <div
+              className={cn(
+                "flex h-full items-center border-b-4 pt-1 transition-[width]",
+                fullScreen
+                  ? "w-6 pl-1"
+                  : sidebarOpen
+                    ? "w-6 pl-1"
+                    : "w-23 pl-18"
               )}
-            </Button>
-          </Tooltip>
-        </div>
-        <Tabs
-          className="grow"
-          darkMode
-          tabs={tabs.map((tab) => ({
-            id: tab.path,
-            title: tabLabel(tab.path),
-            favicon: false,
-            active: tab.path === activePath,
-          }))}
-          pinnedRight={
-            <div className="flex h-full items-center pt-0.5 pl-1.5">
-              <Tooltip content="New file">
+            >
+              <Tooltip
+                content={
+                  <>
+                    {sidebarOpen ? "Hide sidebar" : "Show sidebar"}{" "}
+                    <KbdGroup>
+                      <Kbd className="text-foreground!">⌘ B</Kbd>
+                    </KbdGroup>
+                  </>
+                }
+              >
                 <Button
-                  className="hover:bg-primary! rounded-full"
                   size="icon-sm"
                   variant="ghost"
-                  aria-label="New file"
-                  onClick={onNewFile}
+                  aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                  onClick={onToggleSidebar}
                 >
-                  <PlusIcon className="size-3.5" />
+                  {sidebarOpen ? (
+                    <SidebarCloseIcon className="size-4" />
+                  ) : (
+                    <SidebarOpenIcon className="size-4" />
+                  )}
                 </Button>
               </Tooltip>
             </div>
-          }
-          onTabActive={activate}
-          onTabClose={close}
-          onTabReorder={(_id, from, to) => reorder(from, to)}
-        />
-      </div>
+            <Tabs
+              className="grow"
+              darkMode
+              tabs={tabs.map((tab) => ({
+                id: tab.path,
+                title: tabLabel(tab.path),
+                favicon: false,
+                active: tab.path === activePath,
+              }))}
+              pinnedRight={
+                <div className="flex h-full items-center pt-0.5 pl-1.5">
+                  <Tooltip content="New file">
+                    <Button
+                      className="hover:bg-primary! rounded-full"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="New file"
+                      onClick={onNewFile}
+                    >
+                      <PlusIcon className="size-3.5" />
+                    </Button>
+                  </Tooltip>
+                </div>
+              }
+              onTabActive={activate}
+              onTabClose={close}
+              onTabReorder={(_id, from, to) => reorder(from, to)}
+            />
+          </div>
+        </ContextMenuTrigger>
+        {contextMenuPath !== null ? (
+          <ContextMenuContent className="w-44">
+            <ContextMenuGroup>
+              <ContextMenuItem onSelect={() => close(contextMenuPath)}>
+                Close
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={!hasOtherTabs}
+                onSelect={() => closeOthers(contextMenuPath)}
+              >
+                Close Others
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={closeAll}>
+                Close All
+              </ContextMenuItem>
+            </ContextMenuGroup>
+            <ContextMenuSeparator />
+            <ContextMenuGroup>
+              <ContextMenuItem onSelect={() => reveal(contextMenuPath)}>
+                {REVEAL_LABEL}
+              </ContextMenuItem>
+              <ContextMenuItem
+                variant="destructive"
+                onSelect={() => moveToTrash(contextMenuPath)}
+              >
+                {MOVE_TO_TRASH_LABEL}
+              </ContextMenuItem>
+            </ContextMenuGroup>
+          </ContextMenuContent>
+        ) : null}
+      </ContextMenu>
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => (
           <ThreadTabPane

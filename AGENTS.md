@@ -114,7 +114,7 @@ Prefer dropping new images into the existing `src/mainview/public/images/` folde
 - **`ui/`** is generated shadcn/ui — **don't hand-edit** (also ESLint-ignored). Add components with `bunx --bun shadcn@latest add <component>`.
 - Prefer the **app-level wrappers** in `components/` over the raw shadcn primitives. In particular, **Tooltips must use `@/components/tooltip`** (`<Tooltip content={...}>…</Tooltip>`) — do **not** import `Tooltip`/`TooltipTrigger`/`TooltipContent` from `ui/tooltip` directly. The only direct use of the primitive is `TooltipProvider`, wired once in `app/layout.tsx`.
 - **Confirmations**: gate destructive or irreversible actions (delete a file, remove a provider) behind `ConfirmDialog` from `@/components/confirm-dialog` — don't fire them straight from a click.
-- **Menus, commands, and human-facing labels**: every cross-boundary action is a `Command` (`shared/commands.ts`); its `type` is camelCase. Labels in `COMMAND_META` are **sentence case** ("New file", "Close tab") for the command palette / context menus; native menu items in `bun/app/menu.ts` keep their own **Title Case** wording ("New File", "Close Tab"). Route everything through `executeCommand` rather than calling handlers directly.
+- **Menus, commands, and human-facing labels**: every cross-boundary action is a `Command` (`shared/commands.ts`); its `type` is camelCase. Labels in `COMMAND_META`, native menus, context menus, dropdown menus, and similar menu-like surfaces are **Title Case** ("New File", "Close Tab", "Move to Trash"). Route everything through `executeCommand` rather than calling handlers directly.
 
 ### Performance
 
