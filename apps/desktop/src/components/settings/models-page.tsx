@@ -301,16 +301,16 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
           <CommandInput placeholder="Search providers..." />
           <CommandList className="max-h-72">
             <CommandEmpty>No providers found.</CommandEmpty>
-            <CommandGroup heading="User custom provider">
+            <CommandGroup heading="Customized">
               <CommandItem
-                value="User custom provider"
+                value="Add custom provider"
                 onSelect={() => {
                   setOpen(false);
                   void addCustomProvider("Custom provider", "").then(onAdd);
                 }}
               >
                 <ProviderAvatar id="custom-provider" name="Custom provider" />
-                <span className="line-clamp-1 grow">User custom provider</span>
+                <span className="line-clamp-1 grow">Add custom provider</span>
               </CommandItem>
             </CommandGroup>
             {groups.map((group) => (
@@ -632,33 +632,35 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </>
           )}
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Icon</label>
-            <div className="flex items-center gap-2">
-              <ProviderAvatar
-                id={provider.id}
-                name={provider.name}
-                icon={iconDraft.trim() || undefined}
-              />
-              <Input
-                value={iconDraft}
-                placeholder="Auto (e.g. openai, anthropic, google)"
-                aria-label={`${provider.name} icon`}
-                onChange={(e) => setIconDraft(e.target.value)}
-                onBlur={handleIconBlur}
-              />
+          {!isBuiltin && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Icon</label>
+              <div className="flex items-center gap-2">
+                <ProviderAvatar
+                  id={provider.id}
+                  name={provider.name}
+                  icon={iconDraft.trim() || undefined}
+                />
+                <Input
+                  value={iconDraft}
+                  placeholder="Auto (e.g. openai, anthropic, google)"
+                  aria-label={`${provider.name} icon`}
+                  onChange={(e) => setIconDraft(e.target.value)}
+                  onBlur={handleIconBlur}
+                />
+              </div>
+              <div className="text-muted-foreground text-xs">
+                A{" "}
+                <Link
+                  href="https://icons.lobehub.com"
+                  className="underline underline-offset-2"
+                >
+                  @lobehub/icons
+                </Link>{" "}
+                keyword. Leave blank to auto-resolve from the provider name.
+              </div>
             </div>
-            <div className="text-muted-foreground text-xs">
-              A{" "}
-              <Link
-                href="https://icons.lobehub.com"
-                className="underline underline-offset-2"
-              >
-                @lobehub/icons
-              </Link>{" "}
-              keyword. Leave blank to auto-resolve from the provider name.
-            </div>
-          </div>
+          )}
 
           {provider.id !== "openai-codex" && (
             <div className="flex flex-col gap-2">
