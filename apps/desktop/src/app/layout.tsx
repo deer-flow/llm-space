@@ -3,6 +3,7 @@ import "@fontsource-variable/geist-mono/index.css";
 import { ModelProviderGroup } from "@llm-space/core";
 
 import { ModelProvider } from "@/components/model-provider";
+import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { electrobun } from "@/lib/electrobun";
@@ -12,21 +13,31 @@ import { QueryProvider } from "./query-provider";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <QueryProvider>
-      <ModelProvider fetcher={fetchModels}>
-        <TooltipProvider delayDuration={1000}>
-          <div className="flex size-full flex-col">
-            <Toaster
-              theme="dark"
-              position="top-center"
-              offset={28}
-              closeButton
-            />
-            {children}
-          </div>
-        </TooltipProvider>
-      </ModelProvider>
-    </QueryProvider>
+    <ThemeProvider>
+      <QueryProvider>
+        <ModelProvider fetcher={fetchModels}>
+          <TooltipProvider delayDuration={1000}>
+            <div className="flex size-full flex-col">
+              <ThemedToaster />
+              {children}
+            </div>
+          </TooltipProvider>
+        </ModelProvider>
+      </QueryProvider>
+    </ThemeProvider>
+  );
+}
+
+/** Sonner toaster that tracks the active appearance. */
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      theme={resolvedTheme}
+      position="top-center"
+      offset={28}
+      closeButton
+    />
   );
 }
 

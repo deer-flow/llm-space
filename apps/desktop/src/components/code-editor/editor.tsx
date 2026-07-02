@@ -16,6 +16,7 @@ import {
   type MouseEvent,
 } from "react";
 
+import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
 import { createExtensions } from "./extensions";
@@ -66,7 +67,7 @@ function _CodeEditor(
   },
   ref: React.ForwardedRef<CodeEditorHandle>
 ) {
-  const { resolvedTheme } = { resolvedTheme: "dark" };
+  const { resolvedTheme } = useTheme();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(value);

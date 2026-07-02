@@ -1,9 +1,46 @@
 <!doctype html>
-<html lang="en" class="dark h-screen w-screen" suppressHydrationWarning>
+<html lang="en" class="h-screen w-screen" suppressHydrationWarning>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LLM Space</title>
+    <script>
+      // Apply the persisted appearance before first paint to avoid a flash of
+      // the wrong theme/accent. Mirrors the logic in theme-provider.tsx — keep
+      // the storage keys ("llm-space-theme", "llm-space-primary") in sync.
+      (function () {
+        try {
+          var root = document.documentElement;
+          var theme = localStorage.getItem("llm-space-theme") || "system";
+          var dark =
+            theme === "dark" ||
+            (theme === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          root.classList.toggle("dark", dark);
+
+          var primary = localStorage.getItem("llm-space-primary");
+          if (primary && /^#[0-9a-fA-F]{6}$/.test(primary)) {
+            var n = parseInt(primary.slice(1), 16);
+            var lin = function (c) {
+              var s = c / 255;
+              return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+            };
+            var lum =
+              0.2126 * lin((n >> 16) & 255) +
+              0.7152 * lin((n >> 8) & 255) +
+              0.0722 * lin(n & 255);
+            root.style.setProperty("--primary", primary);
+            root.style.setProperty("--ring", primary);
+            root.style.setProperty(
+              "--primary-foreground",
+              lum > 0.45 ? "oklch(0.216 0.006 56)" : "oklch(0.985 0 0)"
+            );
+          }
+        } catch (e) {
+          // localStorage unavailable — fall back to the default appearance.
+        }
+      })();
+    </script>
   </head>
   <body class="size-full font-sans select-none">
     <div id="root" class="size-full"></div>

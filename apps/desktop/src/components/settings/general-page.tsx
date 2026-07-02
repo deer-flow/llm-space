@@ -3,6 +3,11 @@
 import type { ReactNode } from "react";
 
 import {
+  usePrimaryColor,
+  useTheme,
+  type Theme,
+} from "@/components/theme-provider";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -11,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
+import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
 
 /** A single label-on-the-left, control-on-the-right settings row. */
@@ -30,15 +36,19 @@ function SettingsRow({
 }
 
 export function GeneralPage() {
+  const { theme, setTheme } = useTheme();
+  const { primaryColor, setPrimaryColor } = usePrimaryColor();
   return (
     <SettingsPage title="General">
       <SettingsRow label="Appearance">
-        <Select defaultValue="dark" disabled>
+        <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
           <SelectTrigger className="w-32" aria-label="Appearance">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="light">Light</SelectItem>
             <SelectItem value="dark">Dark</SelectItem>
+            <SelectItem value="system">System</SelectItem>
           </SelectContent>
         </Select>
       </SettingsRow>
@@ -46,17 +56,10 @@ export function GeneralPage() {
       <Separator />
 
       <SettingsRow label="Primary color">
-        <Select defaultValue="default" disabled>
-          <SelectTrigger className="w-32" aria-label="Primary color">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">
-              <span className="bg-primary size-2.5 shrink-0 rounded-full" />
-              Default
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <PrimaryColorPicker
+          value={primaryColor}
+          onChange={setPrimaryColor}
+        />
       </SettingsRow>
 
       <Separator />

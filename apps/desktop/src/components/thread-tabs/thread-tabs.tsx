@@ -13,6 +13,7 @@ import {
   type MouseEvent,
 } from "react";
 
+import { useTheme } from "@/components/theme-provider";
 import { electrobun } from "@/lib/electrobun";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,10 @@ const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
 const MOVE_TO_TRASH_LABEL = _isWindows
   ? "Move to Recycle Bin"
   : "Move to Trash";
+
+// Suppress focus on mouse-down so a click doesn't leave these toolbar icons
+// with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
+const _preventFocusSteal = (e: MouseEvent) => e.preventDefault();
 
 interface ThreadTabsProps {
   className?: string;
@@ -75,6 +80,7 @@ export function ThreadTabs({
   onMove,
   onToggleSidebar,
 }: ThreadTabsProps) {
+  const { resolvedTheme } = useTheme();
   // The chrome-tabs lib renders tab DOM imperatively and exposes no tooltip prop,
   // but it stamps each tab's full path onto `data-tab-id`. Mirror that into the
   // native `title` attribute so hovering a tab reveals its relative path. The
@@ -173,7 +179,10 @@ export function ThreadTabs({
           >
             <div
               className={cn(
-                "flex h-full items-center border-b-4 pt-1 transition-[width]",
+                // border-b-4 continues chrome-tabs' bottom bar across the toggle
+                // area, so its color must match that bar (--tab-bar-bottom), not
+                // the default --border.
+                "flex h-full items-center border-b-4 [border-color:var(--tab-bar-bottom)] pt-1 transition-[width]",
                 fullScreen
                   ? "w-6 pl-1"
                   : sidebarOpen
@@ -195,6 +204,7 @@ export function ThreadTabs({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                  onMouseDown={_preventFocusSteal}
                   onClick={onToggleSidebar}
                 >
                   {sidebarOpen ? (
@@ -207,7 +217,7 @@ export function ThreadTabs({
             </div>
             <Tabs
               className="grow"
-              darkMode
+              darkMode={resolvedTheme === "dark"}
               tabs={tabs.map((tab) => ({
                 id: tab.path,
                 title: tabLabel(tab.path),
@@ -222,6 +232,7 @@ export function ThreadTabs({
                       size="icon-sm"
                       variant="ghost"
                       aria-label="New file"
+                      onMouseDown={_preventFocusSteal}
                       onClick={onNewFile}
                     >
                       <PlusIcon className="size-3.5" />

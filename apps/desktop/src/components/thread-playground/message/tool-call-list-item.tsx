@@ -32,7 +32,7 @@ function _ToolCallListItem({
     [handleRun]
   );
   return (
-    <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3 shadow-md">
+    <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <ToolCallInputView input={toolCall.input} />
       <hr />
       <div className="flex w-full flex-col gap-1">

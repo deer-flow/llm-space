@@ -71,7 +71,7 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
   --animate-shine: shine var(--duration) infinite linear;
-  --color-tabs: #202124;
+  --color-tabs: var(--tabs);
 
   @keyframes shine {
     0% {
@@ -139,6 +139,15 @@
   --sidebar-ring: oklch(0.708 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  --textarea: oklch(0.985 0 0);
+  /* Neutral tab-bar strip for light mode. The chrome-tabs library ships a
+     bluish Chrome palette (#dee1e6) that clashes with the app's neutral grays;
+     the overrides at the end of this file recolor the tabs to match this. */
+  --tabs: oklch(0.928 0 0);
+  /* Color of chrome-tabs' 4px bottom bar (the content-colored strip the active
+     tab merges into). The sidebar-toggle wrapper's border-b-4 mirrors this bar,
+     so it must match. Light: content white; dark keeps the library's #323639. */
+  --tab-bar-bottom: var(--background);
 
   --font-sans: "Geist Variable", system-ui, sans-serif;
   --font-mono: monospace;
@@ -182,7 +191,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --color-tabs: #202124;
+  --tabs: #202124;
+  --tab-bar-bottom: #323639;
 
   font-weight: 300;
 
@@ -251,4 +261,36 @@
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/*
+ * Light-mode chrome-tabs palette.
+ * @sinm/react-chrome-tabs ships a bluish Chrome light theme (#dee1e6 strip,
+ * #5f6368 titles, #a9adb0 dividers) that clashes with the app's neutral,
+ * white-content design. Recolor it to the app tokens for the light case only —
+ * the dark case is styled by chrome-tabs-dark-theme.css, so we scope to
+ * `:not(.chrome-tabs-dark-theme)`. Unlayered so it wins over the library CSS
+ * (same reasoning as the scrollbar block above).
+ */
+.chrome-tabs:not(.chrome-tabs-dark-theme) {
+  background: var(--tabs);
+
+  /* Active tab merges into the white content area below it. */
+  .chrome-tab[active] .chrome-tab-background > svg .chrome-tab-geometry {
+    fill: var(--background);
+  }
+  /* Inactive tab (shown on hover) sits a touch above the strip. */
+  .chrome-tab .chrome-tab-background > svg .chrome-tab-geometry {
+    fill: oklch(0.96 0 0);
+  }
+  .chrome-tab .chrome-tab-title {
+    color: var(--muted-foreground);
+  }
+  .chrome-tab[active] .chrome-tab-title {
+    color: var(--foreground);
+  }
+  .chrome-tab .chrome-tab-dividers::before,
+  .chrome-tab .chrome-tab-dividers::after {
+    background: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+  }
 }
