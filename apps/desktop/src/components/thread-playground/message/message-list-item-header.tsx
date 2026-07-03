@@ -130,7 +130,7 @@ function _MessageListItemHeader({
       </div>
       <div
         className={cn(
-          "flex shrink-0 items-center opacity-0 transition-opacity",
+          "flex shrink-0 items-center opacity-0",
           !readonly && "group-hover:opacity-100"
         )}
       >
