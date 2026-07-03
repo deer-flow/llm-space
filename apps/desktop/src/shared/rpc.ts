@@ -65,6 +65,7 @@ export interface DesktopRPCType {
           providerId: string;
           apiKey?: string | null;
           baseUrl?: string | null;
+          headers?: Record<string, string> | null;
           name?: string | null;
           api?:
             | "anthropic-messages"

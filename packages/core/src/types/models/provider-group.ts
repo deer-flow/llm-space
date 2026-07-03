@@ -17,6 +17,8 @@ export interface ModelProviderGroup {
   apiKey?: string;
   /** Custom base URL override. Empty/absent means the provider default. */
   baseUrl?: string;
+  /** Extra HTTP headers sent with every request to this provider. */
+  headers?: Record<string, string>;
   /** API compatibility mode for a custom provider. */
   api?: "anthropic-messages" | "openai-completions" | "openai-responses";
   /** Model ids the user has disabled. Everything not listed is enabled. */

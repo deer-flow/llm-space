@@ -767,6 +767,8 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
+          {!isBuiltin && <ProviderHeadersEditor provider={provider} />}
+
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Models</span>
@@ -871,6 +873,96 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
         providerApi={isBuiltin ? undefined : apiValue}
         model={editingModel}
       />
+    </div>
+  );
+}
+
+/**
+ * Key-value editor for a custom provider's extra HTTP headers. Rows live in
+ * local state so half-typed entries survive re-renders; only rows with a
+ * non-empty name are persisted, on blur or row removal.
+ */
+function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
+  const updateProvider = useUpdateProvider();
+  const [rows, setRows] = useState<{ key: string; value: string }[]>(() =>
+    Object.entries(provider.headers ?? {}).map(([key, value]) => ({
+      key,
+      value,
+    }))
+  );
+
+  const setRow = (index: number, row: { key: string; value: string }) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? row : r)));
+  };
+
+  // Persist the named rows when they differ from the stored headers. An empty
+  // set clears the field (stored as `null`).
+  const persist = (nextRows: { key: string; value: string }[]) => {
+    const headers: Record<string, string> = {};
+    for (const row of nextRows) {
+      const key = row.key.trim();
+      if (key !== "") headers[key] = row.value;
+    }
+    const current = provider.headers ?? {};
+    const currentKeys = Object.keys(current);
+    const same =
+      Object.keys(headers).length === currentKeys.length &&
+      currentKeys.every((key) => headers[key] === current[key]);
+    if (same) return;
+    void updateProvider(provider.id, {
+      headers: Object.keys(headers).length > 0 ? headers : null,
+    });
+  };
+
+  const removeRow = (index: number) => {
+    const next = rows.filter((_, i) => i !== index);
+    setRows(next);
+    persist(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium">Custom headers</label>
+      {rows.map((row, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <Input
+            value={row.key}
+            placeholder="X-Header-Name"
+            aria-label={`${provider.name} header ${index + 1} name`}
+            onChange={(e) => setRow(index, { ...row, key: e.target.value })}
+            onBlur={() => persist(rows)}
+          />
+          <Input
+            value={row.value}
+            placeholder="Value"
+            aria-label={`${provider.name} header ${index + 1} value`}
+            onChange={(e) => setRow(index, { ...row, value: e.target.value })}
+            onBlur={() => persist(rows)}
+          />
+          <Tooltip content="Remove header">
+            <button
+              type="button"
+              aria-label={`Remove header ${index + 1}`}
+              onClick={() => removeRow(index)}
+              className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </Tooltip>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="self-start"
+        onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}
+      >
+        <Plus /> Add header
+      </Button>
+      <div className="text-muted-foreground text-xs">
+        Sent with every request to this provider.
+      </div>
     </div>
   );
 }

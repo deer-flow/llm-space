@@ -26,6 +26,11 @@ export interface ProviderConfig {
   apiKey?: string;
   /** Custom base URL override for this provider. Absent means the default. */
   baseUrl?: string;
+  /**
+   * Extra HTTP headers sent with every request to this provider. Merged into
+   * the stream options at request time (per-run values win on collision).
+   */
+  headers?: Record<string, string>;
   /** API compatibility mode for a custom provider. */
   api?: CustomProviderApi;
   /**

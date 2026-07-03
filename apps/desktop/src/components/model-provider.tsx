@@ -136,6 +136,7 @@ export function ModelProvider({
       fields: {
         apiKey?: string | null;
         baseUrl?: string | null;
+        headers?: Record<string, string> | null;
         name?: string | null;
         api?:
           | "anthropic-messages"
@@ -327,6 +328,7 @@ export function useUpdateProvider(): (
   fields: {
     apiKey?: string | null;
     baseUrl?: string | null;
+    headers?: Record<string, string> | null;
     name?: string | null;
     api?:
       | "anthropic-messages"

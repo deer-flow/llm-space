@@ -17,6 +17,7 @@ async function getModelProviderGroups() {
       models: provider.getModels(),
       apiKey: await modelManager.getApiKey(provider.id, false),
       baseUrl: modelManager.getBaseUrl(provider.id),
+      headers: modelManager.getHeaders(provider.id),
       api: modelManager.getApi(provider.id),
       disabledModels: modelManager.getDisabledModels(provider.id),
       customModels: modelManager.getCustomModels(provider.id),
@@ -56,6 +57,7 @@ export const mainWindowRPC: MainWindowRPC =
           providerId,
           apiKey,
           baseUrl,
+          headers,
           name,
           api,
           icon,
@@ -63,6 +65,7 @@ export const mainWindowRPC: MainWindowRPC =
           modelManager.updateProvider(providerId, {
             apiKey,
             baseUrl,
+            headers,
             name,
             api,
             icon,

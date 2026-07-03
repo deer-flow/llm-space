@@ -35,9 +35,19 @@ export async function* streamAgent(
     getBaseUrl?: (
       provider: string
     ) => Promise<string | undefined> | string | undefined;
+    /**
+     * Resolve a provider's extra HTTP headers (e.g. from user config). Returns
+     * `undefined`/empty to send no extra headers.
+     */
+    getHeaders?: (
+      provider: string
+    ) =>
+      | Promise<Record<string, string> | undefined>
+      | Record<string, string>
+      | undefined;
   }
 ): AsyncGenerator<AgentEvent> {
-  const { models, signal, getApiKey, getBaseUrl } = options;
+  const { models, signal, getApiKey, getBaseUrl, getHeaders } = options;
 
   if (request.context.messages.length > 0) {
     const lastMessage =
@@ -69,6 +79,14 @@ export async function* streamAgent(
     model.baseUrl = baseUrl;
   }
 
+  // User-configured extra headers, injected per call through the stream
+  // options below (never by mutating the shared model object). pi merges
+  // `options.headers` over `model.headers`; explicit per-call headers from the
+  // agent loop win over the configured ones on collision.
+  const configuredHeaders = await getHeaders?.(request.model.provider);
+  const hasConfiguredHeaders =
+    configuredHeaders && Object.keys(configuredHeaders).length > 0;
+
   const agentStream = agentLoopContinue(
     {
       ...request.context,
@@ -92,7 +110,16 @@ export async function* streamAgent(
     // streamFn is the legacy compat layer, which only knows a hardcoded
     // builtin provider→env-var map and ignores custom providers' auth.
     (streamModel, streamContext, streamOptions) =>
-      models.streamSimple(streamModel, streamContext, streamOptions)
+      models.streamSimple(
+        streamModel,
+        streamContext,
+        hasConfiguredHeaders
+          ? {
+              ...streamOptions,
+              headers: { ...configuredHeaders, ...streamOptions?.headers },
+            }
+          : streamOptions
+      )
   );
 
   try {

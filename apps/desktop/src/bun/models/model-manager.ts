@@ -121,12 +121,14 @@ export class ModelManager {
     {
       apiKey,
       baseUrl,
+      headers,
       name,
       api,
       icon,
     }: {
       apiKey?: string | null;
       baseUrl?: string | null;
+      headers?: Record<string, string> | null;
       name?: string | null;
       api?: CustomProviderApi | null;
       icon?: string | null;
@@ -145,6 +147,13 @@ export class ModelManager {
     if (baseUrl !== undefined) {
       if (baseUrl === null) delete entry.baseUrl;
       else entry.baseUrl = baseUrl;
+    }
+    if (headers !== undefined) {
+      if (headers === null || Object.keys(headers).length === 0) {
+        delete entry.headers;
+      } else {
+        entry.headers = headers;
+      }
     }
     if (name !== undefined) {
       if (name === null) delete entry.name;
@@ -168,6 +177,12 @@ export class ModelManager {
   getBaseUrl(providerId: string): string | undefined {
     return this._config.providers.find((entry) => entry.id === providerId)
       ?.baseUrl;
+  }
+
+  /** The extra HTTP headers configured for a provider, if any. */
+  getHeaders(providerId: string): Record<string, string> | undefined {
+    return this._config.providers.find((entry) => entry.id === providerId)
+      ?.headers;
   }
 
   /** The selected API compatibility mode for a custom provider. */
