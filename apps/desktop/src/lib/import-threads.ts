@@ -11,17 +11,22 @@ import {
   uniqueThreadFileName,
 } from "./thread-file";
 
+export interface ThreadImportFile {
+  name: string;
+  text: string;
+}
+
 /**
- * Parse each file (OpenAI ChatCompletion / Anthropic Messages / native thread
+ * Parse each file payload (OpenAI ChatCompletion / Anthropic Messages / native thread
  * JSON) and write the ones that yield a thread into `parent` as new `.json`
  * files, mirroring the "New File" naming/creation. Files that don't parse into
  * a thread are skipped. Returns the created workspace-relative paths and the
  * total number of files processed. The on-disk title is normalized to the file
  * name by `localFs.write`, same as New File.
  */
-export async function importThreadFiles(
+export async function importThreadFileRecords(
   parent: string,
-  files: File[],
+  files: ThreadImportFile[],
   availableModels: readonly ModelProviderGroup[]
 ): Promise<{ created: string[]; total: number }> {
   const registry = createDefaultThreadParserRegistry();
@@ -31,8 +36,7 @@ export async function importThreadFiles(
   const created: string[] = [];
 
   for (const file of files) {
-    const text = await file.text();
-    const thread = await registry.parse(file.name, text, { availableModels });
+    const thread = await registry.parse(file.name, file.text, { availableModels });
     if (!thread) continue;
 
     const name = uniqueThreadFileName(existing, importStemFromFileName(file.name));
@@ -43,4 +47,19 @@ export async function importThreadFiles(
   }
 
   return { created, total: files.length };
+}
+
+/**
+ * Browser File adapter for drag/drop and renderer-side file input imports.
+ */
+export async function importThreadFiles(
+  parent: string,
+  files: File[],
+  availableModels: readonly ModelProviderGroup[]
+): Promise<{ created: string[]; total: number }> {
+  const records: ThreadImportFile[] = [];
+  for (const file of files) {
+    records.push({ name: file.name, text: await file.text() });
+  }
+  return importThreadFileRecords(parent, records, availableModels);
 }

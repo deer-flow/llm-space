@@ -3,6 +3,7 @@ import { Utils, type BrowserWindow } from "electrobun/bun";
 import { COMMAND_META, type Command } from "../shared/commands";
 
 import { saveZoom } from "./app/window-state";
+import { importFilesWithNativePicker } from "./import-files";
 import { mainWindowRPC } from "./rpc";
 
 /** The documentation website opened by the `openDocument` command. */
@@ -23,6 +24,11 @@ const clampZoom = (zoom: number) =>
  * reload) run here against `window`.
  */
 export function executeCommandInBun(command: Command, window: BrowserWindow) {
+  if (command.type === "importFiles") {
+    void importFilesWithNativePicker(command.args.parent);
+    return;
+  }
+
   if (COMMAND_META[command.type].target === "webview") {
     mainWindowRPC.send.executeCommand(command);
     return;

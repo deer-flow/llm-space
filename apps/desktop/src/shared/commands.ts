@@ -74,14 +74,19 @@ export interface RevealFileCommand extends GenericCommand<
 /** Refresh (re-list) the file tree. */
 export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
 
+export interface ImportFilePayload {
+  name: string;
+  text: string;
+}
+
 /**
  * Import one or more external files (OpenAI / Anthropic / native thread JSON)
- * into the workspace as new thread files. Opens a file picker; each file that
- * parses into a thread is written under `parent` (defaults to the root).
+ * into the workspace as new thread files. When `files` is absent the renderer
+ * opens its hidden picker; native menu actions fill `files` from the OS dialog.
  */
 export interface ImportFilesCommand extends GenericCommand<
   "importFiles",
-  { parent?: string }
+  { parent?: string; files?: ImportFilePayload[] }
 > {}
 
 // --- Tabs ------------------------------------------------------------------

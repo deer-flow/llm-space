@@ -21,7 +21,11 @@ import {
 } from "@/components/ui/resizable";
 import { Welcome } from "@/components/welcome";
 import { electrobun } from "@/lib/electrobun";
-import { importThreadFiles } from "@/lib/import-threads";
+import {
+  importThreadFileRecords,
+  importThreadFiles,
+  type ThreadImportFile,
+} from "@/lib/import-threads";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 
@@ -132,10 +136,17 @@ function PageInner() {
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const { open: openTab } = tabs;
   const handleImportFiles = useCallback(
-    async (files: FileList | File[], parent: string) => {
+    async (files: FileList | File[] | ThreadImportFile[], parent: string) => {
       const list = [...files];
       if (list.length === 0) return;
-      const { created, total } = await importThreadFiles(parent, list, models);
+      const { created, total } =
+        list[0] instanceof File
+          ? await importThreadFiles(parent, list as File[], models)
+          : await importThreadFileRecords(
+              parent,
+              list as ThreadImportFile[],
+              models
+            );
       if (created.length === 0) {
         toast.error("No threads could be imported from the selected files.");
         return;
@@ -176,7 +187,11 @@ function PageInner() {
     },
     openCommandPalette: () => setCommandPaletteOpen(true),
     openOnboard: () => setOnboardOpen(true),
-    importFiles: ({ parent = "" }) => {
+    importFiles: ({ parent = "", files }) => {
+      if (files) {
+        void handleImportFiles(files, parent);
+        return;
+      }
       pendingParentRef.current = parent;
       fileInputRef.current?.click();
     },
