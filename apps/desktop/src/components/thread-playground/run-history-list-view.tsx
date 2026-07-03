@@ -1,11 +1,12 @@
 import type { ThreadSnapshot } from "@llm-space/core";
-import { XIcon } from "lucide-react";
+import { Trash2Icon, XIcon } from "lucide-react";
 import { memo, useMemo } from "react";
 import { format } from "timeago.js";
 
 import { cn } from "@/lib/utils";
 
 import { useAutoAnimation } from "../../lib/use-auto-animation";
+import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup } from "../ui/item";
 
@@ -50,7 +51,7 @@ function _runMessageCountLabel(thread: ThreadSnapshot): string {
 function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const [containerRef] = useAutoAnimation();
   const runHistory = useThreadStore((s) => s.runHistory);
-  const { restoreThread } = useThreadStoreActions();
+  const { restoreThread, removeRun } = useThreadStoreActions();
   const runs = useMemo(() => runHistory.slice().reverse(), [runHistory]);
 
   return (
@@ -117,6 +118,26 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
                   <span className="shrink-0 tabular-nums">
                     {messageCountLabel}
                   </span>
+                  <Tooltip content="Remove run">
+                    <button
+                      type="button"
+                      aria-label={`Remove run from ${time}`}
+                      className="hover:text-foreground focus-visible:ring-ring/30 flex size-3.5 shrink-0 items-center justify-center self-center rounded-sm opacity-0 transition-opacity outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeRun(run);
+                      }}
+                      onKeyDown={(event) => {
+                        // Keep Enter/Space from bubbling to the item's
+                        // restore handler; other keys propagate as usual.
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                        }
+                      }}
+                    >
+                      <Trash2Icon className="size-3" />
+                    </button>
+                  </Tooltip>
                 </div>
               </Item>
             );
