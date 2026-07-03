@@ -95,6 +95,15 @@ const CUSTOM_PROVIDER_API_TYPES: {
   { value: "anthropic-messages", label: "Anthropic Messages" },
 ];
 
+/**
+ * Base-URL guidance for the Anthropic Messages API. Its SDK appends `/v1/...`
+ * to the base URL itself, so — unlike the OpenAI-style APIs, whose SDKs expect
+ * the `/v1` to be part of the base URL — a `/v1` suffix here would double up
+ * into `/v1/v1/...` on every request.
+ */
+const ANTHROPIC_BASE_URL_HINT =
+  "The Anthropic SDK adds /v1 to the request path itself, so enter the URL without a /v1 suffix.";
+
 function sortProviders(providers: ModelProviderGroup[]): ModelProviderGroup[] {
   return [...providers].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -574,6 +583,16 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   });
   const isBuiltin = provider.builtin === true;
 
+  // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
+  // providers are recognized by their models' API; custom providers follow the
+  // live API type selection.
+  const usesAnthropicApi = isBuiltin
+    ? provider.models.some((model) => model.api === "anthropic-messages")
+    : apiValue === "anthropic-messages";
+  const baseUrlPlaceholder = usesAnthropicApi
+    ? "https://api.example.com"
+    : "https://api.example.com/v1";
+
   return (
     <div className="flex min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
@@ -719,12 +738,13 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                 <>
                   <Input
                     defaultValue={provider.baseUrl ?? ""}
-                    placeholder="https://api.example.com/v1"
+                    placeholder={baseUrlPlaceholder}
                     aria-label={`${provider.name} custom base URL`}
                     onBlur={handleBaseUrlBlur}
                   />
                   <div className="text-muted-foreground text-xs">
                     Leave empty to use the default endpoint.
+                    {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
                   </div>
                 </>
               )}
@@ -735,10 +755,15 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               <Input
                 required
                 defaultValue={provider.baseUrl ?? ""}
-                placeholder="https://api.example.com/v1"
+                placeholder={baseUrlPlaceholder}
                 aria-label={`${provider.name} base URL`}
                 onBlur={handleBaseUrlBlur}
               />
+              {usesAnthropicApi && (
+                <div className="text-muted-foreground text-xs">
+                  {ANTHROPIC_BASE_URL_HINT}
+                </div>
+              )}
             </div>
           )}
 
