@@ -1,7 +1,6 @@
-import { basicLightInit } from "@uiw/codemirror-theme-basic";
-import { monokaiInit } from "@uiw/codemirror-theme-monokai";
+import { githubLightInit, githubDarkInit } from "@uiw/codemirror-theme-github";
 
-export const dark = monokaiInit({
+export const dark = githubDarkInit({
   settings: {
     background: "var(--textarea)",
     gutterBackground: "transparent",
@@ -11,7 +10,7 @@ export const dark = monokaiInit({
   },
 });
 
-export const light = basicLightInit({
+export const light = githubLightInit({
   settings: {
     // Match the editor surface to the container (--textarea); basicLight's
     // default is a plain white that clashes with the app's light-gray fields.

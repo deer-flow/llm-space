@@ -50,8 +50,7 @@ export function ModelConfigEditor({
             {paramSummary.map((item, index) => (
               <span key={item.label} className="font-mono">
                 {index > 0 ? ", " : null}
-                {item.label}:{" "}
-                <span className="text-[#98ecac]">{item.value}</span>
+                {item.label}: <span>{item.value}</span>
               </span>
             ))}
           </div>

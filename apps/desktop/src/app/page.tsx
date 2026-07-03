@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { usePanelRef } from "react-resizable-panels";
 
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
@@ -152,6 +159,7 @@ function PageInner() {
       <main className="min-h-0 grow">
         <ResizablePanelGroup>
           <ResizablePanel
+            className="bg-sidebar"
             panelRef={sidebarPanelRef}
             collapsible
             collapsedSize={0}

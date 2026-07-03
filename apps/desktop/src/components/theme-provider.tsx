@@ -35,7 +35,10 @@ interface ThemeContextValue {
 interface PrimaryColorContextValue {
   /** The active accent as a `#rrggbb` hex string. */
   primaryColor: string;
+  hasPrimaryColorOverride: boolean;
   setPrimaryColor: (hex: string) => void;
+  resetPrimaryColor: () => void;
+  resetPrimaryColorVersion: number;
 }
 
 // Split contexts: the accent updates on every drag tick, but theme consumers
@@ -52,7 +55,7 @@ function _readStoredTheme(): Theme {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
   return stored === "light" || stored === "dark" || stored === "system"
     ? stored
-    : "system";
+    : "dark";
 }
 
 function _readStoredPrimary(): string {
@@ -103,6 +106,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   const [primaryColor, setPrimaryState] = useState<string>(_readStoredPrimary);
+  const [hasPrimaryColorOverride, setHasPrimaryColorOverride] = useState(
+    () => {
+      const stored = localStorage.getItem(PRIMARY_STORAGE_KEY);
+      return Boolean(stored && HEX_RE.test(stored));
+    }
+  );
+  const [resetPrimaryColorVersion, setResetPrimaryColorVersion] = useState(0);
 
   const setTheme = useCallback((next: Theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, next);
@@ -111,7 +121,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setPrimaryColor = useCallback((next: string) => {
     localStorage.setItem(PRIMARY_STORAGE_KEY, next);
+    setHasPrimaryColorOverride(true);
     setPrimaryState(next);
+  }, []);
+
+  const resetPrimaryColor = useCallback(() => {
+    localStorage.removeItem(PRIMARY_STORAGE_KEY);
+    setHasPrimaryColorOverride(false);
+    setPrimaryState(DEFAULT_PRIMARY);
+    setResetPrimaryColorVersion((version) => version + 1);
   }, []);
 
   useEffect(() => {
@@ -143,8 +161,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [theme, resolvedTheme, setTheme]
   );
   const primaryValue = useMemo(
-    (): PrimaryColorContextValue => ({ primaryColor, setPrimaryColor }),
-    [primaryColor, setPrimaryColor]
+    (): PrimaryColorContextValue => ({
+      primaryColor,
+      hasPrimaryColorOverride,
+      setPrimaryColor,
+      resetPrimaryColor,
+      resetPrimaryColorVersion,
+    }),
+    [
+      primaryColor,
+      hasPrimaryColorOverride,
+      setPrimaryColor,
+      resetPrimaryColor,
+      resetPrimaryColorVersion,
+    ]
   );
 
   return (

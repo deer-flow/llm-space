@@ -250,7 +250,7 @@ export function FileSystemTreeView({
     const Icon = p.item.icon;
     return (
       <>
-        {Icon && <Icon className="mr-2 h-4 w-4 shrink-0 text-[#64a4f2]" />}
+        {Icon && <Icon className="text-primary mr-2 h-4 w-4 shrink-0" />}
         {isRenaming ? (
           <RenameInput
             initial={p.item.name}
@@ -415,7 +415,7 @@ function RenameInput({
       {!validation.valid && (
         <span
           id="tree-rename-error"
-          className="text-destructive bg-background absolute top-full left-1 z-10 mt-1 whitespace-nowrap text-xs"
+          className="text-destructive bg-background absolute top-full left-1 z-10 mt-1 text-xs whitespace-nowrap"
         >
           {validation.error}
         </span>

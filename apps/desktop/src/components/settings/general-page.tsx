@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import {
+  DEFAULT_PRIMARY,
   usePrimaryColor,
   useTheme,
   type Theme,
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
+import { Button } from "../ui/button";
+
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
 
@@ -24,7 +27,7 @@ function SettingsRow({
   label,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -37,7 +40,13 @@ function SettingsRow({
 
 export function GeneralPage() {
   const { theme, setTheme } = useTheme();
-  const { primaryColor, setPrimaryColor } = usePrimaryColor();
+  const {
+    primaryColor,
+    resetPrimaryColor,
+    resetPrimaryColorVersion,
+    setPrimaryColor,
+  } = usePrimaryColor();
+  const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
   return (
     <SettingsPage title="General">
       <SettingsRow label="Appearance">
@@ -56,10 +65,18 @@ export function GeneralPage() {
       <Separator />
 
       <SettingsRow label="Primary color">
-        <PrimaryColorPicker
-          value={primaryColor}
-          onChange={setPrimaryColor}
-        />
+        <div className="flex items-center gap-2">
+          {showResetPrimaryColor ? (
+            <Button size="sm" variant="secondary" onClick={resetPrimaryColor}>
+              Reset
+            </Button>
+          ) : null}
+          <PrimaryColorPicker
+            key={resetPrimaryColorVersion}
+            value={primaryColor}
+            onChange={setPrimaryColor}
+          />
+        </div>
       </SettingsRow>
 
       <Separator />

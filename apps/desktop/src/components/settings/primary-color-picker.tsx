@@ -38,6 +38,7 @@ export function PrimaryColorPicker({
   );
   return (
     <BlossomColorPicker
+      className="mt-1.5"
       defaultValue={_toValue(value)}
       showCoreColor
       adaptivePositioning
