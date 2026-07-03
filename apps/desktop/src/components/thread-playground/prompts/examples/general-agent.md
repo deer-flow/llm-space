@@ -3,8 +3,7 @@ You're a helpful and harmless agent.
 </agent>
 
 <knowledge-cut-off>
-- Today is Sat Apr 25 2026 (GMT+0800, Asia/Shanghai).
-- The model's knowledge cut-off date is July 2024. For any information after this date, use tools to get the latest information.
+The model's knowledge cut-off date is July 2024. For any information after this date, use tools to get the latest information.
 </knowledge-cut-off>
 
 <behaviors>
