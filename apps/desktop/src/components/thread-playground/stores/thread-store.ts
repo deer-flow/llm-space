@@ -58,6 +58,7 @@ export interface ThreadState {
   undo(): void;
   redo(): void;
   restoreThread(thread: Thread): void;
+  removeRun(run: RunSnapshot): void;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
@@ -583,6 +584,31 @@ export function createThreadStore(
             changeHistory: recordSnapshot(get().changeHistory, next),
           });
         },
+        removeRun(run: RunSnapshot) {
+          if (get().status === "running") {
+            return;
+          }
+          const current = get().runHistory;
+          const runHistory = current.filter((r) => r !== run);
+          if (runHistory.length === current.length) {
+            return;
+          }
+          // Deleting a run is not an undoable edit — undo/redo re-attach the
+          // live runHistory anyway — so update the current snapshot in place
+          // instead of recording a new step.
+          const thread = withRunHistory(get().thread, runHistory);
+          const history = get().changeHistory;
+          set({
+            thread,
+            runHistory,
+            changeHistory: {
+              ...history,
+              snapshots: history.snapshots.map((snapshot, index) =>
+                index === history.index ? thread : snapshot
+              ),
+            },
+          });
+        },
         abort() {
           const { status, abortController } = get();
           if (status !== "running") {
@@ -617,6 +643,7 @@ const selectActions = (s: ThreadState) => ({
   undo: s.undo,
   redo: s.redo,
   restoreThread: s.restoreThread,
+  removeRun: s.removeRun,
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,
