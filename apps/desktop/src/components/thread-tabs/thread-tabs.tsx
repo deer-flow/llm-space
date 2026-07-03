@@ -51,6 +51,7 @@ interface ThreadTabsProps {
   sidebarOpen?: boolean;
   fullScreen?: boolean;
   activate: (path: string) => void;
+  refresh: (path: string) => void;
   close: (path: string) => void;
   closeOthers: (path: string) => void;
   closeAll: () => void;
@@ -70,6 +71,7 @@ export function ThreadTabs({
   sidebarOpen = true,
   fullScreen = false,
   activate,
+  refresh,
   close,
   closeOthers,
   closeAll,
@@ -249,6 +251,12 @@ export function ThreadTabs({
         {contextMenuPath !== null ? (
           <ContextMenuContent className="w-44">
             <ContextMenuGroup>
+              <ContextMenuItem onSelect={() => refresh(contextMenuPath)}>
+                Refresh
+              </ContextMenuItem>
+            </ContextMenuGroup>
+            <ContextMenuSeparator />
+            <ContextMenuGroup>
               <ContextMenuItem onSelect={() => close(contextMenuPath)}>
                 Close
               </ContextMenuItem>
@@ -283,6 +291,7 @@ export function ThreadTabs({
             key={tab.id}
             path={tab.path}
             active={tab.path === activePath}
+            refreshNonce={tab.refreshNonce ?? 0}
             onMove={onMove}
           />
         ))}

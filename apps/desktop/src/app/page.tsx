@@ -191,6 +191,7 @@ function PageInner() {
                 tabs={tabs.tabs}
                 activePath={tabs.activePath}
                 activate={tabs.activate}
+                refresh={tabs.refresh}
                 sidebarOpen={sidebarOpen}
                 fullScreen={fullScreen}
                 close={(path) =>
