@@ -6,6 +6,7 @@ import {
   FilePlus,
   FolderOpen,
   FolderPlus,
+  Import,
   MoreHorizontal,
   RefreshCw,
   SettingsIcon,
@@ -160,6 +161,19 @@ export function NodeActions({ node }: { node: FileNode }) {
             <FolderOpen />
             {REVEAL_LABEL}
           </DropdownMenuItem>
+          {isDir && (
+            <DropdownMenuItem
+              onSelect={() =>
+                executeCommand({
+                  type: "importFiles",
+                  args: { parent: node.path },
+                })
+              }
+            >
+              <Import />
+              Import from Files...
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() =>
@@ -240,6 +254,14 @@ export function RootActions() {
           >
             <FolderOpen />
             {REVEAL_LABEL}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() =>
+              executeCommand({ type: "importFiles", args: { parent: "" } })
+            }
+          >
+            <Import />
+            Import from Files...
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

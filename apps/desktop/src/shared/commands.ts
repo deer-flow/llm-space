@@ -59,6 +59,16 @@ export interface RevealFileCommand extends GenericCommand<
 /** Refresh (re-list) the file tree. */
 export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
 
+/**
+ * Import one or more external files (OpenAI / Anthropic / native thread JSON)
+ * into the workspace as new thread files. Opens a file picker; each file that
+ * parses into a thread is written under `parent` (defaults to the root).
+ */
+export interface ImportFilesCommand extends GenericCommand<
+  "importFiles",
+  { parent?: string }
+> {}
+
 // --- Tabs ------------------------------------------------------------------
 
 /** Close a tab. `path` defaults to the active tab. */
@@ -143,6 +153,7 @@ export type Command =
   | DeleteFileCommand
   | RevealFileCommand
   | RefreshTreeCommand
+  | ImportFilesCommand
   | CloseTabCommand
   | CloseOtherTabsCommand
   | CloseAllTabsCommand
@@ -187,6 +198,7 @@ export const COMMAND_META: Record<
   deleteFile: { label: "Move to Trash", target: "webview" },
   revealFile: { label: "Reveal in Finder", target: "webview" },
   refreshTree: { label: "Refresh", target: "webview" },
+  importFiles: { label: "Import from Files...", target: "webview" },
   closeTab: { label: "Close Tab", target: "webview" },
   closeOtherTabs: { label: "Close Other Tabs", target: "webview" },
   closeAllTabs: { label: "Close All Tabs", target: "webview" },

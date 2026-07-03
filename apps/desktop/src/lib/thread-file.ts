@@ -53,6 +53,32 @@ export function threadPathForTitle(currentPath: string, title: string): string {
   return joinPath(parentOf(currentPath), threadFileNameFromTitle(title));
 }
 
+/**
+ * A collision-free `.json` file name for `stem` within a directory whose
+ * existing names are `existing`: `stem.json`, then `stem-1.json`,
+ * `stem-2.json`, … (mirrors the tree's `untitled` / `untitled-1` scheme, but
+ * with a caller-supplied stem — used when importing files).
+ */
+export function uniqueThreadFileName(
+  existing: Set<string>,
+  stem: string
+): string {
+  const first = ensureJson(stem);
+  if (!existing.has(first)) return first;
+  let n = 1;
+  while (existing.has(`${stem}-${n}${THREAD_FILE_EXTENSION}`)) n++;
+  return `${stem}-${n}${THREAD_FILE_EXTENSION}`;
+}
+
+/**
+ * Derive a thread-file stem from an imported file's name: the basename minus
+ * its final extension, if it is a valid file stem; otherwise `"untitled"`.
+ */
+export function importStemFromFileName(fileName: string): string {
+  const stem = basename(fileName).replace(/\.[^.]+$/, "");
+  return validateThreadFileStem(stem).valid ? stem.trim() : "untitled";
+}
+
 export function validateThreadFileStem(
   value: string
 ): FileStemValidationResult {

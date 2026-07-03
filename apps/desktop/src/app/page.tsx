@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { usePanelRef } from "react-resizable-panels";
+import { toast } from "sonner";
 
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/resizable";
 import { Welcome } from "@/components/welcome";
 import { electrobun } from "@/lib/electrobun";
+import { importThreadFiles } from "@/lib/import-threads";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 
@@ -84,6 +86,11 @@ const COMMAND_PALETTE_BLACKLIST = [
   "closeOtherTabs",
 ];
 
+/** Whether a drag carries OS files (vs. the tree's internal node-reorder drag). */
+function hasFiles(e: React.DragEvent): boolean {
+  return e.dataTransfer.types.includes("Files");
+}
+
 function PageInner() {
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
@@ -108,6 +115,33 @@ function PageInner() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
+
+  // File import: a hidden picker (opened by the `importFiles` command), the
+  // parent directory it should import into, and page-wide drag-and-drop state.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingParentRef = useRef("");
+  const dragDepthRef = useRef(0);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const { open: openTab } = tabs;
+  const handleImportFiles = useCallback(
+    async (files: FileList | File[], parent: string) => {
+      const list = [...files];
+      if (list.length === 0) return;
+      const { created, total } = await importThreadFiles(parent, list, models);
+      if (created.length === 0) {
+        toast.error("No threads could be imported from the selected files.");
+        return;
+      }
+      executeCommand({ type: "refreshTree", args: {} });
+      for (const path of created) openTab(path);
+      const skipped = total - created.length;
+      toast.success(
+        `Imported ${created.length} thread${created.length === 1 ? "" : "s"}`,
+        skipped > 0 ? { description: `${skipped} file(s) skipped` } : undefined
+      );
+    },
+    [models, executeCommand, openTab]
+  );
 
   // Register the command handlers backed by page-level state (tabs, sidebar,
   // settings). `newFile` / `newFolder` / the tree ops are registered by the
@@ -134,6 +168,10 @@ function PageInner() {
     },
     openCommandPalette: () => setCommandPaletteOpen(true),
     openOnboard: () => setOnboardOpen(true),
+    importFiles: ({ parent = "" }) => {
+      pendingParentRef.current = parent;
+      fileInputRef.current?.click();
+    },
   });
 
   // On a fresh launch with no configured models, prompt onboarding. Runs once on
@@ -155,7 +193,50 @@ function PageInner() {
   const fullScreen = useFullScreen();
 
   return (
-    <div className="flex size-full flex-col">
+    <div
+      className="relative flex size-full flex-col"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current += 1;
+        setIsDraggingFiles(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        dragDepthRef.current -= 1;
+        if (dragDepthRef.current <= 0) {
+          dragDepthRef.current = 0;
+          setIsDraggingFiles(false);
+        }
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current = 0;
+        setIsDraggingFiles(false);
+        void handleImportFiles(e.dataTransfer.files, "");
+      }}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".json,application/json"
+        aria-label="Import thread files"
+        className="hidden"
+        onChange={(e) => {
+          const files = e.target.files;
+          if (files?.length) {
+            void handleImportFiles(files, pendingParentRef.current);
+          }
+          e.target.value = "";
+        }}
+      />
       <main className="min-h-0 grow">
         <ResizablePanelGroup>
           <ResizablePanel
@@ -238,6 +319,11 @@ function PageInner() {
       <LazyOverlay open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
       </LazyOverlay>
+      {isDraggingFiles && (
+        <div className="border-primary bg-primary/10 text-primary pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium backdrop-blur-sm">
+          Drop files to import as threads
+        </div>
+      )}
     </div>
   );
 }

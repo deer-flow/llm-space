@@ -50,6 +50,13 @@ ApplicationMenu.setApplicationMenu([
         type: "divider",
       },
       {
+        label: "Import from Files...",
+        action: "importFiles",
+      },
+      {
+        type: "divider",
+      },
+      {
         label: "Refresh Workspace",
         action: "refreshTree",
       },
@@ -199,6 +206,7 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
   settings: { type: "openSettings", args: {} },
   newThread: { type: "newFile", args: {} },
   newFolder: { type: "newFolder", args: {} },
+  importFiles: { type: "importFiles", args: {} },
   refreshTree: { type: "refreshTree", args: {} },
   closeTab: { type: "closeTab", args: {} },
   closeOtherTabs: { type: "closeOtherTabs", args: {} },
