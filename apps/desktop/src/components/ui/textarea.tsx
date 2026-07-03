@@ -6,6 +6,7 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
+      autoCapitalize="off"
       autoComplete="off"
       autoCorrect="off"
       className={cn(
