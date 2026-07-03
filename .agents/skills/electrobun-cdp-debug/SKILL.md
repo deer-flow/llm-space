@@ -12,7 +12,10 @@ This skill uses a hybrid path:
 
 - Use `bunx --bun chrome-devtools-axi ...` for ordinary Chrome sessions,
   public websites, and browser automation that does not depend on Electrobun.
-- Use the bundled `cdp-probe.mjs` for the LLM Space Electrobun CEF renderer.
+- Use the bundled `electrobun-cdp-axi.mjs` raw CDP wrapper for the LLM Space
+  Electrobun CEF renderer.
+- Use the lower-level `cdp-probe.mjs` when JSON output or a custom one-off CDP
+  probe is simpler.
   Current `chrome-devtools-axi` releases do not directly drive this CEF target.
 
 ## Use chrome-devtools-axi For Ordinary Chrome
@@ -57,9 +60,35 @@ TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
 LLM_SPACE_ROOT="$TMP_ROOT" bun run dev:cef
 ```
 
-## Inspect Electrobun Page State
+## Inspect Electrobun With The Raw CDP AXI Wrapper
 
-Use the bundled probe from the repo root:
+Use the bundled AXI-style wrapper from the repo root:
+
+```sh
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs snapshot
+```
+
+Common variants:
+
+```sh
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs pages
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs eval 'document.title'
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs screenshot /tmp/llm-space-cef.png
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs click @r1
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs fill @r2 'hello'
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs console --ms 3000
+bun run .agents/skills/electrobun-cdp-debug/scripts/electrobun-cdp-axi.mjs snapshot --port 9334
+```
+
+The wrapper connects directly to the page target websocket from `/json/list`, so
+it avoids the `chrome-devtools-axi` → `chrome-devtools-mcp` → Puppeteer path that
+currently fails against Electrobun CEF. Snapshot refs such as `@r1` are resolved
+against the current live DOM order on each command; re-run `snapshot` after page
+changes before using a ref.
+
+## Low-Level JSON Probe
+
+Use the bundled JSON probe from the repo root when raw JSON is more useful:
 
 ```sh
 bun run .agents/skills/electrobun-cdp-debug/scripts/cdp-probe.mjs

@@ -1,4 +1,4 @@
 interface:
   display_name: "Electrobun CDP Debug"
   short_description: "Debug the desktop renderer through CDP, with chrome-devtools-axi compatibility notes"
-  default_prompt: "Use $electrobun-cdp-debug to inspect the real LLM Space desktop renderer with the bundled CDP probe; use chrome-devtools-axi only for ordinary Chrome sessions."
+  default_prompt: "Use $electrobun-cdp-debug to inspect the real LLM Space desktop renderer with electrobun-cdp-axi.mjs; use chrome-devtools-axi only for ordinary Chrome sessions."
