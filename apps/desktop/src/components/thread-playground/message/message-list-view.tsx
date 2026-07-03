@@ -16,7 +16,6 @@ import {
   type CSSProperties,
 } from "react";
 
-import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../../ui/button";
@@ -34,6 +33,7 @@ export function MessageListView({
 }) {
   const status = useThreadStore((s) => s.status);
   const collapsedMessageIds = useThreadStore((s) => s.collapsedMessageIds);
+  const autoFocusMessageId = useThreadStore((s) => s.autoFocusMessageId);
   const messages = useThreadStore((s) => s.thread.context?.messages);
   const { appendMessage, moveMessage } = useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
@@ -81,8 +81,8 @@ export function MessageListView({
               <DroppableMessageList
                 droppableProvided={droppableProvided}
                 messages={messages ?? []}
-                dragging={dragging}
                 readonly={readonly}
+                autoFocusMessageId={autoFocusMessageId}
                 collapsedMessageIds={collapsedMessageIds}
               />
             )}
@@ -113,48 +113,20 @@ export function MessageListView({
 function DroppableMessageList({
   droppableProvided,
   messages,
-  dragging,
   readonly,
+  autoFocusMessageId,
   collapsedMessageIds,
 }: {
   droppableProvided: DroppableProvided;
   messages: Message[];
-  dragging: boolean;
   readonly: boolean;
+  autoFocusMessageId: string | null;
   collapsedMessageIds: string[];
 }) {
-  const [animationContainerRef, enableAnimations] = useAutoAnimation({
-    duration: 150,
-  });
-  const droppableInnerRef = useRef(droppableProvided.innerRef);
-  droppableInnerRef.current = droppableProvided.innerRef;
-
-  useEffect(() => {
-    const enabled = !readonly && !dragging;
-    if (!enabled) {
-      enableAnimations(false);
-      return;
-    }
-    const frameId = requestAnimationFrame(() => {
-      enableAnimations(true);
-    });
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, [enableAnimations, readonly, dragging]);
-
-  const setContainerRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      droppableInnerRef.current(node);
-      animationContainerRef(node);
-    },
-    [animationContainerRef]
-  );
-
   return (
     <div
       className="flex flex-col pt-3"
-      ref={setContainerRef}
+      ref={droppableProvided.innerRef}
       {...droppableProvided.droppableProps}
     >
       {messages.map((message, index) => (
@@ -181,6 +153,7 @@ function DroppableMessageList({
                 <MessageListItem
                   message={message}
                   readonly={readonly}
+                  autoFocus={message.id === autoFocusMessageId}
                   collapsed={collapsedMessageIds.includes(message.id)}
                   dragHandleProps={draggableProvided.dragHandleProps}
                 />

@@ -43,6 +43,13 @@ export interface ThreadState {
   status: ThreadStoreStatus;
   abortController: AbortController | null;
   collapsedMessageIds: string[];
+  /**
+   * Id of the message whose editor should grab focus on mount — set only by
+   * append/insert. Every other editor mounts with autoFocus off so opening a
+   * thread doesn't thrash focus/scroll across N editors. Store-only; never
+   * serialized into the thread.
+   */
+  autoFocusMessageId: string | null;
   changeHistory: ChangeHistory;
   /** Thread snapshot + completion time after each run; most recent last. */
   runHistory: RunSnapshot[];
@@ -188,26 +195,29 @@ export function createThreadStore(
         status: "idle",
         abortController: null,
         collapsedMessageIds: [],
+        autoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
         runHistory: initialRunHistory,
 
         appendMessage() {
           const message = createUserMessage();
           updateMessages((messages) => [...messages, message]);
+          set({ autoFocusMessageId: message.id });
           return message.id;
         },
         insertMessageBefore(beforeMessageId: string) {
-          updateMessages((messages) => {
-            const index = messages.findIndex((m) => m.id === beforeMessageId);
-            if (index === -1) {
-              return messages;
-            }
-            return [
-              ...messages.slice(0, index),
-              createUserMessage(),
-              ...messages.slice(index),
-            ];
-          });
+          const messages = get().thread.context?.messages ?? [];
+          const index = messages.findIndex((m) => m.id === beforeMessageId);
+          if (index === -1) {
+            return;
+          }
+          const message = createUserMessage();
+          setMessages([
+            ...messages.slice(0, index),
+            message,
+            ...messages.slice(index),
+          ]);
+          set({ autoFocusMessageId: message.id });
         },
         moveMessage(fromIndex: number, toIndex: number) {
           updateMessages((messages) => {

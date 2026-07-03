@@ -29,6 +29,7 @@ function _MessageListItem({
   readonly = false,
   streaming,
   collapsed,
+  autoFocus = false,
   dragHandleProps,
 }: {
   className?: string;
@@ -37,6 +38,8 @@ function _MessageListItem({
   readonly?: boolean;
   streaming?: boolean;
   collapsed?: boolean;
+  /** Focus this message's editor on mount. Set only for a freshly-added message. */
+  autoFocus?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
   const text = useMemo(() => getMessageText(message), [message]);
@@ -168,7 +171,7 @@ function _MessageListItem({
           {message.content.length > 0 && (
             <CodeEditor
               className="max-h-[40vh] min-h-9.5 w-full bg-transparent"
-              autoFocus
+              autoFocus={autoFocus}
               hideFocusRing
               hideBorder
               placeholder={
