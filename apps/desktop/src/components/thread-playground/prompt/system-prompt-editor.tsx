@@ -20,6 +20,7 @@ function _SystemPromptEditor({
     (s) => s.thread.context?.systemPrompt ?? ""
   );
   const tools = useThreadStore((s) => s.thread.context?.tools);
+  const threadModel = useThreadStore((s) => s.thread.model);
   const { updateSystemPrompt } = useThreadStoreActions();
   const handleChange = useCallback(
     (value: string) => {
@@ -32,7 +33,14 @@ function _SystemPromptEditor({
     text: generated,
     streaming,
     run: generate,
-  } = useStreamText({ systemPrompt: metaPrompt });
+  } = useStreamText({
+    systemPrompt: metaPrompt,
+    reasoning: "off",
+    // Use the thread's own model (id/provider only) when it has one.
+    model: threadModel
+      ? { id: threadModel.id, provider: threadModel.provider }
+      : undefined,
+  });
 
   // Stream the generated prompt straight into the editor.
   useEffect(() => {

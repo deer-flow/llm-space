@@ -4,6 +4,8 @@ import {
   uuid,
   type AssistantMessage,
   type Message,
+  type ModelConfig,
+  type ReasoningLevel,
   type ReducedMessageContent,
 } from "@llm-space/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +19,6 @@ import { useDefaultTextGenerationModel } from "../model-provider";
 // module-level instance is safe (mirrors thread-tab-pane.tsx).
 const transport = createRpcTransport();
 
-const TEMPERATURE = 0;
 const MAX_TOKENS = 10240;
 
 export interface UseStreamTextArgs {
@@ -26,6 +27,14 @@ export interface UseStreamTextArgs {
   messages?: Message[];
   /** When set, a user message with this text is appended to `messages`. */
   userPrompt?: string;
+  /** Reasoning effort for the model. Omitted from params when undefined. */
+  reasoning?: ReasoningLevel;
+  /**
+   * Model to run with. Overrides `useDefaultTextGenerationModel()` when set.
+   * Its `params` are ignored — `temperature`/`maxTokens`/`reasoning` are applied
+   * on top regardless.
+   */
+  model?: ModelConfig;
 }
 
 export interface UseStreamTextResult {
@@ -52,19 +61,27 @@ export function useStreamText({
   systemPrompt,
   messages,
   userPrompt,
+  reasoning,
+  model,
 }: UseStreamTextArgs): UseStreamTextResult {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
 
-  const model = useDefaultTextGenerationModel();
+  const defaultModel = useDefaultTextGenerationModel();
 
   // Keep the latest inputs/model in refs so `run` has a stable identity but
   // always reads current values.
-  const argsRef = useRef({ systemPrompt, messages, userPrompt });
-  argsRef.current = { systemPrompt, messages, userPrompt };
-  const modelRef = useRef(model);
-  modelRef.current = model;
+  const argsRef = useRef({
+    systemPrompt,
+    messages,
+    userPrompt,
+    reasoning,
+    model,
+  });
+  argsRef.current = { systemPrompt, messages, userPrompt, reasoning, model };
+  const defaultModelRef = useRef(defaultModel);
+  defaultModelRef.current = defaultModel;
 
   const controllerRef = useRef<AbortController | null>(null);
 
@@ -72,7 +89,12 @@ export function useStreamText({
   useEffect(() => () => controllerRef.current?.abort(), []);
 
   const run = useCallback(async (overrides?: Partial<UseStreamTextArgs>) => {
-    const base = modelRef.current;
+    const { systemPrompt, messages, userPrompt, reasoning, model } = {
+      ...argsRef.current,
+      ...overrides,
+    };
+    // An explicit `model` overrides the default text-generation model.
+    const base = model ?? defaultModelRef.current;
     if (!base) {
       setError("No model available");
       return;
@@ -114,10 +136,6 @@ export function useStreamText({
       }
     };
 
-    const { systemPrompt, messages, userPrompt } = {
-      ...argsRef.current,
-      ...overrides,
-    };
     const context = {
       systemPrompt,
       messages: [
@@ -137,8 +155,8 @@ export function useStreamText({
       ...base,
       params: {
         ...base.params,
-        temperature: TEMPERATURE,
         maxTokens: MAX_TOKENS,
+        ...(reasoning === undefined ? {} : { reasoning }),
       },
     };
 

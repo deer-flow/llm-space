@@ -12,7 +12,10 @@ import { toast } from "sonner";
 
 import { CodeEditor } from "@/components/code-editor";
 import { GeneratePopoverButton } from "@/components/thread-playground/generate-popover-button";
-import { useThreadStoreActions } from "@/components/thread-playground/stores/thread-store";
+import {
+  useThreadStore,
+  useThreadStoreActions,
+} from "@/components/thread-playground/stores/thread-store";
 import { useStreamText } from "@/components/thread-playground/use-stream-text";
 
 import { Button } from "../../ui/button";
@@ -81,6 +84,7 @@ export function ToolEditorDialog({
   tool: FunctionTool | null;
 }) {
   const { addTool, updateTool } = useThreadStoreActions();
+  const threadModel = useThreadStore((s) => s.thread.model);
   const [text, setText] = useState("");
   const [originalName, setOriginalName] = useState<string | null>(null);
 
@@ -88,7 +92,14 @@ export function ToolEditorDialog({
     text: generated,
     streaming,
     run: generate,
-  } = useStreamText({ systemPrompt: metaToolPrompt });
+  } = useStreamText({
+    systemPrompt: metaToolPrompt,
+    reasoning: "off",
+    // Use the thread's own model (id/provider only) when it has one.
+    model: threadModel
+      ? { id: threadModel.id, provider: threadModel.provider }
+      : undefined,
+  });
 
   // Stream the generated definition straight into the editor.
   useEffect(() => {
