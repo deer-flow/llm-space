@@ -296,3 +296,21 @@
     background: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
   }
 }
+
+/*
+ * No tab-open animation. Opening a file synchronously mounts a whole heavy
+ * editor tree (many CodeMirror instances), which freezes the main thread long
+ * enough to starve any concurrent tab animation into visible stutter. We'd
+ * rather have no animation than a janky one, so neutralize the library's
+ * new-tab slide-in and the content-strip position transition. Unlayered to win
+ * over chrome-tabs.css (same reasoning as the palette overrides above). The
+ * drag-reorder transition is left intact — it only runs during an explicit tab
+ * drag and never collides with a mount.
+ */
+.chrome-tabs .chrome-tab.chrome-tab-was-just-added {
+  top: 0;
+  animation: none;
+}
+.chrome-tabs .chrome-tabs-content {
+  transition: none;
+}

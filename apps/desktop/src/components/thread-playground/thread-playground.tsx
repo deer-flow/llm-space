@@ -62,13 +62,6 @@ export interface ThreadPlaygroundProps {
   onStreamingEnd?: () => void;
 }
 
-/**
- * How long the skeleton stays overlaid on top of the real content after it
- * mounts. The real ThreadPlayground takes roughly this long to render, so the
- * overlay hides that first paint instead of flashing an unfinished UI.
- */
-const SKELETON_OVERLAY_MS = 0;
-
 export function ThreadPlayground({
   loading,
   initialValue,
@@ -85,34 +78,11 @@ export function ThreadPlayground({
     throw new Error("initialValue is required when not loading");
   }
   return (
-    <_ThreadPlaygroundWithOverlay
+    <_ThreadPlayground
       className={className}
       initialValue={initialValue}
       {...props}
     />
-  );
-}
-
-/**
- * Mounts the real ThreadPlayground and keeps the skeleton overlaid on top for
- * {@link SKELETON_OVERLAY_MS} while it does its (relatively slow) first render.
- */
-function _ThreadPlaygroundWithOverlay({
-  className,
-  ...props
-}: ThreadPlaygroundProps) {
-  const [showOverlay, setShowOverlay] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setShowOverlay(false), SKELETON_OVERLAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
-  return (
-    <div className={cn("relative", className)}>
-      <_ThreadPlayground className="size-full" {...props} />
-      {showOverlay && (
-        <ThreadPlaygroundSkeleton className="bg-background absolute inset-0" />
-      )}
-    </div>
   );
 }
 

@@ -1,16 +1,16 @@
 "use client";
 
-import type { Thread } from "@llm-space/core";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { localFs } from "@/client";
-import { normalizeThreadForPath, threadTitleFromPath } from "@/lib/thread-file";
+import { threadTitleFromPath } from "@/lib/thread-file";
 
 export interface ThreadTab {
   id: string;
   path: string;
+  /** Bumped by `refresh(path)` to force the pane to reload the thread from disk. */
+  refreshNonce?: number;
 }
 
 /** Derive a tab label from a thread file path (basename without `.json`). */
@@ -38,6 +38,8 @@ export interface ThreadTabs {
   reorder: (from: number, to: number) => void;
   /** Focus an already-open tab. */
   activate: (path: string) => void;
+  /** Reload the tab's thread from disk, discarding any un-saved in-memory edits. */
+  refresh: (path: string) => void;
   /** Tree delete: close the tab for `removed` and any tab beneath it. */
   handleRemove: (removed: string) => void;
   /** Tree rename/move: rewrite tab paths under `from` → `to`. */
@@ -135,7 +137,6 @@ async function _fileExists(path: string): Promise<boolean> {
 }
 
 export function useThreadTabs(): ThreadTabs {
-  const qc = useQueryClient();
   const [tabs, setTabs] = useState<ThreadTab[]>(() =>
     _loadPersistedTabs().map(_createTab)
   );
@@ -300,28 +301,30 @@ export function useThreadTabs(): ThreadTabs {
     });
   }, []);
 
-  const handleMove = useCallback(
-    (from: string, to: string) => {
-      const rewrite = (p: string): string =>
-        p === from ? to : _isUnder(p, from) ? to + p.slice(from.length) : p;
+  const handleMove = useCallback((from: string, to: string) => {
+    const rewrite = (p: string): string =>
+      p === from ? to : _isUnder(p, from) ? to + p.slice(from.length) : p;
 
-      setTabs((prev) => {
-        if (!prev.some((tab) => _isUnder(tab.path, from))) return prev;
-        // Carry the read cache to the new key so the playground doesn't reload.
-        for (const tab of prev) {
-          const next = rewrite(tab.path);
-          if (next === tab.path) continue;
-          const cached = qc.getQueryData<Thread>(["thread", tab.path]);
-          if (cached !== undefined) {
-            qc.setQueryData(["thread", next], normalizeThreadForPath(cached, next));
-          }
-        }
-        return prev.map((tab) => ({ ...tab, path: rewrite(tab.path) }));
-      });
-      setActivePath((current) => (current === null ? current : rewrite(current)));
-    },
-    [qc]
-  );
+    setTabs((prev) => {
+      if (!prev.some((tab) => _isUnder(tab.path, from))) return prev;
+      // Thread reads are uncached, so there's no read cache to carry to the new
+      // key. Each pane keeps its in-memory store across the rename and re-reads
+      // the new path from disk.
+      return prev.map((tab) => ({ ...tab, path: rewrite(tab.path) }));
+    });
+    setActivePath((current) => (current === null ? current : rewrite(current)));
+  }, []);
+
+  // Bump the tab's refreshNonce; the pane watches it and reloads from disk.
+  const refresh = useCallback((path: string) => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.path === path
+          ? { ...tab, refreshNonce: (tab.refreshNonce ?? 0) + 1 }
+          : tab
+      )
+    );
+  }, []);
 
   return {
     tabs,
@@ -332,6 +335,7 @@ export function useThreadTabs(): ThreadTabs {
     closeAll,
     reorder,
     activate,
+    refresh,
     handleRemove,
     handleMove,
     reopenClosed,
