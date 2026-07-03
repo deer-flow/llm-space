@@ -55,13 +55,6 @@ export interface ThreadTabs {
 const STORAGE_KEY = "llm-space:open-tabs";
 const ACTIVE_KEY = "llm-space:active-tab";
 
-/**
- * Tabs opened on the very first launch (no persisted state yet): the seeded
- * `example.json` thread in the workspace root. Dropped by the mount effect if it
- * doesn't exist, and never re-applied once tabs have been persisted (so closing
- * everything stays empty).
- */
-const FIRST_RUN_TABS = ["example.json"];
 let nextTabId = 0;
 
 function _createTab(path: string): ThreadTab {
@@ -70,15 +63,14 @@ function _createTab(path: string): ThreadTab {
 }
 
 /**
- * Read the persisted tab paths. On first launch (the key was never written)
- * returns {@link FIRST_RUN_TABS}; returns `[]` when the key exists but is empty,
- * malformed, or storage is unavailable.
+ * Read the persisted tab paths. A missing key means there are no open tabs yet,
+ * so the welcome screen remains visible on first launch.
  */
 function _loadPersistedTabs(): string[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [...FIRST_RUN_TABS];
+    if (raw === null) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((p): p is string => typeof p === "string");

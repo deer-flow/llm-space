@@ -1,15 +1,5 @@
 import { uuid, type Message } from "@llm-space/core";
-import {
-  BookOpenTextIcon,
-  BotIcon,
-  BrainCircuitIcon,
-  ChevronDown,
-  ImageIcon,
-  LanguagesIcon,
-  SparklesIcon,
-  WrenchIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { memo, useCallback, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
@@ -24,70 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
-import compactMemoryPrompt from "../prompts/examples/compact-memory.md?raw";
-import deepWikiPrompt from "../prompts/examples/deep-wiki.md?raw";
-import generalAgentPrompt from "../prompts/examples/general-agent.md?raw";
-import metaImagePrompt from "../prompts/examples/meta-image-prompt.md?raw";
-import metaPromptWithTools from "../prompts/examples/meta-prompt-with-tools.md?raw";
-import translationPrompt from "../prompts/examples/translation.md?raw";
 import metaPrompt from "../prompts/meta-prompt.md?raw";
-import metaToolPrompt from "../prompts/meta-tool.md?raw";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
 
-const PROMPT_EXAMPLES = [
-  {
-    type: "example",
-    label: "General Agent",
-    content: generalAgentPrompt,
-    icon: BotIcon,
-  },
-  {
-    type: "example",
-    label: "Translation",
-    content: translationPrompt,
-    icon: LanguagesIcon,
-  },
-  {
-    type: "example",
-    label: "Deep Wiki",
-    content: deepWikiPrompt,
-    icon: BookOpenTextIcon,
-  },
-  {
-    type: "example",
-    label: "Compact Memory",
-    content: compactMemoryPrompt,
-    icon: BrainCircuitIcon,
-  },
-  { type: "separator" },
-  {
-    type: "example",
-    label: "Meta Prompt",
-    content: metaPromptWithTools,
-    icon: SparklesIcon,
-  },
-  {
-    type: "example",
-    label: "Meta Tool",
-    content: metaToolPrompt,
-    icon: WrenchIcon,
-  },
-  {
-    type: "example",
-    label: "Meta Image Prompt",
-    content: metaImagePrompt,
-    icon: ImageIcon,
-  },
-] satisfies readonly (
-  | {
-      type: "example";
-      label: string;
-      content: string;
-      icon: LucideIcon;
-    }
-  | { type: "separator" }
-)[];
+import { PROMPT_EXAMPLES } from "./prompt-examples";
 
 function _SystemPromptEditor({
   className,

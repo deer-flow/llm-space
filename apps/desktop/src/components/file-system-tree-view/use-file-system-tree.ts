@@ -1,6 +1,6 @@
 "use client";
 
-import { uuid, type FileNode } from "@llm-space/core";
+import { uuid, type FileNode, type Thread } from "@llm-space/core";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   normalizeThreadForPath,
   parentOf,
   threadTitleFromPath,
+  uniqueThreadFileName,
 } from "@/lib/thread-file";
 
 /** Query-key factory for a directory listing. */
@@ -103,6 +104,42 @@ function sortNodes(nodes: FileNode[]): FileNode[] {
   });
 }
 
+/**
+ * Create a blank thread for users who want an empty canvas. The title must come
+ * from the destination path so the on-disk file name and thread title stay in
+ * sync from the first write.
+ */
+function _createBlankThread(title: string): Thread {
+  return {
+    title,
+    context: {
+      messages: [
+        { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
+      ],
+    },
+  };
+}
+
+/**
+ * Create a user-owned copy of a prompt example. The prompt becomes the system
+ * prompt, while the user message stays empty so the example behaves as a ready
+ * starting point rather than a pre-run transcript.
+ */
+function _createThreadFromPromptExample(
+  title: string,
+  systemPrompt: string
+): Thread {
+  return {
+    title,
+    context: {
+      systemPrompt,
+      messages: [
+        { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
+      ],
+    },
+  };
+}
+
 export interface FileSystemTree {
   /** Cached listing for each loaded directory path. */
   nodesByPath: Map<string, FileNode[]>;
@@ -119,8 +156,13 @@ export interface FileSystemTree {
   refresh: () => void;
   /** Create an auto-named `untitled` folder under `parent`; returns its path. */
   createFolder: (parent: string) => Promise<string | null>;
-  /** Create an auto-named `untitled.json` thread under `parent`; returns its path. */
+  /** Create an auto-named thread under `parent`; returns its path. */
   createFile: (parent: string) => Promise<string | null>;
+  /** Create a thread from a built-in prompt example; returns its path. */
+  createFileFromPromptExample: (
+    parent: string,
+    example: { fileStem: string; systemPrompt: string }
+  ) => Promise<string | null>;
   /** Delete a file or directory; resolves to whether it succeeded. */
   remove: (path: string) => Promise<boolean>;
   /** Copy a file/directory beside itself as `<name>_copy`; returns the new path. */
@@ -254,18 +296,36 @@ export function useFileSystemTree(): FileSystemTree {
       let path: string;
       try {
         const names = new Set((await localFs.ls(parent)).map((n) => n.name));
-        const { name } = uniqueUntitled(names, ".json");
+        const name = uniqueUntitled(names, ".json").name;
         path = joinPath(parent, name);
+        const title = threadTitleFromPath(path);
         // Model-less by default; the UI resolves a fallback model at run time.
-        // Seed a single empty user message to edit.
-        await localFs.write(path, {
-          title: threadTitleFromPath(path),
-          context: {
-            messages: [
-              { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
-            ],
-          },
-        });
+        await localFs.write(path, _createBlankThread(title));
+      } catch (err) {
+        toast.error((err as Error).message);
+        return null;
+      }
+      void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
+      return path;
+    },
+    [qc]
+  );
+
+  const createFileFromPromptExample = useCallback(
+    async (
+      parent: string,
+      example: { fileStem: string; systemPrompt: string }
+    ): Promise<string | null> => {
+      let path: string;
+      try {
+        const names = new Set((await localFs.ls(parent)).map((n) => n.name));
+        const name = uniqueThreadFileName(names, example.fileStem);
+        path = joinPath(parent, name);
+        const title = threadTitleFromPath(path);
+        await localFs.write(
+          path,
+          _createThreadFromPromptExample(title, example.systemPrompt)
+        );
       } catch (err) {
         toast.error((err as Error).message);
         return null;
@@ -432,6 +492,7 @@ export function useFileSystemTree(): FileSystemTree {
     refresh,
     createFolder,
     createFile,
+    createFileFromPromptExample,
     remove,
     duplicate,
     reveal,

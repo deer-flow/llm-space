@@ -26,8 +26,9 @@ import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
-// palette, onboarding. Loaded lazily so their code (and heavy deps like the
-// color picker and cmdk) stays out of the initial chunk until first opened.
+// palette, onboarding, and examples. Loaded lazily so their code (and heavy
+// deps like the color picker and cmdk) stays out of the initial chunk until
+// first opened.
 const SettingsDialog = lazy(() =>
   import("@/components/settings/settings-dialog").then((m) => ({
     default: m.SettingsDialog,
@@ -41,6 +42,11 @@ const CommandPalette = lazy(() =>
 const OnboardDialog = lazy(() =>
   import("@/components/onboard-dialog").then((m) => ({
     default: m.OnboardDialog,
+  }))
+);
+const StartFromExampleDialog = lazy(() =>
+  import("@/components/start-from-example-dialog").then((m) => ({
+    default: m.StartFromExampleDialog,
   }))
 );
 
@@ -82,6 +88,7 @@ const COMMAND_PALETTE_BLACKLIST = [
   "revealFile",
   "openLink",
   "openCommandPalette",
+  "newFileFromPromptExample",
   "closeTab",
   "closeOtherTabs",
 ];
@@ -115,6 +122,7 @@ function PageInner() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
 
   // File import: a hidden picker (opened by the `importFiles` command), the
   // parent directory it should import into, and page-wide drag-and-drop state.
@@ -259,7 +267,13 @@ function PageInner() {
           <ResizablePanel minSize={640}>
             {tabs.tabs.length === 0 ? (
               <Welcome
-                onNewFile={() => executeCommand({ type: "newFile", args: {} })}
+                onNewStarter={() => setExamplesOpen(true)}
+                onNewFile={() =>
+                  executeCommand({
+                    type: "newFile",
+                    args: {},
+                  })
+                }
                 onModels={() =>
                   executeCommand({
                     type: "openSettings",
@@ -318,6 +332,22 @@ function PageInner() {
       </LazyOverlay>
       <LazyOverlay open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
+      </LazyOverlay>
+      <LazyOverlay open={examplesOpen}>
+        <StartFromExampleDialog
+          open={examplesOpen}
+          onOpenChange={setExamplesOpen}
+          onSelectExample={(example) =>
+            executeCommand({
+              type: "newFileFromPromptExample",
+              args: {
+                exampleId: example.id,
+                fileStem: example.fileStem,
+                systemPrompt: example.content,
+              },
+            })
+          }
+        />
       </LazyOverlay>
       {isDraggingFiles && (
         <div className="border-primary bg-primary/10 text-primary pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium backdrop-blur-sm">

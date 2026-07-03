@@ -26,6 +26,21 @@ export interface NewFileCommand extends GenericCommand<
   { parent?: string; rename?: boolean }
 > {}
 
+/**
+ * Create a new thread from a built-in prompt example. The command carries a
+ * snapshot of the selected prompt so file creation stays decoupled from the
+ * UI-only example catalog.
+ */
+export interface NewFileFromPromptExampleCommand extends GenericCommand<
+  "newFileFromPromptExample",
+  {
+    parent?: string;
+    exampleId: string;
+    fileStem: string;
+    systemPrompt: string;
+  }
+> {}
+
 /** Create a new folder (with in-place rename). `parent` defaults to the root. */
 export interface NewFolderCommand extends GenericCommand<
   "newFolder",
@@ -147,6 +162,7 @@ export interface ReportBugsCommand extends GenericCommand<"reportBugs"> {}
 /** The discriminated union of every command. */
 export type Command =
   | NewFileCommand
+  | NewFileFromPromptExampleCommand
   | NewFolderCommand
   | RenameFileCommand
   | DuplicateFileCommand
@@ -192,6 +208,10 @@ export const COMMAND_META: Record<
   { label: string; target: "webview" | "bun" }
 > = {
   newFile: { label: "New File", target: "webview" },
+  newFileFromPromptExample: {
+    label: "Start from Example",
+    target: "webview",
+  },
   newFolder: { label: "New Folder", target: "webview" },
   renameFile: { label: "Rename", target: "webview" },
   duplicateFile: { label: "Duplicate", target: "webview" },

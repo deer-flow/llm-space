@@ -30,6 +30,20 @@ skill at `./.agents/skills/electrobun-cdp-debug/SKILL.md`. Do **not** mock
 Start with `bun run dev:cef`; normal `bun dev` keeps the native WebView renderer
 and does not expose CDP.
 
+When CEF/CDP verification needs an isolated app data root, put runtime sandbox
+data in the system temporary directory by default, not under `.agents/` or the
+repo:
+
+```sh
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
+LLM_SPACE_ROOT="$TMP_ROOT" bun run dev:cef
+```
+
+Only keep durable evidence in the repo, such as audit screenshots, notes, logs,
+and small redacted JSON snippets. Do not commit or leave routine `workspace/`,
+`settings/`, caches, or generated app data under `.agents/kaizen-loop/` unless a
+fixture is intentionally preserved for review and the reason is documented.
+
 ## Architecture
 
 Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
@@ -67,7 +81,7 @@ Each open thread owns its own Zustand store (`stores/thread-store.ts`), created 
 ### Persistence
 
 State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_ROOT` or `LLM_SPACE_HOME`):
-- `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates it and drops an `example.json`.
+- `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`) and `window.json` (frame/zoom/maximized).
 
 ### The command layer

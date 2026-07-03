@@ -61,6 +61,7 @@ export function FileSystemTreeView({
     refresh,
     createFolder,
     createFile,
+    createFileFromPromptExample,
     remove,
     duplicate,
     reveal,
@@ -92,14 +93,25 @@ export function FileSystemTreeView({
     onSelectFile?.(path);
   }
 
-  // Quick "new thread" flow (⌘N menu, tab-bar "+", welcome screen): create an
-  // auto-named thread in `parent` (root by default), no in-place rename.
+  // Quick thread flow (⌘N/menu/tab-bar/welcome): create an auto-named thread in
+  // `parent` (root by default), no in-place rename, then open it.
   const createThread = useCallback(
     async (parent = "") => {
       const path = await createFile(parent);
       if (path) setPendingThread(path);
     },
     [createFile]
+  );
+
+  const createThreadFromPromptExample = useCallback(
+    async (parent: string, fileStem: string, systemPrompt: string) => {
+      const path = await createFileFromPromptExample(parent, {
+        fileStem,
+        systemPrompt,
+      });
+      if (path) setPendingThread(path);
+    },
+    [createFileFromPromptExample]
   );
 
   // The file-tree commands, backed by this component's state. The ⌘N menu /
@@ -110,6 +122,9 @@ export function FileSystemTreeView({
     newFile: ({ parent = "", rename }) => {
       if (rename) void create(parent, "file");
       else void createThread(parent);
+    },
+    newFileFromPromptExample: ({ parent = "", fileStem, systemPrompt }) => {
+      void createThreadFromPromptExample(parent, fileStem, systemPrompt);
     },
     newFolder: ({ parent = "" }) => void create(parent, "folder"),
     renameFile: ({ path }) => startRenameByPath(path),

@@ -1,14 +1,13 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
 import { getLlmSpaceRoot } from "@llm-space/core/server";
 
-import { EXAMPLE_THREAD } from "./example";
-
 /**
- * On a fresh install `LLM_SPACE_HOME/workspace` does not exist yet. Create it and
- * seed a default `example.json` so the app opens with something to look at
- * instead of an empty tree. No-op once the workspace directory exists.
+ * On a fresh install `LLM_SPACE_HOME/workspace` does not exist yet. Create the
+ * directory and leave it empty so the welcome screen can route users through
+ * the explicit "Start from Example" or blank-thread choices. No-op once the
+ * workspace directory exists.
  */
 export function seedWorkspace(): void {
   const workspace = path.join(getLlmSpaceRoot(), "workspace");
@@ -16,11 +15,6 @@ export function seedWorkspace(): void {
     return;
   }
   mkdirSync(workspace, { recursive: true });
-  writeFileSync(
-    path.join(workspace, "example.json"),
-    `${JSON.stringify(EXAMPLE_THREAD, null, 2)}\n`,
-    "utf8"
-  );
 }
 
 // Run on import so the workspace is seeded before storage/RPC touch it.
