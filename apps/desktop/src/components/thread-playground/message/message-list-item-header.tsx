@@ -65,8 +65,11 @@ function _MessageListItemHeader({
     toggleMessageRole(message.id);
   }, [toggleMessageRole, message.id]);
   const handleToggleMessageCollapse = useCallback(() => {
+    if (readonly) {
+      return;
+    }
     toggleMessageCollapsed(message.id);
-  }, [toggleMessageCollapsed, message.id]);
+  }, [message.id, readonly, toggleMessageCollapsed]);
   return (
     <header className="relative flex w-full shrink-0 items-center px-2 pt-2">
       <Tooltip content="Drag to reorder">
@@ -115,7 +118,7 @@ function _MessageListItemHeader({
       </div>
       <div
         className="relative h-full min-h-full min-w-0 grow"
-        onClick={handleToggleMessageCollapse}
+        onClick={readonly ? undefined : handleToggleMessageCollapse}
       >
         &nbsp;
         {collapsed && preview && (

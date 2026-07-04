@@ -26,20 +26,24 @@ import { MessageListItem } from "./message-list-item";
 
 export function MessageListView({
   className,
+  messages: messagesFromProps,
   readonly: readonlyFromProps = false,
 }: {
   className?: string;
+  messages?: Message[];
   readonly?: boolean;
 }) {
+  const isSnapshotView = messagesFromProps !== undefined;
   const status = useThreadStore((s) => s.status);
   const collapsedMessageIds = useThreadStore((s) => s.collapsedMessageIds);
   const autoFocusMessageId = useThreadStore((s) => s.autoFocusMessageId);
-  const messages = useThreadStore((s) => s.thread.context?.messages);
+  const storeMessages = useThreadStore((s) => s.thread.context?.messages);
   const { appendMessage, moveMessage } = useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
+  const messages = messagesFromProps ?? storeMessages ?? [];
   const readonly = useMemo(() => {
-    return readonlyFromProps || dragging;
-  }, [dragging, readonlyFromProps]);
+    return readonlyFromProps || dragging || isSnapshotView;
+  }, [dragging, isSnapshotView, readonlyFromProps]);
 
   const handleDragStart = useCallback(() => {
     setDragging(true);
@@ -72,23 +76,29 @@ export function MessageListView({
   return (
     <ScrollArea className={cn("size-full", className)}>
       <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
-        <DragDropContext
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <Droppable droppableId="message-list">
-            {(droppableProvided) => (
-              <DroppableMessageList
-                droppableProvided={droppableProvided}
-                messages={messages ?? []}
-                readonly={readonly}
-                autoFocusMessageId={autoFocusMessageId}
-                collapsedMessageIds={collapsedMessageIds}
-              />
-            )}
-          </Droppable>
-        </DragDropContext>
-        <StreamingMessageListItem streaming={status === "running"} />
+        {isSnapshotView ? (
+          <StaticMessageList messages={messages} readonly={readonly} />
+        ) : (
+          <DragDropContext
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <Droppable droppableId="message-list">
+              {(droppableProvided) => (
+                <DroppableMessageList
+                  droppableProvided={droppableProvided}
+                  messages={messages}
+                  readonly={readonly}
+                  autoFocusMessageId={autoFocusMessageId}
+                  collapsedMessageIds={collapsedMessageIds}
+                />
+              )}
+            </Droppable>
+          </DragDropContext>
+        )}
+        {!isSnapshotView && (
+          <StreamingMessageListItem streaming={status === "running"} />
+        )}
         <Button
           // No top margin: the preceding message / streaming item (or, in the
           // empty state, the list's own top padding) already provides the gap.
@@ -107,6 +117,27 @@ export function MessageListView({
         </Button>
       </div>
     </ScrollArea>
+  );
+}
+
+function StaticMessageList({
+  messages,
+  readonly,
+}: {
+  messages: Message[];
+  readonly: boolean;
+}) {
+  return (
+    <div className="flex flex-col pt-3">
+      {messages.map((message) => (
+        <MessageListItem
+          key={message.id}
+          className="mb-3.5"
+          message={message}
+          readonly={readonly}
+        />
+      ))}
+    </div>
   );
 }
 

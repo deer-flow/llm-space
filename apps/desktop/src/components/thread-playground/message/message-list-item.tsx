@@ -59,8 +59,11 @@ function _MessageListItem({
     updateMessageTextContent,
   } = useThreadStoreActions();
   const handleRun = useCallback(async () => {
+    if (readonly) {
+      return;
+    }
     await run(message.id);
-  }, [run, message.id]);
+  }, [message.id, readonly, run]);
   const handleTextContentChange = useCallback(
     (value: string) => {
       updateMessageTextContent(message.id, value);
@@ -193,6 +196,7 @@ function _MessageListItem({
                 <ToolCallListItem
                   key={toolCall.id}
                   messageId={message.id}
+                  readonly={readonly}
                   toolCall={toolCall}
                 />
               ))}

@@ -1,11 +1,23 @@
 import {
+  ArrowLeftIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
   GitCompareArrowsIcon,
   RotateCcwIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { format } from "timeago.js";
 
 import { cn } from "@/lib/utils";
@@ -22,6 +34,7 @@ import {
   runModelLabel,
   summarizeRun,
 } from "./run-history-utils";
+import { RunTraceView } from "./run-trace-view";
 import { useThreadStore, useThreadStoreActions } from "./stores";
 import type { EvaluationRecord, RunSnapshot } from "./stores";
 
@@ -40,9 +53,21 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const { restoreThread, removeRun, saveEvaluation } = useThreadStoreActions();
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
   const [evaluationOpen, setEvaluationOpen] = useState(false);
+  const [inspectingRunId, setInspectingRunId] = useState<string | null>(null);
   const [runPendingRemoval, setRunPendingRemoval] =
     useState<RunSnapshot | null>(null);
   const runs = useMemo(() => runHistory.slice().reverse(), [runHistory]);
+  const inspectingRunIndex = useMemo(() => {
+    if (!inspectingRunId) {
+      return -1;
+    }
+    return runs.findIndex((run) => run.id === inspectingRunId);
+  }, [inspectingRunId, runs]);
+  const inspectingRun =
+    inspectingRunIndex >= 0 ? runs[inspectingRunIndex] : null;
+  const canInspectPrevious = inspectingRunIndex > 0;
+  const canInspectNext =
+    inspectingRunIndex >= 0 && inspectingRunIndex < runs.length - 1;
   const runById = useMemo(() => {
     return new Map(runHistory.map((run) => [run.id, run]));
   }, [runHistory]);
@@ -67,6 +92,11 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     setSelectedRunIds((current) => current.filter((id) => runById.has(id)));
   }, [runById]);
+  useEffect(() => {
+    if (inspectingRunId && inspectingRunIndex === -1) {
+      setInspectingRunId(null);
+    }
+  }, [inspectingRunId, inspectingRunIndex]);
 
   const toggleRunSelection = useCallback((runId: string) => {
     setSelectedRunIds((current) => {
@@ -99,6 +129,77 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
     },
     [restoreThread]
   );
+  const inspectRunFromHistory = useCallback((run: RunSnapshot) => {
+    setInspectingRunId(run.id);
+  }, []);
+  const handleBackToHistory = useCallback(() => {
+    setInspectingRunId(null);
+  }, []);
+  const inspectPreviousRun = useCallback(() => {
+    if (canInspectPrevious) {
+      setInspectingRunId(runs[inspectingRunIndex - 1].id);
+    }
+  }, [canInspectPrevious, inspectingRunIndex, runs]);
+  const inspectNextRun = useCallback(() => {
+    if (canInspectNext) {
+      setInspectingRunId(runs[inspectingRunIndex + 1].id);
+    }
+  }, [canInspectNext, inspectingRunIndex, runs]);
+
+  if (inspectingRun) {
+    return (
+      <div className="flex size-full flex-col">
+        <div className="text-muted-foreground flex h-12 shrink-0 items-center gap-1 border-b px-2 text-sm">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Back to run history"
+            onClick={handleBackToHistory}
+          >
+            <ArrowLeftIcon className="size-3" />
+            Back
+          </Button>
+          <div className="min-w-0 flex-1 px-1">
+            <div className="text-foreground truncate text-sm">Inspect Run</div>
+            <div className="text-muted-foreground text-[0.625rem]">
+              {inspectingRunIndex + 1} of {runs.length}
+            </div>
+          </div>
+          <Tooltip content="Previous run">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Inspect previous run"
+              disabled={!canInspectPrevious}
+              onClick={inspectPreviousRun}
+            >
+              <ChevronLeftIcon className="size-3" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Next run">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Inspect next run"
+              disabled={!canInspectNext}
+              onClick={inspectNextRun}
+            >
+              <ChevronRightIcon className="size-3" />
+            </Button>
+          </Tooltip>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close run history"
+            onClick={onClose}
+          >
+            <XIcon className="size-3" />
+          </Button>
+        </div>
+        <RunTraceView className="min-h-0 flex-1" run={inspectingRun} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex size-full flex-col">
@@ -150,6 +251,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
                 newest={index === 0}
                 selected={selectedRunIds.includes(run.id)}
                 onToggleSelected={toggleRunSelection}
+                onInspectRun={inspectRunFromHistory}
                 onRestore={handleRestoreRun}
                 onRequestRemove={setRunPendingRemoval}
               />
@@ -201,6 +303,7 @@ function _RunHistoryItem({
   newest,
   selected,
   onToggleSelected,
+  onInspectRun,
   onRestore,
   onRequestRemove,
 }: {
@@ -208,6 +311,7 @@ function _RunHistoryItem({
   newest: boolean;
   selected: boolean;
   onToggleSelected: (runId: string) => void;
+  onInspectRun: (run: RunSnapshot) => void;
   onRestore: (thread: RunSnapshot["thread"]) => void;
   onRequestRemove: (run: RunSnapshot) => void;
 }) {
@@ -215,55 +319,45 @@ function _RunHistoryItem({
   const modelLabel = runModelLabel(run.thread);
   const messageCountLabel = runMessageCountLabel(run.thread);
   const time = format(run.timestamp);
+  const handleInspect = useCallback(() => {
+    onInspectRun(run);
+  }, [onInspectRun, run]);
+  const handleInspectKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.currentTarget !== event.target) {
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onInspectRun(run);
+      }
+    },
+    [onInspectRun, run]
+  );
+  const stopInspectClick = useCallback((event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  }, []);
   return (
     <Item
       size="sm"
       variant="muted"
       role="listitem"
+      tabIndex={0}
+      aria-label={`Inspect run from ${time}: ${summary}`}
       className={cn(
-        "group relative flex-col items-start gap-1",
+        "group hover:bg-muted/70 focus-visible:ring-ring relative cursor-pointer flex-col items-start gap-1.5 focus-visible:ring-[3px]",
         selected && "ring-primary/50 ring-1",
         // Flash the newest run's background, fading to the resting color.
         newest && "animate-run-history-enter"
       )}
+      onClick={handleInspect}
+      onKeyDown={handleInspectKeyDown}
     >
-      <div className="flex w-full min-w-0 items-start gap-2">
-        <ItemContent className="min-w-0 flex-1">
-          <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 w-full font-mono">
-            {summary}
-          </ItemDescription>
-        </ItemContent>
-        <div className="flex shrink-0 items-center gap-1">
-          <Tooltip content={selected ? "Remove from comparison" : "Select run"}>
-            <Button
-              variant={selected ? "default" : "outline"}
-              size="icon-xs"
-              className={cn(
-                "opacity-40 shadow-sm transition-opacity",
-                "hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
-                selected && "opacity-100"
-              )}
-              aria-label={
-                selected
-                  ? `Remove run from comparison: ${summary}`
-                  : `Select run for comparison: ${summary}`
-              }
-              aria-pressed={selected}
-              onClick={() => onToggleSelected(run.id)}
-            >
-              {selected && <CheckIcon className="size-2" />}
-            </Button>
-          </Tooltip>
-          <Tooltip content="Restore run">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Restore run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
-              onClick={() => onRestore(run.thread)}
-            >
-              <RotateCcwIcon className="size-3" />
-            </Button>
-          </Tooltip>
+      <ItemContent className="flex w-full min-w-0 flex-row items-start gap-2">
+        <ItemDescription className="text-foreground/60 group-hover:text-foreground line-clamp-2 min-w-0 flex-1 font-mono">
+          {summary}
+        </ItemDescription>
+        <div className="shrink-0" onClick={stopInspectClick}>
           <Tooltip content="Remove run">
             <Button
               variant="ghost"
@@ -279,12 +373,68 @@ function _RunHistoryItem({
             </Button>
           </Tooltip>
         </div>
-      </div>
-      <div className="text-muted-foreground flex w-full min-w-0 items-baseline gap-1.5 text-[0.625rem]">
-        <span className="min-w-0 flex-1 truncate">
-          {time} · {modelLabel}
-        </span>
-        <span className="shrink-0 tabular-nums">{messageCountLabel}</span>
+      </ItemContent>
+      <div className="flex w-full min-w-0 items-center gap-2">
+        <div className="text-muted-foreground flex min-w-0 flex-1 items-baseline gap-1.5 text-[0.625rem]">
+          <span className="min-w-0 flex-1 truncate">
+            {time} · {modelLabel}
+          </span>
+          <span className="shrink-0 tabular-nums">{messageCountLabel}</span>
+        </div>
+        <div
+          className="flex shrink-0 items-center gap-0.5"
+          onClick={stopInspectClick}
+        >
+          <Tooltip content={selected ? "Remove from comparison" : "Select run"}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn(
+                "text-muted-foreground/70 hover:text-foreground opacity-70 transition-opacity",
+                "group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100",
+                selected && "text-primary opacity-100"
+              )}
+              aria-label={
+                selected
+                  ? `Remove run from comparison: ${summary}`
+                  : `Select run for comparison: ${summary}`
+              }
+              aria-pressed={selected}
+              onClick={() => onToggleSelected(run.id)}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "flex size-3 items-center justify-center rounded-[3px] border border-current",
+                  selected &&
+                    "border-primary bg-primary text-primary-foreground"
+                )}
+              >
+                {selected && <CheckIcon className="size-2.5" />}
+              </span>
+            </Button>
+          </Tooltip>
+          <Tooltip content="Inspect run">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Inspect run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
+              onClick={() => onInspectRun(run)}
+            >
+              <EyeIcon className="size-3" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Restore run">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Restore run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
+              onClick={() => onRestore(run.thread)}
+            >
+              <RotateCcwIcon className="size-3" />
+            </Button>
+          </Tooltip>
+        </div>
       </div>
     </Item>
   );

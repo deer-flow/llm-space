@@ -1,4 +1,4 @@
-import { CheckIcon, SaveIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { format } from "timeago.js";
@@ -22,6 +22,7 @@ import {
   runResultText,
   summarizeRun,
 } from "./run-history-utils";
+import { RunTraceView } from "./run-trace-view";
 import type { EvaluationRecord, RunSnapshot } from "./stores";
 
 const VERDICT_OPTIONS: {
@@ -55,15 +56,18 @@ export function RunEvaluationDialog({
     note?: string;
   }) => void;
 }) {
-  const [verdict, setVerdict] = useState<
-    EvaluationRecord["verdict"] | null
-  >(null);
+  const [verdict, setVerdict] = useState<EvaluationRecord["verdict"] | null>(
+    null
+  );
   const [note, setNote] = useState("");
+  const [inspectingRun, setInspectingRun] = useState<RunSnapshot | null>(null);
 
   useEffect(() => {
     if (!open) {
+      setInspectingRun(null);
       return;
     }
+    setInspectingRun(null);
     setVerdict(evaluation?.verdict ?? null);
     setNote(evaluation?.note ?? "");
   }, [evaluation?.id, evaluation?.note, evaluation?.verdict, open]);
@@ -92,12 +96,26 @@ export function RunEvaluationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100vh-4rem)] w-[min(1040px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Evaluate Runs</DialogTitle>
+          <DialogTitle>
+            {inspectingRun ? "Inspect Run" : "Evaluate Runs"}
+          </DialogTitle>
           <DialogDescription>
-            Compare two durable runs and save a verdict with this thread.
+            {inspectingRun
+              ? "Saved run evidence from this comparison."
+              : "Compare two durable runs and save a verdict with this thread."}
           </DialogDescription>
         </DialogHeader>
-        {leftRun && rightRun ? (
+        {inspectingRun ? (
+          <>
+            <RunTraceView className="min-h-0 flex-1" run={inspectingRun} />
+            <div className="flex justify-end border-t px-4 py-3">
+              <Button variant="ghost" onClick={() => setInspectingRun(null)}>
+                <ArrowLeftIcon className="size-3" />
+                Back to Evaluation
+              </Button>
+            </div>
+          </>
+        ) : leftRun && rightRun ? (
           <>
             <div className="min-h-0 overflow-y-auto px-4 py-4">
               <div className="text-muted-foreground mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -107,8 +125,16 @@ export function RunEvaluationDialog({
                 )}
               </div>
               <div className="flex flex-col gap-3 lg:flex-row">
-                <_RunComparisonPanel label="Run A" run={leftRun} />
-                <_RunComparisonPanel label="Run B" run={rightRun} />
+                <_RunComparisonPanel
+                  label="Run A"
+                  run={leftRun}
+                  onInspectRun={setInspectingRun}
+                />
+                <_RunComparisonPanel
+                  label="Run B"
+                  run={rightRun}
+                  onInspectRun={setInspectingRun}
+                />
               </div>
               <div className="mt-4 flex flex-col gap-3">
                 <div>
@@ -165,17 +191,31 @@ export function RunEvaluationDialog({
 function _RunComparisonPanel({
   label,
   run,
+  onInspectRun,
 }: {
   label: string;
   run: RunSnapshot;
+  onInspectRun: (run: RunSnapshot) => void;
 }) {
   return (
     <section className="bg-muted/30 flex min-w-0 flex-1 flex-col rounded-lg border">
       <div className="border-b px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="text-xs font-medium">{label}</div>
-          <div className="text-muted-foreground shrink-0 text-[0.625rem]">
-            {format(run.timestamp)}
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={`Inspect ${label}: ${summarizeRun(run.thread)}`}
+              onClick={() => onInspectRun(run)}
+            >
+              <EyeIcon className="size-3" />
+              Inspect
+            </Button>
+            <div className="text-muted-foreground text-[0.625rem]">
+              {format(run.timestamp)}
+            </div>
           </div>
         </div>
         <div className="text-muted-foreground mt-1 line-clamp-2 font-mono text-xs">
@@ -195,7 +235,10 @@ function _RunComparisonPanel({
           label="System Prompt"
           value={run.thread.context?.systemPrompt?.trim() || "No system prompt"}
         />
-        <_TextExcerpt label="Last User Message" value={runLastUserText(run.thread)} />
+        <_TextExcerpt
+          label="Last User Message"
+          value={runLastUserText(run.thread)}
+        />
         <_TextExcerpt label="Result" value={runResultText(run.thread)} />
       </div>
     </section>

@@ -7,20 +7,28 @@ import { useThreadStoreActions } from "../stores";
 function _ToolCallListItem({
   messageId,
   toolCall,
+  readonly = false,
 }: {
   messageId: string;
   toolCall: ToolCall;
+  readonly?: boolean;
 }) {
   const { run, updateToolCallOutputText } = useThreadStoreActions();
   const handleOutputChange = useCallback(
     (value: string) => {
+      if (readonly) {
+        return;
+      }
       updateToolCallOutputText(messageId, toolCall.id, value);
     },
-    [messageId, toolCall.id, updateToolCallOutputText]
+    [messageId, readonly, toolCall.id, updateToolCallOutputText]
   );
   const handleRun = useCallback(async () => {
+    if (readonly) {
+      return;
+    }
     await run(messageId);
-  }, [run, messageId]);
+  }, [messageId, readonly, run]);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && e.metaKey) {
@@ -43,6 +51,7 @@ function _ToolCallListItem({
           hideFocusRing
           scrollOnFocus
           placeholder={`Enter the response of ${toolCall.input.name}()`}
+          readonly={readonly}
           value={toolCall.output?.content?.map((c) => c.text).join("\n") ?? ""}
           onChange={handleOutputChange}
           onKeyDown={handleKeyDown}

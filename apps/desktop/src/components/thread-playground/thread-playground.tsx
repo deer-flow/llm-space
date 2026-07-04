@@ -324,7 +324,7 @@ function ThreadPlaygroundContent({
           collapsible
           collapsedSize={0}
           defaultSize={0}
-          minSize={200}
+          minSize={RUN_HISTORY_PANEL_SIZE}
           onResize={(size) => {
             setHistoryOpen(size.inPixels > 0);
           }}
