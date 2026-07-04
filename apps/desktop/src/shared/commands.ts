@@ -7,6 +7,8 @@
  * one-RPC-method-per-action sprawl.
  */
 
+import type { Message, Tool } from "@llm-space/core";
+
 /** Base shape for every command: a string `type` and typed `args`. */
 export interface GenericCommand<T extends string, A = Record<string, never>> {
   type: T;
@@ -38,6 +40,10 @@ export interface NewFileFromPromptExampleCommand extends GenericCommand<
     exampleId: string;
     fileStem: string;
     systemPrompt: string;
+    /** Tools to seed the new thread with, if the example provides any. */
+    tools?: Tool[];
+    /** Messages to seed the new thread with, if the example provides any. */
+    messages?: Message[];
   }
 > {}
 

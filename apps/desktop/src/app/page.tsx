@@ -359,6 +359,8 @@ function PageInner() {
                 exampleId: example.id,
                 fileStem: example.fileStem,
                 systemPrompt: example.content,
+                tools: example.tools,
+                messages: example.messages,
               },
             })
           }

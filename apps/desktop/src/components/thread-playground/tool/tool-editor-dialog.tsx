@@ -109,7 +109,7 @@ const BASH_TOOL: FunctionTool = {
 };
 
 const READ_FILE_TOOL: FunctionTool = {
-  name: "read_file",
+  name: "read",
   description:
     "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents; for images, returns a visual representation. Prefer this over bash for reading files.",
   strict: true,
@@ -132,7 +132,7 @@ const READ_FILE_TOOL: FunctionTool = {
 };
 
 const WRITE_FILE_TOOL: FunctionTool = {
-  name: "write_file",
+  name: "write",
   description:
     "Writes content to a file on the local filesystem, creating parent directories if needed. Overwrites the file if it already exists. Use for creating new files or fully replacing file contents.",
   strict: true,
@@ -356,7 +356,7 @@ type ToolExampleItem =
   | { type: "separator" }
   | { type: "tool"; label: string; tool: FunctionTool; icon: LucideIcon };
 
-const TOOL_EXAMPLES: ToolExampleItem[] = [
+export const TOOL_EXAMPLES: ToolExampleItem[] = [
   {
     type: "tool",
     label: "get_weather",
@@ -380,13 +380,13 @@ const TOOL_EXAMPLES: ToolExampleItem[] = [
   { type: "tool", label: "bash()", tool: BASH_TOOL, icon: TerminalIcon },
   {
     type: "tool",
-    label: "read_file",
+    label: "read",
     tool: READ_FILE_TOOL,
     icon: FileTextIcon,
   },
   {
     type: "tool",
-    label: "write_file",
+    label: "write",
     tool: WRITE_FILE_TOOL,
     icon: FileOutputIcon,
   },

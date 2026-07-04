@@ -1,6 +1,12 @@
 "use client";
 
-import { uuid, type FileNode, type Thread } from "@llm-space/core";
+import {
+  uuid,
+  type FileNode,
+  type Message,
+  type Thread,
+  type Tool,
+} from "@llm-space/core";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -127,13 +133,16 @@ function _createBlankThread(title: string): Thread {
  */
 function _createThreadFromPromptExample(
   title: string,
-  systemPrompt: string
+  systemPrompt: string,
+  tools?: Tool[],
+  messages?: Message[]
 ): Thread {
   return {
     title,
     context: {
       systemPrompt,
-      messages: [
+      tools,
+      messages: messages ?? [
         { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
       ],
     },
@@ -161,7 +170,12 @@ export interface FileSystemTree {
   /** Create a thread from a built-in prompt example; returns its path. */
   createFileFromPromptExample: (
     parent: string,
-    example: { fileStem: string; systemPrompt: string }
+    example: {
+      fileStem: string;
+      systemPrompt: string;
+      tools?: Tool[];
+      messages?: Message[];
+    }
   ) => Promise<string | null>;
   /** Delete a file or directory; resolves to whether it succeeded. */
   remove: (path: string) => Promise<boolean>;
@@ -314,7 +328,12 @@ export function useFileSystemTree(): FileSystemTree {
   const createFileFromPromptExample = useCallback(
     async (
       parent: string,
-      example: { fileStem: string; systemPrompt: string }
+      example: {
+        fileStem: string;
+        systemPrompt: string;
+        tools?: Tool[];
+        messages?: Message[];
+      }
     ): Promise<string | null> => {
       let path: string;
       try {
@@ -324,7 +343,12 @@ export function useFileSystemTree(): FileSystemTree {
         const title = threadTitleFromPath(path);
         await localFs.write(
           path,
-          _createThreadFromPromptExample(title, example.systemPrompt)
+          _createThreadFromPromptExample(
+            title,
+            example.systemPrompt,
+            example.tools,
+            example.messages
+          )
         );
       } catch (err) {
         toast.error((err as Error).message);

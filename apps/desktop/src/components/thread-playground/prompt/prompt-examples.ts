@@ -1,7 +1,9 @@
+import { uuid, type Message, type Tool } from "@llm-space/core";
 import {
   BookOpenTextIcon,
   BotIcon,
   BrainCircuitIcon,
+  FileIcon,
   ImageIcon,
   LanguagesIcon,
   SparklesIcon,
@@ -16,6 +18,7 @@ import metaImagePrompt from "../prompts/examples/meta-image-prompt.md?raw";
 import metaPromptWithTools from "../prompts/examples/meta-prompt-with-tools.md?raw";
 import translationPrompt from "../prompts/examples/translation.md?raw";
 import metaToolPrompt from "../prompts/meta-tool.md?raw";
+import { TOOL_EXAMPLES } from "../tool/tool-editor-dialog";
 
 export interface PromptExample {
   type: "example";
@@ -25,9 +28,36 @@ export interface PromptExample {
   description: string;
   content: string;
   icon: LucideIcon;
+  /** Tools to seed the new thread with (only used by "Start from Example"). */
+  tools?: Tool[];
+  /** Messages to seed the new thread with (only used by "Start from Example"). */
+  messages?: Message[];
 }
 
 export type PromptExampleItem = PromptExample | { type: "separator" };
+
+function pickTools(labels: string[]): Tool[] {
+  return TOOL_EXAMPLES.filter(
+    (tool) => tool.type === "tool" && labels.includes(tool.label)
+  )
+    .map((item) => (item.type === "tool" ? item.tool : undefined))
+    .filter(Boolean) as Tool[];
+}
+
+function userPrompt(text: string): Message[] {
+  return [
+    {
+      id: uuid(),
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text,
+        },
+      ],
+    },
+  ];
+}
 
 /**
  * Built-in system prompt examples used by both the system-prompt menu and the
@@ -37,6 +67,19 @@ export type PromptExampleItem = PromptExample | { type: "separator" };
 export const PROMPT_EXAMPLES = [
   {
     type: "example",
+    id: "hello-world",
+    label: "Hello, world",
+    fileStem: "hello-world",
+    description: "A classic, helpful and harmless assistant.",
+    content:
+      "You're a helpful and harmless assistant that can help with tasks like daily work and writing code, answering questions, and more.",
+    icon: FileIcon,
+    tools: pickTools(["web_search", "web_fetch", "weather_report"]),
+    messages: userPrompt("What's the weather in Tokyo and Kyoto?"),
+  },
+  { type: "separator" },
+  {
+    type: "example",
     id: "general-agent",
     label: "General Agent",
     fileStem: "general-agent",
@@ -44,6 +87,21 @@ export const PROMPT_EXAMPLES = [
       "Broad-purpose assistant prompt with practical tool-use rules.",
     content: generalAgentPrompt,
     icon: BotIcon,
+    tools: pickTools([
+      "web_search",
+      "web_fetch",
+      "ls",
+      "read",
+      "write",
+      "edit",
+      "grep",
+      "glob",
+      "bash",
+      "present_files",
+    ]),
+    messages: userPrompt(
+      "Perform a deep research of the open source project DeerFlow 2.0"
+    ),
   },
   {
     type: "example",

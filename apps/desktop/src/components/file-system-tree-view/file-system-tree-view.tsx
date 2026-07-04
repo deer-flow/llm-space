@@ -1,6 +1,6 @@
 "use client";
 
-import type { FileNode } from "@llm-space/core";
+import type { FileNode, Message, Tool } from "@llm-space/core";
 import { MessagesSquare } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -104,10 +104,18 @@ export function FileSystemTreeView({
   );
 
   const createThreadFromPromptExample = useCallback(
-    async (parent: string, fileStem: string, systemPrompt: string) => {
+    async (
+      parent: string,
+      fileStem: string,
+      systemPrompt: string,
+      tools?: Tool[],
+      messages?: Message[]
+    ) => {
       const path = await createFileFromPromptExample(parent, {
         fileStem,
         systemPrompt,
+        tools,
+        messages,
       });
       if (path) setPendingThread(path);
     },
@@ -123,8 +131,20 @@ export function FileSystemTreeView({
       if (rename) void create(parent, "file");
       else void createThread(parent);
     },
-    newFileFromPromptExample: ({ parent = "", fileStem, systemPrompt }) => {
-      void createThreadFromPromptExample(parent, fileStem, systemPrompt);
+    newFileFromPromptExample: ({
+      parent = "",
+      fileStem,
+      systemPrompt,
+      tools,
+      messages,
+    }) => {
+      void createThreadFromPromptExample(
+        parent,
+        fileStem,
+        systemPrompt,
+        tools,
+        messages
+      );
     },
     newFolder: ({ parent = "" }) => void create(parent, "folder"),
     renameFile: ({ path }) => startRenameByPath(path),
