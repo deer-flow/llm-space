@@ -300,12 +300,8 @@ const TODO_WRITE_TOOL: FunctionTool = {
         description: "The complete set of todo items to display.",
         items: {
           type: "object",
-          required: ["id", "content", "status"],
+          required: ["content", "status"],
           properties: {
-            id: {
-              type: "string",
-              description: "Stable unique identifier for this todo item.",
-            },
             content: {
               type: "string",
               description: "Short description of the work item.",
