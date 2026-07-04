@@ -50,6 +50,11 @@ function _McpToolImportPopover({
     () => servers.find((server) => server.id === selectedServerId) ?? null,
     [selectedServerId, servers]
   );
+  const diagnostic = selectedServer?.readiness?.diagnostic;
+  const diagnosticHeadline = diagnostic?.headline;
+  const errorText = diagnosticHeadline ?? selectedServer?.lastError;
+  const isErrorText =
+    Boolean(selectedServer?.lastError) || diagnostic?.outcome === "failed";
 
   const refreshServers = useCallback(async () => {
     setLoadingServers(true);
@@ -191,9 +196,14 @@ function _McpToolImportPopover({
                 <div className="text-xs font-medium">
                   {_serverReadinessLabel(selectedServer)}
                 </div>
-                {selectedServer.lastError ? (
-                  <div className="text-destructive truncate text-xs">
-                    {selectedServer.lastError}
+                {errorText ? (
+                  <div
+                    className={cn(
+                      "truncate text-xs",
+                      isErrorText ? "text-destructive" : "text-muted-foreground"
+                    )}
+                  >
+                    {errorText}
                   </div>
                 ) : null}
               </div>
@@ -263,7 +273,11 @@ function _McpToolImportPopover({
             )}
           </div>
 
-          {selectedServer?.lastError ? (
+          {diagnosticHeadline ? (
+            <div className="text-muted-foreground text-xs">
+              Open Settings for the full redacted diagnostic timeline.
+            </div>
+          ) : selectedServer?.lastError ? (
             <div className="text-destructive text-xs">
               {selectedServer.lastError}
             </div>

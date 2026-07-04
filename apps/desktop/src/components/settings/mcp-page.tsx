@@ -4,6 +4,7 @@ import {
   Check,
   CircleAlert,
   CircleDot,
+  Copy,
   Loader2,
   Plus,
   RefreshCw,
@@ -45,6 +46,7 @@ import { cn } from "@/lib/utils";
 import {
   getMcpReadinessLabel,
   normalizeMcpName,
+  type McpDiagnosticStep,
   type McpServerDraft,
   type McpServerReadiness,
   type McpServerView,
@@ -701,6 +703,7 @@ function ReadinessPanel({
           ? "text-amber-400"
           : "text-muted-foreground";
   const detail = _readinessDetail(readiness, liveToolsLoaded);
+  const diagnostic = readiness.diagnostic;
 
   return (
     <div className="border-border bg-muted/30 flex flex-col gap-2 rounded-md border px-3 py-2">
@@ -724,8 +727,94 @@ function ReadinessPanel({
           Not connected. This is the last saved test result.
         </div>
       ) : null}
+      {diagnostic ? (
+        <div className="border-border/70 mt-1 flex flex-col gap-2 border-t pt-2">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">Diagnostics</div>
+              <div className="text-muted-foreground truncate text-xs">
+                {diagnostic.headline}
+              </div>
+            </div>
+            <Tooltip content="Copy diagnostic summary">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Copy diagnostic summary"
+                onClick={() => void _copyDiagnosticSummary(diagnostic.summary)}
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </Tooltip>
+          </div>
+          {diagnostic.endpoint ? (
+            <div className="text-muted-foreground truncate font-mono text-[11px]">
+              {diagnostic.endpoint}
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-1">
+            {diagnostic.steps.map((step) => (
+              <DiagnosticStepRow key={step.id} step={step} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * Renders one persisted diagnostic phase. Input is already redacted by the Bun
+ * process; this component only maps status to compact visual state.
+ */
+function DiagnosticStepRow({ step }: { step: McpDiagnosticStep }) {
+  return (
+    <div className="flex min-w-0 items-start gap-2 text-xs">
+      <span
+        className={cn(
+          "mt-1.5 size-1.5 shrink-0 rounded-full",
+          step.status === "passed"
+            ? "bg-emerald-500"
+            : step.status === "failed"
+              ? "bg-destructive"
+              : "bg-muted-foreground/50"
+        )}
+      />
+      <div className="min-w-0 grow">
+        <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+          <span className="font-medium">{step.label}</span>
+          <span className="text-muted-foreground">{step.message}</span>
+        </div>
+        {step.detail ? (
+          <div
+            className={cn(
+              "break-words",
+              step.status === "failed"
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}
+          >
+            {step.detail}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Copies the redacted diagnostic summary for support/debugging. It has no app
+ * state side effects beyond a toast because the summary is already persisted.
+ */
+async function _copyDiagnosticSummary(summary: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(summary);
+    toast.success("Diagnostic copied");
+  } catch (error) {
+    toast.error("Failed to copy diagnostic", {
+      description: error instanceof Error ? error.message : "Please try again.",
+    });
+  }
 }
 
 function ToolSummaryRow({ tool }: { tool: McpToolSummary }) {

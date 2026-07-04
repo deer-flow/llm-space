@@ -1,6 +1,7 @@
 import type { JSONSchema } from "@llm-space/core";
 
 export type McpTransportType = "stdio" | "streamableHttp" | "sse";
+export type McpRemoteTransportType = Exclude<McpTransportType, "stdio">;
 
 export interface McpServerDraft {
   name: string;
@@ -14,6 +15,39 @@ export interface McpServerDraft {
 }
 
 export type McpReadinessStatus = "untested" | "ready" | "error" | "stale";
+export type McpDiagnosticOutcome = "passed" | "failed";
+export type McpDiagnosticStepStatus = "passed" | "failed" | "skipped";
+export type McpDiagnosticCategory =
+  | "success"
+  | "invalidConfig"
+  | "missingSecret"
+  | "unreachable"
+  | "timeout"
+  | "unauthorized"
+  | "httpStatus"
+  | "transportMismatch"
+  | "protocol"
+  | "listTools"
+  | "unknown";
+
+export interface McpDiagnosticStep {
+  id: string;
+  label: string;
+  status: McpDiagnosticStepStatus;
+  message: string;
+  detail?: string;
+}
+
+export interface McpServerDiagnostic {
+  outcome: McpDiagnosticOutcome;
+  category: McpDiagnosticCategory;
+  checkedAt: number;
+  transport: McpRemoteTransportType;
+  endpoint?: string;
+  headline: string;
+  steps: McpDiagnosticStep[];
+  summary: string;
+}
 
 export interface McpToolSummary {
   toolName: string;
@@ -33,6 +67,7 @@ export interface McpServerReadiness {
   toolCount: number | null;
   lastError?: string;
   tools: McpToolSummary[];
+  diagnostic?: McpServerDiagnostic;
 }
 
 export interface McpServerConfig extends McpServerDraft {
