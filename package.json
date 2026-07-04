@@ -16,6 +16,9 @@
     "lint:check": "eslint .",
     "prepare": "husky"
   },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}": "eslint --fix"
+  },
   "catalog": {
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-agent-core": "latest",
@@ -34,6 +37,7 @@
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.8.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "^6.0.3",

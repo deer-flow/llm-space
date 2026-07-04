@@ -15,6 +15,7 @@ export default defineConfig([
       "**/build/**",
       "**/.next/**",
       "**/.turbo/**",
+      ".agents/**",
       "apps/desktop/electrobun.config.ts",
       "apps/desktop/src/components/ui/**",
       "apps/desktop/vite.config.ts",
