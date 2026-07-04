@@ -1,10 +1,13 @@
 import type {
+  ModelUsage,
   Thread,
   ThreadEvaluation,
   ThreadRunSnapshot,
   ThreadSnapshot,
 } from "@llm-space/core";
 import { uuid } from "@llm-space/core";
+
+import { emptyModelUsage, isModelUsage } from "../token-usage";
 
 /** Maximum number of snapshots retained, including the current state. */
 export const MAX_HISTORY = 100;
@@ -184,11 +187,17 @@ export function normalizeRunHistory(
       typeof run.id === "string" && run.id.trim()
         ? run.id
         : _fallbackRunId(run, index);
+    const usage =
+      Object.prototype.hasOwnProperty.call(run, "usage") &&
+      isModelUsage(run.usage)
+        ? run.usage
+        : undefined;
     return [
       {
         id,
         timestamp: run.timestamp,
         thread: snapshotThread(run.thread),
+        ...(usage ? { usage } : {}),
       },
     ];
   });
@@ -291,11 +300,17 @@ export function recordRun(
   runHistory: RunSnapshot[],
   thread: Thread,
   timestamp: number,
-  id: string = uuid()
+  options: { id?: string; usage?: ModelUsage | null } = {}
 ): RunSnapshot[] {
+  const usage = options.usage ?? emptyModelUsage();
   const next = [
     ...normalizeRunHistory(runHistory),
-    { id, thread: snapshotThread(thread), timestamp },
+    {
+      id: options.id ?? uuid(),
+      thread: snapshotThread(thread),
+      timestamp,
+      usage,
+    },
   ];
   return next.length > MAX_RUN_HISTORY
     ? next.slice(next.length - MAX_RUN_HISTORY)
@@ -341,17 +356,15 @@ export function upsertEvaluation(
   ) {
     return normalized;
   }
-  const existingIndex = normalized.findIndex(
-    (evaluation) =>
-      _isSameRunPair(
-        evaluation.leftRunId,
-        evaluation.rightRunId,
-        input.leftRunId,
-        input.rightRunId
-      )
+  const existingIndex = normalized.findIndex((evaluation) =>
+    _isSameRunPair(
+      evaluation.leftRunId,
+      evaluation.rightRunId,
+      input.leftRunId,
+      input.rightRunId
+    )
   );
-  const existing =
-    existingIndex === -1 ? undefined : normalized[existingIndex];
+  const existing = existingIndex === -1 ? undefined : normalized[existingIndex];
   const nextEvaluation: EvaluationRecord = {
     id: existing?.id ?? uuid(),
     leftRunId: input.leftRunId,

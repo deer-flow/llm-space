@@ -1,7 +1,7 @@
 import type * as pi from "@earendil-works/pi-ai";
 
 import type { PiThreadContext } from "../types/agent";
-import type { Message } from "../types/messages";
+import type { Message, ModelUsage } from "../types/messages";
 import type { ThreadContext } from "../types/threads";
 import type { Tool } from "../types/tools";
 
@@ -21,8 +21,7 @@ function _convertToPiMessages(messages: Message[]) {
       const piMessage: pi.UserMessage = {
         role: "user",
         content: _convertMessageContents(message) as (
-          | pi.TextContent
-          | pi.ImageContent
+          pi.TextContent | pi.ImageContent
         )[],
         timestamp: Date.now(),
       };
@@ -31,29 +30,14 @@ function _convertToPiMessages(messages: Message[]) {
       const piMessage: pi.AssistantMessage = {
         role: "assistant",
         content: _convertMessageContents(message) as (
-          | pi.TextContent
-          | pi.ThinkingContent
-          | pi.ToolCall
+          pi.TextContent | pi.ThinkingContent | pi.ToolCall
         )[],
         api: "",
         model: "",
         provider: "",
         stopReason: "stop",
         timestamp: Date.now(),
-        usage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 0,
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            total: 0,
-          },
-        },
+        usage: _convertUsage(message.usage),
       };
       result.push(piMessage);
     }
@@ -71,6 +55,26 @@ function _convertToPiMessages(messages: Message[]) {
     }
   }
   return result;
+}
+
+/** Preserve provider usage when replaying saved assistant messages to pi. */
+function _convertUsage(messageUsage: ModelUsage | undefined): pi.Usage {
+  return (
+    messageUsage ?? {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 0,
+      },
+    }
+  );
 }
 
 function _convertMessageContents(
@@ -92,10 +96,7 @@ function _convertMessageContents(
     });
   } else if (message.role === "assistant") {
     const contents: (
-      | pi.TextContent
-      | pi.ImageContent
-      | pi.ThinkingContent
-      | pi.ToolCall
+      pi.TextContent | pi.ImageContent | pi.ThinkingContent | pi.ToolCall
     )[] = [];
     if (message.thinking) {
       contents.push({

@@ -2,6 +2,7 @@ import { Type, type Static } from "typebox";
 
 import { ImageDataContent, TextContent } from "./contents";
 import { ToolCall } from "./tools";
+import { ModelUsage } from "./usage";
 
 /**
  * The allowed content types of a user message.
@@ -63,6 +64,11 @@ export const AssistantMessage = Type.Object({
    * The tool calls of the message.
    */
   toolCalls: Type.Optional(Type.Array(ToolCall)),
+
+  /**
+   * Provider-reported token usage for this completed assistant/model step.
+   */
+  usage: Type.Optional(ModelUsage),
 });
 export type AssistantMessage = Static<typeof AssistantMessage>;
 

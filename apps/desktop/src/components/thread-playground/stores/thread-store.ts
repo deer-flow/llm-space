@@ -22,6 +22,8 @@ import { createStore, useStore, type StoreApi } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/shallow";
 
+import { aggregateMessageUsage } from "../token-usage";
+
 import {
   createInitialHistory,
   normalizeEvaluations,
@@ -451,6 +453,7 @@ export function createThreadStore(
               setMessages(messages);
             }
           }
+          const runStartMessageCount = messages.length;
 
           // Append a finished assistant message to the thread.
           const commit = (message: AssistantMessage) => {
@@ -541,10 +544,14 @@ export function createThreadStore(
             // undo step, and record a run snapshot. No-op for undo if the
             // thread is unchanged.
             const finalThread = get().thread;
+            const runUsage = aggregateMessageUsage(
+              (finalThread.context?.messages ?? []).slice(runStartMessageCount)
+            );
             const runHistory = recordRun(
               get().runHistory,
               finalThread,
-              Date.now()
+              Date.now(),
+              { usage: runUsage }
             );
             const evaluations = normalizeEvaluations(
               get().evaluations,

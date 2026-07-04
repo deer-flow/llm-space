@@ -4,12 +4,14 @@ import { format } from "timeago.js";
 import { cn } from "@/lib/utils";
 
 import { MessageListView } from "./message/message-list-view";
+import { TokenUsageSummary } from "./message/token-usage-summary";
 import {
   runMessageCountLabel,
   runModelLabel,
   summarizeRun,
 } from "./run-history-utils";
 import type { RunSnapshot } from "./stores";
+import { usageForRun } from "./token-usage";
 
 function _RunTraceView({
   className,
@@ -27,6 +29,7 @@ function _RunTraceView({
   }
 
   const messages = run.thread.context?.messages ?? [];
+  const usage = usageForRun(run);
   const systemPrompt =
     run.thread.context?.systemPrompt?.trim() || "No system prompt";
 
@@ -46,6 +49,7 @@ function _RunTraceView({
           <span>{runMessageCountLabel(run.thread)}</span>
           <span>{new Date(run.timestamp).toLocaleString()}</span>
         </div>
+        {usage && <TokenUsageSummary className="mt-2" usage={usage} />}
       </div>
       <details className="group shrink-0 border-b px-3 py-2">
         <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[0.625rem] font-medium">

@@ -37,6 +37,7 @@ import {
 import { RunTraceView } from "./run-trace-view";
 import { useThreadStore, useThreadStoreActions } from "./stores";
 import type { EvaluationRecord, RunSnapshot } from "./stores";
+import { formatCompactUsage, usageForRun } from "./token-usage";
 
 const VERDICT_LABELS: Record<EvaluationRecord["verdict"], string> = {
   leftBetter: "Run A Better",
@@ -374,12 +375,14 @@ function _RunHistoryItem({
           </Tooltip>
         </div>
       </ItemContent>
-      <div className="flex w-full min-w-0 items-center gap-2">
-        <div className="text-muted-foreground flex min-w-0 flex-1 items-baseline gap-1.5 text-[0.625rem]">
-          <span className="min-w-0 flex-1 truncate">
+      <div className="flex w-full min-w-0 items-end gap-2">
+        <div className="text-muted-foreground min-w-0 flex-1 text-[0.625rem]">
+          <div className="truncate">
             {time} · {modelLabel}
-          </span>
-          <span className="shrink-0 tabular-nums">{messageCountLabel}</span>
+          </div>
+          <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+            <span className="shrink-0 tabular-nums">{messageCountLabel}</span>
+          </div>
         </div>
         <div
           className="flex shrink-0 items-center gap-0.5"

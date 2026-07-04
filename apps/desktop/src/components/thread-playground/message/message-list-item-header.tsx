@@ -17,6 +17,7 @@ import { Button } from "../../ui/button";
 import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";
+import { TokenUsageSummary } from "./token-usage-summary";
 
 function _MessageListItemHeader({
   message,
@@ -89,31 +90,36 @@ function _MessageListItemHeader({
           <GripHorizontalIcon className="size-3" />
         </div>
       </Tooltip>
-      <div className="flex shrink-0 items-center">
-        <Tooltip content="Toggle role">
-          <Button
-            className="px-2"
-            variant="outline"
-            size="sm"
-            aria-label={`Change message role from ${message.role}`}
-            disabled={readonly}
-            onClick={handleToggleMessageRole}
-          >
-            <div className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1">
-              {message.role === "user" ? (
-                <>
-                  <UserIcon className="size-3" />
-                  <div>User</div>
-                </>
-              ) : (
-                <>
-                  <BotIcon className="size-3" />
-                  <div>Assistant</div>
-                </>
-              )}
-            </div>
-          </Button>
-        </Tooltip>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="shrink-0">
+          <Tooltip content="Toggle role">
+            <Button
+              className="px-2"
+              variant="outline"
+              size="sm"
+              aria-label={`Change message role from ${message.role}`}
+              disabled={readonly}
+              onClick={handleToggleMessageRole}
+            >
+              <div className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1">
+                {message.role === "user" ? (
+                  <>
+                    <UserIcon className="size-3" />
+                    <div>User</div>
+                  </>
+                ) : (
+                  <>
+                    <BotIcon className="size-3" />
+                    <div>Assistant</div>
+                  </>
+                )}
+              </div>
+            </Button>
+          </Tooltip>
+        </div>
+        {message.role === "assistant" && message.usage && (
+          <TokenUsageSummary usage={message.usage} variant="header" />
+        )}
       </div>
       <div
         className="relative h-full min-h-full min-w-0 grow"

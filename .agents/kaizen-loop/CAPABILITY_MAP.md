@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-04
-- Map status: updated after Manual Tool Continuation V1; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, and manual paused tool-step continuation is now a first-class renderer workflow.
+- Last updated: 2026-07-05
+- Map status: updated after Token Usage Visibility V1; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, and provider-reported token/cost/cache usage is now captured on assistant steps and surfaced in message headers, Run history, and saved-run traces.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -79,6 +79,28 @@
 - Boundary: one thread can run against its selected or fallback model, stream assistant/tool output, abort, and persist completed state.
 - Explicit non-goals: batch runs, scheduled runs, provider health validation.
 - Visible gaps: live-provider continuation after a real paid/provider tool-call turn still needs a bounded smoke check; the global run control remains generic while the message-level continuation flow is specialized.
+
+## Token Usage Visibility
+
+- Status: shipped V1
+- Freshness: confirmed
+- Last checked: 2026-07-05
+- Evidence:
+  - Current discovery screenshot `audits/2026-07-05-002359-token-usage-discovery/01-current-first-run.png` shows the first-run/product surface is healthy enough to inspect.
+  - Current discovery screenshot `audits/2026-07-05-002359-token-usage-discovery/02-example-run-history-no-usage.png` shows the thread editor and Run history panel expose model, messages, and run-history controls, but no token/cost counters or per-step usage summary.
+  - `node_modules/@earendil-works/pi-agent-core/dist/agent-loop.js` emits `message_end` with the provider's final assistant message, including `usage`.
+  - `node_modules/@earendil-works/pi-ai/dist/types.d.ts` defines provider `Usage` with input, output, cache read/write, reasoning, total tokens, and cost fields.
+  - `packages/core/src/client/reducer.ts` now copies non-empty provider usage from `message_end` into the final assistant message.
+  - `packages/core/src/types/messages/usage.ts` and `messages.ts` define a backwards-compatible optional assistant-message `usage` field.
+  - `packages/core/src/client/converters.ts` preserves saved assistant usage when replaying context to pi.
+  - `apps/desktop/src/components/thread-playground/message/token-usage-summary.tsx` renders compact per-step token/cost chips with tooltip breakdowns.
+  - `apps/desktop/src/components/thread-playground/token-usage.ts` formats provider usage, aggregates assistant-step usage, and falls back to old snapshot aggregation only when older saved runs lack their own `usage`.
+  - Implementation screenshots `audits/2026-07-05-002359-token-usage-visibility-v1/02-token-usage-thread-open.png`, `06-run-history-layout-fixed.png`, `07-run-trace-visible.png`, and `04-token-usage-after-reload.png` show per-step usage, run/trace usage, and reload persistence in the real CEF renderer.
+  - Follow-up screenshot `audits/2026-07-05-002359-token-usage-visibility-v1/08-token-usage-header-cache.png` and DOM checks on port `9362` show assistant usage chips in the same header row as `Assistant`, with cache read shown as `cached` and cache write shown as `cache write`.
+  - Review-fix screenshots `audits/2026-07-05-002359-token-usage-visibility-v1/10-review-fix-run-history-open.png` and `11-review-fix-run-trace.png`, plus DOM checks on port `9363`, confirm Run history and trace headers use saved-run `usage` deltas (`210 tok ...`) rather than cumulative thread totals, include input/output/reasoning/cache/cost, omit `Cache Write 1h`, and keep `documentElement.scrollWidth === innerWidth` at 1280px.
+- Boundary: users can see and retain provider-reported token/cost/cache consumption per assistant/model step, per saved run, and inside the saved-run trace inspector. Per-run displays use the run's own usage delta when available, with best-effort old-file fallback to snapshot aggregation. Per-step usage appears in the assistant message header row. Missing or all-zero provider usage is intentionally omitted from the main editor.
+- Explicit non-goals: no provider billing reconciliation, quota enforcement, usage dashboard across workspaces, token estimation before sending, alerts/budgets, or non-LLM tool runtime cost model.
+- Visible gaps: no global usage dashboard, no context-window preflight, no evaluation cost-diff UI, no live paid-provider smoke in this loop, and no full keyboard/screen-reader audit of tooltip details yet.
 
 ## Tool Step Orchestration
 

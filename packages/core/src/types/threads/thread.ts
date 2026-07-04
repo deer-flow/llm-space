@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 
-import { Message } from "../messages";
+import { Message, ModelUsage } from "../messages";
 import { ModelConfig } from "../models";
 import { Tool } from "../tools";
 
@@ -67,6 +67,14 @@ export const ThreadRunSnapshot = Type.Object({
   thread: ThreadSnapshot,
 
   /**
+   * Provider-reported token usage produced by this completed run only.
+   *
+   * Older run snapshots do not have this field; clients can fall back to
+   * summing the snapshot when they need a best-effort display for old files.
+   */
+  usage: Type.Optional(ModelUsage),
+
+  /**
    * Epoch milliseconds (`Date.now()`) when the run completed.
    */
   timestamp: Type.Number(),
@@ -80,9 +88,7 @@ export const ThreadEvaluationVerdict = Type.Union([
   Type.Literal("pass"),
   Type.Literal("fail"),
 ]);
-export type ThreadEvaluationVerdict = Static<
-  typeof ThreadEvaluationVerdict
->;
+export type ThreadEvaluationVerdict = Static<typeof ThreadEvaluationVerdict>;
 
 /**
  * A manual evaluation verdict comparing two durable run snapshots.
