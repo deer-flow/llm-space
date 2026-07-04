@@ -89,6 +89,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     content: generalAgentPrompt,
     icon: BotIcon,
     tools: pickTools([
+      "ask_user_question",
       "web_search",
       "web_fetch",
       "ls",
