@@ -65,7 +65,7 @@ export function Welcome({
           <EmptyMedia variant="icon">
             <SparklesIcon className="size-8" />
           </EmptyMedia>
-          <EmptyTitle>Welcome to LLM Space</EmptyTitle>
+          <EmptyTitle>Welcome to LLM Space 4</EmptyTitle>
           <EmptyDescription>
             Start with a ready agent thread, create a blank one, or open an
             existing file from the left side panel.
