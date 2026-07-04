@@ -326,7 +326,7 @@ const TODO_WRITE_TOOL: FunctionTool = {
 const AGENT_TOOL: FunctionTool = {
   name: "agent",
   description:
-    "Launches a sub-agent to autonomously carry out a self-contained task (e.g. a broad codebase search, multi-step research, or an isolated implementation) and returns its final result. Use to delegate work that doesn't need your ongoing input, or to run independent tasks in parallel. Do not use for simple lookups you can answer directly, or tasks that require interactive back-and-forth steering.",
+    "Spawns a sub-agent to autonomously carry out a self-contained task (e.g. a broad codebase search, multi-step research, or an isolated implementation) and returns its final result. Use to delegate work that doesn't need your ongoing input, or to run independent tasks in parallel. Do not use for simple lookups you can answer directly, or tasks that require interactive back-and-forth steering, unless explicitly asking for it.",
   strict: true,
   parameters: {
     type: "object",
