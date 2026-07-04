@@ -5,6 +5,12 @@ import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const CODEMIRROR_SINGLETON_DEPS = [
+  "@codemirror/language",
+  "@codemirror/state",
+  "@codemirror/view",
+];
+
 export default defineConfig({
   plugins: [react()],
   root: "src/mainview",
@@ -12,6 +18,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "src"),
     },
+    // CodeMirror extensions carry identity-sensitive values from these packages.
+    // Bun may keep older nested copies in transitive package folders, so force
+    // Vite to resolve every editor package against the desktop app's copy.
+    dedupe: CODEMIRROR_SINGLETON_DEPS,
   },
   build: {
     outDir: "../../dist",

@@ -174,7 +174,10 @@ export function useStreamText({
         }
         streamingMessage = reduced.message;
         content = reduced.content;
-        schedulePreview(streamingMessage.content.at(-1)?.text ?? "");
+        schedulePreview(
+          streamingMessage.content[streamingMessage.content.length - 1]
+            ?.text ?? ""
+        );
       }
     } catch (e) {
       if (!controller.signal.aborted) {
@@ -187,7 +190,8 @@ export function useStreamText({
       cancelPreview();
       if (controllerRef.current === controller) {
         // Emit the final text directly so a dropped frame can't leave it stale.
-        setText(streamingMessage?.content.at(-1)?.text ?? "");
+        const finalContent = streamingMessage?.content;
+        setText(finalContent?.[finalContent.length - 1]?.text ?? "");
         setStreaming(false);
         controllerRef.current = null;
       }
