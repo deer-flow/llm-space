@@ -7,6 +7,8 @@ import {
   type Message,
 } from "@llm-space/core";
 import {
+  ActivityIcon,
+  BotIcon,
   CloudSunIcon,
   CodeIcon,
   Edit3Icon,
@@ -16,8 +18,11 @@ import {
   FileTextIcon,
   GlobeIcon,
   ImageIcon,
+  ListTodoIcon,
   ListTreeIcon,
+  PlayIcon,
   SearchIcon,
+  SquareIcon,
   TerminalIcon,
   ChevronDown,
   type LucideIcon,
@@ -309,6 +314,147 @@ const PRESENT_FILES_TOOL: FunctionTool = {
   },
 };
 
+const TODO_WRITE_TOOL: FunctionTool = {
+  name: "todo_write",
+  description:
+    "Creates or updates the assistant's visible todo list for tracking multi-step work. Only use for non-trivial tasks with several concrete steps where tracking progress helps the user — skip it for single-step or trivial requests, where it just adds overhead. Each call replaces the entire list, so pass the full set of todos every time, and keep statuses current as work progresses.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["todos"],
+    properties: {
+      todos: {
+        type: "array",
+        description: "The complete set of todo items to display.",
+        items: {
+          type: "object",
+          required: ["id", "content", "status"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Stable unique identifier for this todo item.",
+            },
+            content: {
+              type: "string",
+              description: "Short description of the work item.",
+            },
+            status: {
+              type: "string",
+              enum: ["pending", "in_progress", "completed", "cancelled"],
+              description: "Current state of the todo item.",
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+const AGENT_TOOL: FunctionTool = {
+  name: "agent",
+  description:
+    "Launches a sub-agent to autonomously carry out a self-contained task (e.g. a broad codebase search, multi-step research, or an isolated implementation) and returns its final result. Use to delegate work that doesn't need your ongoing input, or to run independent tasks in parallel. Do not use for simple lookups you can answer directly, or tasks that require interactive back-and-forth steering.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "prompt"],
+    properties: {
+      description: {
+        type: "string",
+        description: "A short (3-6 word) summary of the sub-agent's task.",
+      },
+      prompt: {
+        type: "string",
+        description:
+          "The full, self-contained task for the sub-agent. It starts with no memory of this conversation, so include all relevant context, file paths, and the expected output.",
+      },
+      subagent_type: {
+        type: "string",
+        description:
+          'Which specialized agent persona to launch (e.g. "general-purpose", "researcher", "code-reviewer"). Defaults to a general-purpose agent if omitted.',
+      },
+      run_in_background: {
+        type: "boolean",
+        description:
+          "Run the sub-agent asynchronously and return immediately instead of blocking on its result. Defaults to false.",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+const TASK_CREATE_TOOL: FunctionTool = {
+  name: "task_create",
+  description:
+    "Starts a long-running command (a dev server, build, watcher, or other background process) and returns immediately with a task id, instead of blocking until it exits. Use for commands you expect to keep running or take a while, and check on later with task_monitor. Do not use for quick commands that finish right away — run those directly instead.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "command"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary of what the task does",
+      },
+      command: {
+        type: "string",
+        description: "The shell command to run in the background",
+      },
+      timeout: {
+        type: "number",
+        description:
+          "Optional maximum time in milliseconds to let the task run before it is automatically stopped",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+const TASK_MONITOR_TOOL: FunctionTool = {
+  name: "task_monitor",
+  description:
+    "Retrieves accumulated output (stdout/stderr) and current status from a task started with task_create. Use to check progress on a running task or read the result of one that has finished. Do not use on a task_id that was already killed with task_kill.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["task_id"],
+    properties: {
+      task_id: {
+        type: "string",
+        description: "The id of the task returned by task_create",
+      },
+      block: {
+        type: "boolean",
+        description:
+          "Wait for the task to finish before returning, instead of immediately returning the output collected so far. Defaults to false.",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+const TASK_KILL_TOOL: FunctionTool = {
+  name: "task_kill",
+  description:
+    "Terminates a running background task started with task_create. Use once a task's output is no longer needed (e.g. a dev server you're done with), or to stop one that is stuck or misbehaving. Do not use on a task that has already finished — there's nothing to kill.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["task_id"],
+    properties: {
+      task_id: {
+        type: "string",
+        description:
+          "The id of the task to terminate, as returned by task_create",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
 const GENERATE_IMAGE_TOOL: FunctionTool = {
   name: "generate_image",
   description:
@@ -377,7 +523,7 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
     icon: GlobeIcon,
   },
   { type: "separator" },
-  { type: "tool", label: "bash()", tool: BASH_TOOL, icon: TerminalIcon },
+  { type: "tool", label: "bash", tool: BASH_TOOL, icon: TerminalIcon },
   {
     type: "tool",
     label: "read",
@@ -399,6 +545,37 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
     label: "present_files",
     tool: PRESENT_FILES_TOOL,
     icon: FileIcon,
+  },
+  { type: "separator" },
+  {
+    type: "tool",
+    label: "todo_write",
+    tool: TODO_WRITE_TOOL,
+    icon: ListTodoIcon,
+  },
+  {
+    type: "tool",
+    label: "agent",
+    tool: AGENT_TOOL,
+    icon: BotIcon,
+  },
+  {
+    type: "tool",
+    label: "task_create",
+    tool: TASK_CREATE_TOOL,
+    icon: PlayIcon,
+  },
+  {
+    type: "tool",
+    label: "task_monitor",
+    tool: TASK_MONITOR_TOOL,
+    icon: ActivityIcon,
+  },
+  {
+    type: "tool",
+    label: "task_kill",
+    tool: TASK_KILL_TOOL,
+    icon: SquareIcon,
   },
   { type: "separator" },
   {

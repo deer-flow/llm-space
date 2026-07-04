@@ -68,7 +68,7 @@ export const PROMPT_EXAMPLES = [
   {
     type: "example",
     id: "hello-world",
-    label: "Hello, world",
+    label: "Hello World",
     fileStem: "hello-world",
     description: "A classic, helpful and harmless assistant.",
     content:
