@@ -76,24 +76,13 @@ import { ProviderAvatar } from "../thread-playground/provider-avatar";
 import { Tooltip } from "../tooltip";
 import { ScrollArea } from "../ui/scroll-area";
 
+import {
+  CUSTOM_PROVIDER_API_TYPES,
+  DEFAULT_CUSTOM_PROVIDER_API,
+  type CustomProviderApi,
+} from "./custom-provider-api";
 import { ModelEditorDialog } from "./model-editor-dialog";
 import { SettingsPage } from "./settings-page";
-
-type CustomProviderApi =
-  | "anthropic-messages"
-  | "openai-completions"
-  | "openai-responses";
-
-const DEFAULT_CUSTOM_PROVIDER_API: CustomProviderApi = "openai-completions";
-
-const CUSTOM_PROVIDER_API_TYPES: {
-  value: CustomProviderApi;
-  label: string;
-}[] = [
-  { value: "openai-completions", label: "OpenAI Completions" },
-  { value: "openai-responses", label: "OpenAI Responses" },
-  { value: "anthropic-messages", label: "Anthropic Messages" },
-];
 
 /**
  * Base-URL guidance for the Anthropic Messages API. Its SDK appends `/v1/...`

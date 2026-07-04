@@ -42,6 +42,13 @@ ApplicationMenu.setApplicationMenu([
         accelerator: "CommandOrControl+N",
       },
       {
+        label: "New from Examples...",
+        action: "newFromExamples",
+      },
+      {
+        type: "divider",
+      },
+      {
         label: "New Folder",
         action: "newFolder",
         accelerator: "CommandOrControl+Shift+N",
@@ -205,6 +212,7 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
   commandPalette: { type: "openCommandPalette", args: {} },
   settings: { type: "openSettings", args: {} },
   newThread: { type: "newFile", args: {} },
+  newFromExamples: { type: "openStartFromExample", args: { parent: "" } },
   newFolder: { type: "newFolder", args: {} },
   importFiles: { type: "importFiles", args: {} },
   refreshTree: { type: "refreshTree", args: {} },

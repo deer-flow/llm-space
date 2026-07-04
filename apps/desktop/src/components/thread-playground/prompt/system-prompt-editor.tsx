@@ -1,24 +1,15 @@
 import { uuid, type Message } from "@llm-space/core";
-import { ChevronDown } from "lucide-react";
 import { memo, useCallback, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
-import { Button } from "../../ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/dropdown-menu";
+import metaPrompt from "../examples/meta-prompt.md?raw";
+import { PROMPT_EXAMPLES } from "../examples/prompts";
+import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
-import metaPrompt from "../prompts/meta-prompt.md?raw";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
-
-import { PROMPT_EXAMPLES } from "./prompt-examples";
 
 function _SystemPromptEditor({
   className,
@@ -110,34 +101,10 @@ function _SystemPromptEditor({
             placeholder="Describe the assistant you want (its role, tone, and rules), and we'll generate a system prompt."
             onGenerate={handleGenerate}
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                Examples
-                <ChevronDown data-icon="inline-end" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {PROMPT_EXAMPLES.map((example, index) =>
-                example.type === "separator" ? (
-                  <DropdownMenuSeparator key={`sep-${index}`} />
-                ) : (
-                  (() => {
-                    const Icon = example.icon;
-                    return (
-                      <DropdownMenuItem
-                        key={example.label}
-                        onSelect={() => handleExampleSelect(example.content)}
-                      >
-                        <Icon />
-                        {example.label}
-                      </DropdownMenuItem>
-                    );
-                  })()
-                )
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ExamplesMenu
+            items={PROMPT_EXAMPLES}
+            onSelect={(example) => handleExampleSelect(example.content)}
+          />
         </div>
       </div>
       <CodeEditor

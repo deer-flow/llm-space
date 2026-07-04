@@ -25,19 +25,13 @@ import { Switch } from "@/components/ui/switch";
 import { useUpdateProvider, useUpsertCustomModel } from "../model-provider";
 import { ModelAvatar } from "../thread-playground/model-avatar";
 
-type CustomProviderApi =
-  | "anthropic-messages"
-  | "openai-completions"
-  | "openai-responses";
+import {
+  CUSTOM_PROVIDER_API_TYPES,
+  DEFAULT_CUSTOM_PROVIDER_API,
+  isCustomProviderApi,
+  type CustomProviderApi,
+} from "./custom-provider-api";
 
-/** The selectable API types, ordered alphabetically by label. */
-const API_TYPES: { value: CustomProviderApi; label: string }[] = [
-  { value: "anthropic-messages", label: "Anthropic Messages" },
-  { value: "openai-completions", label: "OpenAI Completion" },
-  { value: "openai-responses", label: "OpenAI Responses" },
-];
-
-const DEFAULT_API: CustomProviderApi = "openai-completions";
 const DEFAULT_CONTEXT_WINDOW = 262144;
 const DEFAULT_MAX_TOKENS = 262144;
 
@@ -55,7 +49,7 @@ interface FormState {
 
 function initialState(
   model: CustomModel | null | undefined,
-  api: CustomProviderApi = DEFAULT_API
+  api: CustomProviderApi = DEFAULT_CUSTOM_PROVIDER_API
 ): FormState {
   if (!model) {
     return {
@@ -74,7 +68,7 @@ function initialState(
     id: model.id,
     name: model.name,
     icon: model.icon ?? "",
-    api: _customProviderApi(model.api) ?? api,
+    api: isCustomProviderApi(model.api) ? model.api : api,
     reasoning: model.reasoning,
     deepseekThinking:
       (model.compat as { thinkingFormat?: string } | undefined)
@@ -242,7 +236,7 @@ export function ModelEditorDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {API_TYPES.map((type) => (
+                {CUSTOM_PROVIDER_API_TYPES.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>
@@ -319,12 +313,6 @@ export function ModelEditorDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function _customProviderApi(api: string): CustomProviderApi | null {
-  return API_TYPES.some((type) => type.value === api)
-    ? (api as CustomProviderApi)
-    : null;
 }
 
 function Field({

@@ -7,8 +7,6 @@
  * one-RPC-method-per-action sprawl.
  */
 
-import type { Message, Tool } from "@llm-space/core";
-
 /** Base shape for every command: a string `type` and typed `args`. */
 export interface GenericCommand<T extends string, A = Record<string, never>> {
   type: T;
@@ -29,22 +27,23 @@ export interface NewFileCommand extends GenericCommand<
 > {}
 
 /**
- * Create a new thread from a built-in prompt example. The command carries a
- * snapshot of the selected prompt so file creation stays decoupled from the
- * UI-only example catalog.
+ * Create a new thread from a built-in prompt example. The command carries only
+ * the example's `id`; the file-tree handler resolves the full definition (system
+ * prompt, seed tools, seed messages) from the example catalog via
+ * `getPromptExample`. `parent` defaults to the workspace root.
  */
 export interface NewFileFromPromptExampleCommand extends GenericCommand<
   "newFileFromPromptExample",
-  {
-    parent?: string;
-    exampleId: string;
-    fileStem: string;
-    systemPrompt: string;
-    /** Tools to seed the new thread with, if the example provides any. */
-    tools?: Tool[];
-    /** Messages to seed the new thread with, if the example provides any. */
-    messages?: Message[];
-  }
+  { parent?: string; exampleId: string }
+> {}
+
+/**
+ * Open the "Start from Example" dialog. `parent` (default: workspace root) is
+ * where the chosen example's thread will be created.
+ */
+export interface OpenStartFromExampleCommand extends GenericCommand<
+  "openStartFromExample",
+  { parent?: string }
 > {}
 
 /** Create a new folder (with in-place rename). `parent` defaults to the root. */
@@ -174,6 +173,7 @@ export interface ReportBugsCommand extends GenericCommand<"reportBugs"> {}
 export type Command =
   | NewFileCommand
   | NewFileFromPromptExampleCommand
+  | OpenStartFromExampleCommand
   | NewFolderCommand
   | RenameFileCommand
   | DuplicateFileCommand
@@ -221,6 +221,10 @@ export const COMMAND_META: Record<
   newFile: { label: "New File", target: "webview" },
   newFileFromPromptExample: {
     label: "Start from Example",
+    target: "webview",
+  },
+  openStartFromExample: {
+    label: "New from Examples...",
     target: "webview",
   },
   newFolder: { label: "New Folder", target: "webview" },

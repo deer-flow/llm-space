@@ -127,6 +127,8 @@ function PageInner() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  // Which folder a chosen example's thread is created into (default: root).
+  const examplesParentRef = useRef("");
 
   // File import: a hidden picker (opened by the `importFiles` command), the
   // parent directory it should import into, and page-wide drag-and-drop state.
@@ -187,6 +189,10 @@ function PageInner() {
     },
     openCommandPalette: () => setCommandPaletteOpen(true),
     openOnboard: () => setOnboardOpen(true),
+    openStartFromExample: ({ parent = "" }) => {
+      examplesParentRef.current = parent;
+      setExamplesOpen(true);
+    },
     importFiles: ({ parent = "", files }) => {
       if (files) {
         void handleImportFiles(files, parent);
@@ -357,10 +363,7 @@ function PageInner() {
               type: "newFileFromPromptExample",
               args: {
                 exampleId: example.id,
-                fileStem: example.fileStem,
-                systemPrompt: example.content,
-                tools: example.tools,
-                messages: example.messages,
+                parent: examplesParentRef.current,
               },
             })
           }

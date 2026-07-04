@@ -11,14 +11,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import compactMemoryPrompt from "../prompts/examples/compact-memory.md?raw";
-import deepWikiPrompt from "../prompts/examples/deep-wiki.md?raw";
-import generalAgentPrompt from "../prompts/examples/general-agent.md?raw";
-import metaImagePrompt from "../prompts/examples/meta-image-prompt.md?raw";
-import metaPromptWithTools from "../prompts/examples/meta-prompt-with-tools.md?raw";
-import translationPrompt from "../prompts/examples/translation.md?raw";
-import metaToolPrompt from "../prompts/meta-tool.md?raw";
-import { TOOL_EXAMPLES } from "../tool/tool-editor-dialog";
+import compactMemoryPrompt from "./compact-memory.md?raw";
+import deepWikiPrompt from "./deep-wiki.md?raw";
+import generalAgentPrompt from "./general-agent.md?raw";
+import metaImagePrompt from "./meta-image-prompt.md?raw";
+import metaPromptWithTools from "./meta-prompt-with-tools.md?raw";
+import metaToolPrompt from "./meta-tool.md?raw";
+import { TOOL_EXAMPLES } from "./tools";
+import translationPrompt from "./translation.md?raw";
 
 export interface PromptExample {
   type: "example";
@@ -36,9 +36,10 @@ export interface PromptExample {
 
 export type PromptExampleItem = PromptExample | { type: "separator" };
 
-function pickTools(labels: string[]): Tool[] {
+/** Resolve shared tool definitions by their function `name` (not display label). */
+function pickTools(names: string[]): Tool[] {
   return TOOL_EXAMPLES.filter(
-    (tool) => tool.type === "tool" && labels.includes(tool.label)
+    (item) => item.type === "tool" && names.includes(item.tool.name)
   )
     .map((item) => (item.type === "tool" ? item.tool : undefined))
     .filter(Boolean) as Tool[];
@@ -64,7 +65,7 @@ function userPrompt(text: string): Message[] {
  * empty-workspace "Start from Example" flow. `fileStem` is stable by design so
  * changing a display label never changes the default filename for new threads.
  */
-export const PROMPT_EXAMPLES = [
+export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
   {
     type: "example",
     id: "hello-world",
@@ -162,7 +163,7 @@ export const PROMPT_EXAMPLES = [
     content: metaImagePrompt,
     icon: ImageIcon,
   },
-] satisfies readonly PromptExampleItem[];
+];
 
 export function isPromptExample(
   item: PromptExampleItem

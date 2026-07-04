@@ -123,11 +123,11 @@ export function NodeActions({ node }: { node: FileNode }) {
       {isDir && (
         <>
           <IconAction
-            label={`New file in ${node.name}`}
+            label={`New from Examples in ${node.name}`}
             onClick={() =>
               executeCommand({
-                type: "newFile",
-                args: { parent: node.path, rename: true },
+                type: "openStartFromExample",
+                args: { parent: node.path },
               })
             }
           >
@@ -220,11 +220,11 @@ export function RootActions() {
   return (
     <span className="flex items-center gap-1">
       <IconAction
-        label="New file in workspace root"
+        label="New from Examples"
         onClick={() =>
           executeCommand({
-            type: "newFile",
-            args: { parent: "", rename: true },
+            type: "openStartFromExample",
+            args: { parent: "" },
           })
         }
       >

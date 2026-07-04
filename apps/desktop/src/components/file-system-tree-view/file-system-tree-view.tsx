@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRegisterCommands } from "@/commands";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { getPromptExample } from "@/components/thread-playground/examples/prompts";
 import {
   TreeView,
   type TreeDataItem,
@@ -131,19 +132,15 @@ export function FileSystemTreeView({
       if (rename) void create(parent, "file");
       else void createThread(parent);
     },
-    newFileFromPromptExample: ({
-      parent = "",
-      fileStem,
-      systemPrompt,
-      tools,
-      messages,
-    }) => {
+    newFileFromPromptExample: ({ parent = "", exampleId }) => {
+      const example = getPromptExample(exampleId);
+      if (!example) return;
       void createThreadFromPromptExample(
         parent,
-        fileStem,
-        systemPrompt,
-        tools,
-        messages
+        example.fileStem,
+        example.content,
+        example.tools,
+        example.messages
       );
     },
     newFolder: ({ parent = "" }) => void create(parent, "folder"),

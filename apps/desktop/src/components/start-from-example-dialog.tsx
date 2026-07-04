@@ -6,7 +6,7 @@ import {
   PROMPT_EXAMPLES,
   isPromptExample,
   type PromptExample,
-} from "@/components/thread-playground/prompt/prompt-examples";
+} from "@/components/thread-playground/examples/prompts";
 import {
   Dialog,
   DialogContent,
