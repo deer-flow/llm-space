@@ -97,6 +97,10 @@ export const PROMPT_EXAMPLES = [
       "grep",
       "glob",
       "bash",
+      "agent",
+      "todo_write",
+      "task_monitor",
+      "task_kill",
       "present_files",
     ]),
     messages: userPrompt(

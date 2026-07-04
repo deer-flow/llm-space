@@ -386,7 +386,7 @@ const AGENT_TOOL: FunctionTool = {
 };
 
 const TASK_CREATE_TOOL: FunctionTool = {
-  name: "task_create",
+  name: "task",
   description:
     "Starts a long-running command (a dev server, build, watcher, or other background process) and returns immediately with a task id, instead of blocking until it exits. Use for commands you expect to keep running or take a while, and check on later with task_monitor. Do not use for quick commands that finish right away — run those directly instead.",
   strict: true,
