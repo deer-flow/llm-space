@@ -181,13 +181,16 @@ function _CodeEditor(
       <CodeMirror
         ref={cmRef}
         className={cn(
-          "h-full overflow-auto font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
-          // scrollOnFocus: clip at rest, scroll (and show a scrollbar) only once
-          // focused. overflow-auto (not scroll) means a focused editor whose
-          // content already fits still shows no bar. .cm-scroller is CodeMirror's
-          // scroll element, so gating it alone is enough.
-          scrollOnFocus &&
-            "[&_.cm-scroller]:overflow-hidden focus-within:[&_.cm-scroller]:overflow-auto",
+          "h-full font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
+          // scrollOnFocus: clip at rest, scroll only once focused. Gate overflow
+          // on both this wrapper and `.cm-scroller`, since Chromium and WebKit
+          // disagree on which is the scroll container (WebKit collapses the
+          // `h-full` percentage height inside the outer `max-h` box, making the
+          // wrapper scroll instead of `.cm-scroller`). `!` beats CodeMirror's
+          // unlayered `.cm-scroller { overflow-x: auto }`.
+          scrollOnFocus
+            ? "overflow-hidden focus-within:overflow-auto [&_.cm-scroller]:overflow-hidden! focus-within:[&_.cm-scroller]:overflow-auto!"
+            : "overflow-auto",
           // Horizontal padding lives on .cm-content (inside the scroller) so
           // the caret at column 0 is not clipped by the scroller's overflow.
           "p-0 py-1 [&_.cm-content]:px-2! [&_.cm-line]:p-0!"
