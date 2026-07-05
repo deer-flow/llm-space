@@ -231,11 +231,26 @@
  * Kept UNLAYERED on purpose: Tailwind's base layer loses to the unlayered
  * scrollbar styles that libraries like CodeMirror / Radix inject, so these
  * must stay outside @layer to win the cascade.
+ *
+ * The standard `scrollbar-width` / `scrollbar-color` properties are gated behind
+ * `@supports not selector(::-webkit-scrollbar)` (i.e. Firefox only). WebKit (the
+ * native macOS WKWebView) now implements these standard props, and once they are
+ * set on an element it renders its own native scrollbar and IGNORES the
+ * `::-webkit-scrollbar` block below - and its `scrollbar-color` renderer does not
+ * evaluate our `color-mix(... transparent)` value, so it falls back to the ugly
+ * default light-gray bar (very visible on CodeMirror in dark mode). Leaving these
+ * off in WebKit/Chromium lets the `::-webkit-scrollbar` rules drive both engines.
  */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent)
-    transparent;
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 35%,
+        transparent
+      )
+      transparent;
+  }
 }
 ::-webkit-scrollbar {
   width: 8px;
