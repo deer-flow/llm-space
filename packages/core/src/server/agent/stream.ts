@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { Api, Message, Model, Models, Tool } from "@earendil-works/pi-ai";
 
+import { RUN_LAST_MESSAGE_ERROR } from "../../client/run-eligibility";
 import type { AgentStreamRequest } from "../../types/agent";
 
 /**
@@ -53,9 +54,7 @@ export async function* streamAgent(
     const lastMessage =
       request.context.messages[request.context.messages.length - 1]!;
     if (lastMessage.role === "assistant") {
-      throw new Error(
-        "The last message must be a user message or a tool call result."
-      );
+      throw new Error(RUN_LAST_MESSAGE_ERROR);
     }
   }
 

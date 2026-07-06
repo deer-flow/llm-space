@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import {
   AssistantMessage,
+  isRunnableConversation,
   Message,
   reduceMessages,
+  RUN_LAST_MESSAGE_ERROR,
   streamThread,
   Tool as ToolSchema,
   uuid,
@@ -441,17 +443,30 @@ export function createThreadStore(
             toast.error("Select a model to run");
             return;
           }
-          const abortController = new AbortController();
-          set({ status: "running", abortController });
-
-          // Truncate trailing messages when re-running from a given message.
+          // Pre-flight: resolve the message list the run would use (including
+          // the rerun-from truncation) and validate it before entering the
+          // running state, so an unrunnable thread is a complete no-op — no
+          // truncation, no undo step, no run-history entry.
           let messages = [...(get().thread.context?.messages ?? [])];
+          let truncated = false;
           if (fromMessageId) {
             const index = messages.findIndex((m) => m.id === fromMessageId);
             if (index !== -1 && index !== messages.length - 1) {
               messages = messages.slice(0, index + 1);
-              setMessages(messages);
+              truncated = true;
             }
+          }
+          if (!isRunnableConversation(messages)) {
+            toast.error("Error", { description: RUN_LAST_MESSAGE_ERROR });
+            return;
+          }
+          const abortController = new AbortController();
+          set({ status: "running", abortController });
+
+          // Commit the truncation while running so it folds into the run's
+          // single undo step instead of becoming its own snapshot.
+          if (truncated) {
+            setMessages(messages);
           }
           const runStartMessageCount = messages.length;
 
@@ -463,6 +478,10 @@ export function createThreadStore(
 
           let streamingMessage: AssistantMessage | null = null;
           let content: ReducedMessageContent[] = [];
+          // Whether the stream produced at least one event — i.e. the run
+          // actually started. A run that dies earlier (transport/auth/network
+          // failure) is not recorded in the run history.
+          let sawEvent = false;
 
           // Coalesce live-preview updates to at most one per animation frame.
           // A fast stream delivers a burst of events that the transport drains
@@ -499,6 +518,7 @@ export function createThreadStore(
               { signal: abortController.signal, transport: options.transport }
             );
             for await (const chunk of response) {
+              sawEvent = true;
               const reduced = reduceMessages(chunk, {
                 streamingMessage,
                 content,
@@ -544,26 +564,41 @@ export function createThreadStore(
             // undo step, and record a run snapshot. No-op for undo if the
             // thread is unchanged.
             const finalThread = get().thread;
-            const runUsage = aggregateMessageUsage(
-              (finalThread.context?.messages ?? []).slice(runStartMessageCount)
-            );
-            const runHistory = recordRun(
-              get().runHistory,
-              finalThread,
-              Date.now(),
-              { usage: runUsage }
-            );
-            const evaluations = normalizeEvaluations(
-              get().evaluations,
-              runHistory
-            );
-            const thread = withRunHistory(finalThread, runHistory, evaluations);
-            set({
-              thread,
-              changeHistory: recordSnapshot(get().changeHistory, thread),
-              runHistory,
-              evaluations,
-            });
+            if (sawEvent) {
+              const runUsage = aggregateMessageUsage(
+                (finalThread.context?.messages ?? []).slice(
+                  runStartMessageCount
+                )
+              );
+              const runHistory = recordRun(
+                get().runHistory,
+                finalThread,
+                Date.now(),
+                { usage: runUsage }
+              );
+              const evaluations = normalizeEvaluations(
+                get().evaluations,
+                runHistory
+              );
+              const thread = withRunHistory(
+                finalThread,
+                runHistory,
+                evaluations
+              );
+              set({
+                thread,
+                changeHistory: recordSnapshot(get().changeHistory, thread),
+                runHistory,
+                evaluations,
+              });
+            } else {
+              set({
+                changeHistory: recordSnapshot(
+                  get().changeHistory,
+                  finalThread
+                ),
+              });
+            }
           }
         },
         undo() {

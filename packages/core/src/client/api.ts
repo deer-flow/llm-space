@@ -5,6 +5,10 @@ import type { ModelConfig } from "../types/models";
 import type { ThreadContext } from "../types/threads";
 
 import { convertToPiContext } from "./converters";
+import {
+  isRunnableConversation,
+  RUN_LAST_MESSAGE_ERROR,
+} from "./run-eligibility";
 import { createHttpTransport, type AgentTransport } from "./transport";
 
 export async function* streamThread(
@@ -15,16 +19,10 @@ export async function* streamThread(
     transport?: AgentTransport;
   } = {}
 ): AsyncGenerator<AgentEvent> {
-  const context = convertToPiContext(args.context);
-  if (context.messages.length > 0) {
-    const lastMessage = context.messages[context.messages.length - 1]!;
-    // 最后一条消息必须是 userMessage
-    if (lastMessage.role === "assistant") {
-      throw new Error(
-        "The last message must be a user message or a tool call result."
-      );
-    }
+  if (!isRunnableConversation(args.context.messages)) {
+    throw new Error(RUN_LAST_MESSAGE_ERROR);
   }
+  const context = convertToPiContext(args.context);
   const request: AgentStreamRequest = {
     model: {
       provider: args.model.provider,
