@@ -50,12 +50,15 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const [containerRef] = useAutoAnimation();
   const runHistory = useThreadStore((s) => s.runHistory);
   const evaluations = useThreadStore((s) => s.evaluations);
-  const { restoreThread, removeRun, saveEvaluation } = useThreadStoreActions();
+  const { restoreThread, removeRun, saveEvaluation, removeEvaluation } =
+    useThreadStoreActions();
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   const [inspectingRunId, setInspectingRunId] = useState<string | null>(null);
   const [runPendingRemoval, setRunPendingRemoval] =
     useState<RunSnapshot | null>(null);
+  const [evaluationPendingRemoval, setEvaluationPendingRemoval] =
+    useState<EvaluationRecord | null>(null);
   const runs = useMemo(() => runHistory.slice().reverse(), [runHistory]);
   const inspectingRunIndex = useMemo(() => {
     if (!inspectingRunId) {
@@ -263,6 +266,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             evaluations={evaluations}
             runById={runById}
             onOpenEvaluation={openEvaluation}
+            onRequestRemove={setEvaluationPendingRemoval}
           />
         )}
       </div>
@@ -289,6 +293,24 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
           setRunPendingRemoval(null);
           if (run) {
             removeRun(run);
+          }
+        }}
+      />
+      <ConfirmDialog
+        open={evaluationPendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEvaluationPendingRemoval(null);
+          }
+        }}
+        title="Remove Evaluation?"
+        description="This removes the saved evaluation from this thread. The compared runs are kept."
+        confirmLabel="Remove"
+        onConfirm={() => {
+          const evaluation = evaluationPendingRemoval;
+          setEvaluationPendingRemoval(null);
+          if (evaluation) {
+            removeEvaluation(evaluation);
           }
         }}
       />
@@ -448,10 +470,12 @@ function _EvaluationList({
   evaluations,
   runById,
   onOpenEvaluation,
+  onRequestRemove,
 }: {
   evaluations: EvaluationRecord[];
   runById: Map<string, RunSnapshot>;
   onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
+  onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
   const visibleEvaluations = evaluations
     .slice()
@@ -473,44 +497,101 @@ function _EvaluationList({
       </div>
       <ItemGroup className="gap-2!">
         {visibleEvaluations.map(({ evaluation, leftRun, rightRun }) => (
-          <Item
+          <EvaluationListItem
             key={evaluation.id}
-            size="sm"
-            variant="outline"
-            asChild
-            className="hover:bg-foreground/5! cursor-pointer flex-col items-start gap-1"
-          >
-            <button
-              type="button"
-              aria-label={`Open saved evaluation: ${VERDICT_LABELS[evaluation.verdict]}`}
-              onClick={() =>
-                onOpenEvaluation(evaluation.leftRunId, evaluation.rightRunId)
-              }
-            >
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-xs font-medium">
-                  {VERDICT_LABELS[evaluation.verdict]}
-                </span>
-                <span className="text-muted-foreground shrink-0 text-[0.625rem]">
-                  {format(evaluation.updatedAt)}
-                </span>
-              </div>
-              <div className="text-muted-foreground line-clamp-2 w-full text-left font-mono text-[0.625rem]">
-                A: {summarizeRun(leftRun.thread)}
-                {"\n"}B: {summarizeRun(rightRun.thread)}
-              </div>
-              {evaluation.note && (
-                <div className="text-foreground/70 line-clamp-2 w-full text-left text-[0.625rem]">
-                  {evaluation.note}
-                </div>
-              )}
-            </button>
-          </Item>
+            evaluation={evaluation}
+            leftRun={leftRun}
+            rightRun={rightRun}
+            onOpenEvaluation={onOpenEvaluation}
+            onRequestRemove={onRequestRemove}
+          />
         ))}
       </ItemGroup>
     </div>
   );
 }
+
+function _EvaluationListItem({
+  evaluation,
+  leftRun,
+  rightRun,
+  onOpenEvaluation,
+  onRequestRemove,
+}: {
+  evaluation: EvaluationRecord;
+  leftRun: RunSnapshot;
+  rightRun: RunSnapshot;
+  onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
+  onRequestRemove: (evaluation: EvaluationRecord) => void;
+}) {
+  const verdictLabel = VERDICT_LABELS[evaluation.verdict];
+  const handleOpen = useCallback(() => {
+    onOpenEvaluation(evaluation.leftRunId, evaluation.rightRunId);
+  }, [evaluation.leftRunId, evaluation.rightRunId, onOpenEvaluation]);
+  const handleOpenKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.currentTarget !== event.target) {
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleOpen();
+      }
+    },
+    [handleOpen]
+  );
+  const stopOpenClick = useCallback((event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  }, []);
+  return (
+    <Item
+      size="sm"
+      variant="outline"
+      role="listitem"
+      tabIndex={0}
+      aria-label={`Open saved evaluation: ${verdictLabel}`}
+      className="group hover:bg-foreground/5! focus-visible:ring-ring cursor-pointer flex-col items-start gap-1 focus-visible:ring-[3px]"
+      onClick={handleOpen}
+      onKeyDown={handleOpenKeyDown}
+    >
+      <div className="flex w-full items-center justify-between gap-2">
+        <span className="text-xs font-medium">{verdictLabel}</span>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="text-muted-foreground text-[0.625rem]">
+            {format(evaluation.updatedAt)}
+          </span>
+          <div onClick={stopOpenClick}>
+            <Tooltip content="Remove evaluation">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={cn(
+                  "hover:text-destructive pointer-events-none opacity-0 transition-opacity",
+                  "group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                )}
+                aria-label={`Remove evaluation: ${verdictLabel}`}
+                onClick={() => onRequestRemove(evaluation)}
+              >
+                <Trash2Icon className="size-3" />
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+      </div>
+      <div className="text-muted-foreground line-clamp-2 w-full font-mono text-[0.625rem]">
+        A: {summarizeRun(leftRun.thread)}
+        {"\n"}B: {summarizeRun(rightRun.thread)}
+      </div>
+      {evaluation.note && (
+        <div className="text-foreground/70 line-clamp-2 w-full text-[0.625rem]">
+          {evaluation.note}
+        </div>
+      )}
+    </Item>
+  );
+}
+
+const EvaluationListItem = memo(_EvaluationListItem);
 
 /** Find a saved evaluation for the currently selected left/right run pair. */
 function _findEvaluation(

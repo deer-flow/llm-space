@@ -74,6 +74,7 @@ export interface ThreadState {
     verdict: EvaluationRecord["verdict"];
     note?: string;
   }): void;
+  removeEvaluation(evaluation: EvaluationRecord): void;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
@@ -723,6 +724,35 @@ export function createThreadStore(
             },
           });
         },
+        removeEvaluation(evaluation: EvaluationRecord) {
+          if (get().status === "running") {
+            return;
+          }
+          const current = get().evaluations;
+          const evaluations = current.filter((e) => e.id !== evaluation.id);
+          if (evaluations.length === current.length) {
+            return;
+          }
+          // Like removeRun, deleting an evaluation is not an undoable edit;
+          // update the current history snapshot in place instead of recording
+          // a new step.
+          const thread = withRunHistory(
+            get().thread,
+            get().runHistory,
+            evaluations
+          );
+          const changeHistory = get().changeHistory;
+          set({
+            thread,
+            evaluations,
+            changeHistory: {
+              ...changeHistory,
+              snapshots: changeHistory.snapshots.map((snapshot, index) =>
+                index === changeHistory.index ? thread : snapshot
+              ),
+            },
+          });
+        },
         abort() {
           const { status, abortController } = get();
           if (status !== "running") {
@@ -759,6 +789,7 @@ const selectActions = (s: ThreadState) => ({
   restoreThread: s.restoreThread,
   removeRun: s.removeRun,
   saveEvaluation: s.saveEvaluation,
+  removeEvaluation: s.removeEvaluation,
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,
