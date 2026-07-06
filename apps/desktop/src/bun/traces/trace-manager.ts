@@ -19,7 +19,6 @@ import type {
   TraceImportResult,
   TraceLangfuseSearchInput,
   TraceProject,
-  TraceProjectSource,
   TraceRecord,
   TraceRemoteTraceSummary,
   TraceSyncResult,
@@ -39,6 +38,22 @@ interface LangfuseRawTrace {
 }
 
 type LangfuseObservation = Record<string, unknown>;
+
+/**
+ * Bun-only persisted source shape. Full credentials may exist only in
+ * `project.json` and in Bun process memory; renderer/RPC responses use
+ * `TraceProject`, whose source type has no credential fields.
+ */
+type TraceStoredProjectSource =
+  | Extract<TraceProject["source"], { mode: "manual" }>
+  | (Extract<TraceProject["source"], { mode: "connected" }> & {
+      publicKey: string;
+      secretKey: string;
+    });
+
+interface TraceStoredProject extends Omit<TraceProject, "source"> {
+  source: TraceStoredProjectSource;
+}
 
 interface ParsedLangfuseFile {
   fileName: string;
@@ -74,7 +89,7 @@ export class TraceManager {
         .map((entry) => this._readProject(entry.name).catch(() => null))
     );
     return projects
-      .filter((project): project is TraceProject => project !== null)
+      .filter((project): project is TraceStoredProject => project !== null)
       .sort((a, b) => b.updatedAt - a.updatedAt || a.name.localeCompare(b.name))
       .map(_projectForRenderer);
   }
@@ -90,7 +105,7 @@ export class TraceManager {
     }
     const now = Date.now();
     const id = `${TRACE_PROJECT_ID_PREFIX}_${_shortHash(`${trimmed}:${now}:${uuid()}`)}`;
-    const project: TraceProject = {
+    const project: TraceStoredProject = {
       id,
       name: trimmed,
       source: { type: "langfuse", mode: "manual" },
@@ -121,7 +136,7 @@ export class TraceManager {
     const name = _connectedProjectName(input.name, projectInfo, baseUrl);
     const now = Date.now();
     const id = `${TRACE_PROJECT_ID_PREFIX}_${_shortHash(`${name}:${baseUrl}:${now}:${uuid()}`)}`;
-    const project: TraceProject = {
+    const project: TraceStoredProject = {
       id,
       name,
       source: {
@@ -273,7 +288,8 @@ export class TraceManager {
 
   /**
    * Sync selected remote trace ids into local trace storage. Sync upserts by
-   * remote trace id and preserves any existing `workbench.json`.
+   * remote trace id, preserves any existing `workbench.json`, and reports
+   * per-trace failures without hiding successful imports from the same batch.
    */
   async syncLangfuseTraces({
     projectId,
@@ -294,47 +310,61 @@ export class TraceManager {
     const warnings: string[] = [];
     let skipped = 0;
 
-    try {
-      for (const traceId of requested) {
-        const rows = await client.getObservationsForTrace(traceId);
-        if (rows.length === 0) {
+    for (const traceId of requested) {
+      try {
+        const result = await client.getObservationsForTrace(traceId);
+        if (result.rows.length === 0) {
           skipped += 1;
           warnings.push(`Trace ${traceId}: no observations found.`);
+          continue;
+        }
+        if (result.truncated) {
+          skipped += 1;
+          warnings.push(
+            `Trace ${traceId}: more than ${result.rows.length} observations found; V1 sync is capped at ${result.maxPages} pages, so no partial trace was imported.`
+          );
           continue;
         }
         const trace = await this._writeImportedTrace({
           project,
           sourceMode: "connected",
           traceId,
-          rows,
+          rows: result.rows,
           upsert: true,
         });
         imported.push(trace);
+      } catch (error) {
+        skipped += 1;
+        warnings.push(
+          `Trace ${traceId}: ${_errorMessage(error, "Langfuse sync failed.")}`
+        );
       }
+    }
+
+    const now = Date.now();
+    if (warnings.length > 0 || skipped > 0) {
+      await this._writeProject({
+        ...project,
+        source: {
+          ...project.source,
+          lastSyncAt: now,
+          lastSyncStatus: "error",
+          lastSyncError: warnings[0] ?? "Some traces could not be synced.",
+        },
+        updatedAt: now,
+      });
+    } else {
       const sourceWithoutError = { ...project.source };
       delete sourceWithoutError.lastSyncError;
       await this._writeProject({
         ...project,
         source: {
           ...sourceWithoutError,
-          lastSyncAt: Date.now(),
+          lastSyncAt: now,
           lastSyncStatus: "success",
         },
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
-    } catch (error) {
-      await this._writeProject({
-        ...project,
-        source: {
-          ...project.source,
-          lastSyncAt: Date.now(),
-          lastSyncStatus: "error",
-          lastSyncError:
-            error instanceof Error ? error.message : "Langfuse sync failed.",
-        },
-        updatedAt: Date.now(),
-      });
-      throw error;
     }
 
     return { imported, warnings, skipped };
@@ -399,7 +429,7 @@ export class TraceManager {
     rows,
     upsert = false,
   }: {
-    project: TraceProject;
+    project: TraceStoredProject;
     sourceMode: TraceRecord["source"]["mode"];
     fileName?: string;
     traceId: string;
@@ -459,13 +489,13 @@ export class TraceManager {
     return candidate;
   }
 
-  private async _requireProject(projectId: string): Promise<TraceProject> {
+  private async _requireProject(projectId: string): Promise<TraceStoredProject> {
     return this._readProject(projectId);
   }
 
   private async _requireConnectedProject(projectId: string): Promise<
-    TraceProject & {
-      source: Extract<TraceProjectSource, { mode: "connected" }> & {
+    TraceStoredProject & {
+      source: Extract<TraceStoredProjectSource, { mode: "connected" }> & {
         publicKey: string;
         secretKey: string;
       };
@@ -478,8 +508,8 @@ export class TraceManager {
     if (!project.source.publicKey || !project.source.secretKey) {
       throw new Error("Connected Langfuse credentials are missing.");
     }
-    return project as TraceProject & {
-      source: Extract<TraceProjectSource, { mode: "connected" }> & {
+    return project as TraceStoredProject & {
+      source: Extract<TraceStoredProjectSource, { mode: "connected" }> & {
         publicKey: string;
         secretKey: string;
       };
@@ -487,7 +517,7 @@ export class TraceManager {
   }
 
   private _clientForProject(project: {
-    source: Extract<TraceProjectSource, { mode: "connected" }> & {
+    source: Extract<TraceStoredProjectSource, { mode: "connected" }> & {
       publicKey: string;
       secretKey: string;
     };
@@ -507,16 +537,16 @@ export class TraceManager {
     return traces.find((trace) => trace.source.traceId === traceId) ?? null;
   }
 
-  private async _readProject(projectId: string): Promise<TraceProject> {
+  private async _readProject(projectId: string): Promise<TraceStoredProject> {
     return JSON.parse(
       await fs.readFile(
         path.join(this._projectDir(projectId), "project.json"),
         "utf8"
       )
-    ) as TraceProject;
+    ) as TraceStoredProject;
   }
 
-  private async _writeProject(project: TraceProject): Promise<void> {
+  private async _writeProject(project: TraceStoredProject): Promise<void> {
     await fs.mkdir(this._projectDir(project.id), { recursive: true });
     await fs.writeFile(
       path.join(this._projectDir(project.id), "project.json"),
@@ -596,16 +626,34 @@ function _extractLangfuseRows(text: string): LangfuseObservation[] | null {
   return observations.some(_looksLikeLangfuseObservation) ? observations : null;
 }
 
-function _projectForRenderer(project: TraceProject): TraceProject {
+function _projectForRenderer(project: TraceStoredProject): TraceProject {
   if (project.source.mode !== "connected") {
     return project;
   }
-  const safeSource = { ...project.source };
-  delete safeSource.publicKey;
-  delete safeSource.secretKey;
   return {
     ...project,
-    source: safeSource,
+    source: _connectedSourceForRenderer(project.source),
+  };
+}
+
+function _connectedSourceForRenderer(
+  source: Extract<TraceStoredProjectSource, { mode: "connected" }>
+): Extract<TraceProject["source"], { mode: "connected" }> {
+  return {
+    type: source.type,
+    mode: source.mode,
+    baseUrl: source.baseUrl,
+    publicKeyPreview: source.publicKeyPreview,
+    secretKeyPreview: source.secretKeyPreview,
+    ...(source.langfuseProjectId
+      ? { langfuseProjectId: source.langfuseProjectId }
+      : {}),
+    ...(source.langfuseProjectName
+      ? { langfuseProjectName: source.langfuseProjectName }
+      : {}),
+    ...(source.lastSyncAt ? { lastSyncAt: source.lastSyncAt } : {}),
+    ...(source.lastSyncStatus ? { lastSyncStatus: source.lastSyncStatus } : {}),
+    ...(source.lastSyncError ? { lastSyncError: source.lastSyncError } : {}),
   };
 }
 
@@ -660,7 +708,7 @@ function _projectNamesFromRows(rows: LangfuseObservation[]): Set<string> {
 }
 
 function _projectIdsFromExistingTraces(
-  project: TraceProject,
+  project: TraceStoredProject,
   traces: TraceRecord[]
 ): Set<string> {
   return new Set(
@@ -699,11 +747,11 @@ function _assertSingleLangfuseSource(
 }
 
 function _projectSourceAfterImport(
-  source: TraceProjectSource,
+  source: TraceStoredProjectSource,
   existingProjectIds: Set<string>,
   batchProjectIds: Set<string>,
   batchProjectNames: Set<string>
-): TraceProjectSource {
+): TraceStoredProjectSource {
   const existingProjectId = _onlySetValue(existingProjectIds);
   const batchProjectId = _onlySetValue(batchProjectIds);
   const langfuseProjectId =
@@ -739,6 +787,10 @@ function _formatSourceIds(ids: Set<string>): string {
     .slice(0, 2)
     .map((id) => `"${id}"`)
     .join(", ")} and ${values.length - 2} more`;
+}
+
+function _errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function _createTraceRecord({

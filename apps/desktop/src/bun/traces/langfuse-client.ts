@@ -3,7 +3,7 @@ import type {
   TraceRemoteTraceSummary,
 } from "../../shared/traces";
 
-type LangfuseObservation = Record<string, unknown>;
+export type LangfuseObservation = Record<string, unknown>;
 
 export interface LangfuseConnectionConfig {
   baseUrl: string;
@@ -14,6 +14,13 @@ export interface LangfuseConnectionConfig {
 export interface LangfuseProjectInfo {
   projectId?: string;
   projectName?: string;
+}
+
+export interface LangfuseObservationFetchResult {
+  rows: LangfuseObservation[];
+  truncated: boolean;
+  pageCount: number;
+  maxPages: number;
 }
 
 interface LangfuseTraceRow {
@@ -169,10 +176,12 @@ export class LangfuseClient {
   /** Fetch all observations for a remote trace id, bounded for V1 safety. */
   async getObservationsForTrace(
     traceId: string
-  ): Promise<LangfuseObservation[]> {
+  ): Promise<LangfuseObservationFetchResult> {
     const rows: LangfuseObservation[] = [];
     let cursor: string | undefined;
+    let pageCount = 0;
     for (let page = 0; page < MAX_OBSERVATION_PAGES; page += 1) {
+      pageCount = page + 1;
       const url = new URL(`${this._baseUrl}/api/public/v2/observations`);
       url.searchParams.set("fields", OBSERVATION_FIELDS);
       url.searchParams.set("limit", String(OBSERVATION_PAGE_LIMIT));
@@ -198,7 +207,12 @@ export class LangfuseClient {
         break;
       }
     }
-    return rows;
+    return {
+      rows,
+      truncated: Boolean(cursor),
+      pageCount,
+      maxPages: MAX_OBSERVATION_PAGES,
+    };
   }
 
   private async _getJson(input: string | URL): Promise<unknown> {

@@ -1,9 +1,9 @@
 import type { ModelUsage, Thread } from "@llm-space/core";
 
 /**
- * Describes where a trace project gets its Langfuse data. Manual projects hold
- * imported JSON exports; connected projects store credentials locally in
- * `project.json` but RPC/UI responses should use only the preview fields.
+ * Describes where a renderer-visible trace project gets its Langfuse data.
+ * Manual projects hold imported JSON exports; connected projects expose only
+ * redacted credential previews.
  */
 export type TraceProjectSource =
   | {
@@ -16,16 +16,6 @@ export type TraceProjectSource =
       type: "langfuse";
       mode: "connected";
       baseUrl: string;
-      /**
-       * Local-only Langfuse API public key. V1 intentionally persists this in
-       * `project.json`; Bun strips it from project responses before rendering.
-       */
-      publicKey?: string;
-      /**
-       * Local-only Langfuse API secret key. V1 intentionally persists this in
-       * `project.json`; Bun strips it from project responses before rendering.
-       */
-      secretKey?: string;
       publicKeyPreview: string;
       secretKeyPreview: string;
       langfuseProjectId?: string;
@@ -148,7 +138,11 @@ export interface TraceRemoteTraceSummary {
   totalCost?: number;
 }
 
-/** Result of syncing selected trace ids from a connected Langfuse project. */
+/**
+ * Result of syncing selected trace ids from a connected Langfuse project.
+ * Individual trace failures are reported as warnings/skips so partial success is
+ * observable instead of being collapsed into a thrown batch error.
+ */
 export interface TraceSyncResult extends TraceImportResult {}
 
 /**
