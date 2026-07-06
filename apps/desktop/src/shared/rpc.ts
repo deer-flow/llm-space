@@ -213,6 +213,11 @@ export interface DesktopRPCType {
         params: { projectId: string; traceKey: string };
         response: TraceWorkbenchResponse;
       };
+      // Rename a trace summary and keep its editable workbench title in sync.
+      traceUpdateTraceTitle: {
+        params: { projectId: string; traceKey: string; title: string };
+        response: TraceWorkbenchResponse;
+      };
       // Persist a trace workbench thread; raw trace data remains immutable.
       traceWriteWorkbench: {
         params: { projectId: string; traceKey: string; thread: Thread };

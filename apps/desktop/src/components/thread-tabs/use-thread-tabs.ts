@@ -71,6 +71,12 @@ export interface ThreadTabs {
   handleRemove: (removed: string) => void;
   /** File-tree rename/move: rewrite open thread tab paths under `from` to `to`. */
   handleMove: (from: string, to: string) => void;
+  /** Trace metadata edit: update labels for already-open trace tabs. */
+  handleTraceTitleChange: (
+    projectId: string,
+    traceKey: string,
+    title: string
+  ) => void;
   /**
    * Reopen the most recently closed tab group, silently skipping files or traces
    * that no longer exist.
@@ -439,6 +445,18 @@ export function useThreadTabs(): ThreadTabs {
     });
   }, []);
 
+  const handleTraceTitleChange = useCallback(
+    (projectId: string, traceKey: string, title: string) => {
+      const id = _traceTabId(projectId, traceKey);
+      setTabs((prev) =>
+        prev.map((tab) =>
+          tab.id === id && tab.type === "trace" ? { ...tab, title } : tab
+        )
+      );
+    },
+    []
+  );
+
   const refresh = useCallback((id: string) => {
     setTabs((prev) =>
       prev.map((tab) =>
@@ -462,6 +480,7 @@ export function useThreadTabs(): ThreadTabs {
     refresh,
     handleRemove,
     handleMove,
+    handleTraceTitleChange,
     reopenClosed,
   };
 }

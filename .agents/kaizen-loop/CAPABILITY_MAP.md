@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-05
-- Map status: updated after Langfuse Trace Import V1 and Langfuse Connected Source V1; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, and connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench.
+- Last updated: 2026-07-06
+- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, and Trace Workbench Header/Protocol Repair; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, and connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -237,7 +237,7 @@
 
 - Status: shipped V1
 - Freshness: confirmed
-- Last checked: 2026-07-05
+- Last checked: 2026-07-06
 - Evidence:
   - Current discovery screenshot `audits/2026-07-05-160904-langfuse-trace-import-discovery/01-current-native-debug-surface.png` shows the product can render a native reduced debug fixture with assistant thinking, tool calls, token usage, manual continuation state, and Run history.
   - Current discovery screenshot `audits/2026-07-05-160904-langfuse-trace-import-discovery/02-current-run-trace-inspector.png` shows the saved-run trace inspector can render a local `ThreadRunSnapshot` as a non-mutating debug view with usage and step evidence.
@@ -253,7 +253,8 @@
   - `packages/core/src/parsers/json-thread-parser.ts` accepts any non-foreign JSON that satisfies the optional-field `Thread` schema; a Langfuse observations payload with top-level `data` can therefore be written as a native-looking but empty thread instead of being rejected or normalized.
   - `packages/core/src/parsers/normalize-thread.ts` normalizes OpenAI/Anthropic chat-like `messages`, tools, images, tool calls, and tool results, but has no Langfuse trace/observation normalization path.
   - External Langfuse docs reviewed on 2026-07-05 say Langfuse traces are containers of observations, Observations API v2 returns row-level spans/generations/events, and UI/Blob exports can produce JSON/JSONL data that includes observations and trace context.
-- Boundary: users can create local Trace Projects, manually import supported Langfuse JSON (`{ data: [...] }` or bare observation arrays) into the selected project, list imported traces in the dedicated Trace Panel, and open each trace directly as a trace tab that reuses `ThreadPlayground` over a lazy-created trace-owned `workbench.json`.
+  - Protocol repair on 2026-07-06 checked the current Langfuse OpenAPI: v2 observations expose field groups including `io`, but input/output are always raw strings and `parseIoAsJson=true` is deprecated and returns 400. `TraceManager` now decodes JSON-shaped raw strings locally when creating the workbench and repairs existing workbench text wrappers such as `{"content":"..."}` on read.
+- Boundary: users can create local Trace Projects, manually import supported Langfuse JSON (`{ data: [...] }` or bare observation arrays) into the selected project, list imported traces in the dedicated Trace Panel, and open each trace directly as a trace tab that reuses `ThreadPlayground` over a lazy-created trace-owned `workbench.json`. Langfuse raw-string IO is normalized into user/assistant/tool text where it clearly wraps message content.
 - Explicit non-goals: no live Langfuse sync, no automatic connect UI, no JSONL in V1, no write-back to Langfuse, no account-management flow, no OTLP collector, no full read-only trace timeline UI, no Trace/Debug/Runs detail tabs in V1, and no mixing trace-owned workbenches into `workspace/`.
 - Visible gaps: no background sync, no JSONL import, no full raw trace timeline, no import preview, no delete/rename/credential-rotation project management, no schema-specific coverage for every Langfuse export variant, and no global trace search.
 
@@ -261,7 +262,7 @@
 
 - Status: shipped V1
 - Freshness: confirmed
-- Last checked: 2026-07-05
+- Last checked: 2026-07-06
 - Evidence:
   - Pre-implementation CEF discovery screenshot `audits/2026-07-05-221840-langfuse-connect-v1/01-current-trace-panel-empty.png` showed the Trace Panel empty state only supported creating a local Trace Project and manually importing Langfuse JSON; there was no connect/test/sync entry.
   - Pre-implementation CEF snapshot on 2026-07-05 showed the Trace Panel toolbar actions were `New Trace Project` and `Import Langfuse Export`; there was no API credential path.
@@ -282,7 +283,9 @@
   - Polish audit screenshots `audits/2026-07-05-232553-trace-panel-polish/11-clean-connected-list.png`, `13-clean-sync-dialog-final.png`, `14-clean-connect-dialog.png`, and `15-clean-empty-traces.png` confirm the Trace Panel now has a visible panel title, clearer project/source hierarchy, labeled Langfuse connection fields, and a two-path sync dialog for exact trace-id sync or search/select sync.
   - Follow-up screenshot `audits/2026-07-05-232553-trace-panel-polish/16-connect-dialog-no-project-name.png` confirms connected Langfuse setup now only asks for base URL, public key, and secret key; the local project name is derived after validation.
   - Clean CEF verification on port `9372` confirmed no horizontal overflow at 1280px and no relevant console errors after the polish pass; screenshots and DOM text showed only redacted key previews.
-- Boundary: users can create a connected Langfuse Trace Project by entering base URL/public key/secret key, validate before save, persist the local connection in `project.json`, explicitly sync by trace id or by selecting from a bounded recent remote trace search, upsert the same remote trace without duplicating local rows, and open the synced trace in the existing trace-owned Debug workbench.
+  - Trace header/protocol repair evidence on 2026-07-06: CEF screenshot `audits/2026-07-06-trace-head-protocol/01-existing-cef-trace-head.png` shows the trace source header moved into `ThreadPlayground`, with the trace id rendered as a compact badge and a `Copy trace ID` action; DOM check showed no horizontal overflow.
+  - Focused Bun regressions on 2026-07-06 verified trace title rename updates `trace.json`, `workbench.json`, and the listed trace title; v2 raw-string IO imports produce normal system/user/assistant text; existing workbenches with JSON wrapper text are repaired on read.
+- Boundary: users can create a connected Langfuse Trace Project by entering base URL/public key/secret key, validate before save, persist the local connection in `project.json`, explicitly sync by trace id or by selecting from a bounded recent remote trace search, upsert the same remote trace without duplicating local rows, and open the synced trace in the existing trace-owned Debug workbench. Trace tabs expose editable trace titles, source context inside the workbench header, and a copyable trace-id badge.
 - Explicit non-goals: no background daemon or automatic initial sync, no write-back to Langfuse, no org-wide multi-project account picker in V1, no full secret display after save, no OAuth, no OTLP collector, no raw timeline UI, no automatic deletion of local traces when remote traces disappear, and no exhaustive historical backfill.
 - Visible gaps: date-range/cursor UI for large projects, credential rotation/delete/rename project management, richer sync diagnostics/history beyond latest redacted status, full raw trace timeline, global trace search, and JSONL/export variant expansion.
 

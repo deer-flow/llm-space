@@ -401,7 +401,54 @@ export class TraceManager {
     const thread = JSON.parse(
       await fs.readFile(workbenchPath, "utf8")
     ) as Thread;
-    return { trace, thread };
+    const normalizedThread = _normalizeExistingWorkbenchThread(thread);
+    if (normalizedThread !== thread) {
+      await fs.writeFile(
+        workbenchPath,
+        JSON.stringify(normalizedThread, null, 2),
+        "utf8"
+      );
+    }
+    return { trace, thread: normalizedThread };
+  }
+
+  /**
+   * Rename a trace-facing debug workbench. The title belongs to trace metadata,
+   * not the filesystem key, so renaming never moves raw trace folders.
+   */
+  async updateTraceTitle(
+    projectId: string,
+    traceKey: string,
+    title: string
+  ): Promise<TraceWorkbenchResponse> {
+    await this._requireProject(projectId);
+    const normalizedTitle = _normalizeTraceTitle(title);
+    const trace = await this._readTrace(projectId, traceKey);
+    const nextTrace: TraceRecord = {
+      ...trace,
+      title: normalizedTitle,
+      updatedAt: Date.now(),
+    };
+    await fs.writeFile(
+      this._tracePath(projectId, traceKey),
+      JSON.stringify(nextTrace, null, 2),
+      "utf8"
+    );
+
+    const workbenchPath = this._workbenchPath(projectId, traceKey);
+    if (!existsSync(workbenchPath)) {
+      const raw = await this._readRawTrace(projectId, traceKey);
+      const thread = _createWorkbench(nextTrace, raw.rows);
+      await fs.writeFile(workbenchPath, JSON.stringify(thread, null, 2), "utf8");
+      return { trace: nextTrace, thread };
+    }
+
+    const currentThread = JSON.parse(
+      await fs.readFile(workbenchPath, "utf8")
+    ) as Thread;
+    const thread = _threadWithTitle(currentThread, normalizedTitle);
+    await fs.writeFile(workbenchPath, JSON.stringify(thread, null, 2), "utf8");
+    return { trace: nextTrace, thread };
   }
 
   /**
@@ -793,6 +840,120 @@ function _errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function _normalizeTraceTitle(value: string): string {
+  const title = value.trim();
+  if (!title) {
+    throw new Error("Trace title is required.");
+  }
+  if ([...title].some((char) => char.charCodeAt(0) < 32)) {
+    throw new Error("Trace title contains a control character.");
+  }
+  return title;
+}
+
+function _threadWithTitle(thread: Thread, title: string): Thread {
+  return {
+    ...thread,
+    title,
+    runHistory: thread.runHistory?.map((run) => ({
+      ...run,
+      thread: { ...run.thread, title },
+    })),
+  };
+}
+
+function _normalizeExistingWorkbenchThread(thread: Thread): Thread {
+  const normalized = _normalizeThreadMessages(thread);
+  let changed = normalized.changed;
+  const nextRunHistory = normalized.thread.runHistory?.map((run) => {
+    const normalizedRun = _normalizeThreadMessages(run.thread);
+    if (normalizedRun.changed) {
+      changed = true;
+      return { ...run, thread: normalizedRun.thread };
+    }
+    return run;
+  });
+  if (!changed) {
+    return thread;
+  }
+  return { ...normalized.thread, runHistory: nextRunHistory };
+}
+
+function _normalizeThreadMessages(thread: Thread): {
+  thread: Thread;
+  changed: boolean;
+} {
+  const messages = thread.context?.messages;
+  if (!messages) {
+    return { thread, changed: false };
+  }
+  let changed = false;
+  const nextMessages = messages.map((message) => {
+    const next = _normalizeMessageText(message);
+    if (next !== message) {
+      changed = true;
+    }
+    return next;
+  });
+  if (!changed) {
+    return { thread, changed: false };
+  }
+  return {
+    thread: {
+      ...thread,
+      context: { ...thread.context, messages: nextMessages },
+    },
+    changed: true,
+  };
+}
+
+function _normalizeMessageText(message: Message): Message {
+  const content = _normalizeTextContent(message.content);
+  let next =
+    content === message.content ? message : ({ ...message, content } as Message);
+  if (next.role !== "assistant" || !next.toolCalls) {
+    return next;
+  }
+  let toolCallsChanged = false;
+  const toolCalls = next.toolCalls.map((toolCall) => {
+    if (!toolCall.output) {
+      return toolCall;
+    }
+    const outputContent = _normalizeTextContent(toolCall.output.content);
+    if (outputContent === toolCall.output.content) {
+      return toolCall;
+    }
+    toolCallsChanged = true;
+    return {
+      ...toolCall,
+      output: { ...toolCall.output, content: outputContent },
+    };
+  });
+  if (!toolCallsChanged) {
+    return next;
+  }
+  next = { ...next, toolCalls };
+  return next;
+}
+
+function _normalizeTextContent<T extends { type: string; text?: string }>(
+  content: T[]
+): T[] {
+  let changed = false;
+  const next = content.map((item) => {
+    if (item.type !== "text" || typeof item.text !== "string") {
+      return item;
+    }
+    const text = _textFromJsonWrapper(item.text);
+    if (text === item.text) {
+      return item;
+    }
+    changed = true;
+    return { ...item, text };
+  });
+  return changed ? next : content;
+}
+
 function _createTraceRecord({
   projectId,
   key,
@@ -1001,9 +1162,10 @@ function _toolCallFromSpan(row: LangfuseObservation): ToolCall {
 }
 
 function _extractInputMessages(value: unknown): LangfuseObservation[] {
-  const root = _asRecord(value);
-  const rawMessages = Array.isArray(value)
-    ? value
+  const decoded = _jsonDecodedValue(value);
+  const root = _asRecord(decoded);
+  const rawMessages = Array.isArray(decoded)
+    ? decoded
     : root && Array.isArray(root.messages)
       ? root.messages
       : root && Array.isArray(root.input)
@@ -1015,7 +1177,8 @@ function _extractInputMessages(value: unknown): LangfuseObservation[] {
 }
 
 function _assistantOutputText(value: unknown): string {
-  const root = _asRecord(value);
+  const decoded = _jsonDecodedValue(value);
+  const root = _asRecord(decoded);
   if (root) {
     if (_firstString(root.role) === "assistant" && root.content !== undefined) {
       return _textFromValue(root.content);
@@ -1027,7 +1190,7 @@ function _assistantOutputText(value: unknown): string {
       return _textFromValue(message.content);
     }
   }
-  return _textFromValue(value);
+  return _textFromValue(decoded);
 }
 
 function _appendUserMessage(messages: Message[], text: string): void {
@@ -1043,19 +1206,12 @@ function _appendUserMessage(messages: Message[], text: string): void {
 }
 
 function _argumentsFromValue(value: unknown): Record<string, unknown> {
-  const record = _asRecord(value);
+  const decoded = _jsonDecodedValue(value);
+  const record = _asRecord(decoded);
   if (record) {
     return record;
   }
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value) as unknown;
-      return _asRecord(parsed) ?? { value };
-    } catch {
-      return { value };
-    }
-  }
-  return value === undefined ? {} : { value };
+  return decoded === undefined ? {} : { value: decoded };
 }
 
 function _usageFromRow(row: LangfuseObservation): ModelUsage | null {
@@ -1256,12 +1412,59 @@ function _timeValue(value: string | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function _jsonDecodedValue(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+  if (!/^[{["]/.exec(trimmed)) {
+    return value;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function _textFromJsonWrapper(text: string): string {
+  const decoded = _jsonDecodedValue(text);
+  if (decoded === text) {
+    return text;
+  }
+  if (typeof decoded === "string") {
+    return decoded;
+  }
+  const record = _asRecord(decoded);
+  if (
+    record &&
+    (record.content !== undefined ||
+      record.text !== undefined ||
+      Array.isArray(record.choices))
+  ) {
+    return _textFromValue(decoded);
+  }
+  if (Array.isArray(decoded) && decoded.some(_looksLikeTextContentRecord)) {
+    return _textFromValue(decoded);
+  }
+  return text;
+}
+
+function _looksLikeTextContentRecord(value: unknown): boolean {
+  const record = _asRecord(value);
+  return Boolean(record?.text !== undefined || record?.content !== undefined);
+}
+
 function _textFromValue(value: unknown): string {
   if (value == null) {
     return "";
   }
   if (typeof value === "string") {
-    return value;
+    const decoded = _jsonDecodedValue(value);
+    return decoded === value ? value : _textFromValue(decoded);
   }
   if (Array.isArray(value)) {
     return value

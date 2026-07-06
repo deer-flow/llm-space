@@ -411,6 +411,7 @@ function PageInner() {
                 reorder={tabs.reorder}
                 onNewFile={handleNewFile}
                 onMove={tabs.handleMove}
+                onTraceTitleChange={tabs.handleTraceTitleChange}
                 onToggleSidebar={handleToggleSidebar}
               />
             )}

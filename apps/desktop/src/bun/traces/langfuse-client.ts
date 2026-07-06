@@ -65,6 +65,9 @@ type LangfuseTraceFilter =
 
 const OBSERVATION_FIELDS =
   "core,basic,time,io,model,usage,trace_context,metrics";
+// Langfuse v2 observations return input/output as raw strings. The old
+// `parseIoAsJson=true` parameter now returns 400, so TraceManager decodes
+// JSON-shaped strings locally before building the editable workbench.
 const TRACE_LIST_FIELDS = "core,metrics";
 const DEFAULT_REMOTE_TRACE_LIMIT = 50;
 const MAX_REMOTE_TRACE_LIMIT = 100;

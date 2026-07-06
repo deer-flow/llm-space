@@ -2,12 +2,16 @@
 
 import type { Thread } from "@llm-space/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CopyIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
 import { ThreadPlayground } from "@/components/thread-playground";
+import { Tooltip } from "@/components/tooltip";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { TraceRecord } from "@/shared/traces";
 
 const rpcTransport = createRpcTransport();
 
@@ -17,6 +21,7 @@ interface TraceTabPaneProps {
   active: boolean;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
+  onRenameTitle?: (projectId: string, traceKey: string, title: string) => void;
 }
 
 function _TraceTabPane({
@@ -25,6 +30,7 @@ function _TraceTabPane({
   active,
   refreshNonce = 0,
   onClose,
+  onRenameTitle,
 }: TraceTabPaneProps) {
   const tabId = `trace:${projectId}:${traceKey}`;
   const qc = useQueryClient();
@@ -75,6 +81,22 @@ function _TraceTabPane({
     [flushPending]
   );
 
+  const handleRenameTitle = useCallback(
+    async (title: string): Promise<boolean> => {
+      await flushPending();
+      const next = await traceClient.updateTraceTitle(
+        projectId,
+        traceKey,
+        title
+      );
+      qc.setQueryData(["trace", "workbench", projectId, traceKey], next);
+      void qc.invalidateQueries({ queryKey: ["trace", "traces", projectId] });
+      onRenameTitle?.(projectId, traceKey, next.trace.title);
+      return true;
+    },
+    [flushPending, onRenameTitle, projectId, qc, traceKey]
+  );
+
   useEffect(() => {
     return () => {
       void flushPending();
@@ -110,35 +132,84 @@ function _TraceTabPane({
   }, [projectId, qc, refreshNonce, traceKey]);
 
   const trace = data?.trace;
-  const contextLine = trace
-    ? [
-        "Langfuse",
-        trace.source.mode === "manual" ? "Manual Import" : "Connected",
-        `trace ${trace.source.traceId}`,
-        `imported ${new Date(trace.importedAt).toLocaleString()}`,
-      ].join(" · ")
-    : "Langfuse trace";
 
   return (
     <div className={cn("flex size-full flex-col", !active && "hidden")}>
-      <div className="bg-muted/30 border-b px-3 py-1.5">
-        <div className="text-muted-foreground truncate text-[0.6875rem]">
-          {contextLine}
-        </div>
-      </div>
       <ThreadPlayground
         key={reloadKey}
         className="bg-background min-h-0 flex-1 shadow-lg"
         loading={isLoading || !data}
         path={`trace/${projectId}/${traceKey}/workbench.json`}
         title={trace?.title ?? traceKey}
+        headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
         initialValue={data?.thread}
         active={active}
         transport={rpcTransport}
         onChange={handleChange}
+        onRenameTitle={handleRenameTitle}
+        validateTitle={_validateTraceTitle}
       />
     </div>
   );
 }
 
 export const TraceTabPane = memo(_TraceTabPane);
+
+function _TraceHeaderDetails({ trace }: { trace: TraceRecord }) {
+  const traceId = trace.source.traceId;
+  const copyTraceId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(traceId);
+      toast.success("Trace ID copied");
+    } catch {
+      toast.error("Could not copy trace ID");
+    }
+  }, [traceId]);
+  const sourceLabel =
+    trace.source.mode === "manual" ? "Manual Import" : "Connected";
+  return (
+    <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[0.6875rem]">
+      <span className="shrink-0">Langfuse</span>
+      <span className="shrink-0">·</span>
+      <span className="shrink-0">{sourceLabel}</span>
+      <span className="shrink-0">·</span>
+      <span className="hidden shrink-0 sm:inline">
+        imported {new Date(trace.importedAt).toLocaleString()}
+      </span>
+      <span className="hidden shrink-0 sm:inline">·</span>
+      <span
+        className="border-border bg-muted/60 text-foreground min-w-0 max-w-72 truncate rounded-full border px-2 py-0.5 font-mono text-[0.625rem]"
+        title={traceId}
+      >
+        {traceId}
+      </span>
+      <Tooltip content="Copy Trace ID">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Copy trace ID"
+          onClick={copyTraceId}
+        >
+          <CopyIcon className="size-3" />
+        </Button>
+      </Tooltip>
+    </div>
+  );
+}
+
+const TraceHeaderDetails = memo(_TraceHeaderDetails);
+
+function _validateTraceTitle(value: string) {
+  const title = value.trim();
+  if (!title) {
+    return { valid: false, value: title, error: "Trace title is required." };
+  }
+  if ([...title].some((char) => char.charCodeAt(0) < 32)) {
+    return {
+      valid: false,
+      value: title,
+      error: "Trace title contains a control character.",
+    };
+  }
+  return { valid: true, value: title };
+}

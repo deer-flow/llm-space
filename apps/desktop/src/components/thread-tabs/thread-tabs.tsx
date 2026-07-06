@@ -62,6 +62,11 @@ interface ThreadTabsProps {
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
   onMove?: (from: string, to: string) => void;
+  onTraceTitleChange?: (
+    projectId: string,
+    traceKey: string,
+    title: string
+  ) => void;
   onToggleSidebar?: () => void;
 }
 
@@ -81,6 +86,7 @@ export function ThreadTabs({
   reorder,
   onNewFile,
   onMove,
+  onTraceTitleChange,
   onToggleSidebar,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -310,6 +316,7 @@ export function ThreadTabs({
               active={tab.id === activeId}
               refreshNonce={tab.refreshNonce ?? 0}
               onClose={close}
+              onRenameTitle={onTraceTitleChange}
             />
           )
         )}

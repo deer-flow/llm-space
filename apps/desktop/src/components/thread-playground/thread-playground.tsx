@@ -2,7 +2,14 @@
 
 import type { AgentTransport, Thread } from "@llm-space/core";
 import { HistoryIcon, PlayIcon, Redo2Icon, Undo2Icon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { usePanelRef } from "react-resizable-panels";
 
 import { useRegisterCommands } from "@/commands";
@@ -26,7 +33,7 @@ import { Spinner } from "../ui/spinner";
 
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
-import { TitleEditor } from "./misc/title-editor";
+import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
@@ -46,6 +53,7 @@ export interface ThreadPlaygroundProps {
   className?: string;
   path: string;
   title?: string;
+  headerDetails?: ReactNode;
   initialValue: Thread;
   readonly?: boolean;
   /**
@@ -59,6 +67,7 @@ export interface ThreadPlaygroundProps {
 
   onChange?: (thread: Thread) => void;
   onRenameTitle?: (title: string) => Promise<boolean>;
+  validateTitle?: TitleValidator;
   onStreamingStart?: () => void;
   onStreamingEnd?: () => void;
 }
@@ -125,7 +134,9 @@ function ThreadPlaygroundContent({
   className,
   path,
   title: titleFromProps,
+  headerDetails,
   onRenameTitle,
+  validateTitle,
   readonly: readonlyFromProps = false,
   active = false,
 }: Omit<
@@ -198,14 +209,25 @@ function ThreadPlaygroundContent({
     >
       <ResizablePanelGroup>
         <ResizablePanel className="flex min-h-0 flex-col overflow-hidden">
-          <header className="flex h-12 w-full shrink-0 items-center border-b">
+          <header
+            className={cn(
+              "flex w-full shrink-0 items-center border-b",
+              headerDetails ? "min-h-14 py-1.5" : "h-12"
+            )}
+          >
             <div className="min-w-0 grow px-3">
               <TitleEditor
                 className="w-96 max-w-full"
                 title={title}
                 readonly={readonly || !onRenameTitle}
                 onRename={onRenameTitle}
+                validateTitle={validateTitle}
               />
+              {headerDetails ? (
+                <div className="mt-0.5 flex min-w-0 items-center">
+                  {headerDetails}
+                </div>
+              ) : null}
             </div>
             <div
               className={cn(

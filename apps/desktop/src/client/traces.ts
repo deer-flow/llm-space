@@ -58,6 +58,10 @@ export const traceClient = {
   readOrCreateWorkbench(projectId: string, traceKey: string) {
     return _rpc().request.traceReadOrCreateWorkbench({ projectId, traceKey });
   },
+  /** Rename a trace and keep its editable workbench title aligned. */
+  updateTraceTitle(projectId: string, traceKey: string, title: string) {
+    return _rpc().request.traceUpdateTraceTitle({ projectId, traceKey, title });
+  },
   /** Persist the trace workbench thread without changing the raw trace payload. */
   async writeWorkbench(
     projectId: string,

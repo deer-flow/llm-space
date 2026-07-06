@@ -1,23 +1,30 @@
 import { PencilIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 
-import { validateThreadFileStem } from "@/lib/thread-file";
+import {
+  validateThreadFileStem,
+  type FileStemValidationResult,
+} from "@/lib/thread-file";
 import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../../tooltip";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 
+export type TitleValidator = (value: string) => FileStemValidationResult;
+
 function _TitleEditor({
   className,
   title,
   readonly,
   onRename,
+  validateTitle = validateThreadFileStem,
 }: {
   className?: string;
   title: string;
   readonly?: boolean;
   onRename?: (title: string) => Promise<boolean>;
+  validateTitle?: TitleValidator;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -26,8 +33,8 @@ function _TitleEditor({
   const cancelledRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const validation = useMemo(
-    () => validateThreadFileStem(draftTitle),
-    [draftTitle]
+    () => validateTitle(draftTitle),
+    [draftTitle, validateTitle]
   );
 
   const startEditing = useCallback(() => {
@@ -41,7 +48,7 @@ function _TitleEditor({
   }, []);
 
   const commitEditing = useCallback(async () => {
-    const result = validateThreadFileStem(draftTitle);
+    const result = validateTitle(draftTitle);
     if (!result.valid) {
       setError(result.error ?? "Invalid file name.");
       focusInput();
@@ -65,7 +72,7 @@ function _TitleEditor({
     } finally {
       setCommitting(false);
     }
-  }, [draftTitle, focusInput, onRename, title]);
+  }, [draftTitle, focusInput, onRename, title, validateTitle]);
 
   const cancelEditing = useCallback(() => {
     cancelledRef.current = true;

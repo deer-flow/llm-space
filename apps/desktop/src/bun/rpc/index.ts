@@ -170,6 +170,8 @@ export const mainWindowRPC: MainWindowRPC =
           traceManager.readTrace(projectId, traceKey),
         traceReadOrCreateWorkbench: ({ projectId, traceKey }) =>
           traceManager.readOrCreateWorkbench(projectId, traceKey),
+        traceUpdateTraceTitle: ({ projectId, traceKey, title }) =>
+          traceManager.updateTraceTitle(projectId, traceKey, title),
         traceWriteWorkbench: async ({ projectId, traceKey, thread }) => {
           await traceManager.writeWorkbench(projectId, traceKey, thread);
           return null;
