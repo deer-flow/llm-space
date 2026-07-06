@@ -2,185 +2,281 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { localFs } from "@/client";
+import { localFs, traceClient } from "@/client";
 import { threadTitleFromPath } from "@/lib/thread-file";
 
+/** An open workspace thread tab. `id` is stable as `thread:{path}`. */
 export interface ThreadTab {
   id: string;
+  type: "thread";
   path: string;
-  /** Bumped by `refresh(path)` to force the pane to reload the thread from disk. */
+  /** Bumped by `refresh(id)` to force the pane to reload from disk. */
   refreshNonce?: number;
 }
 
-/** Derive a tab label from a thread file path (basename without `.json`). */
-export function tabLabel(path: string): string {
-  return threadTitleFromPath(path);
+/** An open imported trace workbench tab. `id` is `trace:{projectId}:{traceKey}`. */
+export interface TraceTab {
+  id: string;
+  type: "trace";
+  projectId: string;
+  traceKey: string;
+  title: string;
+  refreshNonce?: number;
+}
+
+/** Any tab shown in the main chrome tab bar. */
+export type AppTab = ThreadTab | TraceTab;
+
+type PersistedTab =
+  | { type: "thread"; path: string }
+  | { type: "trace"; projectId: string; traceKey: string; title?: string };
+
+/** Derive a tab label from an app tab. */
+export function tabLabel(tab: AppTab): string {
+  return tab.type === "thread" ? threadTitleFromPath(tab.path) : tab.title;
 }
 
 export interface ThreadTabs {
-  /** Open file paths, in tab order. */
-  tabs: ThreadTab[];
-  /** Currently focused tab, or `null` when no tabs are open. */
-  activePath: string | null;
+  /** Open tabs in their visual order. */
+  tabs: AppTab[];
+  /** Currently focused tab id, or `null` when no tabs are open. */
+  activeId: string | null;
   /**
-   * Open `path` as a tab (adding it if absent) and focus it. Assumes the
-   * caller already knows the file exists; a since-deleted file surfaces as a
-   * read error in the newly opened pane instead.
+   * Open a workspace thread path, adding it if absent and focusing it. Callers
+   * already know the file exists; a stale path reports as a pane read error.
    */
   open: (path: string) => void;
-  /** Close `path`; if it was active, focus its left (else right) neighbor. */
-  close: (path: string) => void;
+  /**
+   * Open an imported trace workbench, adding it if absent and focusing it. The
+   * trace must already be listed by the Trace Panel or restorable from storage.
+   */
+  openTrace: (input: {
+    projectId: string;
+    traceKey: string;
+    title: string;
+  }) => void;
+  /** Close a tab by app-tab id; if it was active, focus its nearest neighbor. */
+  close: (id: string) => void;
   /** Close every open tab except `keep`, which becomes active. */
   closeOthers: (keep: string) => void;
-  /** Close every open tab. */
+  /** Close every open tab and push the group onto the reopen stack. */
   closeAll: () => void;
-  /** Move the tab at `from` to `to` within the tab order. */
+  /** Move the tab at `from` to `to` within the visual tab order. */
   reorder: (from: number, to: number) => void;
-  /** Focus an already-open tab. */
-  activate: (path: string) => void;
-  /** Reload the tab's thread from disk, discarding any un-saved in-memory edits. */
-  refresh: (path: string) => void;
-  /** Tree delete: close the tab for `removed` and any tab beneath it. */
+  /** Focus an already-open tab by id. */
+  activate: (id: string) => void;
+  /** Reload the tab's backing file/workbench, discarding unsaved local edits. */
+  refresh: (id: string) => void;
+  /** File-tree delete: close open thread tabs at or beneath `removed`. */
   handleRemove: (removed: string) => void;
-  /** Tree rename/move: rewrite tab paths under `from` → `to`. */
+  /** File-tree rename/move: rewrite open thread tab paths under `from` to `to`. */
   handleMove: (from: string, to: string) => void;
   /**
-   * Pop the most recent close group off the in-memory stack and reopen its
-   * files, silently skipping any that no longer exist. No-op when empty.
+   * Reopen the most recently closed tab group, silently skipping files or traces
+   * that no longer exist.
    */
   reopenClosed: () => void;
 }
 
-/** localStorage keys under which the open tabs and active tab are persisted. */
-const STORAGE_KEY = "llm-space:open-tabs";
+const STORAGE_KEY = "llm-space:open-app-tabs";
+const LEGACY_STORAGE_KEY = "llm-space:open-tabs";
 const ACTIVE_KEY = "llm-space:active-tab";
 
-let nextTabId = 0;
-
-function _createTab(path: string): ThreadTab {
-  nextTabId += 1;
-  return { id: `tab-${nextTabId}`, path };
+function _threadTabId(path: string): string {
+  return `thread:${path}`;
 }
 
-/**
- * Read the persisted tab paths. A missing key means there are no open tabs yet,
- * so the welcome screen remains visible on first launch.
- */
-function _loadPersistedTabs(): string[] {
+function _traceTabId(projectId: string, traceKey: string): string {
+  return `trace:${projectId}:${traceKey}`;
+}
+
+function _createThreadTab(path: string): ThreadTab {
+  return { id: _threadTabId(path), type: "thread", path };
+}
+
+function _createTraceTab({
+  projectId,
+  traceKey,
+  title,
+}: {
+  projectId: string;
+  traceKey: string;
+  title: string;
+}): TraceTab {
+  return {
+    id: _traceTabId(projectId, traceKey),
+    type: "trace",
+    projectId,
+    traceKey,
+    title,
+  };
+}
+
+function _persistable(tab: AppTab): PersistedTab {
+  return tab.type === "thread"
+    ? { type: "thread", path: tab.path }
+    : {
+        type: "trace",
+        projectId: tab.projectId,
+        traceKey: tab.traceKey,
+        title: tab.title,
+      };
+}
+
+function _fromPersisted(tab: PersistedTab): AppTab | null {
+  if (tab.type === "thread" && tab.path) {
+    return _createThreadTab(tab.path);
+  }
+  if (tab.type === "trace" && tab.projectId && tab.traceKey) {
+    return _createTraceTab({
+      projectId: tab.projectId,
+      traceKey: tab.traceKey,
+      title: tab.title || tab.traceKey,
+    });
+  }
+  return null;
+}
+
+function _loadPersistedTabs(): AppTab[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((p): p is string => typeof p === "string");
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((item): PersistedTab | null => {
+          if (!item || typeof item !== "object") return null;
+          const t = item as PersistedTab;
+          return t.type === "thread" || t.type === "trace" ? t : null;
+        })
+        .map((item) => (item ? _fromPersisted(item) : null))
+        .filter((tab): tab is AppTab => tab !== null);
+    }
+
+    const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacyRaw === null) return [];
+    const legacy: unknown = JSON.parse(legacyRaw);
+    return Array.isArray(legacy)
+      ? legacy
+          .filter((path): path is string => typeof path === "string")
+          .map(_createThreadTab)
+      : [];
   } catch {
     return [];
   }
 }
 
-/** Persist the open tab paths, ignoring any storage failure. */
-function _savePersistedTabs(tabs: string[]): void {
+function _savePersistedTabs(tabs: AppTab[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(tabs.map(_persistable))
+    );
   } catch {
-    // Storage unavailable (private mode, quota) ⇒ persistence is best-effort.
+    // Best-effort persistence only.
   }
 }
 
-/** Read the persisted active tab path, or `null` when unset/unavailable. */
-function _loadPersistedActive(): string | null {
+function _loadPersistedActive(tabs: AppTab[]): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(ACTIVE_KEY);
+    const active = window.localStorage.getItem(ACTIVE_KEY);
+    if (!active) return tabs[0]?.id ?? null;
+    if (tabs.some((tab) => tab.id === active)) return active;
+    const legacyThreadId = _threadTabId(active);
+    return tabs.some((tab) => tab.id === legacyThreadId)
+      ? legacyThreadId
+      : (tabs[0]?.id ?? null);
   } catch {
-    return null;
+    return tabs[0]?.id ?? null;
   }
 }
 
-/** Persist the active tab path (or clear it when `null`), ignoring failures. */
-function _savePersistedActive(path: string | null): void {
+function _savePersistedActive(id: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (path === null) window.localStorage.removeItem(ACTIVE_KEY);
-    else window.localStorage.setItem(ACTIVE_KEY, path);
+    if (id === null) window.localStorage.removeItem(ACTIVE_KEY);
+    else window.localStorage.setItem(ACTIVE_KEY, id);
   } catch {
-    // Best-effort, same as `_savePersistedTabs`.
+    // Best-effort persistence only.
   }
 }
 
-/** Returns whether `path` is `base` itself or nested beneath it. */
 function _isUnder(path: string, base: string): boolean {
   return path === base || path.startsWith(`${base}/`);
 }
 
-/** Whether `path` currently resolves to a file in the local storage. */
-async function _fileExists(path: string): Promise<boolean> {
+async function _threadFileExists(path: string): Promise<boolean> {
   const slash = path.lastIndexOf("/");
   const parent = slash === -1 ? "" : path.slice(0, slash);
   try {
     const siblings = await localFs.ls(parent);
     return siblings.some((n) => n.path === path && n.type === "file");
   } catch {
-    // Parent directory gone (or any ls failure) ⇒ the file isn't openable.
     return false;
   }
 }
 
-export function useThreadTabs(): ThreadTabs {
-  const [tabs, setTabs] = useState<ThreadTab[]>(() =>
-    _loadPersistedTabs().map(_createTab)
-  );
-  const [activePath, setActivePath] = useState<string | null>(() => {
-    const restored = _loadPersistedTabs();
-    const active = _loadPersistedActive();
-    // Honor the persisted active tab when it's still among the open tabs;
-    // otherwise fall back to the first tab.
-    return active !== null && restored.includes(active)
-      ? active
-      : (restored[0] ?? null);
-  });
+async function _traceExists(tab: TraceTab): Promise<boolean> {
+  try {
+    await traceClient.readTrace(tab.projectId, tab.traceKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  // Read the latest tabs inside the async `open` without a stale closure.
+async function _tabExists(tab: AppTab): Promise<boolean> {
+  return tab.type === "thread"
+    ? _threadFileExists(tab.path)
+    : _traceExists(tab);
+}
+
+export function useThreadTabs(): ThreadTabs {
+  const restoredTabs = useRef<AppTab[] | null>(null);
+  if (restoredTabs.current === null) {
+    restoredTabs.current = _loadPersistedTabs();
+  }
+  const [tabs, setTabs] = useState<AppTab[]>(restoredTabs.current);
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    _loadPersistedActive(restoredTabs.current ?? [])
+  );
+
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
-
-  // Closed-tab groups, newest last. Each close pushes one group of paths.
-  const closedStack = useRef<string[][]>([]);
-  const pushClosed = useCallback((paths: string[]) => {
-    if (paths.length > 0) closedStack.current.push(paths);
+  const closedStack = useRef<PersistedTab[][]>([]);
+  const pushClosed = useCallback((closed: AppTab[]) => {
+    if (closed.length > 0) {
+      closedStack.current.push(closed.map(_persistable));
+    }
   }, []);
 
-  // Persist the open tabs after any change (open/close/reorder/move/…).
   useEffect(() => {
-    _savePersistedTabs(tabs.map((tab) => tab.path));
+    _savePersistedTabs(tabs);
   }, [tabs]);
 
-  // Persist the active tab so it is re-focused on the next launch.
   useEffect(() => {
-    _savePersistedActive(activePath);
-  }, [activePath]);
+    _savePersistedActive(activeId);
+  }, [activeId]);
 
-  // On mount, drop any restored tabs whose files no longer exist on disk. The
-  // persistence effect above then rewrites the cleaned list back to storage.
   useEffect(() => {
     const restored = tabsRef.current;
-    const restoredActive = activePath;
+    const restoredActive = activeId;
     if (restored.length === 0) return;
     let cancelled = false;
     void Promise.all(
-      restored.map(async (tab) => ((await _fileExists(tab.path)) ? tab : null))
+      restored.map(async (tab) => ((await _tabExists(tab)) ? tab : null))
     ).then((checked) => {
       if (cancelled) return;
-      const alive = checked.filter((tab): tab is ThreadTab => tab !== null);
+      const alive = checked.filter((tab): tab is AppTab => tab !== null);
       if (alive.length !== restored.length) setTabs(alive);
-      // Keep the restored active tab when it survived; otherwise the first.
-      const alivePaths = alive.map((tab) => tab.path);
-      setActivePath(
-        restoredActive !== null && alivePaths.includes(restoredActive)
+      const aliveIds = alive.map((tab) => tab.id);
+      setActiveId(
+        restoredActive !== null && aliveIds.includes(restoredActive)
           ? restoredActive
-          : (alive[0]?.path ?? null)
+          : (alive[0]?.id ?? null)
       );
     });
     return () => {
@@ -189,36 +285,59 @@ export function useThreadTabs(): ThreadTabs {
   }, []);
 
   const open = useCallback((path: string) => {
-    // Re-focusing an already-open tab needs no existence check.
-    if (tabsRef.current.some((tab) => tab.path === path)) {
-      setActivePath(path);
+    const id = _threadTabId(path);
+    if (tabsRef.current.some((tab) => tab.id === id)) {
+      setActiveId(id);
       return;
     }
-    // Every current caller already knows `path` exists (it came from the
-    // tree's own listing, or a file we just wrote), so open the tab straight
-    // away instead of paying for a redundant `fsLs` round trip first. If the
-    // file is somehow gone, the pane's own read will fail and report it.
     setTabs((prev) =>
-      prev.some((tab) => tab.path === path) ? prev : [...prev, _createTab(path)]
+      prev.some((tab) => tab.id === id)
+        ? prev
+        : [...prev, _createThreadTab(path)]
     );
-    setActivePath(path);
+    setActiveId(id);
   }, []);
 
-  const activate = useCallback((path: string) => {
-    setActivePath(path);
+  const openTrace = useCallback(
+    ({
+      projectId,
+      traceKey,
+      title,
+    }: {
+      projectId: string;
+      traceKey: string;
+      title: string;
+    }) => {
+      const id = _traceTabId(projectId, traceKey);
+      if (tabsRef.current.some((tab) => tab.id === id)) {
+        setActiveId(id);
+        return;
+      }
+      setTabs((prev) =>
+        prev.some((tab) => tab.id === id)
+          ? prev
+          : [...prev, _createTraceTab({ projectId, traceKey, title })]
+      );
+      setActiveId(id);
+    },
+    []
+  );
+
+  const activate = useCallback((id: string) => {
+    setActiveId(id);
   }, []);
 
   const close = useCallback(
-    (path: string) => {
+    (id: string) => {
       setTabs((prev) => {
-        const index = prev.findIndex((tab) => tab.path === path);
+        const index = prev.findIndex((tab) => tab.id === id);
         if (index === -1) return prev;
-        const next = prev.filter((tab) => tab.path !== path);
-        pushClosed([path]);
-        // If we closed the active tab, focus its left neighbor (else the right one).
-        setActivePath((current) =>
-          current === path
-            ? (next[index - 1]?.path ?? next[index]?.path ?? null)
+        const closed = prev[index];
+        const next = prev.filter((tab) => tab.id !== id);
+        if (closed) pushClosed([closed]);
+        setActiveId((current) =>
+          current === id
+            ? (next[index - 1]?.id ?? next[index]?.id ?? null)
             : current
         );
         return next;
@@ -230,40 +349,36 @@ export function useThreadTabs(): ThreadTabs {
   const closeOthers = useCallback(
     (keep: string) => {
       setTabs((prev) => {
-        if (!prev.some((tab) => tab.path === keep)) return prev;
-        pushClosed(
-          prev.filter((tab) => tab.path !== keep).map((tab) => tab.path)
-        );
-        return prev.filter((tab) => tab.path === keep);
+        if (!prev.some((tab) => tab.id === keep)) return prev;
+        pushClosed(prev.filter((tab) => tab.id !== keep));
+        return prev.filter((tab) => tab.id === keep);
       });
-      setActivePath((current) => (current === keep ? current : keep));
+      setActiveId(keep);
     },
     [pushClosed]
   );
 
   const closeAll = useCallback(() => {
-    pushClosed(tabsRef.current.map((tab) => tab.path));
+    pushClosed(tabsRef.current);
     setTabs([]);
-    setActivePath(null);
+    setActiveId(null);
   }, [pushClosed]);
 
   const reopenClosed = useCallback(async () => {
     const group = closedStack.current.pop();
     if (!group) return;
-    // Verify each file still exists, preserving the group's original order.
+    const restored = group.map(_fromPersisted).filter(Boolean) as AppTab[];
     const alive = (
       await Promise.all(
-        group.map(async (p) => ((await _fileExists(p)) ? p : null))
+        restored.map(async (tab) => ((await _tabExists(tab)) ? tab : null))
       )
-    ).filter((p): p is string => p !== null);
+    ).filter((tab): tab is AppTab => tab !== null);
     if (alive.length === 0) return;
     setTabs((prev) => [
       ...prev,
-      ...alive
-        .filter((path) => !prev.some((tab) => tab.path === path))
-        .map(_createTab),
+      ...alive.filter((tab) => !prev.some((current) => current.id === tab.id)),
     ]);
-    setActivePath(alive[alive.length - 1] ?? null);
+    setActiveId(alive[alive.length - 1]?.id ?? null);
   }, []);
 
   const reorder = useCallback((from: number, to: number) => {
@@ -271,7 +386,7 @@ export function useThreadTabs(): ThreadTabs {
       if (from === to || from < 0 || to < 0) return prev;
       if (from >= prev.length || to >= prev.length) return prev;
       const next = [...prev];
-      const [moved] = next.splice(from, 1) as [ThreadTab];
+      const [moved] = next.splice(from, 1) as [AppTab];
       next.splice(to, 0, moved);
       return next;
     });
@@ -279,11 +394,19 @@ export function useThreadTabs(): ThreadTabs {
 
   const handleRemove = useCallback((removed: string) => {
     setTabs((prev) => {
-      const next = prev.filter((tab) => !_isUnder(tab.path, removed));
+      const next = prev.filter(
+        (tab) => tab.type !== "thread" || !_isUnder(tab.path, removed)
+      );
       if (next.length === prev.length) return prev;
-      setActivePath((current) =>
-        current !== null && _isUnder(current, removed)
-          ? (next[next.length - 1]?.path ?? null)
+      setActiveId((current) =>
+        current !== null &&
+        prev.some(
+          (tab) =>
+            tab.id === current &&
+            tab.type === "thread" &&
+            _isUnder(tab.path, removed)
+        )
+          ? (next[next.length - 1]?.id ?? null)
           : current
       );
       return next;
@@ -295,20 +418,31 @@ export function useThreadTabs(): ThreadTabs {
       p === from ? to : _isUnder(p, from) ? to + p.slice(from.length) : p;
 
     setTabs((prev) => {
-      if (!prev.some((tab) => _isUnder(tab.path, from))) return prev;
-      // Thread reads are uncached, so there's no read cache to carry to the new
-      // key. Each pane keeps its in-memory store across the rename and re-reads
-      // the new path from disk.
-      return prev.map((tab) => ({ ...tab, path: rewrite(tab.path) }));
+      if (
+        !prev.some((tab) => tab.type === "thread" && _isUnder(tab.path, from))
+      ) {
+        return prev;
+      }
+      return prev.map((tab) => {
+        if (tab.type !== "thread" || !_isUnder(tab.path, from)) {
+          return tab;
+        }
+        const path = rewrite(tab.path);
+        return { ...tab, id: _threadTabId(path), path };
+      });
     });
-    setActivePath((current) => (current === null ? current : rewrite(current)));
+    setActiveId((current) => {
+      const activeTab = tabsRef.current.find((tab) => tab.id === current);
+      return activeTab?.type === "thread" && _isUnder(activeTab.path, from)
+        ? _threadTabId(rewrite(activeTab.path))
+        : current;
+    });
   }, []);
 
-  // Bump the tab's refreshNonce; the pane watches it and reloads from disk.
-  const refresh = useCallback((path: string) => {
+  const refresh = useCallback((id: string) => {
     setTabs((prev) =>
       prev.map((tab) =>
-        tab.path === path
+        tab.id === id
           ? { ...tab, refreshNonce: (tab.refreshNonce ?? 0) + 1 }
           : tab
       )
@@ -317,8 +451,9 @@ export function useThreadTabs(): ThreadTabs {
 
   return {
     tabs,
-    activePath,
+    activeId,
     open,
+    openTrace,
     close,
     closeOthers,
     closeAll,

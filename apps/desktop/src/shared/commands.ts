@@ -7,6 +7,8 @@
  * one-RPC-method-per-action sprawl.
  */
 
+import type { TraceConnectedProjectInput, TraceImportFile } from "./traces";
+
 /** Base shape for every command: a string `type` and typed `args`. */
 export interface GenericCommand<T extends string, A = Record<string, never>> {
   type: T;
@@ -94,18 +96,61 @@ export interface ImportFilesCommand extends GenericCommand<
   { parent?: string; files?: ImportFilePayload[] }
 > {}
 
-// --- Tabs ------------------------------------------------------------------
+// --- Traces ----------------------------------------------------------------
 
-/** Close a tab. `path` defaults to the active tab. */
-export interface CloseTabCommand extends GenericCommand<
-  "closeTab",
-  { path?: string }
+/**
+ * Create a trace project in `LLM_SPACE_ROOT/traces`. The caller supplies a
+ * non-empty display `name`; the trace panel handler selects the created project
+ * and refreshes the trace-project list.
+ */
+export interface CreateTraceProjectCommand extends GenericCommand<
+  "createTraceProject",
+  { name: string }
 > {}
 
-/** Close every tab except `path` (defaults to the active tab). */
+/**
+ * Create a connected Langfuse trace project after testing credentials. The full
+ * secret is carried only to the Bun process; renderer feedback must be redacted.
+ */
+export interface CreateConnectedTraceProjectCommand extends GenericCommand<
+  "createConnectedTraceProject",
+  TraceConnectedProjectInput
+> {}
+
+/**
+ * Import Langfuse observation export files into one trace project. `files` are
+ * already read by the renderer picker; the bun-side trace manager writes
+ * `raw.json` / `trace.json` and reports skipped files plus source warnings.
+ */
+export interface ImportLangfuseTraceFilesCommand extends GenericCommand<
+  "importLangfuseTraceFiles",
+  { projectId: string; files: TraceImportFile[] }
+> {}
+
+/** Sync selected remote Langfuse trace ids into a connected trace project. */
+export interface SyncLangfuseTraceIdsCommand extends GenericCommand<
+  "syncLangfuseTraceIds",
+  { projectId: string; traceIds: string[] }
+> {}
+
+// --- Tabs ------------------------------------------------------------------
+
+/**
+ * Close a tab. `id` is the app-tab id (`thread:{path}` or `trace:{project}:{key}`);
+ * `path` is kept for legacy thread callers; omitting both closes the active tab.
+ */
+export interface CloseTabCommand extends GenericCommand<
+  "closeTab",
+  { id?: string; path?: string }
+> {}
+
+/**
+ * Close every tab except the target. Prefer `id`; `path` is a legacy thread
+ * path; omitting both keeps the active tab.
+ */
 export interface CloseOtherTabsCommand extends GenericCommand<
   "closeOtherTabs",
-  { path?: string }
+  { id?: string; path?: string }
 > {}
 
 /** Close every open tab. */
@@ -181,6 +226,10 @@ export type Command =
   | RevealFileCommand
   | RefreshTreeCommand
   | ImportFilesCommand
+  | CreateTraceProjectCommand
+  | CreateConnectedTraceProjectCommand
+  | ImportLangfuseTraceFilesCommand
+  | SyncLangfuseTraceIdsCommand
   | CloseTabCommand
   | CloseOtherTabsCommand
   | CloseAllTabsCommand
@@ -234,6 +283,16 @@ export const COMMAND_META: Record<
   revealFile: { label: "Reveal in Finder", target: "webview" },
   refreshTree: { label: "Refresh", target: "webview" },
   importFiles: { label: "Import from Files...", target: "webview" },
+  createTraceProject: { label: "New Trace Project", target: "webview" },
+  createConnectedTraceProject: {
+    label: "Connect Langfuse",
+    target: "webview",
+  },
+  importLangfuseTraceFiles: {
+    label: "Import Langfuse Export...",
+    target: "webview",
+  },
+  syncLangfuseTraceIds: { label: "Sync Langfuse Traces", target: "webview" },
   closeTab: { label: "Close Tab", target: "webview" },
   closeOtherTabs: { label: "Close Other Tabs", target: "webview" },
   closeAllTabs: { label: "Close All Tabs", target: "webview" },

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { FileTextIcon, GitBranchIcon } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
@@ -14,6 +15,8 @@ import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
+import { TracePanel } from "@/components/trace-panel";
+import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -28,6 +31,7 @@ import {
 } from "@/lib/import-threads";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
+import type { TraceRecord } from "@/shared/traces";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
 // palette, onboarding, and examples. Loaded lazily so their code (and heavy
@@ -75,6 +79,42 @@ function LazyOverlay({
   return <Suspense fallback={null}>{children}</Suspense>;
 }
 
+function _SidebarModeSwitch({
+  mode,
+  onModeChange,
+}: {
+  mode: "files" | "traces";
+  onModeChange: (mode: "files" | "traces") => void;
+}) {
+  return (
+    <div className="bg-muted/60 grid w-full grid-cols-2 rounded-md p-0.5">
+      <Button
+        className="h-6 justify-center px-2"
+        variant={mode === "files" ? "secondary" : "ghost"}
+        size="sm"
+        aria-pressed={mode === "files"}
+        onClick={() => onModeChange("files")}
+      >
+        <FileTextIcon className="size-3" />
+        Files
+      </Button>
+      <Button
+        className="relative h-6 justify-center px-2"
+        variant={mode === "traces" ? "secondary" : "ghost"}
+        size="sm"
+        aria-pressed={mode === "traces"}
+        onClick={() => onModeChange("traces")}
+      >
+        <GitBranchIcon className="size-3" />
+        Traces
+        <span className="border-primary/30 bg-primary/10 text-primary absolute top-1 right-2 rounded px-1 py-px text-[0.5rem] leading-none font-semibold tracking-wide uppercase">
+          Beta
+        </span>
+      </Button>
+    </div>
+  );
+}
+
 export function Page() {
   return (
     <CommandProvider>
@@ -95,6 +135,10 @@ const COMMAND_PALETTE_BLACKLIST = [
   "newFileFromPromptExample",
   "closeTab",
   "closeOtherTabs",
+  "createTraceProject",
+  "createConnectedTraceProject",
+  "importLangfuseTraceFiles",
+  "syncLangfuseTraceIds",
 ];
 
 /** Whether a drag carries OS files (vs. the tree's internal node-reorder drag). */
@@ -108,9 +152,9 @@ function PageInner() {
   const models = useModels();
 
   // The active tab is read through a ref so command handlers never go stale.
-  const activePathRef = useRef(tabs.activePath);
-  activePathRef.current = tabs.activePath;
-  const { close, closeOthers, closeAll, reopenClosed } = tabs;
+  const activeTabIdRef = useRef(tabs.activeId);
+  activeTabIdRef.current = tabs.activeId;
+  const { close, closeOthers, closeAll, openTrace, reopenClosed } = tabs;
 
   // Collapse / expand the left side panel.
   const sidebarPanelRef = usePanelRef();
@@ -127,6 +171,7 @@ function PageInner() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
 
@@ -168,12 +213,12 @@ function PageInner() {
   // settings). `newFile` / `newFolder` / the tree ops are registered by the
   // file tree, which owns that state.
   useRegisterCommands({
-    closeTab: ({ path }) => {
-      const target = path ?? activePathRef.current;
+    closeTab: ({ id, path }) => {
+      const target = id ?? (path ? `thread:${path}` : activeTabIdRef.current);
       if (target) close(target);
     },
-    closeOtherTabs: ({ path }) => {
-      const target = path ?? activePathRef.current;
+    closeOtherTabs: ({ id, path }) => {
+      const target = id ?? (path ? `thread:${path}` : activeTabIdRef.current);
       if (target) closeOthers(target);
     },
     closeAllTabs: () => closeAll(),
@@ -220,6 +265,47 @@ function PageInner() {
   }, [executeCommand]);
 
   const fullScreen = useFullScreen();
+  const handleOpenTrace = useCallback(
+    (trace: TraceRecord) => {
+      openTrace({
+        projectId: trace.projectId,
+        traceKey: trace.key,
+        title: trace.title,
+      });
+    },
+    [openTrace]
+  );
+  const handleCloseTab = useCallback(
+    (id: string) => executeCommand({ type: "closeTab", args: { id } }),
+    [executeCommand]
+  );
+  const handleCloseOtherTabs = useCallback(
+    (id: string) => executeCommand({ type: "closeOtherTabs", args: { id } }),
+    [executeCommand]
+  );
+  const handleCloseAllTabs = useCallback(
+    () => executeCommand({ type: "closeAllTabs", args: {} }),
+    [executeCommand]
+  );
+  const handleRevealFile = useCallback(
+    (path: string) => executeCommand({ type: "revealFile", args: { path } }),
+    [executeCommand]
+  );
+  const handleMoveToTrash = useCallback(
+    (path: string) => executeCommand({ type: "deleteFile", args: { path } }),
+    [executeCommand]
+  );
+  const handleNewFile = useCallback(
+    () => executeCommand({ type: "newFile", args: {} }),
+    [executeCommand]
+  );
+  const handleToggleSidebar = useCallback(
+    () => executeCommand({ type: "toggleSidebar", args: {} }),
+    [executeCommand]
+  );
+  const sidebarModeSwitch = (
+    <_SidebarModeSwitch mode={sidebarMode} onModeChange={setSidebarMode} />
+  );
 
   return (
     <div
@@ -269,7 +355,7 @@ function PageInner() {
       <main className="min-h-0 grow">
         <ResizablePanelGroup>
           <ResizablePanel
-            className="bg-sidebar"
+            className="bg-sidebar flex flex-col"
             panelRef={sidebarPanelRef}
             collapsible
             collapsedSize={0}
@@ -278,11 +364,18 @@ function PageInner() {
             onResize={(size) => setSidebarOpen(size.inPixels > 0)}
           >
             <FileSystemTreeView
-              className="size-full"
+              className={sidebarMode === "files" ? "min-h-0 flex-1" : "hidden"}
               onSelectFile={tabs.open}
               onRemove={tabs.handleRemove}
               onMove={tabs.handleMove}
             />
+            <TracePanel
+              className={sidebarMode === "traces" ? "min-h-0 flex-1" : "hidden"}
+              onOpenTrace={handleOpenTrace}
+            />
+            <div className="border-border/70 electrobun-webkit-app-region-no-drag flex shrink-0 border-t px-3 py-2">
+              {sidebarModeSwitch}
+            </div>
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel minSize={640}>
@@ -305,32 +398,20 @@ function PageInner() {
             ) : (
               <ThreadTabs
                 tabs={tabs.tabs}
-                activePath={tabs.activePath}
+                activeId={tabs.activeId}
                 activate={tabs.activate}
                 refresh={tabs.refresh}
                 sidebarOpen={sidebarOpen}
                 fullScreen={fullScreen}
-                close={(path) =>
-                  executeCommand({ type: "closeTab", args: { path } })
-                }
-                closeOthers={(path) =>
-                  executeCommand({ type: "closeOtherTabs", args: { path } })
-                }
-                closeAll={() =>
-                  executeCommand({ type: "closeAllTabs", args: {} })
-                }
-                reveal={(path) =>
-                  executeCommand({ type: "revealFile", args: { path } })
-                }
-                moveToTrash={(path) =>
-                  executeCommand({ type: "deleteFile", args: { path } })
-                }
+                close={handleCloseTab}
+                closeOthers={handleCloseOtherTabs}
+                closeAll={handleCloseAllTabs}
+                reveal={handleRevealFile}
+                moveToTrash={handleMoveToTrash}
                 reorder={tabs.reorder}
-                onNewFile={() => executeCommand({ type: "newFile", args: {} })}
+                onNewFile={handleNewFile}
                 onMove={tabs.handleMove}
-                onToggleSidebar={() =>
-                  executeCommand({ type: "toggleSidebar", args: {} })
-                }
+                onToggleSidebar={handleToggleSidebar}
               />
             )}
           </ResizablePanel>

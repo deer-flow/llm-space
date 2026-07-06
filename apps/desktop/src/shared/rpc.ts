@@ -15,6 +15,17 @@ import type {
   McpServerToolsResponse,
   McpServerView,
 } from "./mcp";
+import type {
+  TraceConnectedProjectInput,
+  TraceImportFile,
+  TraceImportResult,
+  TraceLangfuseSearchInput,
+  TraceProject,
+  TraceRecord,
+  TraceRemoteTraceSummary,
+  TraceSyncResult,
+  TraceWorkbenchResponse,
+} from "./traces";
 
 /** A webview→bun request to start streaming an agent run. */
 export interface StreamThreadRequestPayload {
@@ -60,9 +71,7 @@ export interface DesktopRPCType {
           name: string;
           baseUrl: string;
           api?:
-            | "anthropic-messages"
-            | "openai-completions"
-            | "openai-responses";
+            "anthropic-messages" | "openai-completions" | "openai-responses";
         };
         response: ModelProviderGroup[];
       };
@@ -158,6 +167,56 @@ export interface DesktopRPCType {
           arguments: Record<string, unknown>;
         };
         response: McpCallToolResponse;
+      };
+      // List trace projects for the dedicated Trace Panel.
+      traceListProjects: {
+        params: Record<string, never>;
+        response: TraceProject[];
+      };
+      // Create a manual Langfuse trace project under `traces/projects`.
+      traceCreateProject: {
+        params: { name: string };
+        response: TraceProject;
+      };
+      // Create a connected Langfuse project after validating credentials.
+      traceCreateConnectedProject: {
+        params: TraceConnectedProjectInput;
+        response: TraceProject;
+      };
+      // List trace summaries for one trace project.
+      traceListTraces: {
+        params: { projectId: string };
+        response: TraceRecord[];
+      };
+      // Import renderer-read Langfuse JSON files into one trace project.
+      traceImportLangfuseJson: {
+        params: { projectId: string; files: TraceImportFile[] };
+        response: TraceImportResult;
+      };
+      // Search a bounded remote Langfuse trace list for explicit user sync.
+      traceSearchLangfuseTraces: {
+        params: { projectId: string; filters?: TraceLangfuseSearchInput };
+        response: TraceRemoteTraceSummary[];
+      };
+      // Sync selected remote Langfuse trace ids into local trace storage.
+      traceSyncLangfuseTraces: {
+        params: { projectId: string; traceIds: string[] };
+        response: TraceSyncResult;
+      };
+      // Read a trace summary by key without creating a workbench.
+      traceReadTrace: {
+        params: { projectId: string; traceKey: string };
+        response: TraceRecord;
+      };
+      // Read or lazily create the editable ThreadPlayground workbench.
+      traceReadOrCreateWorkbench: {
+        params: { projectId: string; traceKey: string };
+        response: TraceWorkbenchResponse;
+      };
+      // Persist a trace workbench thread; raw trace data remains immutable.
+      traceWriteWorkbench: {
+        params: { projectId: string; traceKey: string; thread: Thread };
+        response: null;
       };
     };
     // Messages the webview SENDS and the bun side handles.

@@ -45,6 +45,7 @@ import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
 export interface ThreadPlaygroundProps {
   className?: string;
   path: string;
+  title?: string;
   initialValue: Thread;
   readonly?: boolean;
   /**
@@ -123,6 +124,7 @@ const RUN_HISTORY_PANEL_SIZE = "16rem";
 function ThreadPlaygroundContent({
   className,
   path,
+  title: titleFromProps,
   onRenameTitle,
   readonly: readonlyFromProps = false,
   active = false,
@@ -139,7 +141,10 @@ function ThreadPlaygroundContent({
   const undoable = useThreadStore((s) => canUndo(s.changeHistory));
   const redoable = useThreadStore((s) => canRedo(s.changeHistory));
   const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
-  const title = useMemo(() => threadTitleFromPath(path), [path]);
+  const title = useMemo(
+    () => titleFromProps ?? threadTitleFromPath(path),
+    [path, titleFromProps]
+  );
   useEffect(() => {
     syncTitle(title);
   }, [syncTitle, title]);
@@ -198,7 +203,7 @@ function ThreadPlaygroundContent({
               <TitleEditor
                 className="w-96 max-w-full"
                 title={title}
-                readonly={readonly}
+                readonly={readonly || !onRenameTitle}
                 onRename={onRenameTitle}
               />
             </div>

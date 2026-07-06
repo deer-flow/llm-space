@@ -11,6 +11,7 @@ import {
   runStreamThread,
   testModelConnection,
 } from "../streaming";
+import { traceManager } from "../traces";
 
 async function getModelProviderGroups() {
   const models = await modelManager.getAvailableModels();
@@ -154,6 +155,25 @@ export const mainWindowRPC: MainWindowRPC =
         mcpListTools: async ({ serverId }) => mcpManager.listTools(serverId),
         mcpCallTool: async ({ serverId, toolName, arguments: args }) =>
           mcpManager.callTool({ serverId, toolName, arguments: args }),
+        traceListProjects: () => traceManager.listProjects(),
+        traceCreateProject: ({ name }) => traceManager.createProject(name),
+        traceCreateConnectedProject: (input) =>
+          traceManager.createConnectedProject(input),
+        traceListTraces: ({ projectId }) => traceManager.listTraces(projectId),
+        traceImportLangfuseJson: ({ projectId, files }) =>
+          traceManager.importLangfuseJson(projectId, files),
+        traceSearchLangfuseTraces: ({ projectId, filters }) =>
+          traceManager.searchLangfuseTraces({ projectId, filters }),
+        traceSyncLangfuseTraces: ({ projectId, traceIds }) =>
+          traceManager.syncLangfuseTraces({ projectId, traceIds }),
+        traceReadTrace: ({ projectId, traceKey }) =>
+          traceManager.readTrace(projectId, traceKey),
+        traceReadOrCreateWorkbench: ({ projectId, traceKey }) =>
+          traceManager.readOrCreateWorkbench(projectId, traceKey),
+        traceWriteWorkbench: async ({ projectId, traceKey, thread }) => {
+          await traceManager.writeWorkbench(projectId, traceKey, thread);
+          return null;
+        },
       },
       messages: {
         sendStreamThreadRequest: (payload) => {
