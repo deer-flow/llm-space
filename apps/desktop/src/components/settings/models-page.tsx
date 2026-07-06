@@ -3,11 +3,13 @@
 import type { CustomModel, ModelProviderGroup } from "@llm-space/core";
 import {
   Ban,
+  CableIcon,
   Check,
   CheckCheck,
   ExternalLink,
   Eye,
   EyeOff,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -69,6 +71,7 @@ import {
   useRemoveProvider,
   useSetAllModelsEnabled,
   useSetModelEnabled,
+  useTestModelConnection,
   useUpdateProvider,
 } from "../model-provider";
 import { ModelAvatar } from "../thread-playground/model-avatar";
@@ -401,7 +404,7 @@ function ProviderListItem({
             aria-label={`${provider.name} provider actions`}
             title={`${provider.name} provider actions`}
             className={cn(
-              "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded transition-opacity",
+              "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
               menuOpen
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
@@ -979,7 +982,26 @@ function ModelListItem({
   onEdit: () => void;
 }) {
   const removeCustomModel = useRemoveCustomModel();
+  const testModelConnection = useTestModelConnection();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      await testModelConnection(providerId, model.id);
+      toast.success("Model connected successfully", {
+        description: model.name,
+      });
+    } catch (error) {
+      toast.error("Failed to connect to model", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <Item variant="muted" size="sm" className="group">
@@ -995,26 +1017,43 @@ function ModelListItem({
         <ItemTitle className="font-mono">{model.name}</ItemTitle>
       </ItemContent>
       <ItemActions>
-        {isCustom && (
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+          <Tooltip content="Test Connection">
             <button
               type="button"
-              aria-label={`Edit ${model.name}`}
-              onClick={onEdit}
+              aria-label={`Test connection for ${model.name}`}
+              disabled={testing}
+              onClick={() => void handleTestConnection()}
               className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
             >
-              <Pencil className="size-3.5" />
+              {testing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <CableIcon className="size-3.5" />
+              )}
             </button>
-            <button
-              type="button"
-              aria-label={`Delete ${model.name}`}
-              onClick={() => setConfirmOpen(true)}
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex size-6 items-center justify-center rounded transition-colors"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        )}
+          </Tooltip>
+          {isCustom && (
+            <>
+              <button
+                type="button"
+                aria-label={`Edit ${model.name}`}
+                onClick={onEdit}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Delete ${model.name}`}
+                onClick={() => setConfirmOpen(true)}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex size-6 items-center justify-center rounded transition-colors"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </>
+          )}
+        </div>
         <Switch
           size="sm"
           checked={enabled}

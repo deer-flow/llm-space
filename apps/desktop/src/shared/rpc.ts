@@ -90,6 +90,10 @@ export interface DesktopRPCType {
         params: { providerId: string; enabled: boolean };
         response: ModelProviderGroup[];
       };
+      testModelConnection: {
+        params: { providerId: string; modelId: string };
+        response: null;
+      };
       removeCustomModel: {
         params: { providerId: string; modelId: string };
         response: ModelProviderGroup[];

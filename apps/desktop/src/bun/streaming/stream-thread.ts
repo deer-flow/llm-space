@@ -53,3 +53,40 @@ export function abortStreamThread({
 }: AbortStreamThreadPayload): void {
   activeStreams.get(streamId)?.abort();
 }
+
+/** Run a minimal completion to verify that a configured model can respond. */
+export async function testModelConnection({
+  providerId,
+  modelId,
+}: {
+  providerId: string;
+  modelId: string;
+}): Promise<void> {
+  const abortController = new AbortController();
+  for await (const event of streamAgent(
+    {
+      model: { provider: providerId, id: modelId },
+      context: {
+        systemPrompt: "Reply with ok.",
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: "Test connection." }],
+            timestamp: Date.now(),
+          },
+        ],
+        tools: [],
+      },
+    },
+    {
+      models: await modelManager.getAvailableModels(),
+      getApiKey: modelManager.getApiKey.bind(modelManager),
+      getBaseUrl: modelManager.getBaseUrl.bind(modelManager),
+      getHeaders: modelManager.getHeaders.bind(modelManager),
+      signal: abortController.signal,
+    }
+  )) {
+    void event;
+    // Drain the stream; success only means the provider completed the request.
+  }
+}

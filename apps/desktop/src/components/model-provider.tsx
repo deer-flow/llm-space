@@ -44,6 +44,7 @@ interface ModelContextValue {
     enabled: boolean
   ) => Promise<void>;
   setAllModelsEnabled: (providerId: string, enabled: boolean) => Promise<void>;
+  testModelConnection: (providerId: string, modelId: string) => Promise<void>;
   removeCustomModel: (providerId: string, modelId: string) => Promise<void>;
   upsertCustomModel: (
     providerId: string,
@@ -187,6 +188,19 @@ export function ModelProvider({
     []
   );
 
+  const testModelConnection = useCallback(
+    async (providerId: string, modelId: string) => {
+      if (!electrobun.rpc) {
+        throw new Error("Electrobun RPC is not initialized");
+      }
+      await electrobun.rpc.request.testModelConnection({
+        providerId,
+        modelId,
+      });
+    },
+    []
+  );
+
   const removeCustomModel = useCallback(
     async (providerId: string, modelId: string) => {
       if (!electrobun.rpc) {
@@ -244,6 +258,7 @@ export function ModelProvider({
       updateProvider,
       setModelEnabled,
       setAllModelsEnabled,
+      testModelConnection,
       removeCustomModel,
       upsertCustomModel,
       refresh,
@@ -257,6 +272,7 @@ export function ModelProvider({
     updateProvider,
     setModelEnabled,
     setAllModelsEnabled,
+    testModelConnection,
     removeCustomModel,
     upsertCustomModel,
     refresh,
@@ -354,6 +370,13 @@ export function useSetAllModelsEnabled(): (
   enabled: boolean
 ) => Promise<void> {
   return useModelProvider().setAllModelsEnabled;
+}
+
+export function useTestModelConnection(): (
+  providerId: string,
+  modelId: string
+) => Promise<void> {
+  return useModelProvider().testModelConnection;
 }
 
 export function useRemoveCustomModel(): (

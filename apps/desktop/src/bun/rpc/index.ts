@@ -6,7 +6,11 @@ import { moveToTrash, revealInFileManager } from "../fs";
 import { mcpManager } from "../mcp";
 import { modelManager } from "../models";
 import { localFs } from "../storage";
-import { abortStreamThread, runStreamThread } from "../streaming";
+import {
+  abortStreamThread,
+  runStreamThread,
+  testModelConnection,
+} from "../streaming";
 
 async function getModelProviderGroups() {
   const models = await modelManager.getAvailableModels();
@@ -82,6 +86,10 @@ export const mainWindowRPC: MainWindowRPC =
         setAllModelsEnabled: async ({ providerId, enabled }) => {
           modelManager.setAllModelsEnabled(providerId, enabled);
           return getModelProviderGroups();
+        },
+        testModelConnection: async ({ providerId, modelId }) => {
+          await testModelConnection({ providerId, modelId });
+          return null;
         },
         removeCustomModel: async ({ providerId, modelId }) => {
           modelManager.removeCustomModel(providerId, modelId);
