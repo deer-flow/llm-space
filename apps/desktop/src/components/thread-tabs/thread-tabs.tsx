@@ -30,7 +30,8 @@ import {
 import { Kbd, KbdGroup } from "../ui/kbd";
 
 import { ThreadTabPane } from "./thread-tab-pane";
-import { tabLabel, type ThreadTab } from "./use-thread-tabs";
+import { TraceTabPane } from "./trace-tab-pane";
+import { tabLabel, type AppTab } from "./use-thread-tabs";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -46,14 +47,14 @@ const _preventFocusSteal = (e: MouseEvent) => e.preventDefault();
 
 interface ThreadTabsProps {
   className?: string;
-  tabs: ThreadTab[];
-  activePath: string | null;
+  tabs: AppTab[];
+  activeId: string | null;
   sidebarOpen?: boolean;
   fullScreen?: boolean;
-  activate: (path: string) => void;
-  refresh: (path: string) => void;
-  close: (path: string) => void;
-  closeOthers: (path: string) => void;
+  activate: (id: string) => void;
+  refresh: (id: string) => void;
+  close: (id: string) => void;
+  closeOthers: (id: string) => void;
   closeAll: () => void;
   reveal: (path: string) => void;
   moveToTrash: (path: string) => void;
@@ -67,7 +68,7 @@ interface ThreadTabsProps {
 export function ThreadTabs({
   className,
   tabs,
-  activePath,
+  activeId,
   sidebarOpen = true,
   fullScreen = false,
   activate,
@@ -89,7 +90,8 @@ export function ThreadTabs({
   // lib's own updateTab never touches `title`, so this survives label/active
   // updates; we re-apply whenever the tab set changes (covers adds/reorders).
   const containerRef = useRef<HTMLDivElement>(null);
-  const [contextMenuPath, setContextMenuPath] = useState<string | null>(null);
+  const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const contextMenuTab = tabs.find((tab) => tab.id === contextMenuId) ?? null;
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
@@ -98,18 +100,20 @@ export function ThreadTabs({
       .forEach((el) => {
         const id = el.getAttribute("data-tab-id");
         if (!id) return;
-        const label = tabLabel(id);
+        const tab = tabs.find((tab) => tab.id === id);
+        if (!tab) return;
+        const label = tabLabel(tab);
         el.title = id;
         el.tabIndex = 0;
         el.setAttribute("role", "tab");
-        el.setAttribute("aria-selected", String(id === activePath));
+        el.setAttribute("aria-selected", String(id === activeId));
         el.setAttribute("aria-label", `Open ${label}`);
         const closeButton = el.querySelector<HTMLElement>(".chrome-tab-close");
         closeButton?.setAttribute("role", "button");
         closeButton?.setAttribute("tabindex", "0");
         closeButton?.setAttribute("aria-label", `Close ${label}`);
       });
-  }, [tabs, activePath]);
+  }, [tabs, activeId]);
 
   const handleTabsHeaderDoubleClick = useCallback((e: Event) => {
     if (!electrobun.rpc) {
@@ -152,21 +156,21 @@ export function ThreadTabs({
   const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
-      setContextMenuPath(null);
+      setContextMenuId(null);
       event.preventDefault();
       return;
     }
 
     const tab = target.closest<HTMLElement>(".chrome-tab[data-tab-id]");
     const path = tab?.getAttribute("data-tab-id") ?? null;
-    setContextMenuPath(path);
+    setContextMenuId(path);
     if (path === null) {
       event.preventDefault();
     }
   }, []);
 
   const hasOtherTabs =
-    contextMenuPath !== null && tabs.some((tab) => tab.path !== contextMenuPath);
+    contextMenuId !== null && tabs.some((tab) => tab.id !== contextMenuId);
 
   return (
     <div
@@ -221,10 +225,10 @@ export function ThreadTabs({
               className="grow"
               darkMode={resolvedTheme === "dark"}
               tabs={tabs.map((tab) => ({
-                id: tab.path,
-                title: tabLabel(tab.path),
+                id: tab.id,
+                title: tabLabel(tab),
                 favicon: false,
-                active: tab.path === activePath,
+                active: tab.id === activeId,
               }))}
               pinnedRight={
                 <div className="flex h-full items-center pt-0.5 pl-1.5">
@@ -248,54 +252,67 @@ export function ThreadTabs({
             />
           </div>
         </ContextMenuTrigger>
-        {contextMenuPath !== null ? (
+        {contextMenuId !== null ? (
           <ContextMenuContent className="w-44">
             <ContextMenuGroup>
-              <ContextMenuItem onSelect={() => refresh(contextMenuPath)}>
+              <ContextMenuItem onSelect={() => refresh(contextMenuId)}>
                 Refresh
               </ContextMenuItem>
             </ContextMenuGroup>
             <ContextMenuSeparator />
             <ContextMenuGroup>
-              <ContextMenuItem onSelect={() => close(contextMenuPath)}>
+              <ContextMenuItem onSelect={() => close(contextMenuId)}>
                 Close
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={!hasOtherTabs}
-                onSelect={() => closeOthers(contextMenuPath)}
+                onSelect={() => closeOthers(contextMenuId)}
               >
                 Close Others
               </ContextMenuItem>
-              <ContextMenuItem onSelect={closeAll}>
-                Close All
-              </ContextMenuItem>
+              <ContextMenuItem onSelect={closeAll}>Close All</ContextMenuItem>
             </ContextMenuGroup>
-            <ContextMenuSeparator />
-            <ContextMenuGroup>
-              <ContextMenuItem onSelect={() => reveal(contextMenuPath)}>
-                {REVEAL_LABEL}
-              </ContextMenuItem>
-              <ContextMenuItem
-                variant="destructive"
-                onSelect={() => moveToTrash(contextMenuPath)}
-              >
-                {MOVE_TO_TRASH_LABEL}
-              </ContextMenuItem>
-            </ContextMenuGroup>
+            {contextMenuTab?.type === "thread" && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuGroup>
+                  <ContextMenuItem onSelect={() => reveal(contextMenuTab.path)}>
+                    {REVEAL_LABEL}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    variant="destructive"
+                    onSelect={() => moveToTrash(contextMenuTab.path)}
+                  >
+                    {MOVE_TO_TRASH_LABEL}
+                  </ContextMenuItem>
+                </ContextMenuGroup>
+              </>
+            )}
           </ContextMenuContent>
         ) : null}
       </ContextMenu>
       <div className="relative min-h-0 flex-1">
-        {tabs.map((tab) => (
-          <ThreadTabPane
-            key={tab.id}
-            path={tab.path}
-            active={tab.path === activePath}
-            refreshNonce={tab.refreshNonce ?? 0}
-            onMove={onMove}
-            onClose={close}
-          />
-        ))}
+        {tabs.map((tab) =>
+          tab.type === "thread" ? (
+            <ThreadTabPane
+              key={tab.id}
+              path={tab.path}
+              active={tab.id === activeId}
+              refreshNonce={tab.refreshNonce ?? 0}
+              onMove={onMove}
+              onClose={(path) => close(`thread:${path}`)}
+            />
+          ) : (
+            <TraceTabPane
+              key={tab.id}
+              projectId={tab.projectId}
+              traceKey={tab.traceKey}
+              active={tab.id === activeId}
+              refreshNonce={tab.refreshNonce ?? 0}
+              onClose={close}
+            />
+          )
+        )}
       </div>
     </div>
   );

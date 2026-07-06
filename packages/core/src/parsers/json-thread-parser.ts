@@ -23,10 +23,7 @@ export class JsonThreadParser implements ThreadParser {
   }
 }
 
-function _parse(
-  raw: string,
-  context?: ThreadParseContext
-): Thread | undefined {
+function _parse(raw: string, context?: ThreadParseContext): Thread | undefined {
   let data: unknown;
   try {
     data = JSON.parse(raw);
@@ -49,6 +46,21 @@ function _parse(
 function _looksForeign(data: object): boolean {
   return (
     Array.isArray(data) ||
-    Array.isArray((data as Record<string, unknown>).messages)
+    Array.isArray((data as Record<string, unknown>).messages) ||
+    _looksLangfuseObservationsPayload(data)
   );
+}
+
+function _looksLangfuseObservationsPayload(data: object): boolean {
+  const rows = (data as Record<string, unknown>).data;
+  return Array.isArray(rows) && rows.some(_looksLangfuseObservation);
+}
+
+function _looksLangfuseObservation(row: unknown): boolean {
+  if (row === null || typeof row !== "object" || Array.isArray(row)) {
+    return false;
+  }
+  const observation = row as Record<string, unknown>;
+  const traceId = observation.traceId ?? observation.trace_id;
+  return typeof traceId === "string" && typeof observation.id === "string";
 }

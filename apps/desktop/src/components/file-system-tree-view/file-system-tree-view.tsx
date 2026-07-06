@@ -2,7 +2,13 @@
 
 import type { FileNode, Message, Tool } from "@llm-space/core";
 import { MessagesSquare } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { useRegisterCommands } from "@/commands";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -39,11 +45,13 @@ const TRASH_NAME =
 
 export function FileSystemTreeView({
   className,
+  headerStart,
   onSelectFile,
   onRemove,
   onMove,
 }: {
   className?: string;
+  headerStart?: ReactNode;
   /** Fired with a file's path when it is selected (folders aren't selectable). */
   onSelectFile?: (path: string) => void;
   /** Fired with a path after it (file or directory) is successfully deleted. */
@@ -339,9 +347,11 @@ export function FileSystemTreeView({
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <header className="text-muted-foreground electrobun-webkit-app-region-drag flex h-11.5 items-center justify-between px-3 text-xs font-medium">
-        <span className={cn(fullScreen ? "opacity-100" : "opacity-0")}>
-          LLM Space 4
-        </span>
+        {headerStart ?? (
+          <span className={cn(fullScreen ? "opacity-100" : "opacity-0")}>
+            LLM Space 4
+          </span>
+        )}
         <span>
           <RootActions />
         </span>
