@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 
+import { useRenderingFidelity } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
@@ -51,6 +52,7 @@ function _MessageListItem({
   autoFocus?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
+  const { fidelity } = useRenderingFidelity();
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageDataContent; contentIndex: number }[] = [];
@@ -197,6 +199,7 @@ function _MessageListItem({
               hideFocusRing
               hideBorder
               scrollOnFocus
+              plain={fidelity === "lite"}
               placeholder={
                 placeholder ??
                 `Enter ${message.role === "user" ? "user" : "assistant"} message here`

@@ -46,6 +46,13 @@ export interface CodeEditorProps {
    * standalone editors should stay always-scrollable and leave this off.
    */
   scrollOnFocus?: boolean;
+  /**
+   * Render the lightweight plain-text editor (a `<textarea>`) instead of
+   * mounting CodeMirror. Used by the message list under "Lite" rendering
+   * fidelity so a large thread mounts zero CodeMirror editors and scroll cost
+   * no longer scales with message count.
+   */
+  plain?: boolean;
   language?: "markdown" | "json";
   streaming?: boolean;
   value: string;

@@ -10,6 +10,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { callMcpTool } from "@/client/mcp";
+import { useRenderingFidelity } from "@/components/theme-provider";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 
 import { CodeEditor } from "../../code-editor";
@@ -31,6 +32,7 @@ function _ToolCallListItem({
   onContinue: () => void;
   readonly?: boolean;
 }) {
+  const { fidelity } = useRenderingFidelity();
   const { updateToolCallOutputText } = useThreadStoreActions();
   const mcpSource = useThreadStore((state) => {
     const tool = state.thread.context?.tools?.find(
@@ -168,6 +170,7 @@ function _ToolCallListItem({
           hideBorder
           hideFocusRing
           scrollOnFocus
+          plain={fidelity === "lite"}
           placeholder={`Enter the response of ${toolCall.input.name}()`}
           readonly={readonly}
           value={outputText}
