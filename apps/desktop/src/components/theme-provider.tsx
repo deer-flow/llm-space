@@ -19,12 +19,21 @@ export type ResolvedTheme = "light" | "dark";
 export const DEFAULT_PRIMARY = "#5e80ee";
 
 /**
+ * How richly the message list renders. `"rich"` (default) uses full CodeMirror
+ * editors; `"lite"` downgrades the right-side message list to plain `<pre>` text
+ * to keep large threads scrollable on the native WebKit renderer, where mounting
+ * one CodeMirror per message makes scroll cost scale with message count.
+ */
+export type RenderingFidelity = "rich" | "lite";
+
+/**
  * localStorage keys for the persisted appearance. Kept in sync with the
  * anti-FOUC bootstrap script in `mainview/index.html`, which reads the same
  * keys to apply appearance before React mounts — change both together.
  */
 export const THEME_STORAGE_KEY = "llm-space-theme";
 export const PRIMARY_STORAGE_KEY = "llm-space-primary";
+export const RENDERING_FIDELITY_STORAGE_KEY = "llm-space-rendering-fidelity";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -41,12 +50,19 @@ interface PrimaryColorContextValue {
   resetPrimaryColorVersion: number;
 }
 
+interface RenderingFidelityContextValue {
+  fidelity: RenderingFidelity;
+  setFidelity: (fidelity: RenderingFidelity) => void;
+}
+
 // Split contexts: the accent updates on every drag tick, but theme consumers
 // (CodeEditor per message/tool-call, ThreadTabs, the toaster) only read
 // `resolvedTheme`. Keeping accent in its own context spares those hot-list
 // components a re-render storm while the color picker is dragged.
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const PrimaryColorContext = createContext<PrimaryColorContextValue | null>(null);
+const RenderingFidelityContext =
+  createContext<RenderingFidelityContextValue | null>(null);
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -61,6 +77,12 @@ function _readStoredTheme(): Theme {
 function _readStoredPrimary(): string {
   const stored = localStorage.getItem(PRIMARY_STORAGE_KEY);
   return stored && HEX_RE.test(stored) ? stored : DEFAULT_PRIMARY;
+}
+
+function _readStoredFidelity(): RenderingFidelity {
+  return localStorage.getItem(RENDERING_FIDELITY_STORAGE_KEY) === "lite"
+    ? "lite"
+    : "rich";
 }
 
 /** Pick a readable foreground for an arbitrary accent (WCAG relative luminance). */
@@ -113,6 +135,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   );
   const [resetPrimaryColorVersion, setResetPrimaryColorVersion] = useState(0);
+
+  const [fidelity, setFidelityState] =
+    useState<RenderingFidelity>(_readStoredFidelity);
+
+  const setFidelity = useCallback((next: RenderingFidelity) => {
+    localStorage.setItem(RENDERING_FIDELITY_STORAGE_KEY, next);
+    setFidelityState(next);
+  }, []);
 
   const setTheme = useCallback((next: Theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, next);
@@ -177,10 +207,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ]
   );
 
+  const fidelityValue = useMemo(
+    (): RenderingFidelityContextValue => ({ fidelity, setFidelity }),
+    [fidelity, setFidelity]
+  );
+
   return (
     <ThemeContext.Provider value={themeValue}>
       <PrimaryColorContext.Provider value={primaryValue}>
-        {children}
+        <RenderingFidelityContext.Provider value={fidelityValue}>
+          {children}
+        </RenderingFidelityContext.Provider>
       </PrimaryColorContext.Provider>
     </ThemeContext.Provider>
   );
@@ -198,6 +235,16 @@ export function usePrimaryColor(): PrimaryColorContextValue {
   const ctx = useContext(PrimaryColorContext);
   if (!ctx) {
     throw new Error("usePrimaryColor must be used within <ThemeProvider>");
+  }
+  return ctx;
+}
+
+export function useRenderingFidelity(): RenderingFidelityContextValue {
+  const ctx = useContext(RenderingFidelityContext);
+  if (!ctx) {
+    throw new Error(
+      "useRenderingFidelity must be used within <ThemeProvider>"
+    );
   }
   return ctx;
 }

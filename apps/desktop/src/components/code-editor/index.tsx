@@ -212,6 +212,11 @@ const PlainTextCodeEditor = forwardRef<
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
   function CodeEditor(props, ref) {
     const [retryKey, setRetryKey] = useState(0);
+    // "Lite" rendering fidelity: skip CodeMirror and use the lightweight
+    // plain-text editor (a <textarea>) — still editable, just no highlighting.
+    if (props.plain) {
+      return <PlainTextCodeEditor {...props} ref={ref} />;
+    }
     return (
       <CodeEditorErrorBoundary
         resetKey={retryKey}

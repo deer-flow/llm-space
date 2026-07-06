@@ -5,7 +5,9 @@ import type { ReactNode } from "react";
 import {
   DEFAULT_PRIMARY,
   usePrimaryColor,
+  useRenderingFidelity,
   useTheme,
+  type RenderingFidelity,
   type Theme,
 } from "@/components/theme-provider";
 import {
@@ -40,6 +42,7 @@ function SettingsRow({
 
 export function GeneralPage() {
   const { theme, setTheme } = useTheme();
+  const { fidelity, setFidelity } = useRenderingFidelity();
   const {
     primaryColor,
     resetPrimaryColor,
@@ -77,6 +80,33 @@ export function GeneralPage() {
             onChange={setPrimaryColor}
           />
         </div>
+      </SettingsRow>
+
+      <Separator />
+
+      <SettingsRow
+        label={
+          <span className="flex flex-col gap-0.5">
+            Rendering fidelity
+            <span className="text-muted-foreground text-xs">
+              Lite renders the message list as plain text for smoother scrolling
+              on large threads.
+            </span>
+          </span>
+        }
+      >
+        <Select
+          value={fidelity}
+          onValueChange={(v) => setFidelity(v as RenderingFidelity)}
+        >
+          <SelectTrigger className="w-32" aria-label="Rendering fidelity">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rich">Rich</SelectItem>
+            <SelectItem value="lite">Lite</SelectItem>
+          </SelectContent>
+        </Select>
       </SettingsRow>
 
       <Separator />
