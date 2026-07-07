@@ -45,6 +45,15 @@ const MOVE_TO_TRASH_LABEL = _isWindows
 // with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
 const _preventFocusSteal = (e: MouseEvent) => e.preventDefault();
 
+function _tabIdFromEventTarget(target: EventTarget | null): string | null {
+  if (!(target instanceof HTMLElement)) return null;
+  return (
+    target
+      .closest<HTMLElement>(".chrome-tab[data-tab-id]")
+      ?.getAttribute("data-tab-id") ?? null
+  );
+}
+
 interface ThreadTabsProps {
   className?: string;
   tabs: AppTab[];
@@ -178,6 +187,31 @@ export function ThreadTabs({
   const hasOtherTabs =
     contextMenuId !== null && tabs.some((tab) => tab.id !== contextMenuId);
 
+  // The chrome-tabs lib activates a tab on ANY mousedown, so a middle-click
+  // close would flash the tab active before closing it. Stop the middle-button
+  // mousedown during capture — before it reaches the lib's tab-level listener —
+  // and close on auxclick, which the browser still dispatches independently of
+  // the swallowed mousedown. preventDefault also disables middle-click
+  // autoscroll on Windows/Linux.
+  const handleMouseDownCapture = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 1) return;
+      if (_tabIdFromEventTarget(event.target) === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    []
+  );
+
+  const handleAuxClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 1) return;
+      const id = _tabIdFromEventTarget(event.target);
+      if (id !== null) close(id);
+    },
+    [close]
+  );
+
   return (
     <div
       ref={containerRef}
@@ -188,6 +222,8 @@ export function ThreadTabs({
           <div
             className="bg-tabs relative flex w-full"
             onContextMenu={handleContextMenu}
+            onMouseDownCapture={handleMouseDownCapture}
+            onAuxClick={handleAuxClick}
           >
             <div
               className={cn(
