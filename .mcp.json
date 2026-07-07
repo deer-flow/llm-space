@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "posthog": {
+      "type": "http",
+      "url": "https://mcp.posthog.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${LLM_SPACE_POSTHOG_PERSONAL_API_KEY}"
+      }
+    }
+  }
+}

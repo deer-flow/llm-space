@@ -63,11 +63,7 @@ class Analytics {
     this.isFirstRun = isFirstRun;
   }
 
-  /**
-   * The user-facing opt-out preference, plus whether the hard gates (key
-   * present, no env opt-out) allow sending at all - so the Settings toggle
-   * never shows "on" while telemetry is actually force-disabled.
-   */
+  /** The user's preference plus availability; see {@link AnalyticsStatus}. */
   getSettings(): AnalyticsStatus {
     return { enabled: this._enabled, available: this._available };
   }
