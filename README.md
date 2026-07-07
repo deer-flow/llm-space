@@ -28,7 +28,7 @@ LLM Space is a side project of our honored open source project [DeerFlow](https:
 - **Evaluate** — measure how your agent performs across runs.
 - **Manage** — keep your threads organized as files on your own machine.
 
-Your files and API keys stay on your local computer.
+Your files and API keys stay on your local computer. LLM Space collects a small amount of anonymous usage data to improve the app - see [TELEMETRY.md](./TELEMETRY.md) for exactly what is collected and how to opt out.
 
 ## Tech stack
 

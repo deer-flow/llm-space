@@ -10,6 +10,7 @@ import type {
   AnalyticsEventMap,
   AnalyticsEventName,
   AnalyticsSettings,
+  AnalyticsStatus,
 } from "../../shared/analytics";
 import { DEFAULT_ANALYTICS_SETTINGS } from "../../shared/analytics";
 
@@ -62,9 +63,9 @@ class Analytics {
     this.isFirstRun = isFirstRun;
   }
 
-  /** The user-facing opt-out preference (independent of the hard gates). */
-  getSettings(): AnalyticsSettings {
-    return { enabled: this._enabled };
+  /** The user's preference plus availability; see {@link AnalyticsStatus}. */
+  getSettings(): AnalyticsStatus {
+    return { enabled: this._enabled, available: this._available };
   }
 
   /**
@@ -72,7 +73,7 @@ class Analytics {
    * and tears down the client so nothing further is sent; turning it back on
    * lets the next `capture` re-create it lazily.
    */
-  setEnabled(enabled: boolean): AnalyticsSettings {
+  setEnabled(enabled: boolean): AnalyticsStatus {
     if (enabled === this._enabled) return this.getSettings();
     this._enabled = enabled;
     this._saveConfig();

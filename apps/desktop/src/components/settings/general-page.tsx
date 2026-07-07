@@ -142,20 +142,26 @@ function DefaultModelSelect() {
 
 /**
  * Opt out of anonymous, behaviour-only product analytics. The switch reflects
- * the user's stored preference; toggling it persists immediately via RPC. See
- * `shared/analytics.ts` for exactly what is (and isn't) collected.
+ * the user's stored preference; toggling it persists immediately via RPC. When
+ * telemetry is force-disabled (no key, or `LLM_SPACE_ANALYTICS_DISABLED`), the
+ * switch renders off and disabled and the description says nothing is sent,
+ * instead of claiming data is being shared. See `shared/analytics.ts` for
+ * exactly what is (and isn't) collected.
  */
-function AnalyticsToggle() {
+function AnalyticsRow() {
   const [enabled, setEnabled] = useState(DEFAULT_ANALYTICS_SETTINGS.enabled);
+  const [available, setAvailable] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     void getAnalyticsSettings()
       .then((loaded) => {
-        if (!cancelled) setEnabled(loaded.enabled);
+        if (cancelled) return;
+        setEnabled(loaded.enabled);
+        setAvailable(loaded.available);
       })
       .catch(() => {
-        // Keep the default; a load failure is non-fatal for the toggle.
+        // Keep the defaults; a load failure is non-fatal for the toggle.
       });
     return () => {
       cancelled = true;
@@ -176,11 +182,25 @@ function AnalyticsToggle() {
   }, []);
 
   return (
-    <Switch
-      checked={enabled}
-      onCheckedChange={(next) => void handleChange(next)}
-      aria-label="Share anonymous usage analytics"
-    />
+    <SettingsRow
+      label={
+        <span className="flex flex-col gap-0.5">
+          Share anonymous usage analytics
+          <span className="text-muted-foreground text-xs">
+            {available
+              ? "Helps improve the app. Only anonymous actions are sent - never your prompts, messages, or API keys."
+              : "Telemetry is turned off in this build or environment. Nothing is sent."}
+          </span>
+        </span>
+      }
+    >
+      <Switch
+        checked={available && enabled}
+        disabled={!available}
+        onCheckedChange={(next) => void handleChange(next)}
+        aria-label="Share anonymous usage analytics"
+      />
+    </SettingsRow>
   );
 }
 
@@ -284,19 +304,7 @@ export function GeneralPage() {
 
       <Separator />
 
-      <SettingsRow
-        label={
-          <span className="flex flex-col gap-0.5">
-            Share anonymous usage analytics
-            <span className="text-muted-foreground text-xs">
-              Helps improve the app. Only anonymous actions are sent - never
-              your prompts, messages, or API keys.
-            </span>
-          </span>
-        }
-      >
-        <AnalyticsToggle />
-      </SettingsRow>
+      <AnalyticsRow />
     </SettingsPage>
   );
 }

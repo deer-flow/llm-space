@@ -1,5 +1,5 @@
 import { electrobun } from "@/lib/electrobun";
-import type { AnalyticsSettings } from "@/shared/analytics";
+import type { AnalyticsStatus } from "@/shared/analytics";
 
 function _rpc() {
   if (!electrobun.rpc) {
@@ -8,12 +8,12 @@ function _rpc() {
   return electrobun.rpc;
 }
 
-export async function getAnalyticsSettings(): Promise<AnalyticsSettings> {
+export async function getAnalyticsSettings(): Promise<AnalyticsStatus> {
   return _rpc().request.getAnalyticsSettings({});
 }
 
 export async function setAnalyticsSettings(
   enabled: boolean
-): Promise<AnalyticsSettings> {
+): Promise<AnalyticsStatus> {
   return _rpc().request.setAnalyticsSettings({ enabled });
 }

@@ -65,6 +65,16 @@ export interface AnalyticsSettings {
 
 export const DEFAULT_ANALYTICS_SETTINGS: AnalyticsSettings = { enabled: true };
 
+/**
+ * What the renderer sees over RPC: the user's preference plus whether the hard
+ * gates (a configured key, no env opt-out) allow sending at all. When
+ * `available` is false nothing is ever sent regardless of `enabled`, and the
+ * Settings toggle renders disabled instead of claiming data is being shared.
+ */
+export interface AnalyticsStatus extends AnalyticsSettings {
+  available: boolean;
+}
+
 /** A single, self-describing analytics event: a name plus its typed payload. */
 export type AnalyticsEvent = {
   [K in AnalyticsEventName]: { event: K; properties: AnalyticsEventMap[K] };

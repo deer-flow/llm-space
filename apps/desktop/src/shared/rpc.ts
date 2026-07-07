@@ -10,7 +10,7 @@ import type {
 } from "@llm-space/core";
 import type { RPCSchema } from "electrobun";
 
-import type { AnalyticsEvent, AnalyticsSettings } from "./analytics";
+import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
 import type { Command } from "./commands";
 import type {
   McpCallToolResponse,
@@ -202,14 +202,15 @@ export interface DesktopRPCType {
         };
         response: { contentText: string };
       };
-      // The user's anonymous-analytics opt-out preference (see `shared/analytics.ts`).
+      // The user's anonymous-analytics opt-out preference plus whether the
+      // hard gates allow sending at all (see `shared/analytics.ts`).
       getAnalyticsSettings: {
         params: Record<string, never>;
-        response: AnalyticsSettings;
+        response: AnalyticsStatus;
       };
       setAnalyticsSettings: {
         params: { enabled: boolean };
-        response: AnalyticsSettings;
+        response: AnalyticsStatus;
       };
       // The search provider + API keys backing the built-in web tools.
       getSearchSettings: {
