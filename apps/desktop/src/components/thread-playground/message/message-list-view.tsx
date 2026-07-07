@@ -13,7 +13,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 
 import { cn } from "@/lib/utils";
@@ -179,7 +178,7 @@ function DroppableMessageList({
                 // to size the placeholder and compute drag displacement — a
                 // `gap` is invisible to it and offsets every item mid-drag.
                 className="mb-3.5"
-                style={style as CSSProperties}
+                style={style}
               >
                 <MessageListItem
                   message={message}
