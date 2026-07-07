@@ -8,6 +8,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
+import { Tooltip } from "@/components/tooltip";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { useThreadStoreActions } from "../stores";
 
+import { ToolCallInputView } from "./tool-call-input-view";
 import { getToolCallOutputText, getToolCallStatus } from "./tool-call-status";
 import { useToolCallRunner } from "./use-tool-call-runner";
 
@@ -99,19 +101,21 @@ function _ToolCallListItem({
       <div className="flex min-w-0 items-start gap-2">
         <ToolCallInputView input={toolCall.input} />
         {executable ? (
-          <Button
-            className="invisible shrink-0 group-hover/message:visible"
-            size="icon"
-            variant="secondary"
-            disabled={readonly || calling}
-            onClick={() => void handleCall()}
-          >
-            {calling ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <PlayIcon className="size-3" />
-            )}
-          </Button>
+          <Tooltip content="Call this tool">
+            <Button
+              className="invisible shrink-0 group-hover/message:visible"
+              size="icon"
+              variant="secondary"
+              disabled={readonly || calling}
+              onClick={() => void handleCall()}
+            >
+              {calling ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <PlayIcon className="size-3" />
+              )}
+            </Button>
+          </Tooltip>
         ) : null}
       </div>
       <hr />
@@ -152,23 +156,6 @@ function _ToolCallListItem({
   );
 }
 export const ToolCallListItem = memo(_ToolCallListItem);
-
-function _ToolCallInputView({ input }: { input: ToolCallInput }) {
-  const keys = Object.keys(input.arguments);
-  return (
-    <div className="block w-full overflow-x-auto font-mono text-sm select-auto">
-      <span className="text-primary">{input.name}</span>
-      <span className="text-muted-foreground">(</span>
-      {keys.length > 0 && (
-        <span className="whitespace-pre">
-          {JSON.stringify(input.arguments, null, 2)}
-        </span>
-      )}
-      <span className="text-muted-foreground">{")"}</span>
-    </div>
-  );
-}
-const ToolCallInputView = memo(_ToolCallInputView);
 
 // -- tool-call response editors -----------------------------------------------
 
