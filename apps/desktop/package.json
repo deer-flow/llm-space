@@ -41,6 +41,7 @@
     "electrobun": "^1.18.1",
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.22.0",
+    "posthog-node": "^5.39.4",
     "radix-ui": "^1.6.0",
     "react": "catalog:",
     "react-dom": "catalog:",

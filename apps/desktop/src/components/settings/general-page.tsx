@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { toast } from "sonner";
 
+import { getAnalyticsSettings, setAnalyticsSettings } from "@/client/analytics";
 import {
   isModelAvailable,
   useDefaultModel,
@@ -27,6 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 
 import { ModelAvatar } from "../thread-playground/model-avatar";
 import { Button } from "../ui/button";
@@ -130,6 +140,50 @@ function DefaultModelSelect() {
   );
 }
 
+/**
+ * Opt out of anonymous, behaviour-only product analytics. The switch reflects
+ * the user's stored preference; toggling it persists immediately via RPC. See
+ * `shared/analytics.ts` for exactly what is (and isn't) collected.
+ */
+function AnalyticsToggle() {
+  const [enabled, setEnabled] = useState(DEFAULT_ANALYTICS_SETTINGS.enabled);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAnalyticsSettings()
+      .then((loaded) => {
+        if (!cancelled) setEnabled(loaded.enabled);
+      })
+      .catch(() => {
+        // Keep the default; a load failure is non-fatal for the toggle.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleChange = useCallback(async (next: boolean) => {
+    setEnabled(next); // Optimistic; the RPC echoes the input, so no reconcile.
+    try {
+      await setAnalyticsSettings(next);
+    } catch (error) {
+      setEnabled(!next);
+      toast.error("Failed to update analytics setting", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  }, []);
+
+  return (
+    <Switch
+      checked={enabled}
+      onCheckedChange={(next) => void handleChange(next)}
+      aria-label="Share anonymous usage analytics"
+    />
+  );
+}
+
 export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { fidelity, setFidelity } = useRenderingFidelity();
@@ -226,6 +280,22 @@ export function GeneralPage() {
             <SelectItem value="en-US">English (US)</SelectItem>
           </SelectContent>
         </Select>
+      </SettingsRow>
+
+      <Separator />
+
+      <SettingsRow
+        label={
+          <span className="flex flex-col gap-0.5">
+            Share anonymous usage analytics
+            <span className="text-muted-foreground text-xs">
+              Helps improve the app. Only anonymous actions are sent - never
+              your prompts, messages, or API keys.
+            </span>
+          </span>
+        }
+      >
+        <AnalyticsToggle />
       </SettingsRow>
     </SettingsPage>
   );

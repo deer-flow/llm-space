@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { useCommands } from "@/commands";
 import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 import {
@@ -91,12 +92,25 @@ export function OnboardDialog({
   }, [builtinProviders]);
 
   const handleConfigureModels = useCallback(() => {
+    track({
+      event: "onboarding_choice",
+      properties: { choice: "configure_models" },
+    });
     onOpenChange(false);
     executeCommand({ type: "openSettings", args: { tab: "models" } });
   }, [executeCommand, onOpenChange]);
   const handleLearnMore = useCallback(() => {
+    track({ event: "onboarding_choice", properties: { choice: "learn_more" } });
     executeCommand({ type: "openDocument", args: {} });
   }, [executeCommand]);
+  const handleOpenAnalyticsSettings = useCallback(() => {
+    track({
+      event: "onboarding_choice",
+      properties: { choice: "analytics_settings" },
+    });
+    onOpenChange(false);
+    executeCommand({ type: "openSettings", args: { tab: "general" } });
+  }, [executeCommand, onOpenChange]);
 
   const handleAddProvider = useCallback(
     async (provider: ModelProviderGroup) => {
@@ -148,37 +162,49 @@ export function OnboardDialog({
             </Button>
           </DialogClose>
           <div className="absolute right-6 bottom-6 left-6 flex flex-col gap-3 md:right-8 md:bottom-8 md:left-12 md:flex-row md:items-end md:justify-between">
-            <div className="flex shrink-0 flex-wrap items-center gap-4">
-              {models.length === 0 ? (
+            <div className="flex shrink-0 flex-col gap-2.5">
+              <div className="flex flex-wrap items-center gap-4">
+                {models.length === 0 ? (
+                  <Button
+                    className="border-ring/75 h-11 rounded-2xl border bg-white/10! px-6 backdrop-blur-xs"
+                    variant="outline"
+                    size="lg"
+                    onClick={handleConfigureModels}
+                  >
+                    <SettingsIcon className="size-3" />
+                    Configure models
+                  </Button>
+                ) : (
+                  <DialogClose asChild>
+                    <RainbowButton
+                      variant="outline"
+                      className="dark:bg-[red]!"
+                      size="lg"
+                    >
+                      Get started
+                      <ArrowRightIcon className="size-3.5" />
+                    </RainbowButton>
+                  </DialogClose>
+                )}
                 <Button
-                  className="border-ring/75 h-11 rounded-2xl border bg-white/10! px-6 backdrop-blur-xs"
+                  className="h-11 rounded-2xl border border-white/20 bg-white/10! px-8 backdrop-blur-xs"
                   variant="outline"
                   size="lg"
-                  onClick={handleConfigureModels}
+                  onClick={handleLearnMore}
                 >
-                  <SettingsIcon className="size-3" />
-                  Configure models
+                  Learn more
                 </Button>
-              ) : (
-                <DialogClose asChild>
-                  <RainbowButton
-                    variant="outline"
-                    className="dark:bg-[red]!"
-                    size="lg"
-                  >
-                    Get started
-                    <ArrowRightIcon className="size-3.5" />
-                  </RainbowButton>
-                </DialogClose>
-              )}
-              <Button
-                className="h-11 rounded-2xl border border-white/20 bg-white/10! px-8 backdrop-blur-xs"
-                variant="outline"
-                size="lg"
-                onClick={handleLearnMore}
-              >
-                Learn more
-              </Button>
+              </div>
+              <div className="text-xs text-white/65">
+                We collect anonymous usage data to improve the app.{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 transition-colors hover:text-white/90"
+                  onClick={handleOpenAnalyticsSettings}
+                >
+                  Manage in settings
+                </button>
+              </div>
             </div>
             <_OnboardSetupPanel
               className="w-full md:w-[22rem] md:shrink-0"

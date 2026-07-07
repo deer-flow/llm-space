@@ -231,6 +231,20 @@ export class ModelManager {
   }
 
   /**
+   * Whether a model id comes from a shipped builtin provider's static catalog,
+   * as opposed to being typed in by the user (custom providers, and user-added
+   * models on builtin providers). Only catalog ids are safe for telemetry to
+   * record verbatim.
+   */
+  isBuiltinCatalogModel(providerId: string, modelId: string): boolean {
+    if (!this.isBuiltin(providerId)) return false;
+    const provider = BUILTIN_PROVIDERS[providerId];
+    return provider
+      ? provider.getModels().some((model) => model.id === modelId)
+      : false;
+  }
+
+  /**
    * Enable or disable a single model within a provider. Disabling records the
    * model id in the provider's `disabledModels`; enabling removes it. Model
    * enablement is a renderer-facing filter only — it does not affect the

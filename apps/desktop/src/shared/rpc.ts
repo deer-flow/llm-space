@@ -10,6 +10,7 @@ import type {
 } from "@llm-space/core";
 import type { RPCSchema } from "electrobun";
 
+import type { AnalyticsEvent, AnalyticsSettings } from "./analytics";
 import type { Command } from "./commands";
 import type {
   McpCallToolResponse,
@@ -201,6 +202,15 @@ export interface DesktopRPCType {
         };
         response: { contentText: string };
       };
+      // The user's anonymous-analytics opt-out preference (see `shared/analytics.ts`).
+      getAnalyticsSettings: {
+        params: Record<string, never>;
+        response: AnalyticsSettings;
+      };
+      setAnalyticsSettings: {
+        params: { enabled: boolean };
+        response: AnalyticsSettings;
+      };
       // The search provider + API keys backing the built-in web tools.
       getSearchSettings: {
         params: Record<string, never>;
@@ -310,6 +320,9 @@ export interface DesktopRPCType {
       // A unified command dispatched from the webview to run in the bun process
       // (e.g. window zoom / reload). See `shared/commands.ts`.
       executeCommand: Command;
+      // Fire-and-forget: a renderer-only, anonymous analytics event. The bun
+      // side is the single network egress for telemetry. See `shared/analytics.ts`.
+      captureAnalyticsEvent: AnalyticsEvent;
     };
   }>;
   webview: RPCSchema<{

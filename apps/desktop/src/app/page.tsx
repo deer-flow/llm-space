@@ -25,6 +25,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Welcome } from "@/components/welcome";
+import { track } from "@/lib/analytics";
 import { electrobun } from "@/lib/electrobun";
 import {
   importThreadFileRecords,
@@ -179,6 +180,10 @@ function PageInner() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  // One event per open transition, no matter which command opened Settings.
+  useEffect(() => {
+    if (settingsOpen) track({ event: "settings_opened", properties: {} });
+  }, [settingsOpen]);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);

@@ -6,6 +6,7 @@ import { getLlmSpaceRoot } from "@llm-space/core/server";
 import { BrowserView, Utils } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
+import { analytics } from "../analytics";
 import { moveToTrash, revealInFileManager } from "../fs";
 import { mcpManager } from "../mcp";
 import { modelManager } from "../models";
@@ -62,10 +63,13 @@ export const mainWindowRPC: MainWindowRPC =
         builtinProviders: async () => modelManager.getBuiltinProviders(),
         addProvider: async ({ providerId }) => {
           modelManager.addBuiltInProvider({ id: providerId });
+          analytics.capture("provider_added", { providerId, kind: "builtin" });
           return getModelProviderGroups();
         },
         addCustomProvider: async ({ id, name, baseUrl, api }) => {
           modelManager.addCustomProvider({ id, name, baseUrl, api });
+          // Only the provider id is recorded — never the base URL or name.
+          analytics.capture("provider_added", { providerId: id, kind: "custom" });
           return getModelProviderGroups();
         },
         updateProvider: async ({
@@ -162,7 +166,11 @@ export const mainWindowRPC: MainWindowRPC =
           return null;
         },
         mcpListServers: () => mcpManager.listServers(),
-        mcpAddServer: ({ server }) => mcpManager.addServer(server),
+        mcpAddServer: ({ server }) => {
+          const servers = mcpManager.addServer(server);
+          analytics.capture("mcp_server_added", {});
+          return servers;
+        },
         mcpUpdateServer: async ({ serverId, server }) =>
           mcpManager.updateServer(serverId, server),
         mcpRemoveServer: async ({ serverId }) =>
@@ -175,6 +183,9 @@ export const mainWindowRPC: MainWindowRPC =
         builtInListTools: () => listBuiltInTools(),
         builtInCallTool: ({ name, arguments: args }) =>
           callBuiltInTool({ name, arguments: args }),
+        getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
+        setAnalyticsSettings: ({ enabled }) =>
+          Promise.resolve(analytics.setEnabled(enabled)),
         getSearchSettings: () => searchSettings.get(),
         setSearchSettings: ({ settings }) => searchSettings.set(settings),
         skillsGetSettings: () => Promise.resolve(skillsManager.getConfig()),
@@ -230,6 +241,8 @@ export const mainWindowRPC: MainWindowRPC =
           );
         },
         abortStreamThread: (payload) => abortStreamThread(payload),
+        captureAnalyticsEvent: ({ event, properties }) =>
+          analytics.capture(event, properties),
         executeCommand: async (command) => {
           const { executeCommandInBun } = await import("../commands");
           const { mainWindow } = await import("../app/window");
