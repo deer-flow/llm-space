@@ -45,6 +45,15 @@ const MOVE_TO_TRASH_LABEL = _isWindows
 // with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
 const _preventFocusSteal = (e: MouseEvent) => e.preventDefault();
 
+function _tabIdFromEventTarget(target: EventTarget | null): string | null {
+  if (!(target instanceof HTMLElement)) return null;
+  return (
+    target
+      .closest<HTMLElement>(".chrome-tab[data-tab-id]")
+      ?.getAttribute("data-tab-id") ?? null
+  );
+}
+
 interface ThreadTabsProps {
   className?: string;
   tabs: AppTab[];
@@ -160,23 +169,54 @@ export function ThreadTabs({
   }, [tabs.length, handleTabsHeaderDoubleClick]);
 
   const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      setContextMenuId(null);
-      event.preventDefault();
-      return;
-    }
-
-    const tab = target.closest<HTMLElement>(".chrome-tab[data-tab-id]");
-    const path = tab?.getAttribute("data-tab-id") ?? null;
-    setContextMenuId(path);
-    if (path === null) {
+    const id = _tabIdFromEventTarget(event.target);
+    setContextMenuId(id);
+    if (id === null) {
       event.preventDefault();
     }
   }, []);
 
   const hasOtherTabs =
     contextMenuId !== null && tabs.some((tab) => tab.id !== contextMenuId);
+
+  // The chrome-tabs lib activates a tab on ANY mousedown, so a middle-click
+  // close would flash the tab active before closing it. Stop the middle-button
+  // mousedown during capture — before it reaches the lib's tab-level listener —
+  // and close when the matching middle mouseup lands on the same tab. mouseup
+  // is used instead of auxclick because the system WKWebView (the non-CEF
+  // renderer) only dispatches auxclick on WebKit ≥ 17.4. A middle-click chorded
+  // into a left-button drag (buttons & 1) is ignored on both the press and the
+  // release: closing a tab mid-drag would force the lib to end the drag against
+  // a stale tab list. Every middle press first clears the pending-close target,
+  // and every middle release clears it again, so a press that never released
+  // over the strip can't leak into a later gesture and close the wrong tab.
+  // preventDefault also disables middle-click autoscroll on Windows/Linux.
+  const middlePressedTabIdRef = useRef<string | null>(null);
+  const handleMouseDownCapture = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 1) return;
+      middlePressedTabIdRef.current = null;
+      if ((event.buttons & 1) !== 0) return;
+      const id = _tabIdFromEventTarget(event.target);
+      if (id === null) return;
+      middlePressedTabIdRef.current = id;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    []
+  );
+
+  const handleMouseUp = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 1) return;
+      const pressed = middlePressedTabIdRef.current;
+      middlePressedTabIdRef.current = null;
+      if ((event.buttons & 1) !== 0) return;
+      const id = _tabIdFromEventTarget(event.target);
+      if (id !== null && id === pressed) close(id);
+    },
+    [close]
+  );
 
   return (
     <div
@@ -188,6 +228,8 @@ export function ThreadTabs({
           <div
             className="bg-tabs relative flex w-full"
             onContextMenu={handleContextMenu}
+            onMouseDownCapture={handleMouseDownCapture}
+            onMouseUp={handleMouseUp}
           >
             <div
               className={cn(

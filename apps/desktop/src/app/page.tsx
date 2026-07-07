@@ -155,7 +155,15 @@ function PageInner() {
   // The active tab is read through a ref so command handlers never go stale.
   const activeTabIdRef = useRef(tabs.activeId);
   activeTabIdRef.current = tabs.activeId;
-  const { close, closeOthers, closeAll, openTrace, reopenClosed } = tabs;
+  const {
+    close,
+    closeOthers,
+    closeAll,
+    openTrace,
+    reopenClosed,
+    activateNext,
+    activatePrevious,
+  } = tabs;
 
   // Collapse / expand the left side panel.
   const sidebarPanelRef = usePanelRef();
@@ -224,6 +232,8 @@ function PageInner() {
     },
     closeAllTabs: () => closeAll(),
     reopenClosedTab: () => void reopenClosed(),
+    selectNextTab: () => activateNext(),
+    selectPreviousTab: () => activatePrevious(),
     toggleSidebar: () => toggleSidebar(),
     openSettings: ({ tab }) => {
       if (tab) setSettingsTab(tab);

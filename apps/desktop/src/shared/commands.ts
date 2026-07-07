@@ -159,6 +159,12 @@ export interface CloseAllTabsCommand extends GenericCommand<"closeAllTabs"> {}
 /** Reopen the most recently closed tab group. */
 export interface ReopenClosedTabCommand extends GenericCommand<"reopenClosedTab"> {}
 
+/** Activate the tab after the active one in visual order, wrapping around. */
+export interface SelectNextTabCommand extends GenericCommand<"selectNextTab"> {}
+
+/** Activate the tab before the active one in visual order, wrapping around. */
+export interface SelectPreviousTabCommand extends GenericCommand<"selectPreviousTab"> {}
+
 // --- View / app ------------------------------------------------------------
 
 /** Collapse or expand the left side panel. */
@@ -239,6 +245,8 @@ export type Command =
   | CloseOtherTabsCommand
   | CloseAllTabsCommand
   | ReopenClosedTabCommand
+  | SelectNextTabCommand
+  | SelectPreviousTabCommand
   | ToggleSidebarCommand
   | OpenSettingsCommand
   | OpenModelSettingsCommand
@@ -302,6 +310,8 @@ export const COMMAND_META: Record<
   closeOtherTabs: { label: "Close Other Tabs", target: "webview" },
   closeAllTabs: { label: "Close All Tabs", target: "webview" },
   reopenClosedTab: { label: "Reopen Closed Tab", target: "webview" },
+  selectNextTab: { label: "Select Next Tab", target: "webview" },
+  selectPreviousTab: { label: "Select Previous Tab", target: "webview" },
   toggleSidebar: { label: "Toggle Sidebar", target: "webview" },
   openSettings: { label: "Settings", target: "webview" },
   openModelSettings: { label: "Configure Model Settings", target: "webview" },
