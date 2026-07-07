@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import {
   AssistantMessage,
+  isExecutableTool,
   isRunnableConversation,
   Message,
   normalizeThread,
@@ -10,12 +11,15 @@ import {
   Tool as ToolSchema,
   uuid,
   type AgentTransport,
+  type BuiltinTool,
+  type McpTool,
   type MessageContent,
   type ModelConfig,
   type ModelConfigParams,
   type ReducedMessageContent,
   type Thread,
   type Tool,
+  type ToolCall,
   type UserMessage,
 } from "@llm-space/core";
 import { createContext, useContext } from "react";
@@ -43,6 +47,14 @@ import {
 } from "./thread-history";
 
 const toolValidator = Compile(ToolSchema);
+
+/**
+ * Upper bound on model turns in a single auto-call-tools run. Each turn is one
+ * model call (the server terminates the agent loop after tool calls), so this
+ * caps how many times a run will auto-execute tools and continue — a backstop
+ * against a model that calls tools without ever settling on an answer.
+ */
+const MAX_AUTO_TOOL_TURNS = 50;
 
 export type ThreadStoreStatus = "idle" | "running";
 export interface ThreadState {
@@ -118,10 +130,34 @@ export function createThreadStore(
     resolveModel?: (
       saved: ModelConfig | null | undefined
     ) => ModelConfig | null;
+    /**
+     * Whether a run should automatically execute a model turn's pending tool
+     * calls (instead of waiting for the user to click "Call tools"). Read fresh
+     * at run time. On its own it runs tools once and stops; combined with
+     * {@link getReactLoop} it keeps looping. Defaults to `false`.
+     */
+    getAutoRunTools?: () => boolean;
+    /**
+     * Whether the ReAct loop is enabled: keep alternating model turn ⇄ tool
+     * execution until the model stops calling tools. Implies auto-running tools.
+     * Read fresh at run time. Defaults to `false`.
+     */
+    getReactLoop?: () => boolean;
+    /**
+     * Execute an MCP or built-in tool call, returning its textual result. Only
+     * used by the auto-run-tools path; manual tool runs go through the UI's own
+     * runner. Injected so the store stays decoupled from the RPC layer.
+     */
+    executeTool?: (
+      tool: McpTool | BuiltinTool,
+      args: Record<string, unknown>
+    ) => Promise<{ contentText: string; isError: boolean }>;
   } = {}
 ): ThreadStore {
   const normalizedInputThread = normalizeThread(initialThread);
-  const initialRunHistory = normalizeRunHistory(normalizedInputThread.runHistory);
+  const initialRunHistory = normalizeRunHistory(
+    normalizedInputThread.runHistory
+  );
   const initialEvaluations = normalizeEvaluations(
     normalizedInputThread.evaluations,
     initialRunHistory
@@ -215,6 +251,87 @@ export function createThreadStore(
         Boolean(message.thinking) ||
         message.content.length > 0 ||
         (message.toolCalls?.length ?? 0) > 0;
+
+      /**
+       * Auto-call the pending tool calls on the last message so a run can loop
+       * without manual intervention. Returns the updated message list when
+       * every trailing tool call was executed (the conversation can stream
+       * again), or `null` when there is nothing to auto-call — no trailing tool
+       * calls, a non-executable (`function`) tool among them, missing executor,
+       * or an abort mid-flight. In the `null` case the loop stops and the user
+       * drives the next step by hand.
+       */
+      const executePendingToolCalls = async (
+        messages: Message[],
+        signal: AbortSignal
+      ): Promise<Message[] | null> => {
+        const execute = options.executeTool;
+        if (!execute) {
+          return null;
+        }
+        const last = messages[messages.length - 1];
+        if (last?.role !== "assistant") {
+          return null;
+        }
+        const toolCalls = last.toolCalls ?? [];
+        if (toolCalls.length === 0) {
+          return null;
+        }
+        const toolsByName = new Map(
+          (get().thread.context?.tools ?? []).map((tool) => [tool.name, tool])
+        );
+        // Every tool call must map to an executable (MCP/built-in) tool; a
+        // single `function` stub means the turn needs a hand-written result, so
+        // we bail and let the user fill it in.
+        const executable: {
+          toolCall: ToolCall;
+          tool: McpTool | BuiltinTool;
+        }[] = [];
+        for (const toolCall of toolCalls) {
+          const tool = toolsByName.get(toolCall.input.name);
+          if (!tool || !isExecutableTool(tool)) {
+            return null;
+          }
+          executable.push({ toolCall, tool });
+        }
+        const results = await Promise.all(
+          executable.map(async ({ toolCall, tool }) => {
+            try {
+              const { contentText, isError } = await execute(
+                tool,
+                toolCall.input.arguments
+              );
+              return { id: toolCall.id, text: contentText, isError };
+            } catch (error) {
+              const text =
+                error instanceof Error ? error.message : "Tool call failed";
+              return { id: toolCall.id, text, isError: true };
+            }
+          })
+        );
+        // An abort could have landed while tools were in flight; drop the
+        // results and let the run's abort handling take over.
+        if (signal.aborted) {
+          return null;
+        }
+        const resultById = new Map(results.map((r) => [r.id, r]));
+        const nextLast: AssistantMessage = {
+          ...last,
+          toolCalls: toolCalls.map((toolCall) => {
+            const result = resultById.get(toolCall.id)!;
+            return {
+              ...toolCall,
+              output: {
+                content: [{ type: "text", text: result.text }],
+                isError: result.isError,
+              },
+            };
+          }),
+        };
+        const next = [...messages.slice(0, -1), nextLast];
+        setMessages(next);
+        return next;
+      };
 
       // --- store --------------------------------------------------------------
 
@@ -483,11 +600,12 @@ export function createThreadStore(
             setMessages(messages);
           };
 
+          // Live-preview state for the turn currently streaming; reset per turn.
           let streamingMessage: AssistantMessage | null = null;
           let content: ReducedMessageContent[] = [];
-          // Whether the stream produced at least one event — i.e. the run
-          // actually started. A run that dies earlier (transport/auth/network
-          // failure) is not recorded in the run history.
+          // Whether any turn produced at least one event — i.e. the run actually
+          // started. A run that dies earlier (transport/auth/network failure) is
+          // not recorded in the run history.
           let sawEvent = false;
           // Whether the run ended in an error. The agent loop emits lifecycle
           // events before the model call, and a model API failure completes
@@ -523,47 +641,104 @@ export function createThreadStore(
               previewFrame = null;
             }
           };
-          try {
-            const response = streamThread(
-              {
-                context: { ...get().thread.context, messages },
-                model,
-              },
-              { signal: abortController.signal, transport: options.transport }
-            );
-            for await (const chunk of response) {
-              sawEvent = true;
-              const reduced = reduceMessages(chunk, {
-                streamingMessage,
-                content,
-              });
-              if (!reduced) {
-                continue;
+
+          // Stream a single model turn into `messages`. Returns whether it
+          // finished cleanly, was aborted, or failed — the auto-call loop only
+          // continues after a clean turn.
+          const streamTurn = async (): Promise<
+            "completed" | "aborted" | "failed"
+          > => {
+            streamingMessage = null;
+            content = [];
+            try {
+              const response = streamThread(
+                {
+                  context: { ...get().thread.context, messages },
+                  model,
+                },
+                {
+                  signal: abortController.signal,
+                  transport: options.transport,
+                }
+              );
+              for await (const chunk of response) {
+                sawEvent = true;
+                const reduced = reduceMessages(chunk, {
+                  streamingMessage,
+                  content,
+                });
+                if (!reduced) {
+                  continue;
+                }
+                if (reduced.type === "message_start" && streamingMessage) {
+                  commit(streamingMessage);
+                  // The committed message now lives in `messages`; drop the
+                  // stale preview so it isn't rendered twice before the next
+                  // frame.
+                  cancelPreview();
+                  set({ streamingMessage: null });
+                }
+                streamingMessage = reduced.message;
+                content = reduced.content;
+                schedulePreview();
               }
-              if (reduced.type === "message_start" && streamingMessage) {
+              if (streamingMessage) {
                 commit(streamingMessage);
-                // The committed message now lives in `messages`; drop the stale
-                // preview so it isn't rendered twice before the next frame.
+                // The turn's message now lives in `messages`; clear the preview
+                // so it isn't rendered a second time during the gap before the
+                // next turn (e.g. while auto-run tools execute). The trailing
+                // frame is cancelled so a late flush can't resurrect it.
                 cancelPreview();
                 set({ streamingMessage: null });
+                streamingMessage = null;
               }
-              streamingMessage = reduced.message;
-              content = reduced.content;
-              schedulePreview();
-            }
-            if (streamingMessage) {
-              commit(streamingMessage);
-            }
-          } catch (error) {
-            if (abortController.signal.aborted) {
-              if (streamingMessage && hasContent(streamingMessage)) {
-                commit(streamingMessage);
+              return "completed";
+            } catch (error) {
+              if (abortController.signal.aborted) {
+                if (streamingMessage && hasContent(streamingMessage)) {
+                  commit(streamingMessage);
+                }
+                return "aborted";
               }
-            } else {
               failed = true;
               console.error(error);
               if (error instanceof Error) {
                 toast.error("Error", { description: error.message });
+              }
+              return "failed";
+            }
+          };
+
+          try {
+            // Drive the run:
+            //  - a model turn always runs;
+            //  - when tools are auto-run, execute the turn's trailing tool
+            //    calls (unless one needs a hand-written result — then stop and
+            //    let the user fill it in);
+            //  - only the ReAct loop continues to the next turn; plain auto-run
+            //    executes tools once and stops, staying step-by-step.
+            // Capped so a model that calls tools forever can't spin forever.
+            for (let turn = 0; turn < MAX_AUTO_TOOL_TURNS; turn++) {
+              const outcome = await streamTurn();
+              if (outcome !== "completed") {
+                break;
+              }
+              const reactLoop = options.getReactLoop?.() ?? false;
+              const autoRunTools =
+                reactLoop || (options.getAutoRunTools?.() ?? false);
+              if (!autoRunTools) {
+                break;
+              }
+              const withResults = await executePendingToolCalls(
+                messages,
+                abortController.signal
+              );
+              if (!withResults) {
+                break;
+              }
+              messages = withResults;
+              if (!reactLoop) {
+                break;
               }
             }
           } finally {
@@ -608,10 +783,7 @@ export function createThreadStore(
               });
             } else {
               set({
-                changeHistory: recordSnapshot(
-                  get().changeHistory,
-                  finalThread
-                ),
+                changeHistory: recordSnapshot(get().changeHistory, finalThread),
               });
             }
           }

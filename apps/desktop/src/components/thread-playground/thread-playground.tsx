@@ -1,7 +1,13 @@
 "use client";
 
 import type { AgentTransport, Thread } from "@llm-space/core";
-import { HistoryIcon, PlayIcon, Redo2Icon, Undo2Icon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  HistoryIcon,
+  PlayIcon,
+  Redo2Icon,
+  Undo2Icon,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -12,6 +18,7 @@ import {
 } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
+import { executeTool } from "@/client/tool-execution";
 import { useRegisterCommands } from "@/commands";
 import {
   resolveModelConfig,
@@ -24,6 +31,15 @@ import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
+import { ButtonGroup } from "../ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import {
   ResizableHandle,
@@ -31,6 +47,7 @@ import {
   ResizablePanelGroup,
 } from "../ui/resizable";
 import { Spinner } from "../ui/spinner";
+import { Switch } from "../ui/switch";
 
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
@@ -42,7 +59,10 @@ import {
   canRedo,
   canUndo,
   createThreadStore,
+  getAutoRunTools,
+  getReactLoop,
   ThreadStoreContext,
+  useRunMode,
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
@@ -118,7 +138,14 @@ function _ThreadPlayground({
     createThreadStore(initialValue, {
       transport,
       resolveModel: (saved) =>
-        resolveModelConfig(providersRef.current, saved, defaultModelRef.current),
+        resolveModelConfig(
+          providersRef.current,
+          saved,
+          defaultModelRef.current
+        ),
+      getAutoRunTools,
+      getReactLoop,
+      executeTool,
     })
   );
   useThreadPlaygroundEvents(store, {
@@ -157,6 +184,8 @@ function ThreadPlaygroundContent({
   const hasModel = Boolean(savedModel ?? fallbackModel);
   const undoable = useThreadStore((s) => canUndo(s.changeHistory));
   const redoable = useThreadStore((s) => canRedo(s.changeHistory));
+  const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
+    useRunMode();
   const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
   const title = useMemo(
     () => titleFromProps ?? threadTitleFromPath(path),
@@ -278,37 +307,88 @@ function ThreadPlaygroundContent({
               </Tooltip>
             </div>
             <div className="flex items-center px-3">
-              <Tooltip
-                content={
-                  <div>
-                    {status === "running" ? "Stop running" : "Run this thread"}
-                    <KbdGroup>
-                      <Kbd className="text-foreground!">⌘ Enter</Kbd>
-                    </KbdGroup>
-                  </div>
-                }
-              >
-                <Button
-                  className={cn(
-                    "w-20 px-3 py-3.5",
-                    readonlyFromProps && "hidden"
-                  )}
-                  aria-label={
-                    status === "running" ? "Stop running thread" : "Run thread"
+              <ButtonGroup className={cn(readonlyFromProps && "hidden")}>
+                <Tooltip
+                  content={
+                    <div>
+                      {status === "running"
+                        ? "Stop running"
+                        : "Run this thread"}
+                      <KbdGroup>
+                        <Kbd className="text-foreground!">⌘ Enter</Kbd>
+                      </KbdGroup>
+                    </div>
                   }
-                  disabled={
-                    readonlyFromProps || (status !== "running" && !hasModel)
-                  }
-                  onClick={status === "running" ? handleStop : handleRun}
                 >
-                  {status === "running" ? (
-                    <Spinner className="size-3" />
-                  ) : (
-                    <PlayIcon className="size-3" />
-                  )}
-                  {status === "running" ? "Stop" : "Run"}
-                </Button>
-              </Tooltip>
+                  <Button
+                    className="w-20"
+                    aria-label={
+                      status === "running"
+                        ? "Stop running thread"
+                        : "Run thread"
+                    }
+                    disabled={
+                      readonlyFromProps || (status !== "running" && !hasModel)
+                    }
+                    onClick={status === "running" ? handleStop : handleRun}
+                  >
+                    {status === "running" ? (
+                      <Spinner className="size-3" />
+                    ) : (
+                      <PlayIcon className="size-3" />
+                    )}
+                    {status === "running" ? "Stop" : "Run"}
+                  </Button>
+                </Tooltip>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="px-1.5"
+                      aria-label="Run settings"
+                      disabled={readonlyFromProps}
+                    >
+                      <ChevronDownIcon className="size-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-56">
+                    <DropdownMenuLabel>Run settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setReactLoop(!reactLoop);
+                      }}
+                      className="justify-between gap-6"
+                    >
+                      Enable ReAct loop
+                      <Switch
+                        size="sm"
+                        checked={reactLoop}
+                        className="pointer-events-none"
+                      />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      // The ReAct loop implies auto-running tools, so this row
+                      // is forced on and locked while the loop is enabled.
+                      disabled={reactLoop}
+                      onSelect={(event) => {
+                        // Keep the menu open so the switch toggles in place.
+                        event.preventDefault();
+                        setAutoRunTools(!effectiveAutoRunTools);
+                      }}
+                      className="justify-between gap-6"
+                    >
+                      Auto run tools
+                      <Switch
+                        size="sm"
+                        checked={effectiveAutoRunTools}
+                        disabled={reactLoop}
+                        className="pointer-events-none"
+                      />
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </ButtonGroup>
             </div>
           </header>
           <ResizablePanelGroup
