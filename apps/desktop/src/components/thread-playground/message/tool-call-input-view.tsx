@@ -3,6 +3,7 @@ import { MoreHorizontal } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import { TextPreviewDialog } from "@/components/text-preview-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -56,6 +57,7 @@ function _ToolCallArgumentRow({
   trailingComma: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const valueText = formatJson(value);
   const displayValue = indentMultilineValue(valueText);
   const copyText = useCallback(async (text: string, label: string) => {
@@ -75,9 +77,9 @@ function _ToolCallArgumentRow({
   const copyValueJson = useCallback(() => {
     void copyText(formatJson(value), "Value JSON");
   }, [copyText, value]);
-  const copyParamsJson = useCallback(() => {
-    void copyText(formatJson(params), "Params JSON");
-  }, [copyText, params]);
+  const openPreview = useCallback(() => {
+    setPreviewOpen(true);
+  }, []);
 
   return (
     <div className="group/argument relative min-w-max py-0.5 pl-1.5">
@@ -104,10 +106,15 @@ function _ToolCallArgumentRow({
           <DropdownMenuItem onSelect={copyValueJson}>
             Copy Value as JSON
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={copyParamsJson}>
-            Copy Params as JSON
-          </DropdownMenuItem>
+          {typeof value === "string" ? (
+            <>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem onSelect={openPreview}>
+                View Value in Dialog...
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <span className="whitespace-pre">
@@ -117,6 +124,14 @@ function _ToolCallArgumentRow({
         {displayValue}
         {trailingComma ? "," : ""}
       </span>
+      {typeof value === "string" ? (
+        <TextPreviewDialog
+          open={previewOpen}
+          title={`View value of "${argumentKey}"`}
+          value={value}
+          onOpenChange={setPreviewOpen}
+        />
+      ) : null}
     </div>
   );
 }

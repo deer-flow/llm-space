@@ -3,7 +3,13 @@ import {
   type ToolCall,
   type ToolCallInput,
 } from "@llm-space/core";
-import { AlertCircleIcon, CheckIcon, Loader2, PlayIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  CheckIcon,
+  CopyIcon,
+  Loader2,
+  PlayIcon,
+} from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -96,27 +102,48 @@ function _ToolCallListItem({
       setCalling(false);
     }
   }, [executable, readonly, runToolCall, toolCall]);
+  const handleCopyArguments = useCallback(async () => {
+    const text = formatJson(toolCall.input.arguments);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Arguments copied");
+    } catch {
+      toast.error("Failed to copy arguments");
+    }
+  }, [toolCall.input.arguments]);
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <div className="flex min-w-0 items-start gap-2">
         <ToolCallInputView input={toolCall.input} />
-        {executable ? (
-          <Tooltip content="Call this tool">
+        <div className="flex items-center">
+          <Tooltip content="Copy arguments">
             <Button
               className="invisible shrink-0 group-hover/message:visible"
               size="icon"
               variant="secondary"
-              disabled={readonly || calling}
-              onClick={() => void handleCall()}
+              onClick={() => void handleCopyArguments()}
             >
-              {calling ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <PlayIcon className="size-3" />
-              )}
+              <CopyIcon className="size-3" />
             </Button>
           </Tooltip>
-        ) : null}
+          {executable ? (
+            <Tooltip content="Call this tool">
+              <Button
+                className="invisible shrink-0 group-hover/message:visible"
+                size="icon"
+                variant="secondary"
+                disabled={readonly || calling}
+                onClick={() => void handleCall()}
+              >
+                {calling ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <PlayIcon className="size-3" />
+                )}
+              </Button>
+            </Tooltip>
+          ) : null}
+        </div>
       </div>
       <hr />
       <div className="flex w-full flex-col gap-1">
@@ -156,6 +183,10 @@ function _ToolCallListItem({
   );
 }
 export const ToolCallListItem = memo(_ToolCallListItem);
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value, null, 2) ?? String(value);
+}
 
 // -- tool-call response editors -----------------------------------------------
 

@@ -252,9 +252,12 @@ function _reduceAssistantMessageEvent(
     case "toolcall_delta": {
       const toolCallContent = content[event.contentIndex] as ToolCallContent;
       toolCallContent.arguments += event.delta;
-      const args = parseJSON<Record<string, unknown>>(
-        toolCallContent.arguments
-      );
+      let args: Record<string, unknown> = {};
+      try {
+        args = parseJSON<Record<string, unknown>>(toolCallContent.arguments);
+      } catch {
+        return _createUpdateMessageEvent(message, content);
+      }
       return _createUpdateMessageEvent(
         _replaceToolCall(message, toolCallContent.id, (toolCall) => ({
           ...toolCall,
