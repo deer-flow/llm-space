@@ -1,4 +1,5 @@
 import {
+  CircleHelpIcon,
   CloudSunIcon,
   Edit3Icon,
   FileOutputIcon,
@@ -6,11 +7,13 @@ import {
   FileTextIcon,
   FilesIcon,
   FolderSearchIcon,
+  FolderTreeIcon,
   GlobeIcon,
   ListTodoIcon,
   ListTreeIcon,
   PackageCheckIcon,
   SearchIcon,
+  SparklesIcon,
   TerminalIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -21,11 +24,14 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
   "file-output": FileOutputIcon,
   pencil: Edit3Icon,
   "list-tree": ListTreeIcon,
+  "folder-tree": FolderTreeIcon,
   "file-search": FileSearchIcon,
   "folder-search": FolderSearchIcon,
   terminal: TerminalIcon,
   globe: GlobeIcon,
   search: SearchIcon,
+  sparkles: SparklesIcon,
+  "circle-help": CircleHelpIcon,
   "cloud-sun": CloudSunIcon,
   files: FilesIcon,
   "list-todo": ListTodoIcon,
@@ -37,6 +43,8 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   write: "file-output",
   edit: "pencil",
   ls: "list-tree",
+  tree: "folder-tree",
+  skill: "sparkles",
   grep: "file-search",
   glob: "folder-search",
   bash: "terminal",
@@ -45,6 +53,7 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   weather_report: "cloud-sun",
   present_files: "files",
   todo_write: "list-todo",
+  ask_user_question: "circle-help",
 };
 
 /**

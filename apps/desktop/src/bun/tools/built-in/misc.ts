@@ -182,6 +182,81 @@ export async function todo_write(): Promise<"OK"> {
   return Promise.resolve("OK");
 }
 
+// -- ask_user_question --------------------------------------------------------
+
+export const askUserQuestionTool: BuiltinTool = {
+  type: "builtin",
+  name: "ask_user_question",
+  icon: "circle-help",
+  // Always ends the run: its answer must come from a human, so it can never be
+  // auto-executed (not by "auto run tools", not by the ReAct loop).
+  terminate: true,
+  description:
+    'Collect structured multiple-choice answers from the user. Use only when blocked on a decision that is genuinely the user\'s to make — one you cannot resolve from the request, the code, or sensible defaults. Each question must have at least 2 options; users can always select "Other" for custom text. Set multi_select to true for multi-select questions.',
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["questions"],
+    properties: {
+      questions: {
+        type: "array",
+        description:
+          "A list of 1–4 parallel, independent questions with predefined answer choices.",
+        items: {
+          type: "object",
+          required: ["question", "header", "options", "multi_select"],
+          properties: {
+            question: {
+              type: "string",
+              description:
+                "Full question text. Be specific and end with a question mark where appropriate.",
+            },
+            header: {
+              type: "string",
+              description:
+                "Very short tab or tag label for the question, maximum 12 characters, for example Auth or Library.",
+            },
+            options: {
+              type: "array",
+              description:
+                "A list of 2–4 distinct selectable choices. Choices are mutually exclusive unless multi_select is true.",
+              items: {
+                type: "object",
+                required: ["label", "description"],
+                properties: {
+                  label: {
+                    type: "string",
+                    description:
+                      "Short display label for this choice, ideally 1–5 words.",
+                  },
+                  description: {
+                    type: "string",
+                    description:
+                      "Explanation of what this choice means or implies.",
+                  },
+                  preview: {
+                    type: "string",
+                    description:
+                      "Optional markdown preview shown when this option is focused. Intended for single-select questions only.",
+                  },
+                },
+                additionalProperties: false,
+              },
+            },
+            multi_select: {
+              type: "boolean",
+              description:
+                "If true, the user may select multiple options. If false, the user must select exactly one option.",
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
 // -- registry -----------------------------------------------------------------
 
 export const miscBuiltInTools = [
@@ -205,6 +280,18 @@ export const miscBuiltInTools = [
     tool: todoWriteTool,
     async execute() {
       return todo_write();
+    },
+  },
+  {
+    tool: askUserQuestionTool,
+    // Never auto-executed: `terminate` keeps it out of every auto-run path. This
+    // guard only fires if it is somehow invoked directly.
+    execute() {
+      return Promise.reject(
+        new Error(
+          "ask_user_question needs a human answer and cannot be executed automatically."
+        )
+      );
     },
   },
 ];

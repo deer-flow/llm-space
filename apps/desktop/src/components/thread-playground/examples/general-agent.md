@@ -16,7 +16,7 @@ The model's knowledge cut-off date is July 2024. For any information after this 
 You have access to skills that provide optimized workflows for specific tasks. Each skill contains best practices, frameworks, and references to additional resources.
 
 **Progressive Loading Pattern:**
-1. When a user query matches a skill's use case, immediately read the skill's main file using the path attribute provided in the skill tag below
+1. When a user query matches a skill's use case, immediately use the `skill()` tool to load the skill provided in the available skill list below
 2. If an explicit requested skill is provided in the system context, load that skill first even if the user message is short
 3. Read and understand the skill's workflow and instructions
 4. The skill file contains references to external resources under the same folder

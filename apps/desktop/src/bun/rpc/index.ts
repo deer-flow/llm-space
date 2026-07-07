@@ -1,11 +1,12 @@
 import { ModelProviderGroup } from "@llm-space/core";
-import { BrowserView } from "electrobun/bun";
+import { BrowserView, Utils } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
 import { moveToTrash, revealInFileManager } from "../fs";
 import { mcpManager } from "../mcp";
 import { modelManager } from "../models";
 import { searchSettings } from "../search";
+import { skillsManager } from "../skills";
 import { localFs } from "../storage";
 import {
   abortStreamThread,
@@ -167,6 +168,28 @@ export const mainWindowRPC: MainWindowRPC =
           callBuiltInTool({ name, arguments: args }),
         getSearchSettings: () => searchSettings.get(),
         setSearchSettings: ({ settings }) => searchSettings.set(settings),
+        skillsGetSettings: () => Promise.resolve(skillsManager.getConfig()),
+        skillsBrowseForPath: async () => {
+          const selected = await Utils.openFileDialog({
+            startingFolder: "~/",
+            canChooseFiles: false,
+            canChooseDirectory: true,
+            allowsMultipleSelection: false,
+          });
+          const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
+          return { path };
+        },
+        skillsAddPath: ({ path }) => Promise.resolve(skillsManager.addPath(path)),
+        skillsRemovePath: ({ path }) =>
+          Promise.resolve(skillsManager.removePath(path)),
+        skillsSetSkillHidden: ({ path, skillName, hidden }) =>
+          Promise.resolve(skillsManager.setSkillHidden(path, skillName, hidden)),
+        skillsSetAllSkillsHidden: ({ path, hidden }) =>
+          Promise.resolve(skillsManager.setAllSkillsHidden(path, hidden)),
+        skillsListSkills: ({ path }) =>
+          Promise.resolve(skillsManager.listSkills(path)),
+        skillsReadSkill: ({ path }) =>
+          Promise.resolve(skillsManager.readSkill(path)),
         traceListProjects: () => traceManager.listProjects(),
         traceCreateProject: ({ name }) => traceManager.createProject(name),
         traceCreateConnectedProject: (input) =>

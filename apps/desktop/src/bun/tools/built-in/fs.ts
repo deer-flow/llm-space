@@ -1,13 +1,59 @@
 import { spawn } from "node:child_process";
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { BuiltinTool } from "@llm-space/core";
 import { getLlmSpaceRoot } from "@llm-space/core/server";
 
+import { skillsManager } from "../../skills";
+
 /** Workspace root that path-less tools (e.g. `glob`) default to. */
 function _workspaceRoot(): string {
   return path.join(getLlmSpaceRoot(), "workspace");
+}
+
+/**
+ * Directory and file names the traversal tools (`ls`, `glob`, `grep`) skip by
+ * default — dependency, version-control, build-output, and OS-cruft entries
+ * that add noise without signal. `grep` feeds these to ripgrep as exclude
+ * globs; `ls`/`glob` filter them out during traversal.
+ */
+const DEFAULT_IGNORES = [
+  "node_modules",
+  ".git",
+  ".svn",
+  ".hg",
+  ".DS_Store",
+  "Thumbs.db",
+  ".cache",
+  ".next",
+  ".nuxt",
+  ".turbo",
+  ".parcel-cache",
+  "dist",
+  "build",
+  "out",
+  "coverage",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".venv",
+  "venv",
+];
+
+const IGNORED_NAMES = new Set(DEFAULT_IGNORES);
+
+/** Whether a single entry name should be ignored. */
+function _isIgnored(name: string): boolean {
+  return IGNORED_NAMES.has(name);
+}
+
+/** Whether any segment of a relative path is an ignored name. */
+function _hasIgnoredSegment(relativePath: string): boolean {
+  return relativePath
+    .split(/[/\\]/)
+    .some((segment) => IGNORED_NAMES.has(segment));
 }
 
 // -- read ---------------------------------------------------------------------
@@ -23,12 +69,19 @@ const IMAGE_EXTENSIONS = new Set([
   ".ico",
 ]);
 
+/**
+ * Upper bound on the bytes a single `read` returns. An unbounded read (no
+ * `limit`) still stops here so a huge file can't blow past the model's context —
+ * the output is truncated with a notice pointing at `offset`/`limit`.
+ */
+const READ_MAX_SIZE_BYTES = 256 * 1024;
+
 export const readTool: BuiltinTool = {
   type: "builtin",
   name: "read",
   icon: "file-text",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents; for images, returns a visual representation. Prefer this over bash for reading files.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a visual representation. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files. Do NOT use read to load a skill's SKILL.md — use the skill tool instead, unless you specifically need to edit that skill.",
   strict: true,
   parameters: {
     type: "object",
@@ -43,12 +96,26 @@ export const readTool: BuiltinTool = {
         type: "string",
         description: "Absolute path to the file to read",
       },
+      offset: {
+        type: "number",
+        description:
+          "1-based line number to start reading from. Defaults to 1 (the first line).",
+      },
+      limit: {
+        type: "number",
+        description:
+          "Maximum number of lines to read from offset. Defaults to unlimited (the rest of the file), still capped by the 256KB output limit.",
+      },
     },
     additionalProperties: false,
   },
 };
 
-export async function read(filePath: string): Promise<string> {
+export async function read(
+  filePath: string,
+  offset?: number,
+  limit?: number
+): Promise<string> {
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
     throw new Error(`${filePath} is a directory, not a file.`);
@@ -57,10 +124,33 @@ export async function read(filePath: string): Promise<string> {
     return `[image file: ${filePath} (${stat.size} bytes)]`;
   }
   const content = await fs.readFile(filePath, "utf8");
-  return content
-    .split("\n")
-    .map((line, index) => `${index + 1}\t${line}`)
-    .join("\n");
+  const lines = content.split("\n");
+
+  const start = offset && offset > 1 ? offset - 1 : 0;
+  const end = limit !== undefined ? start + Math.max(0, limit) : lines.length;
+  const selected = lines.slice(start, Math.max(start, end));
+
+  // Number lines by their real position and stop once the output would exceed
+  // the size cap, so an unbounded read stays bounded.
+  const out: string[] = [];
+  let bytes = 0;
+  let truncated = false;
+  for (let i = 0; i < selected.length; i++) {
+    const rendered = `${start + i + 1}\t${selected[i]}`;
+    const size = Buffer.byteLength(rendered, "utf8") + 1; // + newline
+    if (out.length > 0 && bytes + size > READ_MAX_SIZE_BYTES) {
+      truncated = true;
+      break;
+    }
+    bytes += size;
+    out.push(rendered);
+  }
+
+  let result = out.join("\n");
+  if (truncated) {
+    result += `\n... [truncated at ${READ_MAX_SIZE_BYTES} bytes; pass offset/limit to read a specific range]`;
+  }
+  return result;
 }
 
 // -- write --------------------------------------------------------------------
@@ -178,7 +268,7 @@ export const lsTool: BuiltinTool = {
   name: "ls",
   icon: "list-tree",
   description:
-    "Lists files and directories at a given path. Returns entry names sorted by modification time (newest first). Use to explore directory structure before reading or editing files.",
+    "Lists files and directories at a given path. Returns entry names sorted by modification time (newest first). Common noise directories (node_modules, .git, build output, etc.) are omitted. Use to explore directory structure before reading or editing files.",
   strict: true,
   parameters: {
     type: "object",
@@ -199,7 +289,9 @@ export const lsTool: BuiltinTool = {
 };
 
 export async function ls(dirPath: string): Promise<string> {
-  const entries = await fs.readdir(dirPath, { withFileTypes: true });
+  const entries = (await fs.readdir(dirPath, { withFileTypes: true })).filter(
+    (entry) => !_isIgnored(entry.name)
+  );
   const withMtime = await Promise.all(
     entries.map(async (entry) => {
       const full = path.join(dirPath, entry.name);
@@ -224,6 +316,104 @@ export async function ls(dirPath: string): Promise<string> {
     .join("\n");
 }
 
+// -- tree ---------------------------------------------------------------------
+
+/** Default and safety-cap depths for `tree`. */
+const TREE_DEFAULT_DEPTH = 5;
+const TREE_MAX_DEPTH = 20;
+
+export const treeTool: BuiltinTool = {
+  type: "builtin",
+  name: "tree",
+  icon: "folder-tree",
+  description:
+    "Prints a directory as an indented tree up to a maximum depth (default 5 levels). Common noise directories (node_modules, .git, build output, etc.) are skipped. Use to understand a project's layout at a glance before reading individual files.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "path"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary explaining why this tree is being generated",
+      },
+      path: {
+        type: "string",
+        description: "Absolute path to the directory to print as a tree",
+      },
+      max_depth: {
+        type: "number",
+        description: `Maximum directory depth to descend. Defaults to ${TREE_DEFAULT_DEPTH}, capped at ${TREE_MAX_DEPTH}.`,
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+export async function tree(dirPath: string, maxDepth?: number): Promise<string> {
+  const stat = await fs.stat(dirPath);
+  if (!stat.isDirectory()) {
+    throw new Error(`${dirPath} is not a directory.`);
+  }
+  const depth =
+    maxDepth !== undefined && maxDepth > 0
+      ? Math.min(Math.floor(maxDepth), TREE_MAX_DEPTH)
+      : TREE_DEFAULT_DEPTH;
+
+  const lines = [dirPath];
+  await _buildTree(dirPath, "", depth, lines);
+  if (lines.length === 1) {
+    return `${dirPath} is empty.`;
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Append a directory's children to `lines` as tree rows, recursing up to
+ * `remaining` more levels. Directories sort before files, ignored names are
+ * skipped, and symlinks are not descended into (avoiding loops).
+ */
+async function _buildTree(
+  dir: string,
+  prefix: string,
+  remaining: number,
+  lines: string[]
+): Promise<void> {
+  if (remaining <= 0) {
+    return;
+  }
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    // Unreadable directory (permissions, race) — render it as a leaf.
+    return;
+  }
+  const visible = entries
+    .filter((entry) => !_isIgnored(entry.name))
+    .sort((a, b) => {
+      const aDir = a.isDirectory() ? 0 : 1;
+      const bDir = b.isDirectory() ? 0 : 1;
+      return aDir - bDir || a.name.localeCompare(b.name);
+    });
+
+  for (let i = 0; i < visible.length; i++) {
+    const entry = visible[i];
+    const last = i === visible.length - 1;
+    const isDir = entry.isDirectory();
+    lines.push(`${prefix}${last ? "└── " : "├── "}${entry.name}${isDir ? "/" : ""}`);
+    if (isDir) {
+      await _buildTree(
+        path.join(dir, entry.name),
+        `${prefix}${last ? "    " : "│   "}`,
+        remaining - 1,
+        lines
+      );
+    }
+  }
+}
+
 // -- grep ---------------------------------------------------------------------
 
 export const grepTool: BuiltinTool = {
@@ -231,7 +421,7 @@ export const grepTool: BuiltinTool = {
   name: "grep",
   icon: "file-search",
   description:
-    "Search file contents with ripgrep. Supports regex patterns, glob filters, and context lines. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
+    "Search file contents with ripgrep. Supports regex patterns, glob filters, and context lines. Common noise directories (node_modules, .git, build output, etc.) are excluded. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
   strict: true,
   parameters: {
     type: "object",
@@ -272,6 +462,10 @@ export async function grep(
   caseInsensitive = false
 ): Promise<string> {
   const args = ["--line-number", "--with-filename", "--color=never"];
+  // Prune common noise dirs/files regardless of any .gitignore presence.
+  for (const name of DEFAULT_IGNORES) {
+    args.push("--glob", `!${name}`);
+  }
   if (caseInsensitive) {
     args.push("--ignore-case");
   }
@@ -297,7 +491,7 @@ export const globTool: BuiltinTool = {
   name: "glob",
   icon: "folder-search",
   description:
-    "Find files matching a glob pattern, sorted by modification time (newest first). Use when you need to locate files by name or extension rather than search their contents.",
+    "Find files matching a glob pattern, sorted by modification time (newest first). Common noise directories (node_modules, .git, build output, etc.) are skipped. Use when you need to locate files by name or extension rather than search their contents.",
   strict: true,
   parameters: {
     type: "object",
@@ -330,6 +524,9 @@ export async function glob(
   const scanner = new Bun.Glob(globPattern);
   const matches: { path: string; mtimeMs: number }[] = [];
   for await (const relative of scanner.scan({ cwd: root, dot: true })) {
+    if (_hasIgnoredSegment(relative)) {
+      continue;
+    }
     const full = path.join(root, relative);
     try {
       matches.push({ path: full, mtimeMs: (await fs.stat(full)).mtimeMs });
@@ -383,13 +580,47 @@ export async function bash(command: string): Promise<{
   return { stdout, stderr, exitCode: code };
 }
 
+// -- skill --------------------------------------------------------------------
+
+export const skillTool: BuiltinTool = {
+  type: "builtin",
+  name: "skill",
+  icon: "sparkles",
+  description:
+    "Load a skill within the main conversation. When users ask you to perform tasks, check if any of the available skills match. Skills provide specialized capabilities and domain knowledge. Prefer this over read for loading a skill's instructions.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: {
+        type: "string",
+        description: "The name of the skill to load (its SKILL.md `name`).",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+export function skill(name: string): string {
+  const found = skillsManager.findSkill(name);
+  if (!found) {
+    throw new Error(`Skill "${name}" not found.`);
+  }
+  return `Base directory for this skill: ${found.path}\n\n${found.content.trim()}`;
+}
+
 // -- registry -----------------------------------------------------------------
 
 export const fsBuiltInTools = [
   {
     tool: readTool,
     async execute(args: Record<string, unknown>) {
-      return read(_requireString(args, "path"));
+      return read(
+        _requireString(args, "path"),
+        _optionalNumber(args, "offset"),
+        _optionalNumber(args, "limit")
+      );
     },
   },
   {
@@ -399,6 +630,12 @@ export const fsBuiltInTools = [
         _requireString(args, "path"),
         _requireString(args, "contents")
       );
+    },
+  },
+  {
+    tool: skillTool,
+    execute(args: Record<string, unknown>) {
+      return Promise.resolve(skill(_requireString(args, "name")));
     },
   },
   {
@@ -416,6 +653,12 @@ export const fsBuiltInTools = [
     tool: lsTool,
     async execute(args: Record<string, unknown>) {
       return ls(_requireString(args, "path"));
+    },
+  },
+  {
+    tool: treeTool,
+    async execute(args: Record<string, unknown>) {
+      return tree(_requireString(args, "path"), _optionalNumber(args, "max_depth"));
     },
   },
   {
@@ -501,6 +744,20 @@ function _optionalBoolean(
   }
   if (typeof value !== "boolean") {
     throw new Error(`${key} must be a boolean.`);
+  }
+  return value;
+}
+
+function _optionalNumber(
+  args: Record<string, unknown>,
+  key: string
+): number | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${key} must be a number.`);
   }
   return value;
 }

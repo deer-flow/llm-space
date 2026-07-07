@@ -18,6 +18,7 @@ import type {
   McpServerView,
 } from "./mcp";
 import type { SearchSettings } from "./search";
+import type { SkillContent, SkillInfo, SkillsSettings } from "./skills";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
@@ -201,6 +202,43 @@ export interface DesktopRPCType {
       setSearchSettings: {
         params: { settings: SearchSettings };
         response: SearchSettings;
+      };
+      // The discovery folders + hidden skills backing the built-in Skill tool.
+      skillsGetSettings: {
+        params: Record<string, never>;
+        response: SkillsSettings;
+      };
+      // Open the native folder picker; `path` is null when the user cancels.
+      skillsBrowseForPath: {
+        params: Record<string, never>;
+        response: { path: string | null };
+      };
+      skillsAddPath: {
+        params: { path: string };
+        response: SkillsSettings;
+      };
+      skillsRemovePath: {
+        params: { path: string };
+        response: SkillsSettings;
+      };
+      skillsSetSkillHidden: {
+        params: { path: string; skillName: string; hidden: boolean };
+        response: SkillsSettings;
+      };
+      // Enable/disable every skill in one folder at once.
+      skillsSetAllSkillsHidden: {
+        params: { path: string; hidden: boolean };
+        response: SkillsSettings;
+      };
+      // Discover the skills under one folder (name/description/path/enabled).
+      skillsListSkills: {
+        params: { path: string };
+        response: SkillInfo[];
+      };
+      // Read one skill's full SKILL.md (frontmatters + body) by its directory.
+      skillsReadSkill: {
+        params: { path: string };
+        response: SkillContent;
       };
       // List trace projects for the dedicated Trace Panel.
       traceListProjects: {

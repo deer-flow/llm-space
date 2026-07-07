@@ -68,6 +68,13 @@ const BuiltinTool = Type.Intersect([
      * truth) instead of a name→icon lookup that drifts per UI surface.
      */
     icon: Type.Optional(Type.String()),
+    /**
+     * When `true`, the tool always ends the run and can never be auto-executed —
+     * its result must be supplied by a human (e.g. `ask_user_question`). It is
+     * excluded from {@link isExecutableTool} so neither the "auto run tools"
+     * nor the ReAct-loop path will ever call it automatically.
+     */
+    terminate: Type.Optional(Type.Boolean()),
   }),
 ]);
 export type BuiltinTool = Static<typeof BuiltinTool>;
@@ -136,10 +143,15 @@ export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
  * Whether a tool has a runtime backend the app can invoke directly. MCP tools
  * call their server and built-in tools call the desktop registry; `function`
  * tools are user-defined stubs with no backend, so their results are supplied
- * by hand. The single source of truth for "can be auto-executed".
+ * by hand. Built-in tools flagged `terminate` (e.g. `ask_user_question`)
+ * require human input, so they are treated as non-executable too. The single
+ * source of truth for "can be auto-executed".
  */
 export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
-  return tool.type === "mcp" || tool.type === "builtin";
+  if (tool.type === "mcp") {
+    return true;
+  }
+  return tool.type === "builtin" && tool.terminate !== true;
 }
 
 function _getLegacyMcpSource(

@@ -1,4 +1,4 @@
-import type { FunctionTool } from "@llm-space/core";
+import type { BuiltinTool, FunctionTool } from "@llm-space/core";
 import {
   ActivityIcon,
   BotIcon,
@@ -10,12 +10,14 @@ import {
   FileOutputIcon,
   FileSearchIcon,
   FileTextIcon,
+  FolderTreeIcon,
   GlobeIcon,
   ImageIcon,
   ListTodoIcon,
   ListTreeIcon,
   PlayIcon,
   SearchIcon,
+  SparklesIcon,
   SquareIcon,
   TerminalIcon,
   type LucideIcon,
@@ -92,7 +94,7 @@ const BASH_TOOL: FunctionTool = _functionTool({
 const READ_FILE_TOOL: FunctionTool = _functionTool({
   name: "read",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents; for images, returns a visual representation. Prefer this over bash for reading files.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a visual representation. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files.",
   strict: true,
   parameters: {
     type: "object",
@@ -106,6 +108,16 @@ const READ_FILE_TOOL: FunctionTool = _functionTool({
       path: {
         type: "string",
         description: "Absolute path to the file to read",
+      },
+      offset: {
+        type: "number",
+        description:
+          "1-based line number to start reading from. Defaults to 1 (the first line).",
+      },
+      limit: {
+        type: "number",
+        description:
+          "Maximum number of lines to read from offset. Defaults to unlimited (the rest of the file), still capped by the 256KB output limit.",
       },
     },
     additionalProperties: false,
@@ -199,6 +211,34 @@ const LS_TOOL: FunctionTool = _functionTool({
   },
 });
 
+const TREE_TOOL: FunctionTool = _functionTool({
+  name: "tree",
+  description:
+    "Prints a directory as an indented tree up to a maximum depth (default 5 levels). Common noise directories (node_modules, .git, build output, etc.) are skipped. Use to understand a project's layout at a glance before reading individual files.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "path"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary explaining why this tree is being generated",
+      },
+      path: {
+        type: "string",
+        description: "Absolute path to the directory to print as a tree",
+      },
+      max_depth: {
+        type: "number",
+        description:
+          "Maximum directory depth to descend. Defaults to 5, capped at 20.",
+      },
+    },
+    additionalProperties: false,
+  },
+});
+
 const GREP_TOOL: FunctionTool = _functionTool({
   name: "grep",
   description:
@@ -258,6 +298,24 @@ const GLOB_TOOL: FunctionTool = _functionTool({
         type: "string",
         description:
           "Absolute path to the directory to search in. Defaults to the workspace root if omitted.",
+      },
+    },
+    additionalProperties: false,
+  },
+});
+
+const SKILL_TOOL: FunctionTool = _functionTool({
+  name: "skill",
+  description:
+    "Load a skill within the main conversation. When users ask you to perform tasks, check if any of the available skills match. Skills provide specialized capabilities and domain knowledge. Prefer this over read for loading a skill's instructions.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: {
+        type: "string",
+        description: "The name of the skill to load (its SKILL.md `name`).",
       },
     },
     additionalProperties: false,
@@ -391,6 +449,22 @@ const ASK_USER_QUESTION_TOOL: FunctionTool = _functionTool({
     additionalProperties: false,
   },
 });
+
+/**
+ * The built-in `ask_user_question`, seeded into example threads (mirrors the
+ * desktop registry in `bun/tools/built-in/misc.ts`). `terminate` marks it as
+ * requiring human input, so it is never auto-executed — the response comes from
+ * the dedicated form editor instead.
+ */
+export const ASK_USER_QUESTION_BUILTIN_TOOL: BuiltinTool = {
+  type: "builtin",
+  name: ASK_USER_QUESTION_TOOL.name,
+  description: ASK_USER_QUESTION_TOOL.description,
+  parameters: ASK_USER_QUESTION_TOOL.parameters,
+  strict: ASK_USER_QUESTION_TOOL.strict,
+  icon: "circle-help",
+  terminate: true,
+};
 
 const AGENT_TOOL: FunctionTool = _functionTool({
   name: "agent",
@@ -576,8 +650,10 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
     tool: WRITE_FILE_TOOL,
     icon: FileOutputIcon,
   },
+  { type: "tool", label: "skill", tool: SKILL_TOOL, icon: SparklesIcon },
   { type: "tool", label: "edit", tool: EDIT_TOOL, icon: Edit3Icon },
   { type: "tool", label: "ls", tool: LS_TOOL, icon: ListTreeIcon },
+  { type: "tool", label: "tree", tool: TREE_TOOL, icon: FolderTreeIcon },
   { type: "tool", label: "grep", tool: GREP_TOOL, icon: FileSearchIcon },
   { type: "tool", label: "glob", tool: GLOB_TOOL, icon: CodeIcon },
   {

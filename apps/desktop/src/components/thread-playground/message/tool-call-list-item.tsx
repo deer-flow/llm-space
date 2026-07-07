@@ -3,16 +3,18 @@ import {
   type ToolCall,
   type ToolCallInput,
 } from "@llm-space/core";
-import { AlertCircleIcon, Loader2, PlayIcon } from "lucide-react";
+import { AlertCircleIcon, CheckIcon, Loader2, PlayIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
 import { Marker, MarkerContent } from "@/components/ui/marker";
+import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
 import { Button } from "../../ui/button";
+import { Input } from "../../ui/input";
 import { useThreadStoreActions } from "../stores";
 
 import { getToolCallOutputText, getToolCallStatus } from "./tool-call-status";
@@ -140,13 +142,9 @@ function _ToolCallListItem({
             {isError ? "Clear error" : "Mark as error"}
           </Button>
         </div>
-        <CodeEditor
-          className="max-h-96 min-h-9.5 px-0!"
-          hideBorder
-          hideFocusRing
-          scrollOnFocus
+        <ToolCallResponseEditor
+          input={toolCall.input}
           plain={fidelity === "lite"}
-          placeholder={`Enter the response of ${toolCall.input.name}()`}
           readonly={readonly}
           value={outputText}
           onChange={handleOutputChange}
@@ -174,3 +172,378 @@ function _ToolCallInputView({ input }: { input: ToolCallInput }) {
   );
 }
 const ToolCallInputView = memo(_ToolCallInputView);
+
+// -- tool-call response editors -----------------------------------------------
+
+/**
+ * Picks the response editor for a tool call. Specialized editors (e.g.
+ * {@link AskUserQuestionEditor}) render only when the tool call's input matches
+ * their expected shape; anything else falls back to the plain code editor.
+ */
+function _ToolCallResponseEditor({
+  input,
+  value,
+  plain,
+  readonly,
+  onChange,
+  onKeyDown,
+}: {
+  input: ToolCallInput;
+  value: string;
+  plain: boolean;
+  readonly: boolean;
+  onChange: (value: string) => void;
+  onKeyDown: (event: React.KeyboardEvent) => void;
+}) {
+  const askUserQuestion = useMemo(
+    () => parseAskUserQuestionInput(input),
+    [input]
+  );
+
+  if (askUserQuestion) {
+    return (
+      <AskUserQuestionEditor
+        questions={askUserQuestion}
+        value={value}
+        readonly={readonly}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+      />
+    );
+  }
+
+  return (
+    <CodeEditor
+      className="max-h-96 min-h-9.5 px-0!"
+      hideBorder
+      hideFocusRing
+      scrollOnFocus
+      plain={plain}
+      placeholder={`Enter the response of ${input.name}()`}
+      readonly={readonly}
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+const ToolCallResponseEditor = memo(_ToolCallResponseEditor);
+
+// -- ask_user_question --------------------------------------------------------
+
+interface AskUserQuestionOption {
+  label: string;
+  description?: string;
+}
+
+interface AskUserQuestionItem {
+  question: string;
+  header?: string;
+  options: AskUserQuestionOption[];
+  multiSelect: boolean;
+}
+
+/** One question's selection: chosen option labels plus a free-form "Other". */
+interface QuestionSelection {
+  selected: string[];
+  otherEnabled: boolean;
+  otherText: string;
+}
+
+/**
+ * Validate a tool call's input against the `ask_user_question` outline and, on
+ * success, return the normalized questions. Returns `null` for any other tool
+ * or a malformed payload, so the caller falls back to the default editor.
+ */
+function parseAskUserQuestionInput(
+  input: ToolCallInput
+): AskUserQuestionItem[] | null {
+  if (input.name !== "ask_user_question") {
+    return null;
+  }
+  const rawQuestions = (input.arguments as Record<string, unknown>)?.questions;
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    return null;
+  }
+
+  const questions: AskUserQuestionItem[] = [];
+  for (const rawQuestion of rawQuestions) {
+    if (typeof rawQuestion !== "object" || rawQuestion === null) {
+      return null;
+    }
+    const q = rawQuestion as Record<string, unknown>;
+    if (typeof q.question !== "string" || q.question === "") {
+      return null;
+    }
+    if (!Array.isArray(q.options) || q.options.length === 0) {
+      return null;
+    }
+    const options: AskUserQuestionOption[] = [];
+    for (const rawOption of q.options) {
+      if (typeof rawOption !== "object" || rawOption === null) {
+        return null;
+      }
+      const o = rawOption as Record<string, unknown>;
+      if (typeof o.label !== "string" || o.label === "") {
+        return null;
+      }
+      options.push({
+        label: o.label,
+        description:
+          typeof o.description === "string" ? o.description : undefined,
+      });
+    }
+    questions.push({
+      question: q.question,
+      header: typeof q.header === "string" ? q.header : undefined,
+      options,
+      multiSelect: q.multi_select === true,
+    });
+  }
+  return questions;
+}
+
+/** Seed each question's selection from the existing response JSON, if any. */
+function _initSelections(
+  questions: AskUserQuestionItem[],
+  value: string
+): QuestionSelection[] {
+  let parsed: unknown;
+  try {
+    parsed = value ? JSON.parse(value) : null;
+  } catch {
+    parsed = null;
+  }
+  const entries = Array.isArray(parsed) ? parsed : [];
+
+  return questions.map((question, index) => {
+    const entry = (entries.find(
+      (e) =>
+        e !== null &&
+        typeof e === "object" &&
+        (e as Record<string, unknown>).question === question.question
+    ) ?? entries[index]) as Record<string, unknown> | undefined;
+    const answers = Array.isArray(entry?.answer)
+      ? entry.answer.filter((a): a is string => typeof a === "string")
+      : [];
+    const labels = new Set(question.options.map((o) => o.label));
+    const selected = answers.filter((a) => labels.has(a));
+    const other = answers.filter((a) => !labels.has(a));
+    return {
+      selected: question.multiSelect ? selected : selected.slice(0, 1),
+      otherEnabled: other.length > 0,
+      otherText: other[0] ?? "",
+    };
+  });
+}
+
+/** Build one question's answer list: chosen labels plus the "Other" text. */
+function _answerFor(selection: QuestionSelection): string[] {
+  const answer = [...selection.selected];
+  if (selection.otherEnabled) {
+    answer.push(selection.otherText.trim() || "Other");
+  }
+  return answer;
+}
+
+/** Serialize selections to the response JSON string. */
+function _serialize(
+  questions: AskUserQuestionItem[],
+  selections: QuestionSelection[]
+): string {
+  const response = questions.map((question, index) => ({
+    question: question.question,
+    answer: _answerFor(selections[index]),
+  }));
+  return JSON.stringify(response, null, 2);
+}
+
+/**
+ * A form-based response editor for `ask_user_question`: renders each question
+ * with single- or multi-select options plus a free-form "Other". The response
+ * is written back as a JSON array of `{ question, answer }` — one entry per
+ * question, `answer` a list of the chosen option labels (or the typed "Other").
+ */
+function AskUserQuestionEditor({
+  questions,
+  value,
+  readonly,
+  onChange,
+  onKeyDown,
+}: {
+  questions: AskUserQuestionItem[];
+  value: string;
+  readonly: boolean;
+  onChange: (value: string) => void;
+  onKeyDown: (event: React.KeyboardEvent) => void;
+}) {
+  const [selections, setSelections] = useState<QuestionSelection[]>(() =>
+    _initSelections(questions, value)
+  );
+
+  const commit = useCallback(
+    (index: number, next: QuestionSelection) => {
+      if (readonly) {
+        return;
+      }
+      const updated = selections.map((s, i) => (i === index ? next : s));
+      setSelections(updated);
+      onChange(_serialize(questions, updated));
+    },
+    [onChange, questions, readonly, selections]
+  );
+
+  const toggleOption = useCallback(
+    (index: number, label: string) => {
+      const question = questions[index];
+      const current = selections[index];
+      if (question.multiSelect) {
+        const has = current.selected.includes(label);
+        commit(index, {
+          ...current,
+          selected: has
+            ? current.selected.filter((l) => l !== label)
+            : [...current.selected, label],
+        });
+        return;
+      }
+      // Single-select: exclusive with itself and with "Other".
+      const isOnlySelected =
+        current.selected.length === 1 &&
+        current.selected[0] === label &&
+        !current.otherEnabled;
+      commit(index, {
+        selected: isOnlySelected ? [] : [label],
+        otherEnabled: false,
+        otherText: current.otherText,
+      });
+    },
+    [commit, questions, selections]
+  );
+
+  const toggleOther = useCallback(
+    (index: number) => {
+      const question = questions[index];
+      const current = selections[index];
+      if (question.multiSelect) {
+        commit(index, { ...current, otherEnabled: !current.otherEnabled });
+        return;
+      }
+      commit(index, {
+        selected: [],
+        otherEnabled: !current.otherEnabled,
+        otherText: current.otherText,
+      });
+    },
+    [commit, questions, selections]
+  );
+
+  const setOtherText = useCallback(
+    (index: number, text: string) => {
+      const question = questions[index];
+      const current = selections[index];
+      commit(index, {
+        selected: question.multiSelect ? current.selected : [],
+        otherEnabled: true,
+        otherText: text,
+      });
+    },
+    [commit, questions, selections]
+  );
+
+  return (
+    <div className="flex w-full flex-col gap-4" onKeyDown={onKeyDown}>
+      {questions.map((question, index) => {
+        const selection = selections[index];
+        return (
+          <div key={index} className="flex flex-col gap-2">
+            {question.header && (
+              <div className="text-muted-foreground text-[0.625rem] font-medium tracking-wide uppercase">
+                {question.header}
+              </div>
+            )}
+            <div className="text-sm font-medium">{question.question}</div>
+            <div className="flex flex-col gap-1">
+              {question.options.map((option) => (
+                <OptionRow
+                  key={option.label}
+                  label={option.label}
+                  description={option.description}
+                  multiSelect={question.multiSelect}
+                  selected={selection.selected.includes(option.label)}
+                  disabled={readonly}
+                  onClick={() => toggleOption(index, option.label)}
+                />
+              ))}
+              <OptionRow
+                label="Other"
+                multiSelect={question.multiSelect}
+                selected={selection.otherEnabled}
+                disabled={readonly}
+                onClick={() => toggleOther(index)}
+              />
+              {selection.otherEnabled && (
+                <Input
+                  className="ml-6 h-8 w-[calc(100%-1.5rem)]"
+                  placeholder="Type your answer…"
+                  aria-label={`Other answer for "${question.question}"`}
+                  disabled={readonly}
+                  value={selection.otherText}
+                  onChange={(e) => setOtherText(index, e.target.value)}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One selectable option row: a radio (single) or checkbox (multi) affordance. */
+function OptionRow({
+  label,
+  description,
+  multiSelect,
+  selected,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  description?: string;
+  multiSelect: boolean;
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+        "hover:bg-foreground/6 disabled:cursor-default disabled:hover:bg-transparent"
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors",
+          multiSelect ? "rounded-[4px]" : "rounded-full",
+          selected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-input"
+        )}
+      >
+        {selected && <CheckIcon className="size-3" />}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{label}</span>
+        {description && (
+          <span className="text-muted-foreground text-xs">{description}</span>
+        )}
+      </span>
+    </button>
+  );
+}

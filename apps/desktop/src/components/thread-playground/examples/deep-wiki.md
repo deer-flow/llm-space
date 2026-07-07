@@ -4,15 +4,16 @@ Analyze the directory structure and file names to infer the purpose and relation
 
 # Steps
 
-1. Analyze the provided directory tree structure to identify key folders and files.
-2. Group related files and folders into logical sections/pages based on their names and locations in the directory tree.
-3. For each page:
+1. Use the `tree`, `ls` and `read` tools to explore the directory tree structure of the repository.
+2. Analyze the provided directory tree structure to identify key folders and files.
+3. Group related files and folders into logical sections/pages based on their names and locations in the directory tree.
+4. For each page:
    - Assign a descriptive title that reflects the content or purpose of the files.
    - Write a concise purpose for the page.
    - List all relevant files for the page.
    - Determine if the page requires a diagram (e.g., for architecture or complex relationships).
    - If applicable, establish parent-child relationships between pages to create a hierarchical structure.
-4. Output the Wiki directory tree in the specified `<wiki_structure>` format.
+5. Output the Wiki directory tree in the specified `<wiki_structure>` format.
 
 # Output Format
 

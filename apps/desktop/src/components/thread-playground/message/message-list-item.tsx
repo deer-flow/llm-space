@@ -6,7 +6,7 @@ import {
   type Message,
   type ToolCall,
 } from "@llm-space/core";
-import { Loader2Icon, PlayIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -247,6 +247,7 @@ function _ToolStepContinuation({
   readonly?: boolean;
 }) {
   const status = useThreadStore((state) => state.status);
+  const { run } = useThreadStoreActions();
   const { resolveTool, runToolCall } = useToolCallRunner(messageId);
   const callableToolCalls = useMemo(
     () =>
@@ -262,6 +263,20 @@ function _ToolStepContinuation({
     status !== "running" &&
     !callingTools &&
     callableToolCalls.length > 0;
+  // "Continue" runs the thread from this message (continuing past the tool
+  // results), mirroring the header's run action — enabled only once every tool
+  // call has a response.
+  const canContinue =
+    !readonly &&
+    status !== "running" &&
+    !callingTools &&
+    summarizeToolCalls(toolCalls).canContinue;
+  const handleContinue = useCallback(async () => {
+    if (!canContinue) {
+      return;
+    }
+    await run(messageId);
+  }, [canContinue, run, messageId]);
   const handleCallTools = useCallback(async () => {
     if (!canCallTools) {
       return;
@@ -305,23 +320,32 @@ function _ToolStepContinuation({
           {toolCalls.length} tool call{toolCalls.length === 1 ? "" : "s"}
         </MarkerContent>
       </Marker>
-      {callableToolCalls.length > 0 ? (
-        <Button
-          className="invisible shrink-0 group-hover/message:visible"
-          size="sm"
-          variant="outline"
-          disabled={!canCallTools}
-          aria-label="Call available MCP and built-in tools"
-          onClick={() => void handleCallTools()}
-        >
-          {callingTools ? (
-            <Loader2Icon className="animate-spin" />
-          ) : (
-            <PlayIcon className="size-3" />
-          )}
-          Call tools
-        </Button>
-      ) : null}
+      <div className="flex shrink-0 items-center gap-2">
+        {callableToolCalls.length > 0 ? (
+          <Button
+            className="invisible shrink-0 group-hover/message:visible"
+            size="sm"
+            variant="outline"
+            disabled={!canCallTools}
+            aria-label="Call available MCP and built-in tools"
+            onClick={() => void handleCallTools()}
+          >
+            Call tools
+          </Button>
+        ) : null}
+        <Tooltip content="Run from this message">
+          <Button
+            className="invisible shrink-0 group-hover/message:visible"
+            size="sm"
+            variant="default"
+            disabled={!canContinue}
+            aria-label="Run from this message"
+            onClick={() => void handleContinue()}
+          >
+            Continue
+          </Button>
+        </Tooltip>
+      </div>
     </div>
   );
 }

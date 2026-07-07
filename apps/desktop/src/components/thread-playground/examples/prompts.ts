@@ -17,7 +17,7 @@ import generalAgentPrompt from "./general-agent.md?raw";
 import metaImagePrompt from "./meta-image-prompt.md?raw";
 import metaPromptWithTools from "./meta-prompt-with-tools.md?raw";
 import metaToolPrompt from "./meta-tool.md?raw";
-import { TOOL_EXAMPLES } from "./tools";
+import { ASK_USER_QUESTION_BUILTIN_TOOL, TOOL_EXAMPLES } from "./tools";
 import translationPrompt from "./translation.md?raw";
 
 export interface PromptExample {
@@ -182,13 +182,14 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     content: generalAgentPrompt,
     icon: BotIcon,
     tools: [
-      ...pickTools(["ask_user_question"]),
+      ASK_USER_QUESTION_BUILTIN_TOOL,
       ...pickBuiltInTools([
         "web_search",
         "web_fetch",
         "ls",
         "read",
         "write",
+        "skill",
         "edit",
         "grep",
         "glob",
@@ -218,7 +219,9 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     fileStem: "deep-wiki",
     description: "Long-form knowledge-base answer prompt with sources.",
     content: deepWikiPrompt,
+    messages: userPrompt("Create a deep wiki for [/path/to/the/repository]"),
     icon: BookOpenTextIcon,
+    tools: [...pickBuiltInTools(["read", "ls", "tree"])],
   },
   {
     type: "example",
