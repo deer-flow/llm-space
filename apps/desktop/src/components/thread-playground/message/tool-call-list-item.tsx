@@ -134,24 +134,15 @@ function _ToolCallListItem({
       <div className="flex w-full flex-col gap-1">
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
           <Marker role="status" className="gap-1">
-            <MarkerIcon className="size-3">
-              {toolCallStatus === "needsResponse" && <Clock4 />}
-              {toolCallStatus === "ready" && (
-                <CheckCircle2 className="size-3 text-green-500" />
-              )}
-              {toolCallStatus === "error" && (
-                <AlertCircleIcon className="size-3 text-red-500" />
-              )}
-            </MarkerIcon>
             <MarkerContent className="text-xs">
               Response ·{" "}
               {toolCallStatus === "needsResponse"
                 ? isError
-                  ? "Needs Error Text"
-                  : "Needs Response"
+                  ? "(Needs error text)"
+                  : "(Needs response)"
                 : toolCallStatus === "error"
-                  ? "Error Result"
-                  : "Ready"}
+                  ? "(Error result)"
+                  : "(Ready)"}
             </MarkerContent>
           </Marker>
           <Button
@@ -162,7 +153,7 @@ function _ToolCallListItem({
             onClick={toggleError}
           >
             <AlertCircleIcon />
-            {isError ? "Clear Error" : "Mark Error"}
+            {isError ? "Clear error" : "Mark as error"}
           </Button>
         </div>
         <CodeEditor

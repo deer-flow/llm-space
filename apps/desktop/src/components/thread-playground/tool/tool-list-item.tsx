@@ -1,7 +1,7 @@
 "use client";
 
 import { type FunctionTool } from "@llm-space/core";
-import { SquareFunction, XIcon } from "lucide-react";
+import { CableIcon, FunctionSquareIcon, XIcon } from "lucide-react";
 import React, { memo, useCallback, useMemo } from "react";
 
 import { cn } from "@/lib/utils";
@@ -39,6 +39,8 @@ function _ToolListItem({
     },
     [onRemove, tool]
   );
+  const ToolIcon =
+    tool.source?.type === "mcp" ? CableIcon : FunctionSquareIcon;
 
   return (
     <div className="group/tool bg-secondary hover:text-accent-foreground inline-flex h-6 shrink-0 items-center rounded-md text-xs/relaxed transition-colors">
@@ -76,7 +78,7 @@ function _ToolListItem({
           disabled={readonly}
           onClick={() => onEdit(tool)}
         >
-          <SquareFunction className="size-3.5 shrink-0 opacity-70" />
+          <ToolIcon className="size-3.5 shrink-0 opacity-70" />
           <span className="font-mono">{tool.name}</span>
         </button>
       </Tooltip>

@@ -11,10 +11,13 @@ import { useCommands } from "@/commands";
 import { Tooltip } from "@/components/tooltip";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -22,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   getMcpReadinessLabel,
@@ -29,16 +33,19 @@ import {
   type McpToolSummary,
 } from "@/shared/mcp";
 
-function _McpToolImportPopover({
+function _McpToolImportDialog({
   existingToolNames,
-  disabled,
   onAdd,
+  onRemove,
+  open,
+  onOpenChange,
 }: {
   existingToolNames: Set<string>;
-  disabled?: boolean;
   onAdd: (tool: FunctionTool) => boolean;
+  onRemove: (toolName: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const { executeCommand } = useCommands();
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<string>("");
@@ -119,11 +126,15 @@ function _McpToolImportPopover({
     setTools(selectedServer?.readiness?.tools ?? []);
   }, [open, selectedServer]);
 
-  const handleAdd = (tool: McpToolSummary) => {
+  const handleToggleTool = (tool: McpToolSummary, checked: boolean) => {
+    if (!checked) {
+      onRemove(tool.directName);
+      return;
+    }
     if (!selectedServer) {
       return;
     }
-    const added = onAdd({
+    onAdd({
       name: tool.directName,
       description: tool.description,
       parameters: tool.inputSchema,
@@ -134,28 +145,18 @@ function _McpToolImportPopover({
         toolName: tool.toolName,
       },
     });
-    if (added) {
-      toast.success("MCP tool added", { description: tool.directName });
-    }
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip content="Add MCP tool">
-        <PopoverTrigger asChild>
-          <Button
-            className="-ml-1 px-0 opacity-50 transition-opacity hover:bg-transparent!"
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-          >
-            <Cable className="size-3" />
-            Add MCP
-          </Button>
-        </PopoverTrigger>
-      </Tooltip>
-      <PopoverContent align="start" className="w-96 p-3">
-        <div className="flex flex-col gap-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[calc(100vh-4rem)] w-[min(720px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b px-4 py-3">
+          <DialogTitle>Add MCP tools</DialogTitle>
+          <DialogDescription>
+            Choose a server, then add one or more MCP tools to this thread.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex min-h-0 flex-col gap-3 overflow-hidden p-4">
           <div className="flex items-center gap-2">
             <Select
               value={selectedServerId}
@@ -212,19 +213,19 @@ function _McpToolImportPopover({
                 variant="ghost"
                 className="shrink-0"
                 onClick={() => {
-                  setOpen(false);
+                  onOpenChange(false);
                   executeCommand({
                     type: "openSettings",
                     args: { tab: "mcp" },
                   });
                 }}
               >
-                Open Settings
+                Open settings
               </Button>
             </div>
           ) : null}
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="min-h-0 overflow-y-auto">
             {servers.length === 0 ? (
               <div className="text-muted-foreground px-1 py-6 text-center text-sm">
                 No MCP servers.
@@ -237,18 +238,14 @@ function _McpToolImportPopover({
               <div className="flex flex-col gap-1.5">
                 {tools.map((tool) => {
                   const exists = existingToolNames.has(tool.directName);
-                  const disabledReason = exists
-                    ? "Already added"
-                    : tool.disabledReason;
+                  const disabledReason = tool.disabledReason;
                   return (
-                    <button
+                    <div
                       key={tool.toolName}
-                      type="button"
-                      disabled={!tool.available || exists}
                       className={cn(
-                        "hover:bg-accent flex min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50"
+                        "hover:bg-accent flex min-w-0 items-start gap-3 rounded-md px-2 py-2 text-left transition-colors",
+                        !tool.available && "opacity-50"
                       )}
-                      onClick={() => handleAdd(tool)}
                     >
                       <Cable className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
                       <span className="min-w-0 grow">
@@ -266,7 +263,17 @@ function _McpToolImportPopover({
                           </span>
                         ) : null}
                       </span>
-                    </button>
+                      <Switch
+                        className="mt-0.5"
+                        size="sm"
+                        checked={exists}
+                        disabled={!tool.available}
+                        aria-label={`${exists ? "Remove" : "Add"} ${tool.directName}`}
+                        onCheckedChange={(checked) =>
+                          handleToggleTool(tool, checked)
+                        }
+                      />
+                    </div>
                   );
                 })}
               </div>
@@ -275,7 +282,7 @@ function _McpToolImportPopover({
 
           {diagnosticHeadline ? (
             <div className="text-muted-foreground text-xs">
-              Open Settings for the full redacted diagnostic timeline.
+              Open settings for the full redacted diagnostic timeline.
             </div>
           ) : selectedServer?.lastError ? (
             <div className="text-destructive text-xs">
@@ -283,12 +290,17 @@ function _McpToolImportPopover({
             </div>
           ) : null}
         </div>
-      </PopoverContent>
-    </Popover>
+        <DialogFooter className="border-t px-4 py-3">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-export const McpToolImportPopover = memo(_McpToolImportPopover);
+export const McpToolImportDialog = memo(_McpToolImportDialog);
 
 function _serverReadinessLabel(server: McpServerView): string {
   const readiness = server.readiness;

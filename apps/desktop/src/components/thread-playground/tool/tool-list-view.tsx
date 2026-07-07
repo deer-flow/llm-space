@@ -1,7 +1,7 @@
 "use client";
 
 import { type FunctionTool } from "@llm-space/core";
-import { PlusIcon } from "lucide-react";
+import { CableIcon, FunctionSquareIcon, PlusIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -12,8 +12,14 @@ import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../ui/dropdown-menu";
 
-import { McpToolImportPopover } from "./mcp-tool-import-popover";
+import { McpToolImportDialog } from "./mcp-tool-import-popover";
 import { ToolEditorDialog } from "./tool-editor-dialog";
 import { ToolListItem } from "./tool-list-item";
 
@@ -27,6 +33,7 @@ export function ToolListView({
   const tools = useThreadStore((s) => s.thread.context?.tools);
   const { addTool, removeTool } = useThreadStoreActions();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
   const existingToolNames = useMemo(
     () => new Set((tools ?? []).map((tool) => tool.name)),
@@ -67,23 +74,38 @@ export function ToolListView({
             onRemove={handleRemoveTool}
           />
         ))}
-        <Button
-          className={cn(
-            "-ml-1 px-0 transition-opacity hover:bg-transparent!",
-            readonly ? "opacity-30!" : "opacity-50"
-          )}
-          variant="ghost"
-          size="sm"
-          disabled={readonly}
-          onClick={openAddDialog}
-        >
-          <PlusIcon className="size-3" />
-          Add tool
-        </Button>
-        <McpToolImportPopover
-          disabled={readonly}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className={cn(
+                "-ml-1 px-0 transition-opacity hover:bg-transparent!",
+                readonly ? "opacity-30!" : "opacity-50"
+              )}
+              variant="ghost"
+              size="sm"
+              disabled={readonly}
+            >
+              <PlusIcon className="size-3" />
+              Add
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={openAddDialog}>
+              <FunctionSquareIcon />
+              Function tool
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setMcpOpen(true)}>
+              <CableIcon />
+              Add MCP tools
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <McpToolImportDialog
+          open={mcpOpen}
+          onOpenChange={setMcpOpen}
           existingToolNames={existingToolNames}
           onAdd={addTool}
+          onRemove={removeTool}
         />
       </div>
       <ToolEditorDialog

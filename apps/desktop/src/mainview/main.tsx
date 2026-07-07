@@ -4,15 +4,15 @@
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { scan } from "react-scan";
+// import { scan } from "react-scan";
 
 import "@/lib/electrobun";
 
 import { App } from "../app";
 
-scan({
-  //enabled: import.meta.env.DEV,
-});
+// scan({
+//   enabled: false,
+// });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

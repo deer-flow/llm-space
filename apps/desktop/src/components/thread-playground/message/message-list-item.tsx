@@ -279,7 +279,7 @@ function _ToolStepContinuation({
           )}
         </MarkerIcon>
         <MarkerContent className="truncate text-xs">
-          {summary.canContinue ? "Tool Results Ready" : "Waiting for Tools"} ·{" "}
+          {summary.canContinue ? "Tool results ready" : "Waiting for tools"} ·{" "}
           {statusLabel}
         </MarkerContent>
       </Marker>

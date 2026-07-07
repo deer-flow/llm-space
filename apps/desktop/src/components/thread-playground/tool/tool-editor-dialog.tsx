@@ -129,10 +129,13 @@ export function ToolEditorDialog({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{originalName ? "Edit tool" : "Add tool"}</DialogTitle>
+          <DialogTitle>
+            {originalName ? "Edit tool" : "Add function tool"}
+          </DialogTitle>
           <DialogDescription>
             A function tool consists of a name, description, and parameters.
-            Parameters are defined using JSON Schema.
+            Parameters are defined using JSON Schema. Since the tool is
+            customized, you need to provide a response at runtime.
           </DialogDescription>
         </DialogHeader>
 

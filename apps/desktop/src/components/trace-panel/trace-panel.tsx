@@ -447,7 +447,7 @@ function _EmptyProjects({ onAddProject }: { onAddProject: () => void }) {
   return (
     <Empty className="h-full border-0 px-3">
       <EmptyHeader>
-        <EmptyTitle>No Trace Projects</EmptyTitle>
+        <EmptyTitle>No trace projects</EmptyTitle>
         <EmptyDescription>
           Connect Langfuse or create a manual project for JSON exports.
         </EmptyDescription>
@@ -455,7 +455,7 @@ function _EmptyProjects({ onAddProject }: { onAddProject: () => void }) {
       <EmptyContent>
         <Button className="w-full py-4" size="lg" onClick={onAddProject}>
           <PlusIcon className="size-3" />
-          Add Trace Project
+          Add trace project
         </Button>
       </EmptyContent>
     </Empty>
