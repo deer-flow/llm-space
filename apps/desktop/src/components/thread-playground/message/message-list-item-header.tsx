@@ -18,6 +18,7 @@ import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";
 import { TokenUsageSummary } from "./token-usage-summary";
+import { summarizeToolCalls } from "./tool-call-status";
 
 function _MessageListItemHeader({
   message,
@@ -32,9 +33,17 @@ function _MessageListItemHeader({
 }) {
   const { run, removeMessage, toggleMessageRole, toggleMessageCollapsed } =
     useThreadStoreActions();
-  const hasToolCalls =
-    message.role === "assistant" && Boolean(message.toolCalls?.length);
-  const runnable = message.role === "user";
+  // An assistant message with tool calls is runnable (running continues from the
+  // tool results) once every call has a response — mirroring ToolStepContinuation's
+  // Run, which is also gated on `canContinue`.
+  const toolResultsReady = useMemo(
+    () =>
+      message.role === "assistant" && message.toolCalls?.length
+        ? summarizeToolCalls(message.toolCalls).canContinue
+        : false,
+    [message]
+  );
+  const runnable = message.role === "user" || toolResultsReady;
   const runTooltip = runnable ? "Run from this message" : "No runnable content";
   const runAriaLabel = runnable
     ? "Run from this message"
@@ -145,19 +154,17 @@ function _MessageListItemHeader({
         {message.role === "user" && (
           <AddImagesMenu messageId={message.id} disabled={readonly} />
         )}
-        {!hasToolCalls && (
-          <Tooltip content={runTooltip}>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={runAriaLabel}
-              disabled={readonly || !runnable}
-              onClick={handleRun}
-            >
-              <PlayCircleIcon className="size-4" />
-            </Button>
-          </Tooltip>
-        )}
+        <Tooltip content={runTooltip}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={runAriaLabel}
+            disabled={readonly || !runnable}
+            onClick={handleRun}
+          >
+            <PlayCircleIcon className="size-4" />
+          </Button>
+        </Tooltip>
         <Tooltip content="Remove message">
           <Button
             variant="ghost"

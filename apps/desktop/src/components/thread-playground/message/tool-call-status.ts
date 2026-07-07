@@ -23,10 +23,6 @@ export function getToolCallOutputText(toolCall: ToolCall): string {
  * Derive the user-facing state from existing thread data; no extra schema.
  */
 export function getToolCallStatus(toolCall: ToolCall): ToolCallStatus {
-  const outputText = getToolCallOutputText(toolCall).trim();
-  if (!outputText) {
-    return "needsResponse";
-  }
   return toolCall.output?.isError ? "error" : "ready";
 }
 

@@ -6,15 +6,7 @@ import {
   type Message,
   type ToolCall,
 } from "@llm-space/core";
-import {
-  AlertCircleIcon,
-  CheckCircle2,
-  Clock4,
-  Loader2Icon,
-  PackageCheckIcon,
-  PlayCircleIcon,
-  PlusIcon,
-} from "lucide-react";
+import { Loader2Icon, PlayIcon, PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,7 +18,7 @@ import { CodeEditor } from "../../code-editor";
 import { Tooltip } from "../../tooltip";
 import { Button } from "../../ui/button";
 import { CollapsibleContent } from "../../ui/collapsible-content";
-import { Marker, MarkerContent, MarkerIcon } from "../../ui/marker";
+import { Marker, MarkerContent } from "../../ui/marker";
 import { ShineBorder } from "../../ui/shine-border";
 import { Skeleton } from "../../ui/skeleton";
 import { useThreadStore, useThreadStoreActions } from "../stores";
@@ -236,7 +228,6 @@ function _MessageListItem({
                   messageId={message.id}
                   readonly={readonly}
                   toolCalls={message.toolCalls}
-                  onContinue={handleContinue}
                 />
               </div>
             )}
@@ -250,12 +241,10 @@ function _ToolStepContinuation({
   messageId,
   toolCalls,
   readonly,
-  onContinue,
 }: {
   messageId: string;
   toolCalls: ToolCall[];
   readonly?: boolean;
-  onContinue: () => void;
 }) {
   const status = useThreadStore((state) => state.status);
   const { resolveTool, runToolCall } = useToolCallRunner(messageId);
@@ -268,25 +257,11 @@ function _ToolStepContinuation({
     [toolCalls, resolveTool]
   );
   const [callingTools, setCallingTools] = useState(false);
-  const summary = useMemo(() => summarizeToolCalls(toolCalls), [toolCalls]);
-  const disabled = readonly || status === "running" || !summary.canContinue;
   const canCallTools =
     !readonly &&
     status !== "running" &&
     !callingTools &&
-    callableToolCalls.length > 1;
-  const readyCount = summary.readyCount + summary.errorCount;
-  const missingLabel =
-    summary.needsResponseCount === 1
-      ? "1 needs response"
-      : `${summary.needsResponseCount} need responses`;
-  const statusLabel = summary.canContinue
-    ? summary.errorCount > 0
-      ? `${readyCount}/${summary.totalCount} supplied · ${summary.errorCount} ${
-          summary.errorCount === 1 ? "error" : "errors"
-        }`
-      : `${readyCount}/${summary.totalCount} supplied`
-    : missingLabel;
+    callableToolCalls.length > 0;
   const handleCallTools = useCallback(async () => {
     if (!canCallTools) {
       return;
@@ -326,56 +301,27 @@ function _ToolStepContinuation({
   return (
     <div className="bg-foreground/4 flex min-w-0 items-center justify-between gap-3 rounded-md px-3 py-1">
       <Marker role="status" className="min-w-0">
-        <MarkerIcon className="size-3">
-          {summary.canContinue ? (
-            summary.errorCount > 0 ? (
-              <AlertCircleIcon className="size-3 text-red-500" />
-            ) : (
-              <CheckCircle2 className="size-3 text-green-500" />
-            )
-          ) : (
-            <Clock4 className="size-3" />
-          )}
-        </MarkerIcon>
         <MarkerContent className="truncate text-xs">
-          {summary.canContinue ? "Tool results ready" : "Waiting for tools"} ·{" "}
-          {statusLabel}
+          {toolCalls.length} tool call{toolCalls.length === 1 ? "" : "s"}
         </MarkerContent>
       </Marker>
-      <div className="flex shrink-0 items-center gap-2">
-        {callableToolCalls.length > 1 ? (
-          <Button
-            className="invisible shrink-0 group-hover/message:visible"
-            size="sm"
-            variant="secondary"
-            disabled={!canCallTools}
-            aria-label="Call available MCP and built-in tools"
-            onClick={() => void handleCallTools()}
-          >
-            {callingTools ? (
-              <Loader2Icon className="animate-spin" />
-            ) : (
-              <PackageCheckIcon />
-            )}
-            Call all
-          </Button>
-        ) : null}
+      {callableToolCalls.length > 0 ? (
         <Button
           className="invisible shrink-0 group-hover/message:visible"
           size="sm"
-          variant={summary.canContinue ? "default" : "secondary"}
-          disabled={disabled}
-          aria-label={
-            summary.canContinue
-              ? "Continue from tool results"
-              : "Continue after tool responses are filled"
-          }
-          onClick={onContinue}
+          variant="outline"
+          disabled={!canCallTools}
+          aria-label="Call available MCP and built-in tools"
+          onClick={() => void handleCallTools()}
         >
-          <PlayCircleIcon />
-          Run
+          {callingTools ? (
+            <Loader2Icon className="animate-spin" />
+          ) : (
+            <PlayIcon className="size-3" />
+          )}
+          Call tools
         </Button>
-      </div>
+      ) : null}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import {
   type ToolCall,
   type ToolCallInput,
 } from "@llm-space/core";
-import { AlertCircleIcon, Loader2, PlayCircleIcon } from "lucide-react";
+import { AlertCircleIcon, Loader2, PlayIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -101,13 +101,16 @@ function _ToolCallListItem({
         {executable ? (
           <Button
             className="invisible shrink-0 group-hover/message:visible"
-            size="sm"
+            size="icon"
             variant="secondary"
             disabled={readonly || calling}
             onClick={() => void handleCall()}
           >
-            {calling ? <Loader2 className="animate-spin" /> : <PlayCircleIcon />}
-            Call {toolCall.input.name}()
+            {calling ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <PlayIcon className="size-3" />
+            )}
           </Button>
         ) : null}
       </div>
@@ -116,14 +119,14 @@ function _ToolCallListItem({
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
           <Marker role="status" className="gap-1">
             <MarkerContent className="text-xs">
-              Response ·{" "}
+              Response
               {toolCallStatus === "needsResponse"
                 ? isError
-                  ? "(Needs error text)"
-                  : "(Needs response)"
+                  ? " · (Needs error text)"
+                  : " · (Needs response)"
                 : toolCallStatus === "error"
-                  ? "(Error result)"
-                  : "(Ready)"}
+                  ? " · (Error result)"
+                  : ""}
             </MarkerContent>
           </Marker>
           <Button
