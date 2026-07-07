@@ -159,6 +159,19 @@ ApplicationMenu.setApplicationMenu([
         type: "divider",
       },
       {
+        label: "Select Previous Tab",
+        action: "selectPreviousTab",
+        accelerator: "CommandOrControl+Option+Left",
+      },
+      {
+        label: "Select Next Tab",
+        action: "selectNextTab",
+        accelerator: "CommandOrControl+Option+Right",
+      },
+      {
+        type: "divider",
+      },
+      {
         role: "toggleFullScreen",
         accelerator: "CommandOrControl+Shift+F",
       },
@@ -220,6 +233,8 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
   closeOtherTabs: { type: "closeOtherTabs", args: {} },
   closeAllTabs: { type: "closeAllTabs", args: {} },
   reopenClosedTabs: { type: "reopenClosedTab", args: {} },
+  selectNextTab: { type: "selectNextTab", args: {} },
+  selectPreviousTab: { type: "selectPreviousTab", args: {} },
   openDocument: { type: "openDocument", args: {} },
   openGitHubProject: {
     type: "openLink",
