@@ -3,6 +3,7 @@
 import {
   Boxes,
   Cable,
+  FlaskConical,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -12,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsTab } from "@/shared/commands";
 
+import { ExperimentalPage } from "./experimental-page";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
 import { ModelsPage } from "./models-page";
@@ -29,6 +31,12 @@ const PAGES = [
   { value: "mcp", label: "MCP", icon: Cable, Page: McpPage },
   { value: "search", label: "Search", icon: Search, Page: SearchPage },
   { value: "skills", label: "Skills", icon: Sparkles, Page: SkillsPage },
+  {
+    value: "experimental",
+    label: "Experimental",
+    icon: FlaskConical,
+    Page: ExperimentalPage,
+  },
 ] as const;
 
 export function SettingsDialog({

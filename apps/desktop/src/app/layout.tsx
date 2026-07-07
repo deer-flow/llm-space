@@ -2,6 +2,7 @@ import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
 import { ModelProviderGroup } from "@llm-space/core";
 
+import { ExperimentalProvider } from "@/components/experimental-provider";
 import { ModelProvider } from "@/components/model-provider";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,16 +15,18 @@ import { QueryProvider } from "./query-provider";
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <QueryProvider>
-        <ModelProvider fetcher={fetchModels}>
-          <TooltipProvider delayDuration={1000}>
-            <div className="flex size-full flex-col">
-              <ThemedToaster />
-              {children}
-            </div>
-          </TooltipProvider>
-        </ModelProvider>
-      </QueryProvider>
+      <ExperimentalProvider>
+        <QueryProvider>
+          <ModelProvider fetcher={fetchModels}>
+            <TooltipProvider delayDuration={1000}>
+              <div className="flex size-full flex-col">
+                <ThemedToaster />
+                {children}
+              </div>
+            </TooltipProvider>
+          </ModelProvider>
+        </QueryProvider>
+      </ExperimentalProvider>
     </ThemeProvider>
   );
 }

@@ -12,6 +12,7 @@ import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
+import { useExperimental } from "@/components/experimental-provider";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { FirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useModels } from "@/components/model-provider";
@@ -151,6 +152,7 @@ function PageInner() {
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
   const models = useModels();
+  const { tracingEnabled } = useExperimental();
 
   // The active tab is read through a ref so command handlers never go stale.
   const activeTabIdRef = useRef(tabs.activeId);
@@ -314,9 +316,9 @@ function PageInner() {
     () => executeCommand({ type: "toggleSidebar", args: {} }),
     [executeCommand]
   );
-  const sidebarModeSwitch = (
-    <_SidebarModeSwitch mode={sidebarMode} onModeChange={setSidebarMode} />
-  );
+  // The Traces sidebar is gated behind the tracing (beta) experiment. With it
+  // off, hide the mode switch and pin the sidebar to files.
+  const effectiveSidebarMode = tracingEnabled ? sidebarMode : "files";
 
   return (
     <div
@@ -375,18 +377,31 @@ function PageInner() {
             onResize={(size) => setSidebarOpen(size.inPixels > 0)}
           >
             <FileSystemTreeView
-              className={sidebarMode === "files" ? "min-h-0 flex-1" : "hidden"}
+              className={
+                effectiveSidebarMode === "files" ? "min-h-0 flex-1" : "hidden"
+              }
               onSelectFile={tabs.open}
               onRemove={tabs.handleRemove}
               onMove={tabs.handleMove}
             />
-            <TracePanel
-              className={sidebarMode === "traces" ? "min-h-0 flex-1" : "hidden"}
-              onOpenTrace={handleOpenTrace}
-            />
-            <div className="border-border/70 electrobun-webkit-app-region-no-drag flex shrink-0 border-t px-3 py-2">
-              {sidebarModeSwitch}
-            </div>
+            {tracingEnabled && (
+              <TracePanel
+                className={
+                  effectiveSidebarMode === "traces"
+                    ? "min-h-0 flex-1"
+                    : "hidden"
+                }
+                onOpenTrace={handleOpenTrace}
+              />
+            )}
+            {tracingEnabled && (
+              <div className="border-border/70 electrobun-webkit-app-region-no-drag flex shrink-0 border-t px-3 py-2">
+                <_SidebarModeSwitch
+                  mode={sidebarMode}
+                  onModeChange={setSidebarMode}
+                />
+              </div>
+            )}
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel minSize={640}>

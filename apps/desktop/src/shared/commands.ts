@@ -176,7 +176,8 @@ export type SettingsTab =
   | "models"
   | "mcp"
   | "search"
-  | "skills";
+  | "skills"
+  | "experimental";
 
 /** Open the Settings dialog, optionally on a specific `tab`. */
 export interface OpenSettingsCommand extends GenericCommand<
