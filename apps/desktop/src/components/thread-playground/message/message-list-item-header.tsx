@@ -3,13 +3,15 @@ import { getMessageText, type Message } from "@llm-space/core";
 import {
   BotIcon,
   ChevronDownIcon,
+  EyeIcon,
   GripHorizontalIcon,
   MinusCircle,
   PlayCircleIcon,
   UserIcon,
 } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 
+import { TextPreviewDialog } from "@/components/text-preview-dialog";
 import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../../tooltip";
@@ -33,6 +35,9 @@ function _MessageListItemHeader({
 }) {
   const { run, removeMessage, toggleMessageRole, toggleMessageCollapsed } =
     useThreadStoreActions();
+  const textContent = useMemo(() => getMessageText(message), [message]);
+  const hasTextContent = textContent.trim().length > 0;
+  const [previewOpen, setPreviewOpen] = useState(false);
   // An assistant message with tool calls is runnable (running continues from the
   // tool results) once every call has a response — mirroring ToolStepContinuation's
   // Run, which is also gated on `canContinue`.
@@ -55,7 +60,7 @@ function _MessageListItemHeader({
     if (!collapsed) {
       return "";
     }
-    const text = getMessageText(message).replace(/\s+/g, " ").trim();
+    const text = textContent.replace(/\s+/g, " ").trim();
     if (text) {
       return text;
     }
@@ -63,7 +68,7 @@ function _MessageListItemHeader({
       return message.toolCalls.map((tc) => `${tc.input.name}()`).join(", ");
     }
     return "";
-  }, [collapsed, message]);
+  }, [collapsed, message, textContent]);
   const handleRun = useCallback(async () => {
     await run(message.id);
   }, [run, message.id]);
@@ -79,6 +84,9 @@ function _MessageListItemHeader({
     }
     toggleMessageCollapsed(message.id);
   }, [message.id, readonly, toggleMessageCollapsed]);
+  const handleOpenPreview = useCallback(() => {
+    setPreviewOpen(true);
+  }, []);
   return (
     <header className="relative flex w-full shrink-0 items-center px-2 pt-2">
       <Tooltip content="Drag to reorder">
@@ -151,6 +159,19 @@ function _MessageListItemHeader({
           !readonly && "group-hover:opacity-100"
         )}
       >
+        <Tooltip
+          content={hasTextContent ? "Preview text content" : "No text content"}
+        >
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Preview text content"
+            disabled={!hasTextContent}
+            onClick={handleOpenPreview}
+          >
+            <EyeIcon className="size-4" />
+          </Button>
+        </Tooltip>
         {message.role === "user" && (
           <AddImagesMenu messageId={message.id} disabled={readonly} />
         )}
@@ -192,6 +213,12 @@ function _MessageListItemHeader({
           />
         </Button>
       </div>
+      <TextPreviewDialog
+        open={previewOpen}
+        title={`${message.role === "user" ? "User" : "Assistant"} message text`}
+        value={textContent}
+        onOpenChange={setPreviewOpen}
+      />
     </header>
   );
 }

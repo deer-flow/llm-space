@@ -115,7 +115,7 @@ function _ToolCallArgumentRow({
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onSelect={openPreview}>
-                View Value...
+                Preview Value...
               </DropdownMenuItem>
             </>
           ) : null}
