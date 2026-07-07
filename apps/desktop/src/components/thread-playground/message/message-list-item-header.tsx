@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 
-import { TextPreviewDialog } from "@/components/text-preview-dialog";
+import { PreviewDialog } from "@/components/preview-dialog";
 import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../../tooltip";
@@ -213,7 +213,7 @@ function _MessageListItemHeader({
           />
         </Button>
       </div>
-      <TextPreviewDialog
+      <PreviewDialog
         open={previewOpen}
         title={`${message.role === "user" ? "User" : "Assistant"} message text`}
         value={textContent}

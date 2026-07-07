@@ -3,7 +3,7 @@ import { MoreHorizontal } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import { TextPreviewDialog } from "@/components/text-preview-dialog";
+import { PreviewDialog } from "@/components/preview-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -56,6 +56,7 @@ function _ToolCallArgumentRow({
   const [open, setOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const valueText = formatJson(value);
+  const isObject = typeof value === "object" && value !== null;
   const copyText = useCallback(async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -119,6 +120,15 @@ function _ToolCallArgumentRow({
               </DropdownMenuItem>
             </>
           ) : null}
+          {isObject ? (
+            <>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem onSelect={openPreview}>
+                View JSON...
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <span className="flex min-w-0 flex-1 items-baseline whitespace-pre">
@@ -129,10 +139,19 @@ function _ToolCallArgumentRow({
         <span className="shrink-0">{trailingComma ? "," : ""}</span>
       </span>
       {typeof value === "string" ? (
-        <TextPreviewDialog
+        <PreviewDialog
           open={previewOpen}
           title={`View value of "${argumentKey}"`}
           value={value}
+          onOpenChange={setPreviewOpen}
+        />
+      ) : null}
+      {isObject ? (
+        <PreviewDialog
+          open={previewOpen}
+          title={`View value of "${argumentKey}"`}
+          type="json"
+          value={valueText}
           onOpenChange={setPreviewOpen}
         />
       ) : null}

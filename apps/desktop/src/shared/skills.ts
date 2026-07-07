@@ -45,5 +45,6 @@ export const DEFAULT_SKILLS_SETTINGS: SkillsSettings = {
   discoveryPaths: [
     { path: "~/.claude/skills", hiddenSkills: [] },
     { path: "~/.codex/skills", hiddenSkills: [] },
+    { path: "~/.agents/skills", hiddenSkills: [] },
   ],
 };
