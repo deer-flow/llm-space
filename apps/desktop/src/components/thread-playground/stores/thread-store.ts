@@ -483,6 +483,13 @@ export function createThreadStore(
           // actually started. A run that dies earlier (transport/auth/network
           // failure) is not recorded in the run history.
           let sawEvent = false;
+          // Whether the run ended in an error. The agent loop emits lifecycle
+          // events before the model call, and a model API failure completes
+          // the stream normally with the error tucked into the message
+          // (surfaced as a throw by reduceMessages on agent_end) — so
+          // `sawEvent` alone can't tell a failed run from a successful one.
+          // A failed run is never recorded in the run history.
+          let failed = false;
 
           // Coalesce live-preview updates to at most one per animation frame.
           // A fast stream delivers a burst of events that the transport drains
@@ -547,6 +554,7 @@ export function createThreadStore(
                 commit(streamingMessage);
               }
             } else {
+              failed = true;
               console.error(error);
               if (error instanceof Error) {
                 toast.error("Error", { description: error.message });
@@ -565,7 +573,7 @@ export function createThreadStore(
             // undo step, and record a run snapshot. No-op for undo if the
             // thread is unchanged.
             const finalThread = get().thread;
-            if (sawEvent) {
+            if (sawEvent && !failed) {
               const runUsage = aggregateMessageUsage(
                 (finalThread.context?.messages ?? []).slice(
                   runStartMessageCount
