@@ -55,15 +55,18 @@ export function SearchPage() {
   }, []);
 
   return (
-    <SettingsPage title="Search">
+    <SettingsPage
+      title="Search"
+      description={
+        <>
+          These settings only apply to the built-in <code>web_search</code> and{" "}
+          <code>web_fetch</code> tools.
+        </>
+      }
+    >
       <div className="flex flex-col gap-4">
         <div className="flex h-14 items-center justify-between gap-4">
-          <span className="flex flex-col gap-0.5 text-sm">
-            Search provider
-            <span className="text-muted-foreground text-xs">
-              Backs the built-in web search and fetch tools.
-            </span>
-          </span>
+          <span className="text-sm">Search provider</span>
           <Select
             value={settings.provider}
             onValueChange={(value) =>

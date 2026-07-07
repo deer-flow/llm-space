@@ -65,6 +65,19 @@ function SettingsRow({
   );
 }
 
+/** A row label with a title and an optional muted one-line explanation. */
+function RowLabel({ title, hint }: { title: string; hint?: string }) {
+  if (!hint) {
+    return <>{title}</>;
+  }
+  return (
+    <span className="flex flex-col gap-0.5">
+      {title}
+      <span className="text-muted-foreground text-xs">{hint}</span>
+    </span>
+  );
+}
+
 /**
  * Picks the app-wide default model. New threads — and threads whose saved model
  * is no longer available — resolve to it. "Automatic" clears the choice and
@@ -230,7 +243,7 @@ function WorkspaceFolderLink() {
   return (
     <Link
       command={{ type: "openWorkspaceFolder", args: {} }}
-      className="text-primary max-w-64 truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
+      className="text-primary max-w-[50%] truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
       title={path}
     >
       {path}
@@ -250,7 +263,14 @@ export function GeneralPage() {
   const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
   return (
     <SettingsPage title="General">
-      <SettingsRow label="Language">
+      <SettingsRow
+        label={
+          <RowLabel
+            title="Language"
+            hint="English only for now — more languages are coming."
+          />
+        }
+      >
         <Select defaultValue="en-US" disabled>
           <SelectTrigger className="w-32" aria-label="Language">
             <SelectValue />
@@ -263,7 +283,14 @@ export function GeneralPage() {
 
       <Separator />
 
-      <SettingsRow label="Appearance">
+      <SettingsRow
+        label={
+          <RowLabel
+            title="Appearance"
+            hint="Match your system setting, or force light or dark."
+          />
+        }
+      >
         <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
           <SelectTrigger className="w-32" aria-label="Appearance">
             <SelectValue />
@@ -278,7 +305,14 @@ export function GeneralPage() {
 
       <Separator />
 
-      <SettingsRow label="Primary color">
+      <SettingsRow
+        label={
+          <RowLabel
+            title="Primary color"
+            hint="The accent color for buttons, links, and highlights."
+          />
+        }
+      >
         <div className="flex items-center gap-2">
           {showResetPrimaryColor ? (
             <Button size="sm" variant="secondary" onClick={resetPrimaryColor}>
@@ -297,13 +331,10 @@ export function GeneralPage() {
 
       <SettingsRow
         label={
-          <span className="flex flex-col gap-0.5">
-            Rendering fidelity
-            <span className="text-muted-foreground text-xs">
-              Lite renders the message list as plain text for smoother scrolling
-              on large threads.
-            </span>
-          </span>
+          <RowLabel
+            title="Rendering"
+            hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
+          />
         }
       >
         <Select
@@ -314,8 +345,8 @@ export function GeneralPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="rich">Rich</SelectItem>
-            <SelectItem value="lite">Lite</SelectItem>
+            <SelectItem value="rich">Full</SelectItem>
+            <SelectItem value="lite">Fast</SelectItem>
           </SelectContent>
         </Select>
       </SettingsRow>
@@ -324,13 +355,10 @@ export function GeneralPage() {
 
       <SettingsRow
         label={
-          <span className="flex flex-col gap-0.5">
-            Default model
-            <span className="text-muted-foreground text-xs">
-              Used for new threads, and when a thread&apos;s model is no longer
-              available.
-            </span>
-          </span>
+          <RowLabel
+            title="Default model"
+            hint="Used for new threads, and when a thread's model is no longer available."
+          />
         }
       >
         <DefaultModelSelect />
@@ -338,7 +366,14 @@ export function GeneralPage() {
 
       <Separator />
 
-      <SettingsRow label="Workspace folder">
+      <SettingsRow
+        label={
+          <RowLabel
+            title="Workspace folder"
+            hint="Where your threads are stored on disk."
+          />
+        }
+      >
         <WorkspaceFolderLink />
       </SettingsRow>
 

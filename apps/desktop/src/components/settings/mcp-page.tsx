@@ -315,7 +315,10 @@ export function McpPage() {
   };
 
   return (
-    <SettingsPage title="MCP">
+    <SettingsPage
+      title="MCP"
+      description="Connect a server to expose its tools, which you can then add to a thread's tools."
+    >
       <div className="flex h-full min-h-0 gap-6">
         <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
           <div className="flex items-center justify-between gap-2">

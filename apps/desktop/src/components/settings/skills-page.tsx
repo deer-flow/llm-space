@@ -125,7 +125,15 @@ export function SkillsPage() {
   }, []);
 
   return (
-    <SettingsPage className="flex size-full min-h-0" title="Skills">
+    <SettingsPage
+      className="flex size-full min-h-0"
+      title="Skills"
+      description={
+        <>
+          These settings only apply to the built-in <code>skill()</code> tool.
+        </>
+      }
+    >
       <PathList
         paths={paths}
         selectedPath={selectedPath}
@@ -320,9 +328,7 @@ function PathSkills({ path }: { path: string | null }) {
       }
       // Optimistically reflect the toggle.
       setSkills((prev) =>
-        prev
-          ? prev.map((s) => (s.name === name ? { ...s, enabled } : s))
-          : prev
+        prev ? prev.map((s) => (s.name === name ? { ...s, enabled } : s)) : prev
       );
       try {
         await setSkillHidden(path, name, !enabled);
