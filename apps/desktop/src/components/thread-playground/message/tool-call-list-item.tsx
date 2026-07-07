@@ -8,7 +8,6 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
-import { useRenderingFidelity } from "@/components/theme-provider";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +32,6 @@ function _ToolCallListItem({
   onContinue: () => void;
   readonly?: boolean;
 }) {
-  const { fidelity } = useRenderingFidelity();
   const { updateToolCallOutputText } = useThreadStoreActions();
   const { resolveTool, runToolCall } = useToolCallRunner(messageId);
   const tool = resolveTool(toolCall.input.name);
@@ -144,7 +142,6 @@ function _ToolCallListItem({
         </div>
         <ToolCallResponseEditor
           input={toolCall.input}
-          plain={fidelity === "lite"}
           readonly={readonly}
           value={outputText}
           onChange={handleOutputChange}
@@ -183,14 +180,12 @@ const ToolCallInputView = memo(_ToolCallInputView);
 function _ToolCallResponseEditor({
   input,
   value,
-  plain,
   readonly,
   onChange,
   onKeyDown,
 }: {
   input: ToolCallInput;
   value: string;
-  plain: boolean;
   readonly: boolean;
   onChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent) => void;
@@ -218,7 +213,9 @@ function _ToolCallResponseEditor({
       hideBorder
       hideFocusRing
       scrollOnFocus
-      plain={plain}
+      // Tool responses are edited as plain text (no CodeMirror), regardless of
+      // rendering fidelity.
+      plain
       placeholder={`Enter the response of ${input.name}()`}
       readonly={readonly}
       value={value}
