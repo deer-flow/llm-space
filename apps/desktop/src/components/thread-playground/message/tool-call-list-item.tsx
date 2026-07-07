@@ -329,18 +329,22 @@ function _initSelections(
   } catch {
     parsed = null;
   }
-  const entries = Array.isArray(parsed) ? parsed : [];
+  const rawAnswers =
+    parsed !== null &&
+    typeof parsed === "object" &&
+    !Array.isArray(parsed) &&
+    typeof (parsed as Record<string, unknown>).answers === "object" &&
+    (parsed as Record<string, unknown>).answers !== null
+      ? ((parsed as Record<string, unknown>).answers as Record<string, unknown>)
+      : {};
 
-  return questions.map((question, index) => {
-    const entry = (entries.find(
-      (e) =>
-        e !== null &&
-        typeof e === "object" &&
-        (e as Record<string, unknown>).question === question.question
-    ) ?? entries[index]) as Record<string, unknown> | undefined;
-    const answers = Array.isArray(entry?.answer)
-      ? entry.answer.filter((a): a is string => typeof a === "string")
-      : [];
+  return questions.map((question) => {
+    const raw = rawAnswers[question.question];
+    const answers = Array.isArray(raw)
+      ? raw.filter((a): a is string => typeof a === "string")
+      : typeof raw === "string"
+        ? [raw]
+        : [];
     const labels = new Set(question.options.map((o) => o.label));
     const selected = answers.filter((a) => labels.has(a));
     const other = answers.filter((a) => !labels.has(a));
@@ -366,18 +370,19 @@ function _serialize(
   questions: AskUserQuestionItem[],
   selections: QuestionSelection[]
 ): string {
-  const response = questions.map((question, index) => ({
-    question: question.question,
-    answer: _answerFor(selections[index]),
-  }));
-  return JSON.stringify(response, null, 2);
+  const answers: Record<string, string[]> = {};
+  questions.forEach((question, index) => {
+    answers[question.question] = _answerFor(selections[index]);
+  });
+  return JSON.stringify({ answers }, null, 2);
 }
 
 /**
  * A form-based response editor for `ask_user_question`: renders each question
  * with single- or multi-select options plus a free-form "Other". The response
- * is written back as a JSON array of `{ question, answer }` — one entry per
- * question, `answer` a list of the chosen option labels (or the typed "Other").
+ * is written back as `{ answers: { [question]: string[] } }` — one entry per
+ * question, keyed by the question text, its value a list of the chosen option
+ * labels (or the typed "Other").
  */
 function AskUserQuestionEditor({
   questions,
