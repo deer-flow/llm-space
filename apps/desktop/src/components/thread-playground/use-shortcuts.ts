@@ -1,14 +1,14 @@
 import { useCallback } from "react";
 import type { KeyboardEvent } from "react";
 
-import { useThreadStore, useThreadStoreActions } from "./stores";
+import { isThreadBusy, useThreadStore, useThreadStoreActions } from "./stores";
 
 /**
  * Keyboard shortcuts for the thread playground, wired to the container's
  * keydown capture handler.
  */
 export function useShortcuts({ readonly }: { readonly: boolean }) {
-  const status = useThreadStore((s) => s.status);
+  const busy = useThreadStore(isThreadBusy);
   const { run, abort } = useThreadStoreActions();
 
   return useCallback(
@@ -27,7 +27,7 @@ export function useShortcuts({ readonly }: { readonly: boolean }) {
           return;
         }
         event.preventDefault();
-        if (status === "running") {
+        if (busy) {
           try {
             abort();
           } catch {
@@ -39,7 +39,7 @@ export function useShortcuts({ readonly }: { readonly: boolean }) {
         return;
       }
     },
-    [abort, readonly, run, status]
+    [abort, busy, readonly, run]
   );
 }
 

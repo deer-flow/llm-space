@@ -17,8 +17,6 @@ import {
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { callBuiltInTool } from "@/client/built-in-tools";
-import { callMcpTool } from "@/client/mcp";
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
 import { isFirecrawlLimitError } from "@/lib/firecrawl";
@@ -31,7 +29,8 @@ import { CollapsibleContent } from "../../ui/collapsible-content";
 import { Marker, MarkerContent, MarkerIcon } from "../../ui/marker";
 import { ShineBorder } from "../../ui/shine-border";
 import { Skeleton } from "../../ui/skeleton";
-import { useThreadStore, useThreadStoreActions } from "../stores";
+import { isThreadBusy, useThreadStore, useThreadStoreActions } from "../stores";
+import { callThreadTool } from "../tool/call-thread-tool";
 
 import { ImageContentList } from "./image-content-view";
 import { MessageListItemHeader } from "./message-list-item-header";
@@ -258,7 +257,7 @@ function _ToolStepContinuation({
   readonly?: boolean;
   onContinue: () => void;
 }) {
-  const status = useThreadStore((state) => state.status);
+  const busy = useThreadStore(isThreadBusy);
   const tools = useThreadStore((state) => state.thread.context?.tools);
   const callableTools = useMemo(() => {
     const toolsByName = new Map((tools ?? []).map((tool) => [tool.name, tool]));
@@ -275,12 +274,9 @@ function _ToolStepContinuation({
   const { updateToolCallOutputText } = useThreadStoreActions();
   const [callingTools, setCallingTools] = useState(false);
   const summary = useMemo(() => summarizeToolCalls(toolCalls), [toolCalls]);
-  const disabled = readonly || status === "running" || !summary.canContinue;
+  const disabled = readonly || busy || !summary.canContinue;
   const canCallTools =
-    !readonly &&
-    status !== "running" &&
-    !callingTools &&
-    callableTools.length > 1;
+    !readonly && !busy && !callingTools && callableTools.length > 1;
   const readyCount = summary.readyCount + summary.errorCount;
   const missingLabel =
     summary.needsResponseCount === 1
@@ -300,33 +296,10 @@ function _ToolStepContinuation({
     setCallingTools(true);
     try {
       const results = await Promise.all(
-        callableTools.map(async ({ tool, toolCall }) => {
-          try {
-            if (tool.type === "mcp") {
-              const result = await callMcpTool({
-                serverId: tool.serverId,
-                toolName: tool.toolName,
-                arguments: toolCall.input.arguments,
-              });
-              return {
-                toolCall,
-                text: result.contentText,
-                isError: result.isError ?? false,
-              };
-            }
-            const result = await callBuiltInTool({
-              name: tool.name,
-              arguments: toolCall.input.arguments,
-            });
-            return { toolCall, text: result.contentText, isError: false };
-          } catch (error) {
-            return {
-              toolCall,
-              text: error instanceof Error ? error.message : "Tool call failed",
-              isError: true,
-            };
-          }
-        })
+        callableTools.map(async ({ tool, toolCall }) => ({
+          toolCall,
+          ...(await callThreadTool(tool, toolCall.input.arguments)),
+        }))
       );
       let errorCount = 0;
       let firecrawlLimitCount = 0;

@@ -31,7 +31,9 @@ import {
   ResizablePanelGroup,
 } from "../ui/resizable";
 import { Spinner } from "../ui/spinner";
+import { Switch } from "../ui/switch";
 
+import { AutoRunApprovalDialog } from "./auto-run-approval-dialog";
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
@@ -42,10 +44,13 @@ import {
   canRedo,
   canUndo,
   createThreadStore,
+  isThreadBusy,
+  MAX_AUTO_RUN_ROUNDS,
   ThreadStoreContext,
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
+import { callThreadTool } from "./tool/call-thread-tool";
 import { ToolListView } from "./tool/tool-list-view";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
@@ -118,7 +123,12 @@ function _ThreadPlayground({
     createThreadStore(initialValue, {
       transport,
       resolveModel: (saved) =>
-        resolveModelConfig(providersRef.current, saved, defaultModelRef.current),
+        resolveModelConfig(
+          providersRef.current,
+          saved,
+          defaultModelRef.current
+        ),
+      callTool: callThreadTool,
     })
   );
   useThreadPlaygroundEvents(store, {
@@ -126,6 +136,14 @@ function _ThreadPlayground({
     onStreamingStart,
     onStreamingEnd,
   });
+  // Stop any in-flight run when the playground unmounts (tab closed or
+  // refreshed onto a fresh store) — an auto-run episode would otherwise keep
+  // chaining model calls and tool executions against the abandoned store.
+  useEffect(() => {
+    return () => {
+      store.getState().abort();
+    };
+  }, [store]);
   return (
     <ThreadStoreContext.Provider value={store}>
       <ThreadPlaygroundContent {...props} />
@@ -150,14 +168,21 @@ function ThreadPlaygroundContent({
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
 >) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const status = useThreadStore((s) => s.status);
+  // Busy spans a whole auto-run episode (round gaps included), not just an
+  // in-flight stream — every run/readonly gate below keys off it.
+  const busy = useThreadStore(isThreadBusy);
+  const runMode = useThreadStore((s) => s.runMode);
+  // Presence only — the per-round counter lives in AutoRunRoundIndicator so
+  // round bumps don't re-render this whole subtree.
+  const hasAutoRun = useThreadStore((s) => s.autoRun !== null);
   const savedModel = useThreadStore((s) => s.thread.model);
   const fallbackModel = useFirstAvailableModel();
   // A thread can run once a model resolves (its own, or the first available).
   const hasModel = Boolean(savedModel ?? fallbackModel);
   const undoable = useThreadStore((s) => canUndo(s.changeHistory));
   const redoable = useThreadStore((s) => canRedo(s.changeHistory));
-  const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
+  const { run, abort, undo, redo, syncTitle, setRunMode } =
+    useThreadStoreActions();
   const title = useMemo(
     () => titleFromProps ?? threadTitleFromPath(path),
     [path, titleFromProps]
@@ -166,18 +191,24 @@ function ThreadPlaygroundContent({
     syncTitle(title);
   }, [syncTitle, title]);
   const readonly = useMemo(() => {
-    return readonlyFromProps || status === "running";
-  }, [readonlyFromProps, status]);
+    return readonlyFromProps || busy;
+  }, [readonlyFromProps, busy]);
   const handleRun = useCallback(async () => {
     await run();
   }, []);
+  const handleRunModeChange = useCallback(
+    (checked: boolean) => {
+      setRunMode(checked ? "auto" : "step");
+    },
+    [setRunMode]
+  );
   // Expose run as a command, but only from the active tab so a global
   // `runThread` targets it (and no-ops when no tab is active). Skip while
   // already running to avoid run()'s "already running" throw.
   useRegisterCommands(
     {
       runThread: () => {
-        if (status !== "running") void run();
+        if (!busy) void run();
       },
     },
     active
@@ -277,11 +308,36 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
             </div>
-            <div className="flex items-center px-3">
+            <div className="flex items-center gap-3 px-3">
+              <div
+                className={cn(
+                  "flex items-center",
+                  readonlyFromProps && "hidden"
+                )}
+              >
+                {hasAutoRun ? (
+                  <AutoRunRoundIndicator />
+                ) : (
+                  <Tooltip content="Auto-run: call MCP and built-in tools automatically and continue until a final answer">
+                    <div className="flex items-center gap-1.5">
+                      <Switch
+                        size="sm"
+                        aria-label="Toggle auto-run"
+                        checked={runMode === "auto"}
+                        disabled={busy}
+                        onCheckedChange={handleRunModeChange}
+                      />
+                      <span className="text-muted-foreground text-xs">
+                        Auto
+                      </span>
+                    </div>
+                  </Tooltip>
+                )}
+              </div>
               <Tooltip
                 content={
                   <div>
-                    {status === "running" ? "Stop running" : "Run this thread"}
+                    {busy ? "Stop running" : "Run this thread"}
                     <KbdGroup>
                       <Kbd className="text-foreground!">⌘ Enter</Kbd>
                     </KbdGroup>
@@ -293,20 +349,16 @@ function ThreadPlaygroundContent({
                     "w-20 px-3 py-3.5",
                     readonlyFromProps && "hidden"
                   )}
-                  aria-label={
-                    status === "running" ? "Stop running thread" : "Run thread"
-                  }
-                  disabled={
-                    readonlyFromProps || (status !== "running" && !hasModel)
-                  }
-                  onClick={status === "running" ? handleStop : handleRun}
+                  aria-label={busy ? "Stop running thread" : "Run thread"}
+                  disabled={readonlyFromProps || (!busy && !hasModel)}
+                  onClick={busy ? handleStop : handleRun}
                 >
-                  {status === "running" ? (
+                  {busy ? (
                     <Spinner className="size-3" />
                   ) : (
                     <PlayIcon className="size-3" />
                   )}
-                  {status === "running" ? "Stop" : "Run"}
+                  {busy ? "Stop" : "Run"}
                 </Button>
               </Tooltip>
             </div>
@@ -365,6 +417,20 @@ function ThreadPlaygroundContent({
           <RunHistoryListView onClose={closeHistory} />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <AutoRunApprovalDialog threadTitle={title} />
     </div>
+  );
+}
+
+/** Isolated so per-round updates don't re-render the whole playground. */
+function AutoRunRoundIndicator() {
+  const round = useThreadStore((s) => s.autoRun?.round ?? null);
+  if (round === null) {
+    return null;
+  }
+  return (
+    <span className="text-muted-foreground text-xs tabular-nums">
+      Round {round}/{MAX_AUTO_RUN_ROUNDS}
+    </span>
   );
 }
