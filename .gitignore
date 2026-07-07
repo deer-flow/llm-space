@@ -39,3 +39,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Skills
 .agents/kaizen-loop/audits/
 .agents/kaizen-loop/test-root/
+
+# Claude Code project MCP config (references a personal API key env var)
+.mcp.json
+
+# Loopany scheduled-agent workspace
+/loopany/
