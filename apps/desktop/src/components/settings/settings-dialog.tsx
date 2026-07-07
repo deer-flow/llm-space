@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Cable, SlidersHorizontal } from "lucide-react";
+import { Boxes, Cable, Search, SlidersHorizontal } from "lucide-react";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,7 @@ import type { SettingsTab } from "@/shared/commands";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
 import { ModelsPage } from "./models-page";
+import { SearchPage } from "./search-page";
 
 const PAGES = [
   {
@@ -19,6 +20,7 @@ const PAGES = [
   },
   { value: "models", label: "Models", icon: Boxes, Page: ModelsPage },
   { value: "mcp", label: "MCP", icon: Cable, Page: McpPage },
+  { value: "search", label: "Search", icon: Search, Page: SearchPage },
 ] as const;
 
 export function SettingsDialog({

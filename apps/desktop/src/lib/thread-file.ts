@@ -1,4 +1,4 @@
-import type { Thread } from "@llm-space/core";
+import { normalizeThread, type Thread } from "@llm-space/core";
 
 const THREAD_FILE_EXTENSION = ".json";
 const INVALID_FILE_STEM_CHARS = /[<>:"/\\|?*]/;
@@ -45,8 +45,11 @@ export function threadTitleFromPath(path: string): string {
 }
 
 export function normalizeThreadForPath(thread: Thread, path: string): Thread {
+  const normalizedThread = normalizeThread(thread);
   const title = threadTitleFromPath(path);
-  return thread.title === title ? thread : { ...thread, title };
+  return normalizedThread.title === title
+    ? normalizedThread
+    : { ...normalizedThread, title };
 }
 
 export function threadPathForTitle(currentPath: string, title: string): string {

@@ -14,7 +14,8 @@ import { usePanelRef } from "react-resizable-panels";
 
 import { useRegisterCommands } from "@/commands";
 import {
-  firstAvailableModel,
+  resolveModelConfig,
+  useDefaultModel,
   useFirstAvailableModel,
   useModels,
 } from "@/components/model-provider";
@@ -104,15 +105,20 @@ function _ThreadPlayground({
   onStreamingEnd,
   ...props
 }: ThreadPlaygroundProps) {
-  // Keep a live ref to the provider list so the store can resolve a fallback
-  // model (first available) at run/edit time without being recreated.
+  // Keep live refs to the provider list and default model so the store can
+  // resolve a thread's model (its own, else the default/first available) at
+  // run/edit time without being recreated.
   const providers = useModels();
   const providersRef = useRef(providers);
   providersRef.current = providers;
+  const defaultModel = useDefaultModel();
+  const defaultModelRef = useRef(defaultModel);
+  defaultModelRef.current = defaultModel;
   const [store] = useState(() =>
     createThreadStore(initialValue, {
       transport,
-      getFallbackModel: () => firstAvailableModel(providersRef.current),
+      resolveModel: (saved) =>
+        resolveModelConfig(providersRef.current, saved, defaultModelRef.current),
     })
   );
   useThreadPlaygroundEvents(store, {

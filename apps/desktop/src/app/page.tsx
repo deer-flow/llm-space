@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
+import { FirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import { TracePanel } from "@/components/trace-panel";
@@ -418,6 +419,7 @@ function PageInner() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
+      <FirecrawlLimitDialog />
       <LazyOverlay open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}

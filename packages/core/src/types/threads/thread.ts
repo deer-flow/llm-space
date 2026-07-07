@@ -2,7 +2,7 @@ import { Type, type Static } from "typebox";
 
 import { Message, ModelUsage } from "../messages";
 import { ModelConfig } from "../models";
-import { Tool } from "../tools";
+import { normalizeTools, Tool } from "../tools";
 
 /**
  * The context of a thread, including the system prompt, messages, and tools.
@@ -149,3 +149,44 @@ export const Thread = Type.Object({
   evaluations: Type.Optional(Type.Array(ThreadEvaluation)),
 });
 export type Thread = Static<typeof Thread>;
+
+export function normalizeThread(thread: Thread): Thread {
+  const context = thread.context;
+  const tools = context?.tools;
+  const runHistory = thread.runHistory;
+  let next = thread;
+
+  if (tools) {
+    const normalizedTools = normalizeTools(tools);
+    if (!_sameTools(tools, normalizedTools)) {
+      next = {
+        ...next,
+        context: { ...context, tools: normalizedTools },
+      };
+    }
+  }
+
+  if (runHistory) {
+    let changed = false;
+    const normalizedRunHistory = runHistory.map((run) => {
+      const normalizedThread = normalizeThread(run.thread);
+      if (normalizedThread !== run.thread) {
+        changed = true;
+        return { ...run, thread: normalizedThread };
+      }
+      return run;
+    });
+    if (changed) {
+      next = { ...next, runHistory: normalizedRunHistory };
+    }
+  }
+
+  return next;
+}
+
+function _sameTools(
+  left: readonly unknown[],
+  right: readonly unknown[]
+): boolean {
+  return left.every((tool, index) => tool === right[index]);
+}

@@ -1,8 +1,10 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
+  BuiltinTool,
   CustomModel,
   FileNode,
+  ModelConfig,
   ModelProviderGroup,
   Thread,
 } from "@llm-space/core";
@@ -15,6 +17,7 @@ import type {
   McpServerToolsResponse,
   McpServerView,
 } from "./mcp";
+import type { SearchSettings } from "./search";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
@@ -99,6 +102,17 @@ export interface DesktopRPCType {
         params: { providerId: string; enabled: boolean };
         response: ModelProviderGroup[];
       };
+      // The user's chosen default model, or `null` for automatic (first
+      // available). Threads with no saved model — or a stale reference — resolve
+      // through it.
+      getDefaultModel: {
+        params: Record<string, never>;
+        response: ModelConfig | null;
+      };
+      setDefaultModel: {
+        params: { model: ModelConfig | null };
+        response: ModelConfig | null;
+      };
       testModelConnection: {
         params: { providerId: string; modelId: string };
         response: null;
@@ -167,6 +181,26 @@ export interface DesktopRPCType {
           arguments: Record<string, unknown>;
         };
         response: McpCallToolResponse;
+      };
+      builtInListTools: {
+        params: Record<string, never>;
+        response: BuiltinTool[];
+      };
+      builtInCallTool: {
+        params: {
+          name: string;
+          arguments: Record<string, unknown>;
+        };
+        response: { contentText: string };
+      };
+      // The search provider + API keys backing the built-in web tools.
+      getSearchSettings: {
+        params: Record<string, never>;
+        response: SearchSettings;
+      };
+      setSearchSettings: {
+        params: { settings: SearchSettings };
+        response: SearchSettings;
       };
       // List trace projects for the dedicated Trace Panel.
       traceListProjects: {

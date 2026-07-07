@@ -28,7 +28,11 @@ import {
  * component.
  */
 
-export const DEFAULT_TOOL: FunctionTool = {
+function _functionTool(tool: Omit<FunctionTool, "type">): FunctionTool {
+  return { type: "function", ...tool };
+}
+
+export const DEFAULT_TOOL: FunctionTool = _functionTool({
   name: "weather_report",
   description: "Get the weather report for a given location",
   parameters: {
@@ -41,9 +45,9 @@ export const DEFAULT_TOOL: FunctionTool = {
     },
     required: ["location"],
   },
-};
+});
 
-const WEB_SEARCH_TOOL: FunctionTool = {
+const WEB_SEARCH_TOOL: FunctionTool = _functionTool({
   name: "web_search",
   description:
     "Searches the web for a given query and returns relevant results. Use when you need to find information, verify facts, or gather data from online sources. Do not use for queries requiring real-time personal or sensitive information.",
@@ -59,9 +63,9 @@ const WEB_SEARCH_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const BASH_TOOL: FunctionTool = {
+const BASH_TOOL: FunctionTool = _functionTool({
   name: "bash",
   description:
     "Executes a bash command and returns stdout, stderr, and exit code. Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-export env vars, and re-source files as needed on every call.",
@@ -83,9 +87,9 @@ const BASH_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const READ_FILE_TOOL: FunctionTool = {
+const READ_FILE_TOOL: FunctionTool = _functionTool({
   name: "read",
   description:
     "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents; for images, returns a visual representation. Prefer this over bash for reading files.",
@@ -106,9 +110,9 @@ const READ_FILE_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const WRITE_FILE_TOOL: FunctionTool = {
+const WRITE_FILE_TOOL: FunctionTool = _functionTool({
   name: "write",
   description:
     "Writes content to a file on the local filesystem, creating parent directories if needed. Overwrites the file if it already exists. Use for creating new files or fully replacing file contents.",
@@ -133,9 +137,9 @@ const WRITE_FILE_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const EDIT_TOOL: FunctionTool = {
+const EDIT_TOOL: FunctionTool = _functionTool({
   name: "edit",
   description:
     "Performs exact string replacement in a file. The old_string must match the file contents exactly (including whitespace and indentation). Use for surgical edits; prefer write_file when replacing the entire file.",
@@ -170,9 +174,9 @@ const EDIT_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const LS_TOOL: FunctionTool = {
+const LS_TOOL: FunctionTool = _functionTool({
   name: "ls",
   description:
     "Lists files and directories at a given path. Returns entry names sorted by modification time (newest first). Use to explore directory structure before reading or editing files.",
@@ -193,9 +197,9 @@ const LS_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const GREP_TOOL: FunctionTool = {
+const GREP_TOOL: FunctionTool = _functionTool({
   name: "grep",
   description:
     "Search file contents with ripgrep. Supports regex patterns, glob filters, and context lines. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
@@ -230,9 +234,9 @@ const GREP_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const GLOB_TOOL: FunctionTool = {
+const GLOB_TOOL: FunctionTool = _functionTool({
   name: "glob",
   description:
     "Find files matching a glob pattern, sorted by modification time (newest first). Use when you need to locate files by name or extension rather than search their contents.",
@@ -258,9 +262,9 @@ const GLOB_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const PRESENT_FILES_TOOL: FunctionTool = {
+const PRESENT_FILES_TOOL: FunctionTool = _functionTool({
   name: "present_files",
   description:
     'You should always use this tool to present the artifacts and foundings after each creation or edit. Other wise the user won\'t be able to "see" them. Use when delivering final artifacts, reports, charts, or other outputs the user should see or download.',
@@ -284,9 +288,9 @@ const PRESENT_FILES_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const TODO_WRITE_TOOL: FunctionTool = {
+const TODO_WRITE_TOOL: FunctionTool = _functionTool({
   name: "todo_write",
   description:
     "Creates or updates the assistant's visible todo list for tracking multi-step work. Only use for non-trivial tasks with several concrete steps where tracking progress helps the user — skip it for single-step or trivial requests, where it just adds overhead. Each call replaces the entire list, so pass the full set of todos every time, and keep statuses current as work progresses.",
@@ -318,9 +322,9 @@ const TODO_WRITE_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const ASK_USER_QUESTION_TOOL: FunctionTool = {
+const ASK_USER_QUESTION_TOOL: FunctionTool = _functionTool({
   name: "ask_user_question",
   description:
     'Collect structured multiple-choice answers from the user. Use only when blocked on a decision that is genuinely the user\'s to make — one you cannot resolve from the request, the code, or sensible defaults. Each question must have at least 2 options; users can always select "Other" for custom text. Set multi_select to true for multi-select questions.',
@@ -386,9 +390,9 @@ const ASK_USER_QUESTION_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const AGENT_TOOL: FunctionTool = {
+const AGENT_TOOL: FunctionTool = _functionTool({
   name: "agent",
   description:
     "Spawns a sub-agent to autonomously carry out a self-contained task (e.g. a broad codebase search, multi-step research, or an isolated implementation) and returns its final result. Use to delegate work that doesn't need your ongoing input, or to run independent tasks in parallel. Do not use for simple lookups you can answer directly, or tasks that require interactive back-and-forth steering.",
@@ -419,9 +423,9 @@ const AGENT_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const TASK_CREATE_TOOL: FunctionTool = {
+const TASK_CREATE_TOOL: FunctionTool = _functionTool({
   name: "task",
   description:
     "Starts a long-running command (a dev server, build, watcher, or other background process) and returns immediately with a task id, instead of blocking until it exits. Use for commands you expect to keep running or take a while, and check on later with task_monitor. Do not use for quick commands that finish right away — run those directly instead.",
@@ -447,9 +451,9 @@ const TASK_CREATE_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const TASK_MONITOR_TOOL: FunctionTool = {
+const TASK_MONITOR_TOOL: FunctionTool = _functionTool({
   name: "task_monitor",
   description:
     "Retrieves accumulated output (stdout/stderr) and current status from a task started with task_create. Use to check progress on a running task or read the result of one that has finished. Do not use on a task_id that was already killed with task_kill.",
@@ -470,9 +474,9 @@ const TASK_MONITOR_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const TASK_KILL_TOOL: FunctionTool = {
+const TASK_KILL_TOOL: FunctionTool = _functionTool({
   name: "task_kill",
   description:
     "Terminates a running background task started with task_create. Use once a task's output is no longer needed (e.g. a dev server you're done with), or to stop one that is stuck or misbehaving. Do not use on a task that has already finished — there's nothing to kill.",
@@ -489,9 +493,9 @@ const TASK_KILL_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const GENERATE_IMAGE_TOOL: FunctionTool = {
+const GENERATE_IMAGE_TOOL: FunctionTool = _functionTool({
   name: "generate_image",
   description:
     "Generate an image from a text prompt. Use when the user explicitly asks for an image, illustration, icon, mockup, or other visual asset. Do not use for data-heavy visualizations such as charts, plots, or tables — generate those with code instead.",
@@ -513,9 +517,9 @@ const GENERATE_IMAGE_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
-const WEB_FETCH_TOOL: FunctionTool = {
+const WEB_FETCH_TOOL: FunctionTool = _functionTool({
   name: "web_fetch",
   description:
     "Fetches content from a specified URL and returns its contents in a readable markdown format. Use when you have a specific URL and need to read its text content, documentation, or articles. Do not use for search queries (use web_search instead) or binary file downloads.",
@@ -532,7 +536,7 @@ const WEB_FETCH_TOOL: FunctionTool = {
     },
     additionalProperties: false,
   },
-};
+});
 
 export type ToolExampleItem =
   | { type: "separator" }

@@ -1,7 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
+import {
+  isModelAvailable,
+  useDefaultModel,
+  useModels,
+  useSetDefaultModel,
+} from "@/components/model-provider";
 import {
   DEFAULT_PRIMARY,
   usePrimaryColor,
@@ -13,16 +19,23 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
+import { ModelAvatar } from "../thread-playground/model-avatar";
 import { Button } from "../ui/button";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
+
+/** Sentinel value for the "Automatic (first available model)" option. */
+const AUTO_DEFAULT_MODEL = "__auto__";
 
 /** A single label-on-the-left, control-on-the-right settings row. */
 function SettingsRow({
@@ -37,6 +50,83 @@ function SettingsRow({
       <span className="text-sm">{label}</span>
       {children}
     </div>
+  );
+}
+
+/**
+ * Picks the app-wide default model. New threads — and threads whose saved model
+ * is no longer available — resolve to it. "Automatic" clears the choice and
+ * falls back to the first available model.
+ */
+function DefaultModelSelect() {
+  const providers = useModels();
+  const defaultModel = useDefaultModel();
+  const setDefaultModel = useSetDefaultModel();
+
+  const groups = useMemo(
+    () =>
+      [...providers]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((group) => {
+          const disabled = new Set(group.disabledModels ?? []);
+          return {
+            id: group.id,
+            name: group.name,
+            models: group.models.filter((model) => !disabled.has(model.id)),
+          };
+        })
+        .filter((group) => group.models.length > 0),
+    [providers]
+  );
+
+  // Show "Automatic" whenever nothing is chosen or the saved default is no
+  // longer available, matching the resolution fallback.
+  const value =
+    defaultModel && isModelAvailable(providers, defaultModel)
+      ? `${defaultModel.provider}:${defaultModel.id}`
+      : AUTO_DEFAULT_MODEL;
+
+  const handleChange = (next: string) => {
+    if (next === AUTO_DEFAULT_MODEL) {
+      void setDefaultModel(null);
+      return;
+    }
+    const separator = next.indexOf(":");
+    void setDefaultModel({
+      provider: next.slice(0, separator),
+      id: next.slice(separator + 1),
+    });
+  };
+
+  return (
+    <Select value={value} onValueChange={handleChange}>
+      <SelectTrigger className="w-64" aria-label="Default model">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={AUTO_DEFAULT_MODEL}>Automatic</SelectItem>
+        {groups.length > 0 ? <SelectSeparator /> : null}
+        {groups.map((group) => (
+          <SelectGroup key={group.id}>
+            <SelectLabel>{group.name}</SelectLabel>
+            {group.models.map((model) => (
+              <SelectItem
+                key={`${model.provider}:${model.id}`}
+                value={`${model.provider}:${model.id}`}
+              >
+                <ModelAvatar
+                  id={model.id}
+                  name={model.name}
+                  icon={model.icon}
+                  size={16}
+                />
+                <span className="font-mono">{model.name}</span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -63,6 +153,22 @@ export function GeneralPage() {
             <SelectItem value="system">System</SelectItem>
           </SelectContent>
         </Select>
+      </SettingsRow>
+
+      <Separator />
+
+      <SettingsRow
+        label={
+          <span className="flex flex-col gap-0.5">
+            Default model
+            <span className="text-muted-foreground text-xs">
+              Used for new threads, and when a thread&apos;s model is no longer
+              available.
+            </span>
+          </span>
+        }
+      >
+        <DefaultModelSelect />
       </SettingsRow>
 
       <Separator />

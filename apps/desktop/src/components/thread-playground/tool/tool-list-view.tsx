@@ -1,7 +1,12 @@
 "use client";
 
-import { type FunctionTool } from "@llm-space/core";
-import { CableIcon, FunctionSquareIcon, PlusIcon } from "lucide-react";
+import { type FunctionTool, type Tool } from "@llm-space/core";
+import {
+  CableIcon,
+  FunctionSquareIcon,
+  PackageCheckIcon,
+  PlusIcon,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -16,9 +21,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 
+import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
 import { McpToolImportDialog } from "./mcp-tool-import-popover";
 import { ToolEditorDialog } from "./tool-editor-dialog";
 import { ToolListItem } from "./tool-list-item";
@@ -34,6 +41,16 @@ export function ToolListView({
   const { addTool, removeTool } = useThreadStoreActions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [builtInOpen, setBuiltInOpen] = useState(false);
+  const [initialMcpServerId, setInitialMcpServerId] = useState<string | null>(
+    null
+  );
+  const [initialMcpToolName, setInitialMcpToolName] = useState<string | null>(
+    null
+  );
+  const [initialBuiltInToolName, setInitialBuiltInToolName] = useState<
+    string | null
+  >(null);
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
   const existingToolNames = useMemo(
     () => new Set((tools ?? []).map((tool) => tool.name)),
@@ -47,13 +64,24 @@ export function ToolListView({
     setDialogOpen(true);
   }, []);
 
-  const openEditDialog = useCallback((tool: FunctionTool) => {
+  const openEditDialog = useCallback((tool: Tool) => {
+    if (tool.type === "mcp") {
+      setInitialMcpServerId(tool.serverId);
+      setInitialMcpToolName(tool.name);
+      setMcpOpen(true);
+      return;
+    }
+    if (tool.type === "builtin") {
+      setInitialBuiltInToolName(tool.name);
+      setBuiltInOpen(true);
+      return;
+    }
     setEditingTool(tool);
     setDialogOpen(true);
   }, []);
 
   const handleRemoveTool = useCallback(
-    (tool: FunctionTool) => {
+    (tool: Tool) => {
       removeTool(tool.name);
     },
     [removeTool]
@@ -94,15 +122,52 @@ export function ToolListView({
               <FunctionSquareIcon />
               Function tool
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setMcpOpen(true)}>
+            <DropdownMenuItem
+              onSelect={() => {
+                setInitialMcpServerId(null);
+                setInitialMcpToolName(null);
+                setMcpOpen(true);
+              }}
+            >
               <CableIcon />
               Add MCP tools
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
+                setInitialBuiltInToolName(null);
+                setBuiltInOpen(true);
+              }}
+            >
+              <PackageCheckIcon />
+              Add built-in tools
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <McpToolImportDialog
           open={mcpOpen}
-          onOpenChange={setMcpOpen}
+          onOpenChange={(open) => {
+            setMcpOpen(open);
+            if (!open) {
+              setInitialMcpServerId(null);
+              setInitialMcpToolName(null);
+            }
+          }}
+          initialServerId={initialMcpServerId}
+          initialToolName={initialMcpToolName}
+          existingToolNames={existingToolNames}
+          onAdd={addTool}
+          onRemove={removeTool}
+        />
+        <BuiltInToolImportDialog
+          open={builtInOpen}
+          onOpenChange={(open) => {
+            setBuiltInOpen(open);
+            if (!open) {
+              setInitialBuiltInToolName(null);
+            }
+          }}
+          initialToolName={initialBuiltInToolName}
           existingToolNames={existingToolNames}
           onAdd={addTool}
           onRemove={removeTool}

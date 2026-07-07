@@ -9,12 +9,19 @@ import {
   AlertCircleIcon,
   CheckCircle2,
   Clock4,
+  Loader2Icon,
+  PackageCheckIcon,
   PlayCircleIcon,
   PlusIcon,
 } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import { callBuiltInTool } from "@/client/built-in-tools";
+import { callMcpTool } from "@/client/mcp";
+import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
+import { isFirecrawlLimitError } from "@/lib/firecrawl";
 import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
@@ -137,7 +144,7 @@ function _MessageListItem({
   return (
     <div
       className={cn(
-        "hover:border-accent-foreground/20 focus-within:border-ring! group relative flex size-full flex-col items-center rounded-lg border bg-(--textarea) transition-[padding-bottom,border-color]",
+        "hover:border-accent-foreground/20 focus-within:border-ring! group group/message relative flex size-full flex-col items-center rounded-lg border bg-(--textarea) transition-[padding-bottom,border-color]",
         collapsed && "pb-2.5",
         className
       )}
@@ -227,6 +234,7 @@ function _MessageListItem({
                   />
                 ))}
                 <ToolStepContinuation
+                  messageId={message.id}
                   readonly={readonly}
                   toolCalls={message.toolCalls}
                   onContinue={handleContinue}
@@ -240,17 +248,39 @@ function _MessageListItem({
 }
 
 function _ToolStepContinuation({
+  messageId,
   toolCalls,
   readonly,
   onContinue,
 }: {
+  messageId: string;
   toolCalls: ToolCall[];
   readonly?: boolean;
   onContinue: () => void;
 }) {
   const status = useThreadStore((state) => state.status);
+  const tools = useThreadStore((state) => state.thread.context?.tools);
+  const callableTools = useMemo(() => {
+    const toolsByName = new Map((tools ?? []).map((tool) => [tool.name, tool]));
+    return toolCalls
+      .map((toolCall) => {
+        const tool = toolsByName.get(toolCall.input.name);
+        if (tool?.type !== "mcp" && tool?.type !== "builtin") {
+          return null;
+        }
+        return { toolCall, tool };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [toolCalls, tools]);
+  const { updateToolCallOutputText } = useThreadStoreActions();
+  const [callingTools, setCallingTools] = useState(false);
   const summary = useMemo(() => summarizeToolCalls(toolCalls), [toolCalls]);
   const disabled = readonly || status === "running" || !summary.canContinue;
+  const canCallTools =
+    !readonly &&
+    status !== "running" &&
+    !callingTools &&
+    callableTools.length > 1;
   const readyCount = summary.readyCount + summary.errorCount;
   const missingLabel =
     summary.needsResponseCount === 1
@@ -263,6 +293,73 @@ function _ToolStepContinuation({
         }`
       : `${readyCount}/${summary.totalCount} supplied`
     : missingLabel;
+  const handleCallTools = useCallback(async () => {
+    if (!canCallTools) {
+      return;
+    }
+    setCallingTools(true);
+    try {
+      const results = await Promise.all(
+        callableTools.map(async ({ tool, toolCall }) => {
+          try {
+            if (tool.type === "mcp") {
+              const result = await callMcpTool({
+                serverId: tool.serverId,
+                toolName: tool.toolName,
+                arguments: toolCall.input.arguments,
+              });
+              return {
+                toolCall,
+                text: result.contentText,
+                isError: result.isError ?? false,
+              };
+            }
+            const result = await callBuiltInTool({
+              name: tool.name,
+              arguments: toolCall.input.arguments,
+            });
+            return { toolCall, text: result.contentText, isError: false };
+          } catch (error) {
+            return {
+              toolCall,
+              text: error instanceof Error ? error.message : "Tool call failed",
+              isError: true,
+            };
+          }
+        })
+      );
+      let errorCount = 0;
+      let firecrawlLimitCount = 0;
+      for (const result of results) {
+        if (result.isError) {
+          errorCount += 1;
+          if (isFirecrawlLimitError(result.text)) {
+            firecrawlLimitCount += 1;
+          }
+        }
+        updateToolCallOutputText(
+          messageId,
+          result.toolCall.id,
+          result.text,
+          result.isError
+        );
+      }
+      if (firecrawlLimitCount > 0) {
+        openFirecrawlLimitDialog();
+      }
+      // Suppress the generic toast when the only failures are the Firecrawl
+      // limit, since the dialog already explains them.
+      if (errorCount > firecrawlLimitCount) {
+        toast.error("Some tool calls failed", {
+          description: `${errorCount}/${results.length} tool call${
+            results.length === 1 ? "" : "s"
+          } failed.`,
+        });
+      }
+    } finally {
+      setCallingTools(false);
+    }
+  }, [callableTools, canCallTools, messageId, updateToolCallOutputText]);
 
   return (
     <div className="bg-foreground/4 flex min-w-0 items-center justify-between gap-3 rounded-md px-3 py-1">
@@ -275,7 +372,7 @@ function _ToolStepContinuation({
               <CheckCircle2 className="size-3 text-green-500" />
             )
           ) : (
-            <Clock4 />
+            <Clock4 className="size-3" />
           )}
         </MarkerIcon>
         <MarkerContent className="truncate text-xs">
@@ -283,21 +380,40 @@ function _ToolStepContinuation({
           {statusLabel}
         </MarkerContent>
       </Marker>
-      <Button
-        className="shrink-0"
-        size="sm"
-        variant={summary.canContinue ? "default" : "secondary"}
-        disabled={disabled}
-        aria-label={
-          summary.canContinue
-            ? "Continue from tool results"
-            : "Continue after tool responses are filled"
-        }
-        onClick={onContinue}
-      >
-        <PlayCircleIcon />
-        Run
-      </Button>
+      <div className="flex shrink-0 items-center gap-2">
+        {callableTools.length > 1 ? (
+          <Button
+            className="invisible shrink-0 group-hover/message:visible"
+            size="sm"
+            variant="secondary"
+            disabled={!canCallTools}
+            aria-label="Call available MCP and built-in tools"
+            onClick={() => void handleCallTools()}
+          >
+            {callingTools ? (
+              <Loader2Icon className="animate-spin" />
+            ) : (
+              <PackageCheckIcon />
+            )}
+            Call all
+          </Button>
+        ) : null}
+        <Button
+          className="invisible shrink-0 group-hover/message:visible"
+          size="sm"
+          variant={summary.canContinue ? "default" : "secondary"}
+          disabled={disabled}
+          aria-label={
+            summary.canContinue
+              ? "Continue from tool results"
+              : "Continue after tool responses are filled"
+          }
+          onClick={onContinue}
+        >
+          <PlayCircleIcon />
+          Run
+        </Button>
+      </div>
     </div>
   );
 }

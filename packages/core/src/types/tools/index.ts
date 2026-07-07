@@ -2,53 +2,141 @@ import { Type, type Static } from "typebox";
 
 import { JSONSchema } from "../shared";
 
-const McpToolSource = Type.Object({
-  type: Type.Literal("mcp"),
+const ToolBase = Type.Object({
   /**
-   * The configured MCP server id that owns the raw MCP tool.
-   */
-  serverId: Type.String(),
-  /**
-   * The normalized server segment used in `mcp__{serverName}__{toolName}`.
-   */
-  serverName: Type.String(),
-  /**
-   * The raw MCP tool name sent back to the server during `tools/call`.
-   */
-  toolName: Type.String(),
-});
-export type McpToolSource = Static<typeof McpToolSource>;
-
-/**
- * The definition of a custom function tool.
- */
-const FunctionTool = Type.Object({
-  /**
-   * The name of the tool.
+   * The name of the tool exposed to the model.
    */
   name: Type.String(),
 
   /**
-   * The description of the tool.
+   * The description of the tool exposed to the model.
    */
   description: Type.String(),
 
   /**
-   * A JSON schema represents the parameters of the function tool.
+   * A JSON schema representing the parameters of the tool.
    */
   parameters: JSONSchema,
 
   strict: Type.Optional(Type.Boolean()),
-
-  /**
-   * Optional provenance for tools backed by an external runtime.
-   */
-  source: Type.Optional(Type.Union([McpToolSource])),
 });
+
+/**
+ * The definition of a custom function tool.
+ */
+const FunctionTool = Type.Intersect([
+  ToolBase,
+  Type.Object({
+    type: Type.Literal("function"),
+  }),
+]);
 export type FunctionTool = Static<typeof FunctionTool>;
+
+/**
+ * The definition of a tool backed by an MCP server.
+ */
+const McpTool = Type.Intersect([
+  ToolBase,
+  Type.Object({
+    type: Type.Literal("mcp"),
+    /**
+     * The configured MCP server id that owns the raw MCP tool.
+     */
+    serverId: Type.String(),
+    /**
+     * The normalized server segment used in `mcp__{serverName}__{toolName}`.
+     */
+    serverName: Type.String(),
+    /**
+     * The raw MCP tool name sent back to the server during `tools/call`.
+     */
+    toolName: Type.String(),
+  }),
+]);
+export type McpTool = Static<typeof McpTool>;
+
+/**
+ * The definition of a tool backed by the desktop's built-in runtime registry.
+ */
+const BuiltinTool = Type.Intersect([
+  ToolBase,
+  Type.Object({
+    type: Type.Literal("builtin"),
+    /**
+     * Stable icon key resolved to a Lucide icon on the renderer. Keeps the
+     * built-in tool's icon defined alongside the tool itself (single source of
+     * truth) instead of a name→icon lookup that drifts per UI surface.
+     */
+    icon: Type.Optional(Type.String()),
+  }),
+]);
+export type BuiltinTool = Static<typeof BuiltinTool>;
+
+export interface LegacyMcpToolSource {
+  /**
+   * The configured MCP server id that owns the raw MCP tool.
+   */
+  type: "mcp";
+  serverId: string;
+  /**
+   * The normalized server segment used in `mcp__{serverName}__{toolName}`.
+   */
+  serverName: string;
+  /**
+   * The raw MCP tool name sent back to the server during `tools/call`.
+   */
+  toolName: string;
+}
 
 /**
  * The union type of the tools.
  */
-export const Tool = Type.Union([FunctionTool]);
-export type Tool = Static<typeof Tool>;
+export const Tool = Type.Union([FunctionTool, McpTool, BuiltinTool]);
+export type Tool = FunctionTool | McpTool | BuiltinTool;
+
+export type LegacyTool = Omit<FunctionTool, "type"> & {
+  type?: "function";
+  source?: LegacyMcpToolSource;
+};
+
+export function normalizeTool(tool: Tool | LegacyTool): Tool {
+  if (tool.type === "mcp" || tool.type === "builtin") {
+    return tool;
+  }
+  const legacySource = _getLegacyMcpSource(tool);
+  if (legacySource) {
+    return {
+      type: "mcp",
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      ...(tool.strict === undefined ? {} : { strict: tool.strict }),
+      serverId: legacySource.serverId,
+      serverName: legacySource.serverName,
+      toolName: legacySource.toolName,
+    };
+  }
+  if (tool.type === "function" && !("source" in tool)) {
+    return tool as FunctionTool;
+  }
+  return {
+    type: "function",
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    ...(tool.strict === undefined ? {} : { strict: tool.strict }),
+  };
+}
+
+export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
+  return tools.map(normalizeTool);
+}
+
+function _getLegacyMcpSource(
+  tool: Tool | LegacyTool
+): LegacyMcpToolSource | undefined {
+  if (!("source" in tool) || tool.source?.type !== "mcp") {
+    return undefined;
+  }
+  return tool.source;
+}

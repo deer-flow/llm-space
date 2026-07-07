@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
+  normalizeThread,
   uuid,
   type AssistantMessage,
   type Message,
@@ -909,11 +910,13 @@ function _threadWithImportedModel(
 }
 
 function _normalizeExistingWorkbenchThread(thread: Thread): Thread {
-  const normalized = _normalizeThreadMessages(thread);
-  let changed = normalized.changed;
+  const normalizedBase = normalizeThread(thread);
+  const normalized = _normalizeThreadMessages(normalizedBase);
+  let changed = normalizedBase !== thread || normalized.changed;
   const nextRunHistory = normalized.thread.runHistory?.map((run) => {
-    const normalizedRun = _normalizeThreadMessages(run.thread);
-    if (normalizedRun.changed) {
+    const normalizedRunBase = normalizeThread(run.thread);
+    const normalizedRun = _normalizeThreadMessages(normalizedRunBase);
+    if (normalizedRunBase !== run.thread || normalizedRun.changed) {
       changed = true;
       return { ...run, thread: normalizedRun.thread };
     }

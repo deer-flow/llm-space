@@ -45,6 +45,99 @@ function pickTools(names: string[]): Tool[] {
     .filter(Boolean) as Tool[];
 }
 
+/**
+ * Like {@link pickTools} but seeds the runtime `type: "builtin"` variant so the
+ * tools are wired to real execution. Reuses each example's schema and preserves
+ * the requested order; icons resolve by name in `getBuiltInToolIcon`.
+ */
+function pickBuiltInTools(names: string[]): Tool[] {
+  return names
+    .map((name) => {
+      const item = TOOL_EXAMPLES.find(
+        (entry) => entry.type === "tool" && entry.tool.name === name
+      );
+      return item?.type === "tool"
+        ? { ...item.tool, type: "builtin" as const }
+        : undefined;
+    })
+    .filter(Boolean) as Tool[];
+}
+
+/**
+ * Built-in tool definitions mirroring the desktop runtime registry
+ * (`bun/tools/built-in/{web,misc}.ts`). Seeded as `type: "builtin"` so they're
+ * wired to real execution — the `Call` action looks them up by name on the bun
+ * side, so names, schemas, and icons must match the registry.
+ */
+const HELLO_WORLD_BUILT_IN_TOOLS: Tool[] = [
+  {
+    type: "builtin",
+    name: "web_search",
+    icon: "search",
+    description: "Search the web and return LLM-friendly results.",
+    strict: true,
+    parameters: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query string to look up on the web.",
+        },
+        limit: {
+          type: "number",
+          description:
+            "Maximum number of search results to return. Defaults to 5.",
+        },
+        includeContent: {
+          type: "boolean",
+          description:
+            "Whether to include short markdown content snippets for each result. Defaults to false.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "builtin",
+    name: "web_fetch",
+    icon: "globe",
+    description:
+      "Fetch one webpage and return LLM-friendly readable markdown content.",
+    strict: true,
+    parameters: {
+      type: "object",
+      required: ["url"],
+      properties: {
+        url: {
+          type: "string",
+          description:
+            "The URL to fetch. Must be a fully qualified URL starting with http:// or https://.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "builtin",
+    name: "weather_report",
+    icon: "cloud-sun",
+    description: "Get today's weather report for a city.",
+    strict: true,
+    parameters: {
+      type: "object",
+      required: ["city"],
+      properties: {
+        city: {
+          type: "string",
+          description: "The city to get today's weather report for.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+];
+
 function userPrompt(text: string): Message[] {
   return [
     {
@@ -75,7 +168,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     content:
       "You're a helpful and harmless assistant that can help with tasks like daily work and writing code, answering questions, and more.",
     icon: FileIcon,
-    tools: pickTools(["web_search", "web_fetch", "weather_report"]),
+    tools: HELLO_WORLD_BUILT_IN_TOOLS,
     messages: userPrompt("What's the weather in Tokyo and Kyoto?"),
   },
   { type: "separator" },
@@ -88,23 +181,22 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
       "Broad-purpose assistant prompt with practical tool-use rules.",
     content: generalAgentPrompt,
     icon: BotIcon,
-    tools: pickTools([
-      "ask_user_question",
-      "web_search",
-      "web_fetch",
-      "ls",
-      "read",
-      "write",
-      "edit",
-      "grep",
-      "glob",
-      "bash",
-      "agent",
-      "todo_write",
-      "task_monitor",
-      "task_kill",
-      "present_files",
-    ]),
+    tools: [
+      ...pickTools(["ask_user_question"]),
+      ...pickBuiltInTools([
+        "web_search",
+        "web_fetch",
+        "ls",
+        "read",
+        "write",
+        "edit",
+        "grep",
+        "glob",
+        "bash",
+      ]),
+      ...pickTools(["agent"]),
+      ...pickBuiltInTools(["todo_write", "present_files"]),
+    ],
     messages: userPrompt(
       "Perform a deep research of the open source project DeerFlow 2.0"
     ),
@@ -116,6 +208,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     fileStem: "translation",
     description: "Translator prompt focused on preserving meaning and style.",
     content: translationPrompt,
+    messages: userPrompt("Where there's a will, there's a way."),
     icon: LanguagesIcon,
   },
   {

@@ -3,18 +3,19 @@ import {
   AssistantMessage,
   isRunnableConversation,
   Message,
+  normalizeThread,
   reduceMessages,
   RUN_LAST_MESSAGE_ERROR,
   streamThread,
   Tool as ToolSchema,
   uuid,
   type AgentTransport,
-  type FunctionTool,
   type MessageContent,
   type ModelConfig,
   type ModelConfigParams,
   type ReducedMessageContent,
   type Thread,
+  type Tool,
   type UserMessage,
 } from "@llm-space/core";
 import { createContext, useContext } from "react";
@@ -93,8 +94,8 @@ export interface ThreadState {
     text: string,
     isError?: boolean
   ): void;
-  addTool(tool: FunctionTool): boolean;
-  updateTool(name: string, tool: FunctionTool): boolean;
+  addTool(tool: Tool): boolean;
+  updateTool(name: string, tool: Tool): boolean;
   removeTool(name: string): void;
   toggleMessageRole(id: string): void;
   toggleMessageCollapsed(id: string): void;
@@ -108,20 +109,25 @@ export function createThreadStore(
   options: {
     transport?: AgentTransport;
     /**
-     * Resolve the model to use when the thread has no saved model — the first
-     * available model, or `null` when none are configured. Supplied by the UI,
-     * which holds the live provider list.
+     * Resolve the model a run/edit should use given the thread's saved model:
+     * the saved model when still available, else the user's default, else the
+     * first available model (`null` when none are configured). Supplied by the
+     * UI, which holds the live provider list and default. Catches both threads
+     * with no model and threads with a stale (removed) reference.
      */
-    getFallbackModel?: () => ModelConfig | null;
+    resolveModel?: (
+      saved: ModelConfig | null | undefined
+    ) => ModelConfig | null;
   } = {}
 ): ThreadStore {
-  const initialRunHistory = normalizeRunHistory(initialThread.runHistory);
+  const normalizedInputThread = normalizeThread(initialThread);
+  const initialRunHistory = normalizeRunHistory(normalizedInputThread.runHistory);
   const initialEvaluations = normalizeEvaluations(
-    initialThread.evaluations,
+    normalizedInputThread.evaluations,
     initialRunHistory
   );
   const normalizedInitialThread = withRunHistory(
-    initialThread,
+    normalizedInputThread,
     initialRunHistory,
     initialEvaluations
   );
@@ -187,7 +193,7 @@ export function createThreadStore(
       });
 
       /** Validate a tool against the schema, toasting the first errors. */
-      const validateTool = (tool: FunctionTool): boolean => {
+      const validateTool = (tool: Tool): boolean => {
         if (!toolValidator.Check(tool)) {
           const errors = [...toolValidator.Errors(tool)];
           toast.error("Error", {
@@ -288,9 +294,9 @@ export function createThreadStore(
           set({ thread: { ...current, title } });
         },
         updateModelParams(params: Partial<ModelConfigParams>) {
-          // Materialize the model on explicit param edits: fall back to the
-          // first available model when the thread has none yet.
-          const base = get().thread.model ?? options.getFallbackModel?.();
+          // Materialize the model on explicit param edits: resolve the thread's
+          // model (falling back when it has none, or a stale reference).
+          const base = options.resolveModel?.(get().thread.model);
           if (!base) {
             return;
           }
@@ -436,10 +442,10 @@ export function createThreadStore(
           if (get().status === "running") {
             throw new Error("Thread is already running");
           }
-          // Resolve the model to run with: the thread's own, else the first
-          // available. A thread with no resolvable model cannot run.
-          const model =
-            get().thread.model ?? options.getFallbackModel?.() ?? null;
+          // Resolve the model to run with: the thread's own when available,
+          // else the default/first available. A thread with no resolvable model
+          // cannot run.
+          const model = options.resolveModel?.(get().thread.model) ?? null;
           if (!model) {
             toast.error("Select a model to run");
             return;

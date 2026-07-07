@@ -12,6 +12,11 @@ import type {
   UserMessage,
   UserMessageContent,
 } from "../types";
+import {
+  normalizeTool,
+  type FunctionTool,
+  type LegacyMcpToolSource,
+} from "../types/tools";
 import { parseJSON, uuid } from "../utils";
 
 import type { ThreadParseContext } from "./thread-parser";
@@ -447,24 +452,38 @@ function _resolveTools(tools: unknown): Tool[] {
       typeof src.description === "string" ? src.description : "";
     const parameters =
       _asRecord(src.parameters) ?? _asRecord(src.input_schema) ?? {};
-    const tool: Tool = {
+    const base: Omit<FunctionTool, "type"> = {
       name,
       description,
       parameters,
     };
     if (typeof src.strict === "boolean") {
-      tool.strict = src.strict;
+      base.strict = src.strict;
+    }
+    if (src.type === "mcp") {
+      const { serverId, serverName, toolName } = src;
+      if (
+        typeof serverId === "string" &&
+        typeof serverName === "string" &&
+        typeof toolName === "string"
+      ) {
+        result.push({
+          ...base,
+          type: "mcp",
+          serverId,
+          serverName,
+          toolName,
+        });
+      }
+      continue;
     }
     const source = _resolveToolSource(src.source);
-    if (source) {
-      tool.source = source;
-    }
-    result.push(tool);
+    result.push(normalizeTool(source ? { ...base, source } : base));
   }
   return result;
 }
 
-function _resolveToolSource(source: unknown): Tool["source"] | undefined {
+function _resolveToolSource(source: unknown): LegacyMcpToolSource | undefined {
   const raw = _asRecord(source);
   if (raw?.type !== "mcp") {
     return undefined;

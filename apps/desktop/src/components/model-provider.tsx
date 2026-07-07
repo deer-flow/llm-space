@@ -53,6 +53,8 @@ interface ModelContextValue {
   ) => Promise<void>;
   refresh: () => Promise<void>;
   getModel: (ref: { id: string; provider: string }) => pi.Model<pi.Api> | null;
+  defaultModel: ModelConfig | null;
+  setDefaultModel: (model: ModelConfig | null) => Promise<void>;
 }
 
 const ModelContext = createContext<ModelContextValue | null>(null);
@@ -87,6 +89,43 @@ export function firstAvailableModel(
   return null;
 }
 
+/**
+ * Whether a model reference is still configured and enabled — i.e. its provider
+ * exists, lists the model, and hasn't disabled it. Used to detect stale thread
+ * references and to validate the saved default model.
+ */
+export function isModelAvailable(
+  providers: ModelProviderGroup[],
+  ref: { provider: string; id: string }
+): boolean {
+  const group = providers.find((g) => g.id === ref.provider);
+  if (!group?.models.some((m) => m.id === ref.id)) {
+    return false;
+  }
+  return !(group.disabledModels ?? []).includes(ref.id);
+}
+
+/**
+ * Resolve the model a thread should actually use: the thread's own saved model
+ * when it is still available, else the user's default model when set and
+ * available, else the first available model. Returns `null` only when no models
+ * are configured at all. The saved model's `params` are preserved; the fallback
+ * paths return a bare `{ provider, id }`.
+ */
+export function resolveModelConfig(
+  providers: ModelProviderGroup[],
+  saved: ModelConfig | null | undefined,
+  def: ModelConfig | null
+): ModelConfig | null {
+  if (saved && isModelAvailable(providers, saved)) {
+    return saved;
+  }
+  if (def && isModelAvailable(providers, def)) {
+    return def;
+  }
+  return firstAvailableModel(providers);
+}
+
 export function ModelProvider({
   fetcher,
   children,
@@ -97,6 +136,17 @@ export function ModelProvider({
   fallback?: ReactNode;
 }) {
   const [providers, setProviders] = useState<ModelProviderGroup[] | null>(null);
+  const [defaultModel, setDefaultModelState] = useState<ModelConfig | null>(
+    null
+  );
+
+  const setDefaultModel = useCallback(async (model: ModelConfig | null) => {
+    if (!electrobun.rpc) {
+      throw new Error("Electrobun RPC is not initialized");
+    }
+    const updated = await electrobun.rpc.request.setDefaultModel({ model });
+    setDefaultModelState(updated);
+  }, []);
 
   const removeProvider = useCallback(async (providerId: string) => {
     if (!electrobun.rpc) {
@@ -235,7 +285,14 @@ export function ModelProvider({
   // cached beyond the current render.
   const refresh = useCallback(async () => {
     try {
-      setProviders(await fetcher());
+      const [nextProviders, nextDefault] = await Promise.all([
+        fetcher(),
+        electrobun.rpc
+          ? electrobun.rpc.request.getDefaultModel({})
+          : Promise.resolve(null),
+      ]);
+      setProviders(nextProviders);
+      setDefaultModelState(nextDefault ?? null);
     } catch (error) {
       console.error("Failed to fetch models", error);
     }
@@ -263,6 +320,8 @@ export function ModelProvider({
       upsertCustomModel,
       refresh,
       getModel: (ref) => index.get(`${ref.provider}:${ref.id}`) ?? null,
+      defaultModel,
+      setDefaultModel,
     };
   }, [
     providers,
@@ -276,6 +335,8 @@ export function ModelProvider({
     removeCustomModel,
     upsertCustomModel,
     refresh,
+    defaultModel,
+    setDefaultModel,
   ]);
 
   if (!contextValue) {
@@ -301,15 +362,46 @@ export function useModels(): ModelProviderGroup[] {
   return useModelProvider().providers;
 }
 
-/** The fallback model for a thread with no saved model (`null` if none). */
+/**
+ * The fallback model for a thread with no saved model: the user's default when
+ * set and available, else the first available model (`null` if none).
+ */
 export function useFirstAvailableModel(): ModelConfig | null {
-  const providers = useModels();
-  return useMemo(() => firstAvailableModel(providers), [providers]);
+  const { providers, defaultModel } = useModelProvider();
+  return useMemo(
+    () => resolveModelConfig(providers, null, defaultModel),
+    [providers, defaultModel]
+  );
+}
+
+/**
+ * Resolve the model a thread should display/run with, given its saved model:
+ * the saved model when still available, else the default, else first available.
+ */
+export function useResolveModelConfig(
+  saved: ModelConfig | null | undefined
+): ModelConfig | null {
+  const { providers, defaultModel } = useModelProvider();
+  return useMemo(
+    () => resolveModelConfig(providers, saved, defaultModel),
+    [providers, saved, defaultModel]
+  );
 }
 
 /** The model used for ad-hoc text generation (e.g. `useStreamText`). */
 export function useDefaultTextGenerationModel(): ModelConfig | null {
   return useFirstAvailableModel();
+}
+
+/** The user's chosen default model, or `null` for automatic (first available). */
+export function useDefaultModel(): ModelConfig | null {
+  return useModelProvider().defaultModel;
+}
+
+export function useSetDefaultModel(): (
+  model: ModelConfig | null
+) => Promise<void> {
+  return useModelProvider().setDefaultModel;
 }
 
 export function useRemoveProvider(): (providerId: string) => Promise<void> {

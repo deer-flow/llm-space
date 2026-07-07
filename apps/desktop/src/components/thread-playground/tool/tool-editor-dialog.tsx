@@ -2,6 +2,7 @@
 
 import {
   parseJSON,
+  normalizeTool,
   uuid,
   type FunctionTool,
   type Message,
@@ -106,7 +107,14 @@ export function ToolEditorDialog({
   const handleSave = () => {
     let parsed: FunctionTool;
     try {
-      parsed = parseJSON<FunctionTool>(text);
+      const normalized = normalizeTool(parseJSON(text));
+      if (normalized.type !== "function") {
+        toast.error("Error", {
+          description: "MCP tools cannot be edited as function tools",
+        });
+        return;
+      }
+      parsed = normalized;
     } catch {
       toast.error("Error", { description: "Invalid JSON" });
       return;

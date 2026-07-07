@@ -165,8 +165,6 @@ function _TraceHeaderDetails({ trace }: { trace: TraceRecord }) {
       toast.error("Could not copy trace ID");
     }
   }, [traceId]);
-  const sourceLabel =
-    trace.source.mode === "manual" ? "Manual Import" : "Connected";
   return (
     <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[0.6875rem]">
       <span className="border-border bg-muted/60 text-foreground max-w-72 min-w-0 truncate rounded-full border px-2 py-0.5 font-mono text-[0.625rem]">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useFirstAvailableModel, useModel } from "@/components/model-provider";
+import { useModel, useResolveModelConfig } from "@/components/model-provider";
 import { cn } from "@/lib/utils";
 
 import { useThreadStore } from "../stores";
@@ -15,11 +15,11 @@ export function ModelConfigEditor({
   className?: string;
   readonly?: boolean;
 }) {
-  // A thread may have no saved model; fall back to the first available one for
-  // display. `null` when there are no models at all.
+  // A thread may have no saved model, or a stale one whose provider was removed;
+  // resolve it for display (own → default → first available). `null` when there
+  // are no models at all.
   const savedModel = useThreadStore((s) => s.thread.model);
-  const fallbackModel = useFirstAvailableModel();
-  const model = savedModel ?? fallbackModel;
+  const model = useResolveModelConfig(savedModel);
   const resolvedModel = useModel({
     id: model?.id ?? "",
     provider: model?.provider ?? "",

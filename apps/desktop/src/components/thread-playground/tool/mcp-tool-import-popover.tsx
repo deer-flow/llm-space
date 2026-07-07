@@ -1,8 +1,15 @@
 "use client";
 
-import { type FunctionTool } from "@llm-space/core";
+import { type McpTool } from "@llm-space/core";
 import { Cable, Loader2, RefreshCw } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { format } from "timeago.js";
 
@@ -35,13 +42,17 @@ import {
 
 function _McpToolImportDialog({
   existingToolNames,
+  initialServerId,
+  initialToolName,
   onAdd,
   onRemove,
   open,
   onOpenChange,
 }: {
   existingToolNames: Set<string>;
-  onAdd: (tool: FunctionTool) => boolean;
+  initialServerId?: string | null;
+  initialToolName?: string | null;
+  onAdd: (tool: McpTool) => boolean;
   onRemove: (toolName: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,6 +63,10 @@ function _McpToolImportDialog({
   const [tools, setTools] = useState<McpToolSummary[]>([]);
   const [loadingServers, setLoadingServers] = useState(false);
   const [loadingTools, setLoadingTools] = useState(false);
+  const [highlightedToolName, setHighlightedToolName] = useState<string | null>(
+    null
+  );
+  const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const selectedServer = useMemo(
     () => servers.find((server) => server.id === selectedServerId) ?? null,
@@ -69,9 +84,11 @@ function _McpToolImportDialog({
       const next = await listMcpServers();
       setServers(next);
       setSelectedServerId((current) =>
-        current && next.some((server) => server.id === current)
-          ? current
-          : (next[0]?.id ?? "")
+        initialServerId && next.some((server) => server.id === initialServerId)
+          ? initialServerId
+          : current && next.some((server) => server.id === current)
+            ? current
+            : (next[0]?.id ?? "")
       );
     } catch (error) {
       toast.error("Failed to load MCP servers", {
@@ -81,7 +98,7 @@ function _McpToolImportDialog({
     } finally {
       setLoadingServers(false);
     }
-  }, []);
+  }, [initialServerId]);
 
   const refreshTools = useCallback(
     async (serverId: string) => {
@@ -113,6 +130,17 @@ function _McpToolImportDialog({
   );
 
   useEffect(() => {
+    if (!open || !initialServerId) {
+      return;
+    }
+    setSelectedServerId((current) =>
+      servers.some((server) => server.id === initialServerId)
+        ? initialServerId
+        : current
+    );
+  }, [initialServerId, open, servers]);
+
+  useEffect(() => {
     if (!open) {
       return;
     }
@@ -126,6 +154,28 @@ function _McpToolImportDialog({
     setTools(selectedServer?.readiness?.tools ?? []);
   }, [open, selectedServer]);
 
+  useEffect(() => {
+    if (!open || !initialToolName) {
+      return;
+    }
+    if (!tools.some((tool) => tool.directName === initialToolName)) {
+      return;
+    }
+    setHighlightedToolName(initialToolName);
+    requestAnimationFrame(() => {
+      toolRowRefs.current.get(initialToolName)?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    });
+    const timeout = window.setTimeout(() => {
+      setHighlightedToolName((current) =>
+        current === initialToolName ? null : current
+      );
+    }, 2000);
+    return () => window.clearTimeout(timeout);
+  }, [initialToolName, open, tools]);
+
   const handleToggleTool = (tool: McpToolSummary, checked: boolean) => {
     if (!checked) {
       onRemove(tool.directName);
@@ -135,15 +185,13 @@ function _McpToolImportDialog({
       return;
     }
     onAdd({
+      type: "mcp",
       name: tool.directName,
       description: tool.description,
       parameters: tool.inputSchema,
-      source: {
-        type: "mcp",
-        serverId: selectedServer.id,
-        serverName: selectedServer.serverName,
-        toolName: tool.toolName,
-      },
+      serverId: selectedServer.id,
+      serverName: selectedServer.serverName,
+      toolName: tool.toolName,
     });
   };
 
@@ -239,11 +287,20 @@ function _McpToolImportDialog({
                 {tools.map((tool) => {
                   const exists = existingToolNames.has(tool.directName);
                   const disabledReason = tool.disabledReason;
+                  const highlighted = highlightedToolName === tool.directName;
                   return (
                     <div
                       key={tool.toolName}
+                      ref={(element) => {
+                        if (element) {
+                          toolRowRefs.current.set(tool.directName, element);
+                        } else {
+                          toolRowRefs.current.delete(tool.directName);
+                        }
+                      }}
                       className={cn(
-                        "hover:bg-accent flex min-w-0 items-start gap-3 rounded-md px-2 py-2 text-left transition-colors",
+                        "hover:bg-accent flex min-w-0 items-start gap-3 rounded-md px-2 py-2 text-left transition-colors duration-500",
+                        highlighted && "bg-accent text-accent-foreground",
                         !tool.available && "opacity-50"
                       )}
                     >

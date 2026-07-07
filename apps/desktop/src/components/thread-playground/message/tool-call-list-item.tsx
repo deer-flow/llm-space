@@ -1,17 +1,14 @@
 import type { ToolCall, ToolCallInput } from "@llm-space/core";
-import {
-  AlertCircleIcon,
-  Cable,
-  CheckCircle2,
-  Clock4,
-  Loader2,
-} from "lucide-react";
+import { AlertCircleIcon, Loader2, PlayCircleIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { callBuiltInTool } from "@/client/built-in-tools";
 import { callMcpTool } from "@/client/mcp";
+import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
-import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import { Marker, MarkerContent } from "@/components/ui/marker";
+import { isFirecrawlLimitError } from "@/lib/firecrawl";
 
 import { CodeEditor } from "../../code-editor";
 import { Button } from "../../ui/button";
@@ -38,9 +35,16 @@ function _ToolCallListItem({
     const tool = state.thread.context?.tools?.find(
       (item) => item.name === toolCall.input.name
     );
-    return tool?.source?.type === "mcp" ? tool.source : null;
+    return tool?.type === "mcp" ? tool : null;
+  });
+  const builtInTool = useThreadStore((state) => {
+    const tool = state.thread.context?.tools?.find(
+      (item) => item.name === toolCall.input.name
+    );
+    return tool?.type === "builtin" ? tool : null;
   });
   const [callingMcp, setCallingMcp] = useState(false);
+  const [callingBuiltIn, setCallingBuiltIn] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
   const toolCallStatus = useMemo(() => getToolCallStatus(toolCall), [toolCall]);
   const isError = toolCall.output?.isError ?? false;
@@ -113,20 +117,76 @@ function _ToolCallListItem({
     toolCall.input.arguments,
     updateToolCallOutputText,
   ]);
+  const handleCallBuiltInTool = useCallback(async () => {
+    if (readonly || !builtInTool) {
+      return;
+    }
+    setCallingBuiltIn(true);
+    try {
+      const result = await callBuiltInTool({
+        name: builtInTool.name,
+        arguments: toolCall.input.arguments,
+      });
+      updateToolCallOutputText(
+        messageId,
+        toolCall.id,
+        result.contentText,
+        false
+      );
+    } catch (error) {
+      if (error instanceof Error && isFirecrawlLimitError(error.message)) {
+        openFirecrawlLimitDialog();
+      } else {
+        toast.error("Failed to call built-in tool", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      }
+    } finally {
+      setCallingBuiltIn(false);
+    }
+  }, [
+    builtInTool,
+    messageId,
+    readonly,
+    toolCall.id,
+    toolCall.input.arguments,
+    updateToolCallOutputText,
+  ]);
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <div className="flex min-w-0 items-start gap-2">
         <ToolCallInputView input={toolCall.input} />
         {mcpSource ? (
           <Button
-            className="shrink-0"
+            className="invisible shrink-0 group-hover/message:visible"
             size="sm"
             variant="secondary"
             disabled={readonly || callingMcp}
             onClick={() => void handleCallMcpTool()}
           >
-            {callingMcp ? <Loader2 className="animate-spin" /> : <Cable />}
-            Call MCP Tool
+            {callingMcp ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <PlayCircleIcon />
+            )}
+            Call {toolCall.input.name}()
+          </Button>
+        ) : null}
+        {builtInTool ? (
+          <Button
+            className="invisible shrink-0 group-hover/message:visible"
+            size="sm"
+            variant="secondary"
+            disabled={readonly || callingBuiltIn}
+            onClick={() => void handleCallBuiltInTool()}
+          >
+            {callingBuiltIn ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <PlayCircleIcon />
+            )}
+            Call {toolCall.input.name}()
           </Button>
         ) : null}
       </div>
@@ -146,7 +206,7 @@ function _ToolCallListItem({
             </MarkerContent>
           </Marker>
           <Button
-            className="shrink-0"
+            className="invisible shrink-0 group-hover/message:visible"
             size="xs"
             variant={isError ? "destructive" : "ghost"}
             disabled={readonly}

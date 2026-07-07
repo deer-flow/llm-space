@@ -1,7 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import type { FileNode, FileSystem, Thread, ThreadStorage } from "../../../types";
+import {
+  normalizeThread,
+  type FileNode,
+  type FileSystem,
+  type Thread,
+  type ThreadStorage,
+} from "../../../types";
 
 /**
  * A {@link FileSystem} and {@link ThreadStorage} backed by the local
@@ -76,13 +82,17 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
 
   async read(p: string): Promise<Thread> {
     const text = await fs.readFile(this._resolve(p), "utf8");
-    return JSON.parse(text) as Thread;
+    return normalizeThread(JSON.parse(text) as Thread);
   }
 
   async write(p: string, thread: Thread): Promise<void> {
     const real = this._resolve(p);
     await fs.mkdir(path.dirname(real), { recursive: true });
-    await fs.writeFile(real, JSON.stringify(thread, null, 2), "utf8");
+    await fs.writeFile(
+      real,
+      JSON.stringify(normalizeThread(thread), null, 2),
+      "utf8"
+    );
   }
 
   /**

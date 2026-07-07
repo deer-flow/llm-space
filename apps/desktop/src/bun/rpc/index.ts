@@ -5,12 +5,14 @@ import type { DesktopRPCType } from "../../shared/rpc";
 import { moveToTrash, revealInFileManager } from "../fs";
 import { mcpManager } from "../mcp";
 import { modelManager } from "../models";
+import { searchSettings } from "../search";
 import { localFs } from "../storage";
 import {
   abortStreamThread,
   runStreamThread,
   testModelConnection,
 } from "../streaming";
+import { callBuiltInTool, listBuiltInTools } from "../tools/built-in";
 import { traceManager } from "../traces";
 
 async function getModelProviderGroups() {
@@ -88,6 +90,11 @@ export const mainWindowRPC: MainWindowRPC =
           modelManager.setAllModelsEnabled(providerId, enabled);
           return getModelProviderGroups();
         },
+        getDefaultModel: () => Promise.resolve(modelManager.getDefaultModel()),
+        setDefaultModel: ({ model }) => {
+          modelManager.setDefaultModel(model);
+          return Promise.resolve(modelManager.getDefaultModel());
+        },
         testModelConnection: async ({ providerId, modelId }) => {
           await testModelConnection({ providerId, modelId });
           return null;
@@ -155,6 +162,11 @@ export const mainWindowRPC: MainWindowRPC =
         mcpListTools: async ({ serverId }) => mcpManager.listTools(serverId),
         mcpCallTool: async ({ serverId, toolName, arguments: args }) =>
           mcpManager.callTool({ serverId, toolName, arguments: args }),
+        builtInListTools: () => listBuiltInTools(),
+        builtInCallTool: ({ name, arguments: args }) =>
+          callBuiltInTool({ name, arguments: args }),
+        getSearchSettings: () => searchSettings.get(),
+        setSearchSettings: ({ settings }) => searchSettings.set(settings),
         traceListProjects: () => traceManager.listProjects(),
         traceCreateProject: ({ name }) => traceManager.createProject(name),
         traceCreateConnectedProject: (input) =>

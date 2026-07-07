@@ -10,7 +10,7 @@ import {
   type Models,
   type Provider,
 } from "@earendil-works/pi-ai";
-import { ModelProviderGroup } from "@llm-space/core";
+import { ModelProviderGroup, type ModelConfig } from "@llm-space/core";
 import { getSettingsDir } from "@llm-space/core/server";
 
 import {
@@ -237,6 +237,24 @@ export class ModelManager {
    * `Models` registry — so the cached build is left intact. Throws when the
    * provider is not configured.
    */
+  /** The user's chosen default model, or `null` when set to automatic. */
+  getDefaultModel(): ModelConfig | null {
+    return this._config.defaultModel ?? null;
+  }
+
+  /**
+   * Set (or clear, with `null`) the default model. Clearing means "automatic" —
+   * threads fall back to the first available model.
+   */
+  setDefaultModel(model: ModelConfig | null): void {
+    if (model) {
+      this._config.defaultModel = model;
+    } else {
+      delete this._config.defaultModel;
+    }
+    this._saveConfig();
+  }
+
   setModelEnabled(providerId: string, modelId: string, enabled: boolean): void {
     const entry = this._config.providers.find(
       (provider) => provider.id === providerId
@@ -546,6 +564,7 @@ export class ModelManager {
       ) as ModelsConfig;
       return {
         providers: Array.isArray(parsed.providers) ? parsed.providers : [],
+        defaultModel: parsed.defaultModel,
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

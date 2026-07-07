@@ -1,4 +1,4 @@
-import type { CustomModel } from "@llm-space/core";
+import type { CustomModel, ModelConfig } from "@llm-space/core";
 
 export type CustomProviderApi =
   | "anthropic-messages"
@@ -58,4 +58,10 @@ export interface ProviderConfig {
 /** Shape of `settings/models.json`. */
 export interface ModelsConfig {
   providers: ProviderConfig[];
+  /**
+   * The user's chosen default model. Used to resolve threads with no saved
+   * model (or a stale reference to a removed model). Absent means "automatic" —
+   * fall back to the first available model.
+   */
+  defaultModel?: ModelConfig;
 }
