@@ -132,6 +132,16 @@ export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
   return tools.map(normalizeTool);
 }
 
+/**
+ * Whether a tool has a runtime backend the app can invoke directly. MCP tools
+ * call their server and built-in tools call the desktop registry; `function`
+ * tools are user-defined stubs with no backend, so their results are supplied
+ * by hand. The single source of truth for "can be auto-executed".
+ */
+export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
+  return tool.type === "mcp" || tool.type === "builtin";
+}
+
 function _getLegacyMcpSource(
   tool: Tool | LegacyTool
 ): LegacyMcpToolSource | undefined {

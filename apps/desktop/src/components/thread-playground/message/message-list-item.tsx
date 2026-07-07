@@ -1,6 +1,7 @@
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import {
   getMessageText,
+  isExecutableTool,
   type ImageDataContent,
   type Message,
   type ToolCall,
@@ -17,11 +18,8 @@ import {
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { callBuiltInTool } from "@/client/built-in-tools";
-import { callMcpTool } from "@/client/mcp";
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
-import { isFirecrawlLimitError } from "@/lib/firecrawl";
 import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
@@ -38,6 +36,7 @@ import { MessageListItemHeader } from "./message-list-item-header";
 import { ThinkingView } from "./thinking-view";
 import { ToolCallListItem } from "./tool-call-list-item";
 import { summarizeToolCalls } from "./tool-call-status";
+import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _MessageListItem({
   className,
@@ -259,20 +258,15 @@ function _ToolStepContinuation({
   onContinue: () => void;
 }) {
   const status = useThreadStore((state) => state.status);
-  const tools = useThreadStore((state) => state.thread.context?.tools);
-  const callableTools = useMemo(() => {
-    const toolsByName = new Map((tools ?? []).map((tool) => [tool.name, tool]));
-    return toolCalls
-      .map((toolCall) => {
-        const tool = toolsByName.get(toolCall.input.name);
-        if (tool?.type !== "mcp" && tool?.type !== "builtin") {
-          return null;
-        }
-        return { toolCall, tool };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [toolCalls, tools]);
-  const { updateToolCallOutputText } = useThreadStoreActions();
+  const { resolveTool, runToolCall } = useToolCallRunner(messageId);
+  const callableToolCalls = useMemo(
+    () =>
+      toolCalls.filter((toolCall) => {
+        const tool = resolveTool(toolCall.input.name);
+        return tool !== undefined && isExecutableTool(tool);
+      }),
+    [toolCalls, resolveTool]
+  );
   const [callingTools, setCallingTools] = useState(false);
   const summary = useMemo(() => summarizeToolCalls(toolCalls), [toolCalls]);
   const disabled = readonly || status === "running" || !summary.canContinue;
@@ -280,7 +274,7 @@ function _ToolStepContinuation({
     !readonly &&
     status !== "running" &&
     !callingTools &&
-    callableTools.length > 1;
+    callableToolCalls.length > 1;
   const readyCount = summary.readyCount + summary.errorCount;
   const missingLabel =
     summary.needsResponseCount === 1
@@ -299,50 +293,18 @@ function _ToolStepContinuation({
     }
     setCallingTools(true);
     try {
-      const results = await Promise.all(
-        callableTools.map(async ({ tool, toolCall }) => {
-          try {
-            if (tool.type === "mcp") {
-              const result = await callMcpTool({
-                serverId: tool.serverId,
-                toolName: tool.toolName,
-                arguments: toolCall.input.arguments,
-              });
-              return {
-                toolCall,
-                text: result.contentText,
-                isError: result.isError ?? false,
-              };
-            }
-            const result = await callBuiltInTool({
-              name: tool.name,
-              arguments: toolCall.input.arguments,
-            });
-            return { toolCall, text: result.contentText, isError: false };
-          } catch (error) {
-            return {
-              toolCall,
-              text: error instanceof Error ? error.message : "Tool call failed",
-              isError: true,
-            };
-          }
-        })
+      const outcomes = await Promise.all(
+        callableToolCalls.map((toolCall) => runToolCall(toolCall))
       );
       let errorCount = 0;
       let firecrawlLimitCount = 0;
-      for (const result of results) {
-        if (result.isError) {
+      for (const outcome of outcomes) {
+        if (outcome?.isError) {
           errorCount += 1;
-          if (isFirecrawlLimitError(result.text)) {
+          if (outcome.isFirecrawlLimit) {
             firecrawlLimitCount += 1;
           }
         }
-        updateToolCallOutputText(
-          messageId,
-          result.toolCall.id,
-          result.text,
-          result.isError
-        );
       }
       if (firecrawlLimitCount > 0) {
         openFirecrawlLimitDialog();
@@ -351,15 +313,15 @@ function _ToolStepContinuation({
       // limit, since the dialog already explains them.
       if (errorCount > firecrawlLimitCount) {
         toast.error("Some tool calls failed", {
-          description: `${errorCount}/${results.length} tool call${
-            results.length === 1 ? "" : "s"
+          description: `${errorCount}/${outcomes.length} tool call${
+            outcomes.length === 1 ? "" : "s"
           } failed.`,
         });
       }
     } finally {
       setCallingTools(false);
     }
-  }, [callableTools, canCallTools, messageId, updateToolCallOutputText]);
+  }, [callableToolCalls, canCallTools, runToolCall]);
 
   return (
     <div className="bg-foreground/4 flex min-w-0 items-center justify-between gap-3 rounded-md px-3 py-1">
@@ -381,7 +343,7 @@ function _ToolStepContinuation({
         </MarkerContent>
       </Marker>
       <div className="flex shrink-0 items-center gap-2">
-        {callableTools.length > 1 ? (
+        {callableToolCalls.length > 1 ? (
           <Button
             className="invisible shrink-0 group-hover/message:visible"
             size="sm"

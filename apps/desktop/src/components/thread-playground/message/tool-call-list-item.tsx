@@ -1,20 +1,22 @@
-import type { ToolCall, ToolCallInput } from "@llm-space/core";
+import {
+  isExecutableTool,
+  type ToolCall,
+  type ToolCallInput,
+} from "@llm-space/core";
 import { AlertCircleIcon, Loader2, PlayCircleIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { callBuiltInTool } from "@/client/built-in-tools";
-import { callMcpTool } from "@/client/mcp";
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
 import { Marker, MarkerContent } from "@/components/ui/marker";
-import { isFirecrawlLimitError } from "@/lib/firecrawl";
 
 import { CodeEditor } from "../../code-editor";
 import { Button } from "../../ui/button";
-import { useThreadStore, useThreadStoreActions } from "../stores";
+import { useThreadStoreActions } from "../stores";
 
 import { getToolCallOutputText, getToolCallStatus } from "./tool-call-status";
+import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _ToolCallListItem({
   messageId,
@@ -31,20 +33,10 @@ function _ToolCallListItem({
 }) {
   const { fidelity } = useRenderingFidelity();
   const { updateToolCallOutputText } = useThreadStoreActions();
-  const mcpSource = useThreadStore((state) => {
-    const tool = state.thread.context?.tools?.find(
-      (item) => item.name === toolCall.input.name
-    );
-    return tool?.type === "mcp" ? tool : null;
-  });
-  const builtInTool = useThreadStore((state) => {
-    const tool = state.thread.context?.tools?.find(
-      (item) => item.name === toolCall.input.name
-    );
-    return tool?.type === "builtin" ? tool : null;
-  });
-  const [callingMcp, setCallingMcp] = useState(false);
-  const [callingBuiltIn, setCallingBuiltIn] = useState(false);
+  const { resolveTool, runToolCall } = useToolCallRunner(messageId);
+  const tool = resolveTool(toolCall.input.name);
+  const executable = tool !== undefined && isExecutableTool(tool);
+  const [calling, setCalling] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
   const toolCallStatus = useMemo(() => getToolCallStatus(toolCall), [toolCall]);
   const isError = toolCall.output?.isError ?? false;
@@ -84,108 +76,37 @@ function _ToolCallListItem({
     },
     [canContinue, onContinue]
   );
-  const handleCallMcpTool = useCallback(async () => {
-    if (readonly || !mcpSource) {
+  const handleCall = useCallback(async () => {
+    if (readonly || !executable) {
       return;
     }
-    setCallingMcp(true);
+    setCalling(true);
     try {
-      const result = await callMcpTool({
-        serverId: mcpSource.serverId,
-        toolName: mcpSource.toolName,
-        arguments: toolCall.input.arguments,
-      });
-      updateToolCallOutputText(
-        messageId,
-        toolCall.id,
-        result.contentText,
-        result.isError ?? false
-      );
-    } catch (error) {
-      toast.error("Failed to call MCP tool", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    } finally {
-      setCallingMcp(false);
-    }
-  }, [
-    messageId,
-    mcpSource,
-    readonly,
-    toolCall.id,
-    toolCall.input.arguments,
-    updateToolCallOutputText,
-  ]);
-  const handleCallBuiltInTool = useCallback(async () => {
-    if (readonly || !builtInTool) {
-      return;
-    }
-    setCallingBuiltIn(true);
-    try {
-      const result = await callBuiltInTool({
-        name: builtInTool.name,
-        arguments: toolCall.input.arguments,
-      });
-      updateToolCallOutputText(
-        messageId,
-        toolCall.id,
-        result.contentText,
-        false
-      );
-    } catch (error) {
-      if (error instanceof Error && isFirecrawlLimitError(error.message)) {
-        openFirecrawlLimitDialog();
-      } else {
-        toast.error("Failed to call built-in tool", {
-          description:
-            error instanceof Error ? error.message : "Please try again.",
-        });
+      const outcome = await runToolCall(toolCall);
+      if (outcome?.isError) {
+        if (outcome.isFirecrawlLimit) {
+          openFirecrawlLimitDialog();
+        } else {
+          toast.error(`Failed to call ${toolCall.input.name}()`);
+        }
       }
     } finally {
-      setCallingBuiltIn(false);
+      setCalling(false);
     }
-  }, [
-    builtInTool,
-    messageId,
-    readonly,
-    toolCall.id,
-    toolCall.input.arguments,
-    updateToolCallOutputText,
-  ]);
+  }, [executable, readonly, runToolCall, toolCall]);
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <div className="flex min-w-0 items-start gap-2">
         <ToolCallInputView input={toolCall.input} />
-        {mcpSource ? (
+        {executable ? (
           <Button
             className="invisible shrink-0 group-hover/message:visible"
             size="sm"
             variant="secondary"
-            disabled={readonly || callingMcp}
-            onClick={() => void handleCallMcpTool()}
+            disabled={readonly || calling}
+            onClick={() => void handleCall()}
           >
-            {callingMcp ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <PlayCircleIcon />
-            )}
-            Call {toolCall.input.name}()
-          </Button>
-        ) : null}
-        {builtInTool ? (
-          <Button
-            className="invisible shrink-0 group-hover/message:visible"
-            size="sm"
-            variant="secondary"
-            disabled={readonly || callingBuiltIn}
-            onClick={() => void handleCallBuiltInTool()}
-          >
-            {callingBuiltIn ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <PlayCircleIcon />
-            )}
+            {calling ? <Loader2 className="animate-spin" /> : <PlayCircleIcon />}
             Call {toolCall.input.name}()
           </Button>
         ) : null}
