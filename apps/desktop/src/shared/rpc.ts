@@ -140,6 +140,13 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { fullScreen: boolean };
       };
+      // Resolve a directory under the llm-space root, creating it (recursively)
+      // if missing, and return its absolute path. The renderer can't touch the
+      // filesystem or read the root itself.
+      ensureRootDir: {
+        params: { relativePath: string };
+        response: { path: string };
+      };
       // Local filesystem / thread storage, mirroring the web `/api/fs/local/*`
       // routes. Void operations resolve to `null`.
       fsLs: { params: { path: string }; response: FileNode[] };

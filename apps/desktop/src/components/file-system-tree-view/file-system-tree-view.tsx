@@ -13,7 +13,10 @@ import {
 
 import { useRegisterCommands } from "@/commands";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { getPromptExample } from "@/components/thread-playground/examples/prompts";
+import {
+  getPromptExample,
+  resolveSeed,
+} from "@/components/thread-playground/examples/prompts";
 import {
   TreeView,
   type TreeDataItem,
@@ -151,13 +154,22 @@ export function FileSystemTreeView({
     newFileFromPromptExample: ({ parent = "", exampleId }) => {
       const example = getPromptExample(exampleId);
       if (!example) return;
-      void createThreadFromPromptExample(
-        parent,
-        example.fileStem,
-        example.content,
-        example.tools,
-        example.messages
-      );
+      // Resolve the seed fields (each may be a factory re-read at creation
+      // time — e.g. the General Agent's live skills list) before seeding.
+      void (async () => {
+        const [content, tools, messages] = await Promise.all([
+          resolveSeed(example.content),
+          resolveSeed(example.tools),
+          resolveSeed(example.messages),
+        ]);
+        await createThreadFromPromptExample(
+          parent,
+          example.fileStem,
+          content ?? "",
+          tools,
+          messages
+        );
+      })();
     },
     newFolder: ({ parent = "" }) => void create(parent, "folder"),
     renameFile: ({ path }) => startRenameByPath(path),

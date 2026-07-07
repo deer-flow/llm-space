@@ -11,6 +11,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { ensureRootDir } from "@/client/paths";
+import { getSkillsSettings, listSkills } from "@/client/skills";
+import type { SkillInfo } from "@/shared/skills";
+
 import compactMemoryPrompt from "./compact-memory.md?raw";
 import deepWikiPrompt from "./deep-wiki.md?raw";
 import generalAgentPrompt from "./general-agent.md?raw";
@@ -20,18 +24,36 @@ import metaToolPrompt from "./meta-tool.md?raw";
 import { ASK_USER_QUESTION_BUILTIN_TOOL, TOOL_EXAMPLES } from "./tools";
 import translationPrompt from "./translation.md?raw";
 
+/**
+ * A seed field that is either a literal value or a factory re-evaluated every
+ * time a thread is created from the example. The factory form lets a field
+ * depend on live state (e.g. the currently enabled skills) instead of a value
+ * frozen at module load.
+ */
+export type Resolvable<T> = T | (() => T | Promise<T>);
+
+/** Resolve a {@link Resolvable}, calling and awaiting the factory form. */
+export async function resolveSeed<T>(
+  value: Resolvable<T> | undefined
+): Promise<T | undefined> {
+  if (typeof value === "function") {
+    return (value as () => T | Promise<T>)();
+  }
+  return value;
+}
+
 export interface PromptExample {
   type: "example";
   id: string;
   label: string;
   fileStem: string;
   description: string;
-  content: string;
+  content: Resolvable<string>;
   icon: LucideIcon;
   /** Tools to seed the new thread with (only used by "Start from Example"). */
-  tools?: Tool[];
+  tools?: Resolvable<Tool[]>;
   /** Messages to seed the new thread with (only used by "Start from Example"). */
-  messages?: Message[];
+  messages?: Resolvable<Message[]>;
 }
 
 export type PromptExampleItem = PromptExample | { type: "separator" };
@@ -154,6 +176,67 @@ function userPrompt(text: string): Message[] {
 }
 
 /**
+ * Enabled skills across every configured discovery folder, de-duplicated by
+ * name (first folder wins) and sorted. Reads live settings, so callers get the
+ * current list at the moment a thread is created — not a snapshot from load.
+ */
+async function listEnabledSkills(): Promise<SkillInfo[]> {
+  const { discoveryPaths } = await getSkillsSettings();
+  const perPath = await Promise.all(
+    discoveryPaths.map((entry) => listSkills(entry.path))
+  );
+  const byName = new Map<string, SkillInfo>();
+  for (const skill of perPath.flat()) {
+    if (skill.enabled && !byName.has(skill.name)) {
+      byName.set(skill.name, skill);
+    }
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Seed the General Agent thread with a `<system-reminder>` listing the actually
+ * enabled skills, followed by the user's question. Re-read on every thread
+ * creation via the {@link Resolvable} factory form.
+ */
+async function generalAgentMessages(): Promise<Message[]> {
+  const [skills, rootPath] = await Promise.all([
+    listEnabledSkills(),
+    ensureRootDir("tmp/deep-research"),
+  ]);
+  const lines = skills
+    .map((skill) => `- ${skill.name}: ${skill.description}`)
+    .join("\n");
+  const reminder = `<system-reminder>
+<workspace>
+<root path="${rootPath}" exists="false" />
+</workspace>
+<available-skills>
+The following skills are available for use with the Skill tool:
+
+${lines}
+</available-skills>
+</system-reminder>`;
+  return [
+    {
+      id: uuid(),
+      role: "user",
+      content: [{ type: "text", text: reminder }],
+    },
+    {
+      id: uuid(),
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: "Perform a deep research of the open source project DeerFlow 2.0",
+        },
+      ],
+    },
+  ];
+}
+
+/**
  * Built-in system prompt examples used by both the system-prompt menu and the
  * empty-workspace "Start from Example" flow. `fileStem` is stable by design so
  * changing a display label never changes the default filename for new threads.
@@ -198,9 +281,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
       ...pickTools(["agent"]),
       ...pickBuiltInTools(["todo_write", "present_files"]),
     ],
-    messages: userPrompt(
-      "Perform a deep research of the open source project DeerFlow 2.0"
-    ),
+    messages: generalAgentMessages,
   },
   {
     type: "example",

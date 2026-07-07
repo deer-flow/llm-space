@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 import { CodeEditor } from "../../code-editor";
 import metaPrompt from "../examples/meta-prompt.md?raw";
-import { PROMPT_EXAMPLES } from "../examples/prompts";
+import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
@@ -103,7 +103,11 @@ function _SystemPromptEditor({
           />
           <ExamplesMenu
             items={PROMPT_EXAMPLES}
-            onSelect={(example) => handleExampleSelect(example.content)}
+            onSelect={(example) =>
+              void resolveSeed(example.content).then((content) => {
+                if (content !== undefined) handleExampleSelect(content);
+              })
+            }
           />
         </div>
       </div>
