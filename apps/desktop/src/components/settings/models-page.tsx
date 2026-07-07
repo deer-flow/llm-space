@@ -7,8 +7,6 @@ import {
   Check,
   CheckCheck,
   ExternalLink,
-  Eye,
-  EyeOff,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -79,6 +77,7 @@ import { ProviderAvatar } from "../thread-playground/provider-avatar";
 import { Tooltip } from "../tooltip";
 import { ScrollArea } from "../ui/scroll-area";
 
+import { ApiKeyField } from "./api-key-field";
 import {
   CUSTOM_PROVIDER_API_TYPES,
   DEFAULT_CUSTOM_PROVIDER_API,
@@ -445,7 +444,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const updateProvider = useUpdateProvider();
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
-  const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [iconDraft, setIconDraft] = useState(provider?.icon ?? "");
   const [baseUrlEnabled, setBaseUrlEnabled] = useState(
     Boolean(provider?.baseUrl)
@@ -588,21 +586,26 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   return (
     <div className="flex min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
-        <div className="flex flex-col gap-6 pl-6">
+        <div className="flex flex-col gap-6 pr-4 pl-6">
           <div className="flex items-center gap-2">
-            <h3 className="font-heading text-lg font-medium">
-              {provider.name}
-            </h3>
             {isBuiltin && provider.websiteLink ? (
               <Tooltip content={`Learn more about ${provider.name}`}>
                 <Link
                   href={provider.websiteLink}
                   aria-label={`Open ${provider.name} website`}
+                  className="group/provider-link text-foreground hover:text-foreground flex items-center gap-2"
                 >
-                  <ExternalLink className="text-muted-foreground hover:text-foreground size-4 transition-colors" />
+                  <h3 className="font-heading text-lg font-medium">
+                    {provider.name}
+                  </h3>
+                  <ExternalLink className="text-muted-foreground group-hover/provider-link:text-foreground size-4 transition-colors" />
                 </Link>
               </Tooltip>
-            ) : null}
+            ) : (
+              <h3 className="font-heading text-lg font-medium">
+                {provider.name}
+              </h3>
+            )}
           </div>
 
           {!isBuiltin && (
@@ -674,42 +677,27 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           )}
 
           {provider.id !== "openai-codex" && (
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">API key</label>
-              <div className="relative">
-                <Input
-                  type={apiKeyVisible ? "text" : "password"}
-                  defaultValue={provider.apiKey ?? ""}
-                  placeholder={`Input API Key for ${provider.name}.`}
-                  className="pr-9"
-                  aria-label={`${provider.name} API key`}
-                  onBlur={handleApiKeyBlur}
-                />
-                <button
-                  type="button"
-                  onClick={() => setApiKeyVisible((visible) => !visible)}
-                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 transition-colors"
-                  aria-label={apiKeyVisible ? "Hide API key" : "Show API key"}
-                >
-                  {apiKeyVisible ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
-                </button>
-              </div>
-              <div className="text-muted-foreground pl-5 text-xs">
-                <div className="list-item">
-                  {
-                    'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
-                  }
+            <ApiKeyField
+              label="API key"
+              getKeyUrl={provider.websiteLink}
+              defaultValue={provider.apiKey ?? ""}
+              placeholder={`Input API Key for ${provider.name}.`}
+              aria-label={`${provider.name} API key`}
+              onBlur={handleApiKeyBlur}
+              description={
+                <div className="text-muted-foreground pl-5 text-xs">
+                  <div className="list-item">
+                    {
+                      'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
+                    }
+                  </div>
+                  <div className="list-item">
+                    Leave it blank to use the official {provider.name} environment
+                    variable
+                  </div>
                 </div>
-                <div className="list-item">
-                  Leave it blank to use the official {provider.name} environment
-                  variable
-                </div>
-              </div>
-            </div>
+              }
+            />
           )}
 
           {isBuiltin ? (
