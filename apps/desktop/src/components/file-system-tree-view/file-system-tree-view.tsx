@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 
@@ -95,6 +96,7 @@ export function FileSystemTreeView({
   // Path of a just-duplicated node: selected + scrolled to once its listing
   // loads (no rename, no tab — works for both files and folders).
   const [pendingDuplicate, setPendingDuplicate] = useState<string | null>(null);
+  const [openActionsPath, setOpenActionsPath] = useState<string | null>(null);
 
   // Open a freshly created file in a tab and select its node in the tree.
   function revealCreatedFile(path: string) {
@@ -130,6 +132,12 @@ export function FileSystemTreeView({
     },
     [createFileFromPromptExample]
   );
+
+  const openNodeActionsMenu = useCallback((path: string, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenActionsPath(path);
+  }, []);
 
   // The file-tree commands, backed by this component's state. The ⌘N menu /
   // tab "+" / welcome dispatch `newFile` with no `rename`, giving the quick
@@ -224,7 +232,15 @@ export function FileSystemTreeView({
 
   const data = useMemo<TreeDataItem[]>(() => {
     const toItem = (node: FileNode): TreeDataItem => {
-      const actions = <NodeActions node={node} />;
+      const actions = (
+        <NodeActions
+          node={node}
+          menuOpen={openActionsPath === node.path}
+          onMenuOpenChange={(open) => {
+            setOpenActionsPath(open ? node.path : null);
+          }}
+        />
+      );
       if (node.type === "directory") {
         const open = expanded.has(node.path);
         // Empty array stays truthy so the directory still renders an expand
@@ -237,6 +253,7 @@ export function FileSystemTreeView({
           draggable: true,
           droppable: true,
           onClick: () => toggle(node.path),
+          onContextMenu: (event) => openNodeActionsMenu(node.path, event),
           // While renaming, render as a leaf (a div) instead of an accordion
           // trigger (a button) so the input's keys (Space/Enter) don't toggle
           // the node. A renamed folder is always collapsed first (see
@@ -252,6 +269,7 @@ export function FileSystemTreeView({
         icon: MessagesSquare,
         draggable: true,
         droppable: false,
+        onContextMenu: (event) => openNodeActionsMenu(node.path, event),
         actions,
       };
     };
@@ -265,7 +283,15 @@ export function FileSystemTreeView({
         .map(toItem);
 
     return build("");
-  }, [nodesByPath, loadingByPath, expanded, toggle, renaming]);
+  }, [
+    nodesByPath,
+    loadingByPath,
+    expanded,
+    toggle,
+    renaming,
+    openActionsPath,
+    openNodeActionsMenu,
+  ]);
 
   // Start an in-place rename of the node at `path`. Only directories can be
   // expanded, so collapse first (the row renders as a leaf while editing) to

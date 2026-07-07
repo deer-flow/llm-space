@@ -115,7 +115,15 @@ function MoreActionsTrigger({ label }: { label: string }) {
  * only). Everything else (reveal, rename, duplicate, delete) lives behind the
  * "..." overflow menu. Every action dispatches a command via {@link useCommands}.
  */
-export function NodeActions({ node }: { node: FileNode }) {
+export function NodeActions({
+  node,
+  menuOpen,
+  onMenuOpenChange,
+}: {
+  node: FileNode;
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+}) {
   const { executeCommand } = useCommands();
   const isDir = node.type === "directory";
   return (
@@ -146,7 +154,7 @@ export function NodeActions({ node }: { node: FileNode }) {
           </IconAction>
         </>
       )}
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
         <MoreActionsTrigger label={`More actions for ${node.name}`} />
         <DropdownMenuContent
           align="end"
@@ -215,7 +223,13 @@ export function NodeActions({ node }: { node: FileNode }) {
  * and refresh behind the "..." overflow menu. Every action dispatches a command
  * via {@link useCommands}.
  */
-export function RootActions() {
+export function RootActions({
+  menuOpen,
+  onMenuOpenChange,
+}: {
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+}) {
   const { executeCommand } = useCommands();
   return (
     <span className="flex items-center gap-1">
@@ -244,7 +258,7 @@ export function RootActions() {
       >
         <SettingsIcon className="size-4" />
       </IconAction>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
         <MoreActionsTrigger label="More actions for workspace root" />
         <DropdownMenuContent align="end">
           <DropdownMenuItem

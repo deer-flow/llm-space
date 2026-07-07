@@ -37,6 +37,7 @@ interface TreeDataItem {
   actions?: React.ReactNode;
   loading?: boolean;
   onClick?: () => void;
+  onContextMenu?: (event: React.MouseEvent) => void;
   draggable?: boolean;
   droppable?: boolean;
   disabled?: boolean;
@@ -365,6 +366,7 @@ const TreeNode = ({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
+          onContextMenu={item.onContextMenu}
         >
           {renderItem ? (
             renderItem({
@@ -508,6 +510,7 @@ const TreeLeaf = React.forwardRef<
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
+        onContextMenu={item.onContextMenu}
         {...props}
       >
         {renderItem ? (
