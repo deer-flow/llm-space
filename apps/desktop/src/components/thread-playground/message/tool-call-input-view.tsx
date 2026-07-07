@@ -235,8 +235,11 @@ function ArgumentLine({
     return line;
   }
   return (
+    // The click handler lives on `line` itself; the wrapping span here is only
+    // the tooltip trigger. Adding another onClick would fire onToggle twice as
+    // the event bubbles, cancelling the toggle out.
     <Tooltip content={`Click to ${expanded ? "collapse" : "expand"}`}>
-      <span onClick={onToggle}>{line}</span>
+      <span>{line}</span>
     </Tooltip>
   );
 }

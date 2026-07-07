@@ -113,9 +113,9 @@ function _ToolCallListItem({
   }, [toolCall.input.arguments]);
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
-      <div className="flex min-w-0 items-start gap-2">
+      <div className="relative flex min-w-0 items-start">
         <ToolCallInputView input={toolCall.input} />
-        <div className="flex items-center">
+        <div className="absolute top-0 right-0 flex items-center">
           <Tooltip content="Copy arguments">
             <Button
               className="invisible shrink-0 group-hover/message:visible"
