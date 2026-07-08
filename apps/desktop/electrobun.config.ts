@@ -6,6 +6,17 @@ const desktopRenderer = Bun.env.LLM_SPACE_DESKTOP_RENDERER;
 const useCefRenderer = desktopRenderer === "cef";
 const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT ?? "9333";
 
+// Local-testing escape hatches — CI leaves both unset:
+//   LLM_SPACE_SKIP_SIGNING=1  → unsigned canary/stable build (no Apple creds
+//                               needed; locally-built apps have no quarantine
+//                               flag, so Gatekeeper doesn't mind)
+//   LLM_SPACE_UPDATE_BASE_URL → point the update feed at a local static
+//                               server to exercise the auto-update loop
+const skipSigning = Boolean(Bun.env.LLM_SPACE_SKIP_SIGNING);
+const updateBaseUrl =
+  Bun.env.LLM_SPACE_UPDATE_BASE_URL ??
+  "https://github.com/llm-space/llm-space/releases/download/updates";
+
 export default {
   app: {
     name: "LLM Space",
@@ -29,8 +40,8 @@ export default {
     mac: {
       // Signing/notarization run only on canary/stable builds and require the
       // ELECTROBUN_DEVELOPER_ID + App Store Connect API key env vars (CI).
-      codesign: true,
-      notarize: true,
+      codesign: !skipSigning,
+      notarize: !skipSigning,
       bundleCEF: useCefRenderer,
       ...(useCefRenderer
         ? {
@@ -59,6 +70,6 @@ export default {
     // Burned into every shipped bundle — the updater fetches
     // `{baseUrl}/{channel}-{os}-{arch}-update.json` from here. Both channels
     // share the rolling `updates` GitHub release (artifacts are channel-prefixed).
-    baseUrl: "https://github.com/llm-space/llm-space/releases/download/updates",
+    baseUrl: updateBaseUrl,
   },
 } satisfies ElectrobunConfig;
