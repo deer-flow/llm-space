@@ -130,6 +130,10 @@ export function OnboardDialog({
     [addProvider]
   );
 
+  const handleReady = useCallback(() => {
+    onOpenChange(false);
+  }, []);
+
   const readyProviderName =
     addedProviderName ?? models[0]?.name ?? models[0]?.id ?? null;
 
@@ -217,6 +221,7 @@ export function OnboardDialog({
               addingProviderId={addingProviderId}
               onAddProvider={handleAddProvider}
               onConfigureModels={handleConfigureModels}
+              onReady={handleReady}
             />
           </div>
         </div>
@@ -268,6 +273,7 @@ function _OnboardSetupPanel({
   addingProviderId,
   onAddProvider,
   onConfigureModels,
+  onReady,
 }: {
   className?: string;
   configured: boolean;
@@ -279,6 +285,7 @@ function _OnboardSetupPanel({
   addingProviderId: string | null;
   onAddProvider: (provider: ModelProviderGroup) => void;
   onConfigureModels: () => void;
+  onReady: () => void;
 }) {
   return (
     <div
@@ -288,7 +295,7 @@ function _OnboardSetupPanel({
       )}
     >
       {configured ? (
-        <_ReadySetupState providerName={readyProviderName} />
+        <_ReadySetupState providerName={readyProviderName} onReady={onReady} />
       ) : loading ? (
         <_LoadingSetupState />
       ) : loadError ? (
@@ -330,9 +337,15 @@ function _LoadingSetupState() {
   );
 }
 
-function _ReadySetupState({ providerName }: { providerName: string | null }) {
+function _ReadySetupState({
+  providerName,
+  onReady,
+}: {
+  providerName: string | null;
+  onReady?: () => void;
+}) {
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex cursor-pointer items-start gap-3" onClick={onReady}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/18 text-emerald-200">
         <CheckIcon className="size-4" />
       </div>
