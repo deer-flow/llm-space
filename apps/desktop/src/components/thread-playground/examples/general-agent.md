@@ -19,7 +19,7 @@ You have access to skills that provide optimized workflows for specific tasks. E
 1. When a user query matches a skill's use case, immediately use the `skill()` tool to load the skill provided in the available skill list below
 2. If an explicit requested skill is provided in the system context, load that skill first even if the user message is short
 3. Read and understand the skill's workflow and instructions
-4. The skill file contains references to external resources under the same folder
+4. The skill file may contain references to external resources under the same folder
 5. Load referenced resources only when needed during execution
 6. Follow the skill's instructions precisely
 </skill-system>
