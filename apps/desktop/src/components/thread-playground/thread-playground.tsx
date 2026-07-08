@@ -307,15 +307,7 @@ function ThreadPlaygroundContent({
               </Tooltip>
             </div>
             <div className="flex items-center px-3">
-              <ButtonGroup
-                // The seam between Run and the chevron is the Run button's 1px
-                // right border. Blend it into the button by default (no visible
-                // line), and only reveal a faint translucent divider on hover.
-                className={cn(
-                  "[&>*:first-child]:border-r-primary [&>*:first-child]:transition-colors hover:[&>*:first-child]:border-r-primary-foreground/20",
-                  readonlyFromProps && "hidden"
-                )}
-              >
+              <ButtonGroup className={cn(readonlyFromProps && "hidden")}>
                 <Tooltip
                   content={
                     <div>
@@ -329,7 +321,7 @@ function ThreadPlaygroundContent({
                   }
                 >
                   <Button
-                    className="w-20"
+                    className="border-r-primary border-none pr-1 pl-4"
                     aria-label={
                       status === "running"
                         ? "Stop running thread"
@@ -351,9 +343,11 @@ function ThreadPlaygroundContent({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="px-1.5"
+                      className="border-none pr-1.5 pl-0.5"
                       aria-label="Run settings"
-                      disabled={readonlyFromProps}
+                      disabled={
+                        readonlyFromProps || (status !== "running" && !hasModel)
+                      }
                     >
                       <ChevronDownIcon className="size-3" />
                     </Button>
