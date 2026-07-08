@@ -10,7 +10,13 @@ bun = "1.3"
 [env]
 _.path = "node_modules/.bin"
 
-# --- Dev workflow (thin forwards to package.json scripts) -------------------
+# --- Setup & dev workflow ---------------------------------------------------
+
+[tasks.setup]
+description = "One-shot bootstrap for a fresh clone: install tools + JS deps"
+# `mise install` provisions the locked toolchain (bun via mise.lock); the bun
+# install then pulls JS deps and runs husky's `prepare` hook.
+run = ["mise install", "bun install"]
 
 [tasks.dev]
 description = "Run the desktop app (Vite HMR + electrobun watch)"
