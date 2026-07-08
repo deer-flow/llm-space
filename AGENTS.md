@@ -12,6 +12,8 @@ Use **bun** for everything (`packageManager: bun`, pinned to `bun 1.3` in `mise.
 | Run desktop app | `bun dev` | root script → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `electrobun dev --watch`) |
 | Run desktop app with CEF/CDP debugging | `bun run dev:cef` | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default |
 | Build (canary) | `bun run build:canary` | in `apps/desktop` → `vite build && electrobun build --env=canary` |
+| Build (stable) | `bun run build:stable` | in `apps/desktop` → `vite build && electrobun build --env=stable` |
+| Cut a release | `bun run release` / `bun run release:canary` | root script → `bun scripts/release.ts`; see "Releases & auto-update" |
 | Lint | `bun lint` / `bun run lint:check` | `lint` = `eslint --fix`, `lint:check` / `check` = `eslint .`; flat config at repo root |
 | Add a dependency | `bun add <pkg>` | run inside the target package (`apps/desktop` or `packages/core`) |
 | Add a shadcn/ui component | `bunx --bun shadcn@latest add <component>` | run inside `apps/desktop` |
@@ -61,7 +63,7 @@ Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
 
 The typed contract lives in `src/shared/rpc.ts` (`DesktopRPCType`). The bun side defines handlers in `src/bun/rpc/index.ts` (`mainWindowRPC`); the renderer holds the client in `src/lib/electrobun.ts` (`electrobun.rpc`). Two directions:
 - **requests** (webview → bun, request/response): `availableModels`, `addProvider`/`updateProvider`/`removeProvider`/`setModelEnabled`/…, and the filesystem ops `fsLs`/`fsRead`/`fsWrite`/`fsMkdir`/`fsCp`/`fsMv`/`fsRm`/`fsReveal` (mirroring what were HTTP routes).
-- **messages** (fire-and-forget, both ways): agent streaming (`sendStreamThreadRequest` / `receiveStreamThreadResponse` / `abortStreamThread`), fullscreen sync, and `executeCommand` (see the command layer).
+- **messages** (fire-and-forget, both ways): agent streaming (`sendStreamThreadRequest` / `receiveStreamThreadResponse` / `abortStreamThread`), fullscreen sync, update status (`updateStatusChanged`), and `executeCommand` (see the command layer).
 
 Electrobun RPC has no native streaming, so agent runs **simulate a stream over fire-and-forget messages**, correlated by a per-run `streamId` (uuid):
 1. Renderer `createRpcTransport()` (`src/client/rpc-transport.ts`) sends `sendStreamThreadRequest { streamId, request }`.
@@ -83,6 +85,10 @@ Each open thread owns its own Zustand store (`stores/thread-store.ts`), created 
 State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_ROOT` or `LLM_SPACE_HOME`):
 - `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`) and `window.json` (frame/zoom/maximized).
+
+### Releases & auto-update
+
+The app version has a **single source of truth: `apps/desktop/package.json`** — `electrobun.config.ts` imports it, and release CI fails if the pushed tag doesn't match. Cut releases with `bun run release` (stable) or `bun run release:canary`; the script (`scripts/release.ts`) runs `commit-and-tag-version` (conventional-commits-driven bump + `CHANGELOG.md` + commit + `v*` tag, config in `.versionrc.json`) and pushes atomically. The tag triggers `.github/workflows/release.yml`: build → codesign/notarize (canary/stable only; needs the `ELECTROBUN_*` secrets) → smoke test → upload. Artifacts land in two GitHub releases: the rolling `updates` release is the machine-readable update feed (`release.baseUrl` points at it; **never delete its `.patch` files** — old installs chain through them), and a versioned release carries the DMG + changelog for humans. In-app auto-update lives in `bun/updates/` (background check → silent download → "restart to update" toast via the `updateStatusChanged` message); the dev channel never updates.
 
 ### The command layer
 

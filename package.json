@@ -10,6 +10,9 @@
     "dev": "cd apps/desktop && bun run dev:hmr",
     "dev:cef": "cd apps/desktop && bun run dev:cef",
     "build:canary": "cd apps/desktop && bun run build:canary",
+    "build:stable": "cd apps/desktop && bun run build:stable",
+    "release": "bun scripts/release.ts",
+    "release:canary": "bun scripts/release.ts --prerelease canary",
     "lint": "eslint --fix",
     "lint:check": "eslint .",
     "prepare": "husky"
@@ -29,6 +32,7 @@
     "@types/bun": "latest",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "commit-and-tag-version": "^12.7.3",
     "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.1",

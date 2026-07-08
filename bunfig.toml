@@ -1,0 +1,5 @@
+# Pin the public npm registry for this project, so installs never bake a
+# private mirror's URLs into bun.lock (which CI runners can't reach). This
+# overrides any registry set in a developer's global ~/.npmrc.
+[install]
+registry = "https://registry.npmjs.org"
