@@ -63,6 +63,7 @@ export interface ThreadState {
   streamingMessage: AssistantMessage | null;
   status: ThreadStoreStatus;
   abortController: AbortController | null;
+  activeRunId: string | null;
   collapsedMessageIds: string[];
   /**
    * Id of the message whose editor should grab focus on mount — set only by
@@ -172,6 +173,8 @@ export function createThreadStore(
   return createStore<ThreadState>()(
     subscribeWithSelector((set, get) => {
       // --- internal helpers ---------------------------------------------------
+
+      let stopActiveRun: (() => void) | null = null;
 
       const patchThread = (partial: Partial<Thread>) => {
         const next = { ...get().thread, ...partial };
@@ -359,6 +362,7 @@ export function createThreadStore(
         streamingMessage: null,
         status: "idle",
         abortController: null,
+        activeRunId: null,
         collapsedMessageIds: [],
         autoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
@@ -604,7 +608,14 @@ export function createThreadStore(
             return;
           }
           const abortController = new AbortController();
-          set({ status: "running", abortController });
+          const runId = uuid();
+          const isActiveRun = () => get().activeRunId === runId;
+          set({
+            status: "running",
+            abortController,
+            activeRunId: runId,
+            streamingMessage: null,
+          });
 
           // Commit the truncation while running so it folds into the run's
           // single undo step instead of becoming its own snapshot.
@@ -615,6 +626,9 @@ export function createThreadStore(
 
           // Append a finished assistant message to the thread.
           const commit = (message: AssistantMessage) => {
+            if (!isActiveRun()) {
+              return;
+            }
             messages = [...messages, message];
             setMessages(messages);
           };
@@ -645,9 +659,15 @@ export function createThreadStore(
           let previewFrame: number | null = null;
           const flushPreview = () => {
             previewFrame = null;
+            if (!isActiveRun()) {
+              return;
+            }
             set({ streamingMessage });
           };
           const schedulePreview = () => {
+            if (!isActiveRun()) {
+              return;
+            }
             if (!canRaf) {
               set({ streamingMessage });
               return;
@@ -661,106 +681,10 @@ export function createThreadStore(
             }
           };
 
-          // Stream a single model turn into `messages`. Returns whether it
-          // finished cleanly, was aborted, or failed — the auto-call loop only
-          // continues after a clean turn.
-          const streamTurn = async (): Promise<
-            "completed" | "aborted" | "failed"
-          > => {
-            streamingMessage = null;
-            content = [];
-            try {
-              const response = streamThread(
-                {
-                  context: { ...get().thread.context, messages },
-                  model,
-                },
-                {
-                  signal: abortController.signal,
-                  transport: options.transport,
-                }
-              );
-              for await (const chunk of response) {
-                sawEvent = true;
-                const reduced = reduceMessages(chunk, {
-                  streamingMessage,
-                  content,
-                });
-                if (!reduced) {
-                  continue;
-                }
-                if (reduced.type === "message_start" && streamingMessage) {
-                  commit(streamingMessage);
-                  // The committed message now lives in `messages`; drop the
-                  // stale preview so it isn't rendered twice before the next
-                  // frame.
-                  cancelPreview();
-                  set({ streamingMessage: null });
-                }
-                streamingMessage = reduced.message;
-                content = reduced.content;
-                schedulePreview();
-              }
-              if (streamingMessage) {
-                commit(streamingMessage);
-                // The turn's message now lives in `messages`; clear the preview
-                // so it isn't rendered a second time during the gap before the
-                // next turn (e.g. while auto-run tools execute). The trailing
-                // frame is cancelled so a late flush can't resurrect it.
-                cancelPreview();
-                set({ streamingMessage: null });
-                streamingMessage = null;
-              }
-              return "completed";
-            } catch (error) {
-              if (abortController.signal.aborted) {
-                if (streamingMessage && hasContent(streamingMessage)) {
-                  commit(streamingMessage);
-                }
-                return "aborted";
-              }
-              failed = true;
-              console.error(error);
-              if (error instanceof Error) {
-                toast.error("Error", { description: error.message });
-              }
-              return "failed";
+          const finalizeActiveRun = () => {
+            if (!isActiveRun()) {
+              return;
             }
-          };
-
-          try {
-            // Drive the run:
-            //  - a model turn always runs;
-            //  - when tools are auto-run, execute the turn's trailing tool
-            //    calls (unless one needs a hand-written result — then stop and
-            //    let the user fill it in);
-            //  - only the ReAct loop continues to the next turn; plain auto-run
-            //    executes tools once and stops, staying step-by-step.
-            // Capped so a model that calls tools forever can't spin forever.
-            for (let turn = 0; turn < MAX_AUTO_TOOL_TURNS; turn++) {
-              const outcome = await streamTurn();
-              if (outcome !== "completed") {
-                break;
-              }
-              const reactLoop = options.getReactLoop?.() ?? false;
-              const autoRunTools =
-                reactLoop || (options.getAutoRunTools?.() ?? false);
-              if (!autoRunTools) {
-                break;
-              }
-              const withResults = await executePendingToolCalls(
-                messages,
-                abortController.signal
-              );
-              if (!withResults) {
-                break;
-              }
-              messages = withResults;
-              if (!reactLoop) {
-                break;
-              }
-            }
-          } finally {
             // Drop any pending frame before the terminal clear so a late flush
             // can't resurrect a stale streamingMessage after we reset to null.
             cancelPreview();
@@ -768,7 +692,10 @@ export function createThreadStore(
               streamingMessage: null,
               status: "idle",
               abortController: null,
+              activeRunId: null,
             });
+            stopActiveRun = null;
+
             // Fold the whole run (truncation + generated messages) into one
             // undo step, and record a run snapshot. No-op for undo if the
             // thread is unchanged.
@@ -805,6 +732,145 @@ export function createThreadStore(
                 changeHistory: recordSnapshot(get().changeHistory, finalThread),
               });
             }
+          };
+
+          stopActiveRun = () => {
+            if (!isActiveRun()) {
+              return;
+            }
+            try {
+              abortController.abort();
+            } catch {
+              // Ignored
+            }
+            if (streamingMessage && hasContent(streamingMessage)) {
+              commit(streamingMessage);
+              streamingMessage = null;
+            }
+            finalizeActiveRun();
+          };
+
+          // Stream a single model turn into `messages`. Returns whether it
+          // finished cleanly, was aborted, or failed — the auto-call loop only
+          // continues after a clean turn.
+          const streamTurn = async (): Promise<
+            "completed" | "aborted" | "failed"
+          > => {
+            streamingMessage = null;
+            content = [];
+            try {
+              const response = streamThread(
+                {
+                  context: { ...get().thread.context, messages },
+                  model,
+                },
+                {
+                  signal: abortController.signal,
+                  transport: options.transport,
+                }
+              );
+              for await (const chunk of response) {
+                if (!isActiveRun()) {
+                  return "aborted";
+                }
+                sawEvent = true;
+                const reduced = reduceMessages(chunk, {
+                  streamingMessage,
+                  content,
+                });
+                if (!reduced) {
+                  continue;
+                }
+                if (reduced.type === "message_start" && streamingMessage) {
+                  commit(streamingMessage);
+                  // The committed message now lives in `messages`; drop the
+                  // stale preview so it isn't rendered twice before the next
+                  // frame.
+                  cancelPreview();
+                  if (isActiveRun()) {
+                    set({ streamingMessage: null });
+                  }
+                }
+                streamingMessage = reduced.message;
+                content = reduced.content;
+                schedulePreview();
+              }
+              if (!isActiveRun()) {
+                return "aborted";
+              }
+              if (streamingMessage) {
+                commit(streamingMessage);
+                // The turn's message now lives in `messages`; clear the preview
+                // so it isn't rendered a second time during the gap before the
+                // next turn (e.g. while auto-run tools execute). The trailing
+                // frame is cancelled so a late flush can't resurrect it.
+                cancelPreview();
+                if (isActiveRun()) {
+                  set({ streamingMessage: null });
+                }
+                streamingMessage = null;
+              }
+              return "completed";
+            } catch (error) {
+              if (abortController.signal.aborted) {
+                if (
+                  isActiveRun() &&
+                  streamingMessage &&
+                  hasContent(streamingMessage)
+                ) {
+                  commit(streamingMessage);
+                }
+                return "aborted";
+              }
+              if (!isActiveRun()) {
+                return "aborted";
+              }
+              failed = true;
+              console.error(error);
+              if (error instanceof Error) {
+                toast.error("Error", { description: error.message });
+              }
+              return "failed";
+            }
+          };
+
+          try {
+            // Drive the run:
+            //  - a model turn always runs;
+            //  - when tools are auto-run, execute the turn's trailing tool
+            //    calls (unless one needs a hand-written result — then stop and
+            //    let the user fill it in);
+            //  - only the ReAct loop continues to the next turn; plain auto-run
+            //    executes tools once and stops, staying step-by-step.
+            // Capped so a model that calls tools forever can't spin forever.
+            for (let turn = 0; turn < MAX_AUTO_TOOL_TURNS; turn++) {
+              const outcome = await streamTurn();
+              if (outcome !== "completed") {
+                break;
+              }
+              const reactLoop = options.getReactLoop?.() ?? false;
+              const autoRunTools =
+                reactLoop || (options.getAutoRunTools?.() ?? false);
+              if (!autoRunTools) {
+                break;
+              }
+              const withResults = await executePendingToolCalls(
+                messages,
+                abortController.signal
+              );
+              if (!isActiveRun()) {
+                break;
+              }
+              if (!withResults) {
+                break;
+              }
+              messages = withResults;
+              if (!reactLoop) {
+                break;
+              }
+            }
+          } finally {
+            finalizeActiveRun();
           }
         },
         undo() {
@@ -959,15 +1025,11 @@ export function createThreadStore(
           });
         },
         abort() {
-          const { status, abortController } = get();
+          const { status } = get();
           if (status !== "running") {
             return;
           }
-          try {
-            abortController?.abort();
-          } catch {
-            // Ignored
-          }
+          stopActiveRun?.();
         },
       };
     })
