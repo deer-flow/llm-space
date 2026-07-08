@@ -891,18 +891,6 @@ export function createThreadStore(
             // thread is unchanged.
             const finalThread = get().thread;
             if (sawEvent && !failed) {
-              const runThread =
-                finalThread.context &&
-                renderedSystemPrompt !==
-                  (finalThread.context.systemPrompt ?? "")
-                  ? {
-                      ...finalThread,
-                      context: {
-                        ...finalThread.context,
-                        systemPrompt: renderedSystemPrompt,
-                      },
-                    }
-                  : finalThread;
               const runUsage = aggregateMessageUsage(
                 (finalThread.context?.messages ?? []).slice(
                   runStartMessageCount
@@ -910,7 +898,7 @@ export function createThreadStore(
               );
               const runHistory = recordRun(
                 get().runHistory,
-                runThread,
+                finalThread,
                 Date.now(),
                 { usage: runUsage }
               );
