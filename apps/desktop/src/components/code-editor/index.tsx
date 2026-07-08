@@ -125,18 +125,22 @@ const PlainTextCodeEditor = forwardRef<
   const focusedRef = useRef(false);
   // Uncontrolled: the DOM textarea owns its value while the user types, so a
   // keystroke writes only to `draftRef` and never re-renders React. External
-  // updates are pushed in imperatively by the effect below.
+  // updates and imperative insertions are pushed in by `setDraftValue`.
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const setDraftValue = useCallback((next: string) => {
+    draftRef.current = next;
+    if (textareaRef.current && textareaRef.current.value !== next) {
+      textareaRef.current.value = next;
+    }
+  }, []);
 
   useEffect(() => {
     if (!focusedRef.current || readonly) {
-      draftRef.current = value;
+      setDraftValue(value);
       committedRef.current = value;
-      if (textareaRef.current && textareaRef.current.value !== value) {
-        textareaRef.current.value = value;
-      }
     }
-  }, [readonly, value]);
+  }, [readonly, setDraftValue, value]);
 
   const commit = useCallback(() => {
     if (onChange && draftRef.current !== committedRef.current) {
@@ -145,13 +149,35 @@ const PlainTextCodeEditor = forwardRef<
     }
   }, [onChange]);
 
+  const insertText = useCallback(
+    (text: string) => {
+      const textarea = textareaRef.current;
+      const current = draftRef.current;
+      const from = textarea?.selectionStart ?? current.length;
+      const to = textarea?.selectionEnd ?? current.length;
+      const next = `${current.slice(0, from)}${text}${current.slice(to)}`;
+      const anchor = from + text.length;
+      setDraftValue(next);
+      if (onChange && next !== committedRef.current) {
+        onChange(next);
+        committedRef.current = next;
+      }
+      requestAnimationFrame(() => {
+        textarea?.focus();
+        textarea?.setSelectionRange(anchor, anchor);
+      });
+    },
+    [onChange, setDraftValue]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
       commit,
       getValue: () => draftRef.current,
+      insertText,
     }),
-    [commit]
+    [commit, insertText]
   );
 
   const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {

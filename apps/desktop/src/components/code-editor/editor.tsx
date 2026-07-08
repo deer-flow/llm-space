@@ -32,6 +32,7 @@ const BASIC_SETUP: BasicSetupOptions = {
 export interface CodeEditorHandle {
   commit: () => void;
   getValue: () => string;
+  insertText: (text: string) => void;
 }
 
 export interface CodeEditorProps {
@@ -118,15 +119,23 @@ function _CodeEditor(
     },
     [detectLanguage]
   );
+  const setDraftValue = useCallback(
+    (next: string, syncEditorValue = false) => {
+      draftRef.current = next;
+      refreshLanguage(next);
+      if (syncEditorValue) {
+        setSyncedValue(next);
+      }
+    },
+    [refreshLanguage]
+  );
 
   useEffect(() => {
     if (!isFocusedRef.current || readonly) {
-      draftRef.current = value;
+      setDraftValue(value, true);
       committedRef.current = value;
-      setSyncedValue(value);
-      refreshLanguage(value);
     }
-  }, [value, readonly, refreshLanguage]);
+  }, [value, readonly, setDraftValue]);
 
   const commit = useCallback(() => {
     if (onChange && draftRef.current !== committedRef.current) {
@@ -135,13 +144,40 @@ function _CodeEditor(
     }
   }, [onChange]);
 
+  const insertText = useCallback(
+    (text: string) => {
+      const view = cmRef.current?.view;
+      const current = view?.state.doc.toString() ?? draftRef.current;
+      const range = view?.state.selection.main;
+      const from = range?.from ?? current.length;
+      const to = range?.to ?? current.length;
+      const next = `${current.slice(0, from)}${text}${current.slice(to)}`;
+      const anchor = from + text.length;
+      if (view) {
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor },
+          scrollIntoView: true,
+        });
+        view.focus();
+      }
+      setDraftValue(next, true);
+      if (onChange && next !== committedRef.current) {
+        onChange(next);
+        committedRef.current = next;
+      }
+    },
+    [onChange, setDraftValue]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
       commit,
       getValue: () => draftRef.current,
+      insertText,
     }),
-    [commit]
+    [commit, insertText]
   );
 
   const handleChange = useCallback(

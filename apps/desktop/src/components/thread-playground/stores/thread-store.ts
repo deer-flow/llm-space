@@ -19,6 +19,9 @@ import {
   type ModelConfigParams,
   type ReducedMessageContent,
   type Thread,
+  type ThreadVariable,
+  type ThreadVariableVariants,
+  type ThreadVariables,
   type Tool,
   type ToolCall,
   type UserMessage,
@@ -30,6 +33,14 @@ import { createStore, useStore, type StoreApi } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/shallow";
 
+import {
+  DEFAULT_VARIABLE_VARIANT_NAME,
+  ensureThreadVariableState,
+  normalizePromptVariableState,
+  PromptVariableError,
+  replacePromptVariableReferences,
+  renderSystemPromptVariables,
+} from "../prompt-variables";
 import { aggregateMessageUsage } from "../token-usage";
 
 import {
@@ -95,6 +106,12 @@ export interface ThreadState {
   moveMessage(fromIndex: number, toIndex: number): void;
   removeMessage(id: string): void;
   updateSystemPrompt(systemPrompt: string): void;
+  updatePromptVariable(name: string, variable: ThreadVariable): void;
+  renamePromptVariable(oldName: string, newName: string): boolean;
+  addCustomVariable(name: string, value?: string): boolean;
+  updateCustomVariable(name: string, value: string): void;
+  renameCustomVariable(oldName: string, newName: string): boolean;
+  removeCustomVariable(name: string): void;
   updateTitle(title: string | undefined): void;
   syncTitle(title: string): void;
   updateModelParams(params: Partial<ModelConfigParams>): void;
@@ -156,7 +173,9 @@ export function createThreadStore(
     ) => Promise<{ contentText: string; isError: boolean }>;
   } = {}
 ): ThreadStore {
-  const normalizedInputThread = normalizeThread(initialThread);
+  const normalizedInputThread = ensureThreadVariableState(
+    normalizeThread(initialThread)
+  );
   const initialRunHistory = normalizeRunHistory(
     normalizedInputThread.runHistory
   );
@@ -188,6 +207,65 @@ export function createThreadStore(
 
       const patchContext = (partial: Partial<Thread["context"]>) => {
         patchThread({ context: { ...get().thread.context, ...partial } });
+      };
+
+      const getVariableState = () =>
+        normalizePromptVariableState(get().thread.context);
+
+      const setVariableState = (
+        variables: ThreadVariables,
+        variableVariants: ThreadVariableVariants,
+        systemPrompt = get().thread.context?.systemPrompt
+      ) => {
+        patchContext({ variables, variableVariants, systemPrompt });
+      };
+
+      const defaultCustomValues = (
+        variableVariants: ThreadVariableVariants
+      ) => variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
+
+      const customVariableNames = (variableVariants: ThreadVariableVariants) =>
+        new Set(Object.keys(defaultCustomValues(variableVariants)));
+
+      const withDefaultCustomValues = (
+        values: Record<string, string>
+      ): ThreadVariableVariants => ({
+        active: DEFAULT_VARIABLE_VARIANT_NAME,
+        variants: { [DEFAULT_VARIABLE_VARIANT_NAME]: values },
+      });
+
+      /*
+       * Custom variables now expose one explicit default set, so every edit
+       * rewrites the state to that single bucket.
+       */
+      const setDefaultCustomValues = (
+        variables: ThreadVariables,
+        values: Record<string, string>,
+        systemPrompt = get().thread.context?.systemPrompt
+      ) => {
+        setVariableState(
+          variables,
+          withDefaultCustomValues(values),
+          systemPrompt
+        );
+      };
+
+      const allCustomVariableNames = (
+        variableVariants: ThreadVariableVariants
+      ) => {
+        const names = new Set<string>();
+        for (const values of Object.values(variableVariants.variants)) {
+          for (const name of Object.keys(values)) {
+            names.add(name);
+          }
+        }
+        return names;
+      };
+
+      const showDuplicateVariableName = (name: string) => {
+        toast.error("Variable name already exists", {
+          description: `"${name}" is already used by another variable.`,
+        });
       };
 
       const setMessages = (messages: Message[]) => {
@@ -423,6 +501,101 @@ export function createThreadStore(
         updateSystemPrompt(systemPrompt: string) {
           patchContext({ systemPrompt });
         },
+        updatePromptVariable(name, variable) {
+          const { variables, variableVariants } = getVariableState();
+          setVariableState(
+            { ...variables, [name]: variable },
+            variableVariants
+          );
+        },
+        renamePromptVariable(oldName, newName) {
+          if (oldName === newName) {
+            return true;
+          }
+          const { variables, variableVariants } = getVariableState();
+          if (
+            Object.prototype.hasOwnProperty.call(variables, newName) ||
+            allCustomVariableNames(variableVariants).has(newName)
+          ) {
+            showDuplicateVariableName(newName);
+            return false;
+          }
+          const variable = variables[oldName];
+          if (!variable) {
+            return false;
+          }
+          const nextVariables = { ...variables };
+          delete nextVariables[oldName];
+          nextVariables[newName] = variable;
+          setVariableState(
+            nextVariables,
+            variableVariants,
+            replacePromptVariableReferences(
+              get().thread.context?.systemPrompt ?? "",
+              oldName,
+              newName
+            )
+          );
+          return true;
+        },
+        addCustomVariable(name, value = "") {
+          const { variables, variableVariants } = getVariableState();
+          const customValues = defaultCustomValues(variableVariants);
+          if (Object.prototype.hasOwnProperty.call(variables, name)) {
+            showDuplicateVariableName(name);
+            return false;
+          }
+          if (Object.prototype.hasOwnProperty.call(customValues, name)) {
+            showDuplicateVariableName(name);
+            return false;
+          }
+          setDefaultCustomValues(variables, { ...customValues, [name]: value });
+          return true;
+        },
+        updateCustomVariable(name, value) {
+          const { variables, variableVariants } = getVariableState();
+          const customValues = defaultCustomValues(variableVariants);
+          setDefaultCustomValues(variables, { ...customValues, [name]: value });
+        },
+        renameCustomVariable(oldName, newName) {
+          if (oldName === newName) {
+            return true;
+          }
+          const { variables, variableVariants } = getVariableState();
+          const existingCustomNames = customVariableNames(variableVariants);
+          existingCustomNames.delete(oldName);
+          if (
+            Object.prototype.hasOwnProperty.call(variables, newName) ||
+            existingCustomNames.has(newName)
+          ) {
+            showDuplicateVariableName(newName);
+            return false;
+          }
+          const customValues = defaultCustomValues(variableVariants);
+          if (!Object.prototype.hasOwnProperty.call(customValues, oldName)) {
+            return false;
+          }
+          const nextValues = { ...customValues };
+          const value = nextValues[oldName];
+          delete nextValues[oldName];
+          nextValues[newName] = value;
+          setDefaultCustomValues(
+            variables,
+            nextValues,
+            replacePromptVariableReferences(
+              get().thread.context?.systemPrompt ?? "",
+              oldName,
+              newName
+            )
+          );
+          return true;
+        },
+        removeCustomVariable(name) {
+          const { variables, variableVariants } = getVariableState();
+          const nextValues = { ...defaultCustomValues(variableVariants) };
+          delete nextValues[name];
+          setDefaultCustomValues(variables, nextValues);
+        },
         updateTitle(title: string | undefined) {
           patchThread({ title });
         },
@@ -607,6 +780,23 @@ export function createThreadStore(
             toast.error("Error", { description: RUN_LAST_MESSAGE_ERROR });
             return;
           }
+          let renderedSystemPrompt = get().thread.context?.systemPrompt ?? "";
+          try {
+            renderedSystemPrompt = (
+              await renderSystemPromptVariables({
+                systemPrompt: renderedSystemPrompt,
+                context: get().thread.context,
+              })
+            ).systemPrompt;
+          } catch (error) {
+            toast.error("Unable to render prompt variables", {
+              description:
+                error instanceof PromptVariableError || error instanceof Error
+                  ? error.message
+                  : "Please check the system prompt variables.",
+            });
+            return;
+          }
           const abortController = new AbortController();
           const runId = uuid();
           const isActiveRun = () => get().activeRunId === runId;
@@ -701,6 +891,18 @@ export function createThreadStore(
             // thread is unchanged.
             const finalThread = get().thread;
             if (sawEvent && !failed) {
+              const runThread =
+                finalThread.context &&
+                renderedSystemPrompt !==
+                  (finalThread.context.systemPrompt ?? "")
+                  ? {
+                      ...finalThread,
+                      context: {
+                        ...finalThread.context,
+                        systemPrompt: renderedSystemPrompt,
+                      },
+                    }
+                  : finalThread;
               const runUsage = aggregateMessageUsage(
                 (finalThread.context?.messages ?? []).slice(
                   runStartMessageCount
@@ -708,7 +910,7 @@ export function createThreadStore(
               );
               const runHistory = recordRun(
                 get().runHistory,
-                finalThread,
+                runThread,
                 Date.now(),
                 { usage: runUsage }
               );
@@ -761,7 +963,11 @@ export function createThreadStore(
             try {
               const response = streamThread(
                 {
-                  context: { ...get().thread.context, messages },
+                  context: {
+                    ...get().thread.context,
+                    systemPrompt: renderedSystemPrompt,
+                    messages,
+                  },
                   model,
                 },
                 {
@@ -1063,6 +1269,12 @@ const selectActions = (s: ThreadState) => ({
   moveMessage: s.moveMessage,
   removeMessage: s.removeMessage,
   updateSystemPrompt: s.updateSystemPrompt,
+  updatePromptVariable: s.updatePromptVariable,
+  renamePromptVariable: s.renamePromptVariable,
+  addCustomVariable: s.addCustomVariable,
+  updateCustomVariable: s.updateCustomVariable,
+  renameCustomVariable: s.renameCustomVariable,
+  removeCustomVariable: s.removeCustomVariable,
   updateTitle: s.updateTitle,
   syncTitle: s.syncTitle,
   updateModelParams: s.updateModelParams,

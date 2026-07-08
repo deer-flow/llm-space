@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-06
-- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, and Trace Workbench Header/Protocol Repair; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, and connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity.
+- Last updated: 2026-07-08
+- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, Trace Workbench Header/Protocol Repair, and System Prompt Variables V2 layout polish; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity, and system prompts now support a resizable persistent Variables panel with thread-owned built-ins, selected skill groups, and custom variable scenario switching while preserving editable templates.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -35,8 +35,20 @@
 
 - Status: manual builder with prompt examples
 - Freshness: confirmed
-- Last checked: 2026-07-04
+- Last checked: 2026-07-08
 - Evidence:
+  - Discovery CEF screenshot `audits/2026-07-08-173643-system-prompt-variables/01-current-system-prompt-editor.png` showed the pre-V1 system prompt editor exposed `Generate` and `Examples`, but no Variables entry, variable picker, rendered-preview affordance, date token, or skill selector in the prompt surface.
+  - Discovery CEF snapshot on 2026-07-08 showed system prompt editing, model/tool rows, message editing, and run history active with no horizontal overflow before this capability was added.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/03-variables-button-thread.png` shows a new `Variables` action beside `Generate` and `Examples`.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/04-variables-popover-skills.png` shows current-date format preview and enabled-skill selection/preview inside the variables popover.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/05-date-skill-inserted.png` shows date and selected-skill placeholders inserted into the system prompt editor.
+  - Runtime resolver check in the live CEF/Vite page resolved `{{llm_space.current_date format="default"}}` and `{{llm_space.skill name="deep-research" format="summary"}}` into concrete prompt text and returned an actionable error for a missing skill.
+  - Variable Panel V2 screenshot `audits/2026-07-08-191806-variable-panel-v2/07-v2-skills-markdown-indent.png` shows simple placeholders in the editor while selected skills, `markdown-list` format, and `2 spaces` indentation live in the panel.
+  - Variable Panel V2 screenshot `audits/2026-07-08-191806-variable-panel-v2/06-v2-custom-scenario.png` shows custom variable `customer_profile` under active scenario `scenario_2` with a multiline value.
+  - Isolated runtime file `workspace/untitled-3.json` persisted `context.variables.available_skills` with `skillNames`, `format`, and `indent`, plus `context.variableVariants` with `baseline` and `scenario_2` value sets.
+  - Live CEF resolver checks rendered `{{available_skills}}`, `{{customer_profile}}`, and `{{system_date}}`, and rejected legacy `{{llm_space.current_date format="default"}}`, empty skill selections, and empty custom values with actionable errors.
+  - `apps/desktop/src/components/thread-playground/prompt-variables.ts` formats date and skill variables, loads enabled skills through existing skill settings, and resolves placeholders.
+  - `apps/desktop/src/components/thread-playground/stores/thread-store.ts` now renders variables before `streamThread()` while run snapshots keep the rendered prompt and the live editor keeps the template.
   - Current screenshot `02-starter-thread-current.png` shows `Start from Example` now opens a prompt-example chooser rather than directly creating a single starter thread.
   - Current screenshot `03-example-thread-opened.png` shows a `general-agent` prompt example opened with a populated system prompt, fallback model, and an empty user message.
   - Current CEF discovery screenshot `audits/2026-07-04-175331-next-capability-discovery/01-current-first-run.png` confirms the first-run surface still offers `Start from Example`, `Blank thread`, and `Configure models`.
@@ -46,9 +58,36 @@
   - `apps/desktop/src/components/start-from-example-dialog.tsx` exposes the chooser.
   - `apps/desktop/src/components/thread-playground/prompt/prompt-examples.ts` defines the available prompt examples and stable file stems.
   - `apps/desktop/src/components/thread-playground/thread-playground.tsx` resolves a fallback model and enables run when a model exists.
-- Boundary: user can choose built-in prompt examples or blank threads, then manually edit model, tools, system prompt, and messages inside one thread file.
+- Boundary: user can choose built-in prompt examples or blank threads, manually edit model/tools/system prompt/messages, manage thread-owned prompt variables below the system prompt editor, insert simple `{{variable_name}}` placeholders, configure current date and selected skill groups, switch custom variable scenarios, preview formatted values, and run with those variables resolved while keeping the stored system prompt as a reusable template.
 - Explicit non-goals: multi-file prompt projects, template marketplace, automated prompt optimization.
-- Visible gaps: no guided task setup after choosing an example; no automated CEF regression smoke for first-thread editing yet.
+- Visible gaps: no smart spacing between consecutive inserted placeholders, no dedicated rendered-vs-template diff panel, no full keyboard/screen-reader audit for the variables panel, no guided task setup after choosing an example, and no automated CEF regression smoke for first-thread editing yet.
+
+## System Prompt Variables
+
+- Status: shipped V2 with layout polish
+- Freshness: confirmed
+- Last checked: 2026-07-08
+- Evidence:
+  - Discovery CEF screenshot `audits/2026-07-08-173643-system-prompt-variables/01-current-system-prompt-editor.png` confirmed the original prompt editor gap: no Variables affordance beside `Generate` and `Examples`.
+  - Source inspection confirmed skill discovery and runtime loading already existed through Settings/RPC and the built-in `skill()` tool, so V1 reused existing enabled-skill data instead of introducing a new discovery model.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/03-variables-button-thread.png` shows `Variables` in the system prompt toolbar.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/04-variables-popover-skills.png` shows date and skill variable formats with previews.
+  - Implementation screenshot `audits/2026-07-08-173643-system-prompt-variables/05-date-skill-inserted.png` shows durable date and skill placeholders inserted into the prompt editor.
+  - `workspace/untitled.json` in the isolated CEF runtime persisted the placeholder template.
+  - Focused resolver checks in the live CEF/Vite page confirmed concrete date/skill rendering and missing-skill errors.
+  - V2 screenshot `audits/2026-07-08-191806-variable-panel-v2/07-v2-skills-markdown-indent.png` shows the persistent Variables panel below the editor with `available_skills`, selected `deep-research`, `markdown-list`, and `2 spaces`.
+  - V2 screenshot `audits/2026-07-08-191806-variable-panel-v2/06-v2-custom-scenario.png` shows active scenario `scenario_2` and custom multiline variable `customer_profile`.
+  - V2 isolated runtime file `workspace/untitled-3.json` persisted `context.variables` and `context.variableVariants`:
+    - `available_skills`: `skillNames: ["deep-research"]`, `format: "markdown-list"`, `indent: 2`
+    - `system_date`: `type: "currentDate"`, `format: "readable-date"`
+    - `variableVariants.active: "scenario_2"` with `baseline` and `scenario_2` value sets.
+  - Live CEF resolver checks rendered simple placeholders and returned blocking errors for legacy `llm_space.*` expressions, missing skills, and empty custom values.
+  - Layout polish screenshot `audits/2026-07-08-220831-variable-panel-redesign/03-final-skills-detail.png` shows the Variables panel as a resizable section under the system prompt editor with a full-width header divider, compact rows, and a selected-row detail editor.
+  - CEF drag verification on port `9333` moved the horizontal resize handle and changed the Variables panel from `243.39px` to `333.39px` without horizontal overflow.
+  - TypeScript, lint, diff check, console, and overflow checks passed for the implementation.
+- Boundary: users can manage variables in a persistent resizable panel below the system prompt editor; scan compact variable rows; open a selected variable detail editor; rename/configure built-in current-date and skills variables; select an ordered group of enabled skills; choose `xml` or `markdown-list` skills format plus skills-only indentation; add custom variables; switch whole custom-value scenarios such as `baseline` and `scenario_2`; insert simple `{{variable_name}}` placeholders; persist all variable config in the thread; and render those variables before the model call. Saved run snapshots store the rendered system prompt used for that run.
+- Explicit non-goals: no broad templating language, no prompt marketplace, no automatic skill invocation, no secret/env-variable interpolation, no background skill indexing beyond current discovery folders.
+- Visible gaps: no smart whitespace/newline insertion between consecutive placeholders, no rendered-template diff UI, no full accessibility audit beyond DOM labels/screenshot review, and no paid-provider smoke run in this loop.
 
 ## Thread Editor Reliability
 

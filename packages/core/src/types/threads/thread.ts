@@ -4,6 +4,60 @@ import { Message, ModelUsage } from "../messages";
 import { ModelConfig } from "../models";
 import { normalizeTools, Tool } from "../tools";
 
+export const ThreadCurrentDateVariableFormat = Type.Union([
+  Type.Literal("readable-date"),
+  Type.Literal("iso-date"),
+  Type.Literal("local-date-time"),
+]);
+export type ThreadCurrentDateVariableFormat = Static<
+  typeof ThreadCurrentDateVariableFormat
+>;
+
+export const ThreadSkillsVariableFormat = Type.Union([
+  Type.Literal("xml"),
+  Type.Literal("markdown-list"),
+]);
+export type ThreadSkillsVariableFormat = Static<
+  typeof ThreadSkillsVariableFormat
+>;
+
+export const ThreadCurrentDateVariable = Type.Object({
+  type: Type.Literal("currentDate"),
+  format: ThreadCurrentDateVariableFormat,
+});
+export type ThreadCurrentDateVariable = Static<
+  typeof ThreadCurrentDateVariable
+>;
+
+export const ThreadSkillsVariable = Type.Object({
+  type: Type.Literal("skills"),
+  skillNames: Type.Array(Type.String()),
+  format: ThreadSkillsVariableFormat,
+  indent: Type.Number(),
+});
+export type ThreadSkillsVariable = Static<typeof ThreadSkillsVariable>;
+
+export const ThreadVariable = Type.Union([
+  ThreadCurrentDateVariable,
+  ThreadSkillsVariable,
+]);
+export type ThreadVariable = Static<typeof ThreadVariable>;
+
+export const ThreadVariables = Type.Record(Type.String(), ThreadVariable);
+export type ThreadVariables = Static<typeof ThreadVariables>;
+
+/**
+ * Custom-variable value set. The desktop app only writes the `default` bucket.
+ */
+export const ThreadVariableVariants = Type.Object({
+  active: Type.String(),
+  variants: Type.Record(
+    Type.String(),
+    Type.Record(Type.String(), Type.String())
+  ),
+});
+export type ThreadVariableVariants = Static<typeof ThreadVariableVariants>;
+
 /**
  * The context of a thread, including the system prompt, messages, and tools.
  */
@@ -17,6 +71,16 @@ export const ThreadContext = Type.Object({
    * The tools of the thread.
    */
   tools: Type.Optional(Type.Array(Tool)),
+
+  /**
+   * Built-in prompt variables keyed by their placeholder name.
+   */
+  variables: Type.Optional(ThreadVariables),
+
+  /**
+   * Custom-variable values keyed by the built-in `default` bucket.
+   */
+  variableVariants: Type.Optional(ThreadVariableVariants),
 
   /**
    * The messages of the thread.

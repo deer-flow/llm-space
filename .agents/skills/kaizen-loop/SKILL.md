@@ -115,6 +115,7 @@ Ask for approval before implementation.
 Implement only after the user approves the product recommendation and v1 plan.
 
 - First, hand the approved plan to `$grill-me` for a requirements discussion. This gate is complete only when the discussion has resolved the target user/job, must-have behavior, explicit non-goals, acceptance criteria, data or persistence boundaries, risks, and stop conditions. If the discussion changes scope, update the plan and ask for approval again before editing product code.
+- If the approved work touches frontend UI or user interaction, broad plan approval is not enough. Before editing product code, present the concrete interaction scheme to the user and get explicit confirmation of entry points, primary actions, states, transitions, keyboard/selection behavior, persistence side effects, and audit evidence. If confirmation changes scope, update the plan and ask for approval again.
 - Build the smallest coherent end-to-end version of the approved capability.
 - Use the repository's existing package manager, scripts, frameworks, UI primitives, and architecture. Do not introduce a new tool or abstraction unless it is needed for the v1.
 - Follow local boundaries for client/server code, generated files, API contracts, persistence, permissions, and data ownership.

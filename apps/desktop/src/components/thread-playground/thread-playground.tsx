@@ -53,7 +53,11 @@ import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
-import { SystemPromptEditor } from "./prompt/system-prompt-editor";
+import {
+  SystemPromptEditor,
+  type SystemPromptEditorHandle,
+} from "./prompt/system-prompt-editor";
+import { SystemPromptVariablesPanel } from "./prompt/system-prompt-variables-panel";
 import { RunHistoryListView } from "./run-history-list-view";
 import {
   canRedo,
@@ -177,6 +181,7 @@ function ThreadPlaygroundContent({
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
 >) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const systemPromptEditorRef = useRef<SystemPromptEditorHandle>(null);
   const status = useThreadStore((s) => s.status);
   const savedModel = useThreadStore((s) => s.thread.model);
   const fallbackModel = useFirstAvailableModel();
@@ -187,6 +192,7 @@ function ThreadPlaygroundContent({
   const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
     useRunMode();
   const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
+  const [systemPromptStreaming, setSystemPromptStreaming] = useState(false);
   const title = useMemo(
     () => titleFromProps ?? threadTitleFromPath(path),
     [path, titleFromProps]
@@ -233,6 +239,9 @@ function ThreadPlaygroundContent({
   }, [runHistoryPanelRef]);
   const closeHistory = useCallback(() => {
     runHistoryPanelRef.current?.collapse();
+  }, []);
+  const handleInsertVariable = useCallback((placeholder: string) => {
+    systemPromptEditorRef.current?.insertText(placeholder);
   }, []);
   const handleShortcuts = useShortcuts({ readonly: readonlyFromProps });
   return (
@@ -402,33 +411,63 @@ function ThreadPlaygroundContent({
             className="flex min-h-0 grow"
             orientation="horizontal"
           >
-            <ResizablePanel
-              className="px-3 pb-3"
-              defaultSize="50%"
-              minSize="300px"
-            >
+            <ResizablePanel className="pb-3" defaultSize="50%" minSize="300px">
               <div className="flex size-full flex-col">
-                <div className={"flex w-full border-b py-2"}>
-                  <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                    Models
+                <div className="px-3">
+                  <div className={"flex w-full border-b py-2"}>
+                    <div className="text-muted-foreground w-20 shrink-0 text-sm">
+                      Models
+                    </div>
+                    <div className="flex grow items-center">
+                      <ModelConfigEditor readonly={readonly} />
+                    </div>
                   </div>
-                  <div className="flex grow items-center">
-                    <ModelConfigEditor readonly={readonly} />
-                  </div>
-                </div>
-                <div className={"flex w-full border-b py-2"}>
-                  <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                    Tools
-                  </div>
-                  <div className="flex grow items-center">
-                    <ToolListView readonly={readonly} />
+                  <div className={"flex w-full border-b py-2"}>
+                    <div className="text-muted-foreground w-20 shrink-0 text-sm">
+                      Tools
+                    </div>
+                    <div className="flex grow items-center">
+                      <ToolListView readonly={readonly} />
+                    </div>
                   </div>
                 </div>
                 <div className="flex min-h-0 w-full grow flex-col">
-                  <SystemPromptEditor
+                  <ResizablePanelGroup
                     className="min-h-0 grow"
-                    readonly={readonly}
-                  />
+                    orientation="vertical"
+                    resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}
+                  >
+                    <ResizablePanel
+                      id="system-prompt-editor"
+                      className="min-h-0 px-3"
+                      defaultSize="70%"
+                      minSize="180px"
+                    >
+                      <SystemPromptEditor
+                        ref={systemPromptEditorRef}
+                        className="size-full min-h-0"
+                        readonly={readonly}
+                        onStreamingChange={setSystemPromptStreaming}
+                      />
+                    </ResizablePanel>
+                    <ResizableHandle
+                      withHandle
+                      className="bg-border/70 my-2 opacity-70 hover:opacity-100"
+                    />
+                    <ResizablePanel
+                      id="system-prompt-variables"
+                      className="min-h-0"
+                      defaultSize="240px"
+                      minSize="140px"
+                      maxSize="520px"
+                      groupResizeBehavior="preserve-pixel-size"
+                    >
+                      <SystemPromptVariablesPanel
+                        disabled={readonly || systemPromptStreaming}
+                        onInsert={handleInsertVariable}
+                      />
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 </div>
               </div>
             </ResizablePanel>

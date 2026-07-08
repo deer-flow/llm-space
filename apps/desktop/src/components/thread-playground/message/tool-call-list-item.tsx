@@ -26,7 +26,7 @@ import { Input } from "../../ui/input";
 import { useThreadStoreActions } from "../stores";
 
 import { ToolCallInputView } from "./tool-call-input-view";
-import { getToolCallOutputText, getToolCallStatus } from "./tool-call-status";
+import { getToolCallOutputText } from "./tool-call-status";
 import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _ToolCallListItem({
@@ -49,7 +49,6 @@ function _ToolCallListItem({
   const [calling, setCalling] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
-  const toolCallStatus = useMemo(() => getToolCallStatus(toolCall), [toolCall]);
   const isError = toolCall.output?.isError ?? false;
   const handleOutputChange = useCallback(
     (value: string) => {
