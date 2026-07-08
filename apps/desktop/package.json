@@ -1,13 +1,14 @@
 {
   "name": "@llm-space/desktop",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "scripts": {
     "start": "vite build && electrobun dev",
     "dev": "electrobun dev --watch",
     "dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
     "dev:cef": "LLM_SPACE_DESKTOP_RENDERER=cef LLM_SPACE_DESKTOP_CDP_PORT=${LLM_SPACE_DESKTOP_CDP_PORT:-9333} bun run dev:hmr",
     "hmr": "vite --port 5173",
-    "build:canary": "vite build && electrobun build --env=canary"
+    "build:canary": "vite build && electrobun build --env=canary",
+    "build:stable": "vite build && electrobun build --env=stable"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
