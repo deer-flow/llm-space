@@ -8,6 +8,7 @@ Use **bun** for everything (fuzzy-pinned in `mise.toml`, exact version + checksu
 
 | Task | Command | Notes |
 |---|---|---|
+| Set up a fresh clone | `mise setup` | installs the locked toolchain (`mise install`) + JS deps (`bun install`) |
 | Install deps | `bun install` | from repo root |
 | Run desktop app | `bun dev` | root script → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `electrobun dev --watch`) |
 | Run desktop app with CEF/CDP debugging | `bun run dev:cef` | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default |
