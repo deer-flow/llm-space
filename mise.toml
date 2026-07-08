@@ -6,10 +6,44 @@ NODE_ENV = "development"
 _.path = "node_modules/.bin"
 
 [tasks.install]
-run = "bun run install"
+run = "bun install"
 
 [tasks.dev]
-run = "bun --filter @llm-space/web dev"
+run = "bun run dev"
 
 [tasks.lint]
 run = "bun run lint"
+
+# --- Local packaging (see AGENTS.md "Releases & auto-update") ---------------
+
+[tasks.pack]
+description = "Unsigned canary build — fastest local packaging check"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_SIGNING = "1" }
+run = "bun run build:canary"
+
+[tasks."pack:adhoc"]
+description = "Ad-hoc signed canary build — exercises the signing path with no Apple creds"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_NOTARIZE = "1", ELECTROBUN_DEVELOPER_ID = "-" }
+run = "bun run build:canary"
+
+[tasks."pack:signed"]
+description = "Developer-ID signed canary build, no notarization (set ELECTROBUN_DEVELOPER_ID yourself)"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_NOTARIZE = "1" }
+run = "bun run build:canary"
+
+# --- Local auto-update loop: `feed:serve` in one terminal, then `pack:feed`
+# --- once per version; launch the app from a copy outside build/ ------------
+
+[tasks."pack:feed"]
+description = "Unsigned canary build published to the local update feed (localhost:8321)"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_SIGNING = "1", LLM_SPACE_UPDATE_BASE_URL = "http://localhost:8321" }
+run = ["bun run build:canary", "mkdir -p .dev-feed && cp artifacts/* .dev-feed/"]
+
+[tasks."feed:serve"]
+description = "Serve the local update feed on localhost:8321"
+dir = "apps/desktop"
+run = "mkdir -p .dev-feed && python3 -m http.server 8321 -d .dev-feed"
