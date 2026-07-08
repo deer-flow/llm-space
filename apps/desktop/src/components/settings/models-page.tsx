@@ -120,7 +120,11 @@ export function ModelsPage() {
     providers.find((provider) => provider.id === selectedId) ?? null;
 
   return (
-    <SettingsPage className="flex size-full min-h-0" title="Models">
+    <SettingsPage
+      className="flex size-full min-h-0"
+      title="Models"
+      description="LLM Space supports various model providers and their custom models, from OpenAI, Anthropic and Google compatible to Codex."
+    >
       <ProviderList
         providers={providers}
         selectedId={selectedId}
@@ -692,8 +696,8 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                     }
                   </div>
                   <div className="list-item">
-                    Leave it blank to use the official {provider.name} environment
-                    variable
+                    Leave it blank to use the official {provider.name}{" "}
+                    environment variable
                   </div>
                 </div>
               }
