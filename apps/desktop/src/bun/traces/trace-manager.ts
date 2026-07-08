@@ -1312,7 +1312,10 @@ function _aggregateRowsUsage(
   rows: LangfuseObservation[]
 ): ModelUsage | undefined {
   return _aggregateUsages(
-    rows.map(_usageFromRow).filter(Boolean) as ModelUsage[]
+    rows.flatMap((row) => {
+      const usage = _usageFromRow(row);
+      return usage ? [usage] : [];
+    })
   );
 }
 
@@ -1553,15 +1556,16 @@ function _textFromValue(value: unknown): string {
   }
   if (Array.isArray(value)) {
     return value
-      .map((item) => {
+      .flatMap((item) => {
         const record = _asRecord(item);
-        return record?.text !== undefined
-          ? _textFromValue(record.text)
-          : record?.content !== undefined
-            ? _textFromValue(record.content)
-            : _textFromValue(item);
+        const text =
+          record?.text !== undefined
+            ? _textFromValue(record.text)
+            : record?.content !== undefined
+              ? _textFromValue(record.content)
+              : _textFromValue(item);
+        return text ? [text] : [];
       })
-      .filter(Boolean)
       .join("\n");
   }
   const record = _asRecord(value);
@@ -1576,8 +1580,7 @@ function _textFromValue(value: unknown): string {
 
 function _messageText(content: Message["content"]): string {
   return content
-    .map((item) => (item.type === "text" ? item.text : ""))
-    .filter(Boolean)
+    .flatMap((item) => (item.type === "text" && item.text ? [item.text] : []))
     .join("\n")
     .trim();
 }
