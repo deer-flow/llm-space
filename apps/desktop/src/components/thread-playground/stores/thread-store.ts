@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import {
   AssistantMessage,
+  isDangerousBashCommand,
   isExecutableTool,
   isRunnableConversation,
   Message,
@@ -291,6 +292,24 @@ export function createThreadStore(
           const tool = toolsByName.get(toolCall.input.name);
           if (!tool || !isExecutableTool(tool)) {
             return null;
+          }
+          // A destructive `bash` command must never be auto-executed, even under
+          // "auto run tools" or the ReAct loop — treat it like a `terminate`
+          // tool: stop the loop and leave it pending for the user to review and
+          // run by hand.
+          if (tool.type === "builtin" && tool.name === "bash") {
+            const command = (toolCall.input.arguments as { command?: unknown })
+              ?.command;
+            if (
+              typeof command === "string" &&
+              isDangerousBashCommand(command)
+            ) {
+              toast.warning("Auto-run paused for a risky command", {
+                description:
+                  "A bash command looked destructive, so it wasn't run automatically. Review it and run it by hand if it's safe.",
+              });
+              return null;
+            }
           }
           executable.push({ toolCall, tool });
         }

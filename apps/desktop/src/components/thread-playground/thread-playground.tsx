@@ -307,7 +307,15 @@ function ThreadPlaygroundContent({
               </Tooltip>
             </div>
             <div className="flex items-center px-3">
-              <ButtonGroup className={cn(readonlyFromProps && "hidden")}>
+              <ButtonGroup
+                // The seam between Run and the chevron is the Run button's 1px
+                // right border. Blend it into the button by default (no visible
+                // line), and only reveal a faint translucent divider on hover.
+                className={cn(
+                  "[&>*:first-child]:border-r-primary [&>*:first-child]:transition-colors hover:[&>*:first-child]:border-r-primary-foreground/20",
+                  readonlyFromProps && "hidden"
+                )}
+              >
                 <Tooltip
                   content={
                     <div>

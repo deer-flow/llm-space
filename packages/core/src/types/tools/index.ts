@@ -154,6 +154,37 @@ export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
   return tool.type === "builtin" && tool.terminate !== true;
 }
 
+/**
+ * A conservative denylist of shell fragments that make a `bash` command too
+ * destructive to run automatically (`rm`, `mkfs`, `dd of=…`, fork bombs,
+ * writes to raw devices, pipe-to-shell installers, `sudo`, power state changes,
+ * …). Detection is intentionally simple and substring/word based — it errs
+ * toward flagging, since a false positive only means the user runs the command
+ * by hand.
+ */
+const DANGEROUS_BASH_PATTERNS: RegExp[] = [
+  /\brm\s+/i, // any rm, including rm -rf
+  /\bmkfs\b/i, // format a filesystem
+  /\bdd\b[^|]*\bof=/i, // dd writing to a device/file
+  /:\s*\(\s*\)\s*\{.*\}\s*;/, // fork bomb :(){ :|:& };:
+  /\b(shutdown|reboot|halt|poweroff)\b/i,
+  /\bchmod\s+-R\b/i,
+  /\bchown\s+-R\b/i,
+  />\s*\/dev\/(sd|nvme|disk)/i, // overwrite a raw disk
+  /\bsudo\b/i,
+  /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh)\b/i, // pipe-to-shell
+];
+
+/**
+ * Whether a `bash` command is destructive enough that it must never be run
+ * automatically. Used to keep such commands out of the auto-run / ReAct paths —
+ * effectively treating the call as `terminate` — while still letting the user
+ * execute it deliberately by hand.
+ */
+export function isDangerousBashCommand(command: string): boolean {
+  return DANGEROUS_BASH_PATTERNS.some((pattern) => pattern.test(command));
+}
+
 function _getLegacyMcpSource(
   tool: Tool | LegacyTool
 ): LegacyMcpToolSource | undefined {

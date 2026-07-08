@@ -6,7 +6,7 @@ import path from "node:path";
 import type { BuiltinTool } from "@llm-space/core";
 import { getLlmSpaceRoot } from "@llm-space/core/server";
 
-import { revealInFileManager } from "../../fs";
+import { openPath, revealInFileManager } from "../../fs";
 import { skillsManager } from "../../skills";
 
 /** Workspace root that path-less tools (e.g. `glob`) default to. */
@@ -683,13 +683,28 @@ export const presentFilesTool: BuiltinTool = {
 };
 
 /**
- * Present files to the user by revealing each in the OS file manager (Finder on
- * macOS, Explorer on Windows, the enclosing folder on Linux) — the same reveal
- * used by the tree-view "Reveal in Finder" action.
+ * Present files to the user. HTML files are opened directly with the OS default
+ * handler (so a generated page renders in the browser); everything else is
+ * revealed in the file manager (Finder on macOS, Explorer on Windows, the
+ * enclosing folder on Linux) — the same reveal used by the tree-view "Reveal in
+ * Finder" action.
  */
 export async function present_files(paths: string[]): Promise<"OK"> {
-  await Promise.all(paths.map((p) => revealInFileManager(p)));
+  const reveals: Promise<void>[] = [];
+  for (const p of paths) {
+    if (_isHtmlFile(p)) {
+      openPath(p);
+    } else {
+      reveals.push(revealInFileManager(p));
+    }
+  }
+  await Promise.all(reveals);
   return "OK";
+}
+
+function _isHtmlFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext === ".html" || ext === ".htm";
 }
 
 // -- registry -----------------------------------------------------------------

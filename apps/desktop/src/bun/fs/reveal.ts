@@ -19,6 +19,32 @@ export async function revealInFileManager(abs: string): Promise<void> {
   Bun.spawn(cmd, { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).unref();
 }
 
+/**
+ * Open an absolute path with the OS default handler (the file's default app, or
+ * a folder in the file manager). Unlike {@link revealInFileManager}, this opens
+ * the target itself rather than selecting it in its parent folder.
+ *
+ * - macOS — `open <path>`.
+ * - Windows — `explorer <path>`.
+ * - Linux/other — `xdg-open <path>`.
+ *
+ * Fire-and-forget and detached, mirroring {@link revealInFileManager}.
+ */
+export function openPath(abs: string): void {
+  const cmd = _openCommand(abs);
+  Bun.spawn(cmd, { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).unref();
+}
+
+function _openCommand(abs: string): string[] {
+  if (process.platform === "darwin") {
+    return ["open", abs];
+  }
+  if (process.platform === "win32") {
+    return ["explorer.exe", abs];
+  }
+  return ["xdg-open", abs];
+}
+
 async function _revealCommand(abs: string): Promise<string[]> {
   if (process.platform === "darwin") {
     return ["open", "-R", abs];
