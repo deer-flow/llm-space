@@ -1,20 +1,15 @@
+# Tool versions: fuzzy spec here, exact version + checksums in mise.lock
+# (regenerate with `mise lock` after bumping).
 [tools]
 bun = "1.3"
 
 # Deliberately no NODE_ENV here: mise [env] applies to every command run in
-# this directory (and to CI via mise-action) — a global NODE_ENV=development
-# leaks into `vite build` and ships dev-mode React. Tools set their own.
+# this directory (and reaches CI through mise-action's shims) — a global
+# NODE_ENV=development leaks into `vite build` and ships dev-mode React.
+# Tools set their own. Day-to-day commands live in package.json scripts;
+# mise tasks exist only where they add env/dir composition on top.
 [env]
 _.path = "node_modules/.bin"
-
-[tasks.install]
-run = "bun install"
-
-[tasks.dev]
-run = "bun run dev"
-
-[tasks.lint]
-run = "bun run lint"
 
 # --- Local packaging (see AGENTS.md "Releases & auto-update") ---------------
 
@@ -48,4 +43,4 @@ run = ["bun run build:canary", "mkdir -p .dev-feed && cp artifacts/* .dev-feed/"
 [tasks."feed:serve"]
 description = "Serve the local update feed on localhost:8321"
 dir = "apps/desktop"
-run = "mkdir -p .dev-feed && python3 -m http.server 8321 -d .dev-feed"
+run = "bun scripts/serve-feed.ts"

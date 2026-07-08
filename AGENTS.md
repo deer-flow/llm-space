@@ -4,7 +4,7 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 
 ## Tooling
 
-Use **bun** for everything (`packageManager: bun`, pinned to `bun 1.3` in `mise.toml`). Do not use npm/pnpm/yarn.
+Use **bun** for everything (fuzzy-pinned in `mise.toml`, exact version + checksums locked in `mise.lock` — regenerate with `mise lock` when bumping). Do not use npm/pnpm/yarn.
 
 | Task | Command | Notes |
 |---|---|---|
@@ -13,6 +13,7 @@ Use **bun** for everything (`packageManager: bun`, pinned to `bun 1.3` in `mise.
 | Run desktop app with CEF/CDP debugging | `bun run dev:cef` | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default |
 | Build (canary) | `bun run build:canary` | in `apps/desktop` → `vite build && electrobun build --env=canary` |
 | Build (stable) | `bun run build:stable` | in `apps/desktop` → `vite build && electrobun build --env=stable` |
+| Local packaging / update test | `mise run pack` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
 | Cut a release | `bun run release` / `bun run release:canary` | root script → `bun scripts/release.ts`; see "Releases & auto-update" |
 | Lint | `bun lint` / `bun run lint:check` | `lint` = `eslint --fix`, `lint:check` / `check` = `eslint .`; flat config at repo root |
 | Add a dependency | `bun add <pkg>` | run inside the target package (`apps/desktop` or `packages/core`) |

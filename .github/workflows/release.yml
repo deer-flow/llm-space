@@ -91,7 +91,10 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
-      - uses: jdx/mise-action@v2
+      # v4: reads mise.lock (installs the exact locked bun with checksum
+      # verification); its [env]→GITHUB_ENV export excludes PATH entries and
+      # our [env] carries nothing else.
+      - uses: jdx/mise-action@v4
 
       - run: bun install --frozen-lockfile
 
