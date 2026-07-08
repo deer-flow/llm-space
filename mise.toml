@@ -1,8 +1,10 @@
 [tools]
 bun = "1.3"
 
+# Deliberately no NODE_ENV here: mise [env] applies to every command run in
+# this directory (and to CI via mise-action) — a global NODE_ENV=development
+# leaks into `vite build` and ships dev-mode React. Tools set their own.
 [env]
-NODE_ENV = "development"
 _.path = "node_modules/.bin"
 
 [tasks.install]
