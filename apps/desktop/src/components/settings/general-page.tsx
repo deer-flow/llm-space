@@ -37,7 +37,9 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
+import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
 import { Link } from "../link";
 import { ModelAvatar } from "../thread-playground/model-avatar";
@@ -251,9 +253,23 @@ function WorkspaceFolderLink() {
   );
 }
 
+/** Read/write the bun-owned update mode over RPC. */
+function useUpdateMode(): [UpdateMode, (mode: UpdateMode) => void] {
+  const [mode, setMode] = useState<UpdateMode>(DEFAULT_UPDATE_MODE);
+  useEffect(() => {
+    void electrobun.rpc?.request.updateMode({}).then(setMode);
+  }, []);
+  const change = (next: UpdateMode) => {
+    setMode(next);
+    void electrobun.rpc?.request.setUpdateMode({ mode: next });
+  };
+  return [mode, change];
+}
+
 export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { fidelity, setFidelity } = useRenderingFidelity();
+  const [updateMode, setUpdateMode] = useUpdateMode();
   const {
     primaryColor,
     resetPrimaryColor,
@@ -362,6 +378,31 @@ export function GeneralPage() {
         }
       >
         <DefaultModelSelect />
+      </SettingsRow>
+
+      <Separator />
+
+      <SettingsRow
+        label={
+          <RowLabel
+            title="Software updates"
+            hint="Automatic downloads updates in the background and prompts you to restart."
+          />
+        }
+      >
+        <Select
+          value={updateMode}
+          onValueChange={(v) => setUpdateMode(v as UpdateMode)}
+        >
+          <SelectTrigger className="w-40" aria-label="Software updates">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="automatic">Automatic</SelectItem>
+            <SelectItem value="manual">Check manually</SelectItem>
+            <SelectItem value="off">Off</SelectItem>
+          </SelectContent>
+        </Select>
       </SettingsRow>
 
       <Separator />

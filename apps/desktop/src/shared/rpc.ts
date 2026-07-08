@@ -31,7 +31,7 @@ import type {
   TraceSyncResult,
   TraceWorkbenchResponse,
 } from "./traces";
-import type { UpdateStatusChangedPayload } from "./updates";
+import type { UpdateMode, UpdateStatusChangedPayload } from "./updates";
 
 /** A webview→bun request to start streaming an agent run. */
 export interface StreamThreadRequestPayload {
@@ -315,6 +315,14 @@ export interface DesktopRPCType {
       traceWriteWorkbench: {
         params: { projectId: string; traceKey: string; thread: Thread };
         response: null;
+      };
+      // Update settings + the "we just updated" signal (pulled once on mount,
+      // race-free vs. the fire-and-forget `updateStatusChanged` message).
+      updateMode: { params: Record<string, never>; response: UpdateMode };
+      setUpdateMode: { params: { mode: UpdateMode }; response: null };
+      pendingInstalledVersion: {
+        params: Record<string, never>;
+        response: string | null;
       };
     };
     // Messages the webview SENDS and the bun side handles.

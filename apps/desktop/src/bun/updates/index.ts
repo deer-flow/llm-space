@@ -1,7 +1,15 @@
 import { Updater } from "electrobun/bun";
 
-import type { UpdateStatus } from "../../shared/updates";
+import type { UpdateMode, UpdateStatus } from "../../shared/updates";
+import { setUpdateReadyInMenu } from "../app/menu";
 import { mainWindowRPC } from "../rpc";
+
+import {
+  getLastSeenHash,
+  getUpdateMode,
+  setLastSeenHash,
+  setUpdateMode as persistUpdateMode,
+} from "./state";
 
 const INITIAL_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60_000;
@@ -14,6 +22,11 @@ let isCheckInFlight = false;
 // the final "ready" prompt (background timer).
 let isPassManual = false;
 let lastStatus: UpdateStatus | null = null;
+// The version we launched into after an applyUpdate relaunch, if any — pulled
+// once by the renderer (race-free) to show the "Updated to …" toast.
+let installedVersion: string | null = null;
+let backgroundTimer: ReturnType<typeof setTimeout> | null = null;
+let backgroundInterval: ReturnType<typeof setInterval> | null = null;
 
 function _sendStatus(status: UpdateStatus) {
   lastStatus = status;
@@ -51,6 +64,9 @@ export async function checkForUpdates(manual: boolean) {
       return;
     }
     if (!info.updateAvailable) {
+      // Revert a stale "Restart to Update" menu item — the ready build the
+      // renderer's badge tracked may have been rolled back on the feed.
+      setUpdateReadyInMenu(null);
       const { version } = await Updater.getLocalInfo();
       _sendStatus({ state: "up-to-date", version });
       return;
@@ -63,6 +79,7 @@ export async function checkForUpdates(manual: boolean) {
       _sendStatus({ state: "error", message });
       return;
     }
+    setUpdateReadyInMenu(info.version);
     _sendStatus({ state: "ready", version: info.version });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -92,13 +109,61 @@ export async function applyUpdateAndRestart() {
 }
 
 /**
- * Start background update polling: one delayed check shortly after launch,
- * then a slow interval. No-op on the dev channel (electrobun disables updates
- * there anyway).
+ * The version we just updated into this launch (null if unchanged). Consumed
+ * once: a webview reload re-mounts the renderer and re-pulls, so clearing here
+ * keeps the "Updated to …" toast to a single show per process (also guards the
+ * dev StrictMode double-mount).
+ */
+export function getInstalledVersion(): string | null {
+  const version = installedVersion;
+  installedVersion = null;
+  return version;
+}
+
+export async function getUpdateModeSetting(): Promise<UpdateMode> {
+  return getUpdateMode();
+}
+
+/** Persist the update mode and re-arm/tear-down the background timers live. */
+export async function setUpdateModeSetting(mode: UpdateMode) {
+  await persistUpdateMode(mode);
+  _applySchedule(mode);
+}
+
+function _clearSchedule() {
+  if (backgroundTimer) clearTimeout(backgroundTimer);
+  if (backgroundInterval) clearInterval(backgroundInterval);
+  backgroundTimer = null;
+  backgroundInterval = null;
+}
+
+function _applySchedule(mode: UpdateMode) {
+  _clearSchedule();
+  // Only `automatic` polls; `manual`/`off` rely on the menu item.
+  if (mode !== "automatic") return;
+  backgroundTimer = setTimeout(
+    () => void checkForUpdates(false),
+    INITIAL_CHECK_DELAY_MS
+  );
+  backgroundInterval = setInterval(
+    () => void checkForUpdates(false),
+    CHECK_INTERVAL_MS
+  );
+}
+
+/**
+ * Start the updater: detect whether this launch is a just-applied update
+ * (bundle hash changed since last launch) and, unless the dev channel or an
+ * `off`/`manual` mode says otherwise, begin background polling. The dev
+ * channel disables updates entirely (electrobun does too).
  */
 export async function startUpdaterService() {
-  const channel = await Updater.localInfo.channel();
+  const { channel, hash, version } = await Updater.getLocalInfo();
   if (channel === "dev") return;
-  setTimeout(() => void checkForUpdates(false), INITIAL_CHECK_DELAY_MS);
-  setInterval(() => void checkForUpdates(false), CHECK_INTERVAL_MS);
+
+  const lastSeen = await getLastSeenHash();
+  if (lastSeen && lastSeen !== hash) installedVersion = version;
+  if (lastSeen !== hash) await setLastSeenHash(hash);
+
+  _applySchedule(await getUpdateMode());
 }

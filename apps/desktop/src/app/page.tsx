@@ -24,7 +24,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { UpdateNotifications } from "@/components/update-notifications";
+import { UpdateIndicator } from "@/components/update-indicator";
+import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
 import { track } from "@/lib/analytics";
 import { electrobun } from "@/lib/electrobun";
@@ -122,8 +123,9 @@ function _SidebarModeSwitch({
 export function Page() {
   return (
     <CommandProvider>
-      <UpdateNotifications />
-      <PageInner />
+      <UpdateStatusProvider>
+        <PageInner />
+      </UpdateStatusProvider>
     </CommandProvider>
   );
 }
@@ -450,6 +452,7 @@ function PageInner() {
                 onMove={tabs.handleMove}
                 onTraceTitleChange={tabs.handleTraceTitleChange}
                 onToggleSidebar={handleToggleSidebar}
+                toolbarSlot={<UpdateIndicator />}
               />
             )}
           </ResizablePanel>
