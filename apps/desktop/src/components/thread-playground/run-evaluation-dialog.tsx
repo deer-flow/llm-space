@@ -1,5 +1,5 @@
 import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { format } from "timeago.js";
 
@@ -62,15 +62,21 @@ export function RunEvaluationDialog({
   const [note, setNote] = useState("");
   const [inspectingRun, setInspectingRun] = useState<RunSnapshot | null>(null);
 
-  useEffect(() => {
-    if (!open) {
-      setInspectingRun(null);
-      return;
-    }
+  const [prevOpen, setPrevOpen] = useState(false);
+  const [prevEvaluation, setPrevEvaluation] = useState(evaluation);
+
+  // Reinitialize the dialog when it opens or the evaluation changes. Adjusting
+  // during render (not via useEffect) avoids a stale frame between the two
+  // commits. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (open !== prevOpen || evaluation !== prevEvaluation) {
+    setPrevOpen(open);
+    setPrevEvaluation(evaluation);
     setInspectingRun(null);
-    setVerdict(evaluation?.verdict ?? null);
-    setNote(evaluation?.note ?? "");
-  }, [evaluation?.id, evaluation?.note, evaluation?.verdict, open]);
+    if (open) {
+      setVerdict(evaluation?.verdict ?? null);
+      setNote(evaluation?.note ?? "");
+    }
+  }
 
   const title = useMemo(() => {
     if (!leftRun || !rightRun) {
