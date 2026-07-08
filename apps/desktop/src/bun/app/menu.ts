@@ -9,6 +9,10 @@ ApplicationMenu.setApplicationMenu([
   {
     submenu: [
       { label: "About LLM Space", role: "about" },
+      {
+        label: "Check for Updates...",
+        action: "checkForUpdates",
+      },
       { type: "divider" },
       {
         label: "Settings...",
@@ -260,6 +264,7 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
     args: { url: "https://github.com/deer-flow/llm-space/tree/main" },
   },
   reportBugs: { type: "reportBugs", args: {} },
+  checkForUpdates: { type: "checkForUpdates", args: {} },
   donate: {
     type: "openLink",
     args: { url: "https://my.feishu.cn/wiki/OvLBwVuSkiCR1ik5wGEcBXZfnye" },

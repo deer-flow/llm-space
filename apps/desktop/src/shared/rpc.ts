@@ -31,6 +31,7 @@ import type {
   TraceSyncResult,
   TraceWorkbenchResponse,
 } from "./traces";
+import type { UpdateStatusChangedPayload } from "./updates";
 
 /** A webview→bun request to start streaming an agent run. */
 export interface StreamThreadRequestPayload {
@@ -335,6 +336,8 @@ export interface DesktopRPCType {
       receiveStreamThreadResponse: StreamThreadResponsePayload;
       // OS-level fullscreen state changed (entered/exited).
       fullScreenChanged: { fullScreen: boolean };
+      // App-update flow progress from the bun-side updater service.
+      updateStatusChanged: UpdateStatusChangedPayload;
       // A unified command dispatched from the bun process (native menu / global
       // shortcuts) to run in the webview. See `shared/commands.ts`.
       executeCommand: Command;
