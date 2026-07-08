@@ -20,6 +20,7 @@ import {
   SparklesIcon,
   SquareIcon,
   TerminalIcon,
+  TimerIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -85,6 +86,11 @@ const BASH_TOOL: FunctionTool = _functionTool({
         type: "string",
         description:
           "The bash command to execute. Must be self-contained — include cd, export, and any other setup inline, because prior invocations leave no lasting shell state.",
+      },
+      timeout: {
+        type: "number",
+        description:
+          "Timeout in milliseconds (max 600000ms, 120000ms by default).",
       },
     },
     additionalProperties: false,
@@ -376,6 +382,29 @@ const TODO_WRITE_TOOL: FunctionTool = _functionTool({
           },
           additionalProperties: false,
         },
+      },
+    },
+    additionalProperties: false,
+  },
+});
+
+const SLEEP_TOOL: FunctionTool = _functionTool({
+  name: "sleep",
+  description:
+    "Pause for a given number of milliseconds before returning. Use to wait between polling steps or to space out actions.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "duration_ms"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary explaining why the sleep is being performed",
+      },
+      duration_ms: {
+        type: "number",
+        description: "How long to sleep, in milliseconds.",
       },
     },
     additionalProperties: false,
@@ -674,6 +703,12 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
     label: "ask_user_question",
     tool: ASK_USER_QUESTION_TOOL,
     icon: CircleHelpIcon,
+  },
+  {
+    type: "tool",
+    label: "sleep",
+    tool: SLEEP_TOOL,
+    icon: TimerIcon,
   },
   {
     type: "tool",

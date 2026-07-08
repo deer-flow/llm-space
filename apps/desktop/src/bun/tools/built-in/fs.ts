@@ -6,6 +6,7 @@ import path from "node:path";
 import type { BuiltinTool } from "@llm-space/core";
 import { getLlmSpaceRoot } from "@llm-space/core/server";
 
+import { revealInFileManager } from "../../fs";
 import { skillsManager } from "../../skills";
 
 /** Workspace root that path-less tools (e.g. `glob`) default to. */
@@ -566,17 +567,32 @@ export const bashTool: BuiltinTool = {
         description:
           "The bash command to execute. Must be self-contained — include cd, export, and any other setup inline, because prior invocations leave no lasting shell state.",
       },
+      timeout: {
+        type: "number",
+        description:
+          "Timeout in milliseconds (max 600000ms, 120000ms by default).",
+      },
     },
     additionalProperties: false,
   },
 };
 
-export async function bash(command: string): Promise<{
+const BASH_DEFAULT_TIMEOUT_MS = 120_000;
+const BASH_MAX_TIMEOUT_MS = 600_000;
+
+export async function bash(
+  command: string,
+  timeout?: number
+): Promise<{
   stdout: string;
   stderr: string;
   exitCode: number;
 }> {
-  const { stdout, stderr, code } = await _run("bash", ["-c", command]);
+  const timeoutMs = Math.min(
+    timeout ?? BASH_DEFAULT_TIMEOUT_MS,
+    BASH_MAX_TIMEOUT_MS
+  );
+  const { stdout, stderr, code } = await _run("bash", ["-c", command], timeoutMs);
   return { stdout, stderr, exitCode: code };
 }
 
@@ -608,6 +624,46 @@ export function skill(name: string): string {
     throw new Error(`Skill "${name}" not found.`);
   }
   return `Base directory for this skill: ${found.path}\n\n${found.content.trim()}`;
+}
+
+// -- present_files ------------------------------------------------------------
+
+export const presentFilesTool: BuiltinTool = {
+  type: "builtin",
+  name: "present_files",
+  icon: "files",
+  description:
+    'You should always use this tool to present the artifacts and foundings after each creation or edit. Other wise the user won\'t be able to "see" them. Use when delivering final artifacts, reports, charts, or other outputs the user should see or download.',
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "paths"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary explaining what files are being presented and why",
+      },
+      paths: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+        description: "Absolute paths to the files to present to the user",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+/**
+ * Present files to the user by revealing each in the OS file manager (Finder on
+ * macOS, Explorer on Windows, the enclosing folder on Linux) — the same reveal
+ * used by the tree-view "Reveal in Finder" action.
+ */
+export async function present_files(paths: string[]): Promise<"OK"> {
+  await Promise.all(paths.map((p) => revealInFileManager(p)));
+  return "OK";
 }
 
 // -- registry -----------------------------------------------------------------
@@ -684,7 +740,16 @@ export const fsBuiltInTools = [
   {
     tool: bashTool,
     async execute(args: Record<string, unknown>) {
-      return bash(_requireString(args, "command"));
+      return bash(
+        _requireString(args, "command"),
+        _optionalNumber(args, "timeout")
+      );
+    },
+  },
+  {
+    tool: presentFilesTool,
+    async execute(args: Record<string, unknown>) {
+      return present_files(_requireStringArray(args, "paths"));
     },
   },
 ];
@@ -693,23 +758,56 @@ export const fsBuiltInTools = [
 
 function _run(
   command: string,
-  args: string[]
+  args: string[],
+  timeoutMs?: number
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            timedOut = true;
+            child.kill("SIGKILL");
+          }, timeoutMs);
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      if (timer) clearTimeout(timer);
+      reject(error);
+    });
     child.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      if (timedOut) {
+        reject(new Error(`Command timed out after ${timeoutMs}ms`));
+        return;
+      }
       resolve({ stdout, stderr, code: code ?? 0 });
     });
   });
+}
+
+/** Read a non-empty array of strings from `args`, rejecting other shapes. */
+function _requireStringArray(
+  args: Record<string, unknown>,
+  key: string
+): string[] {
+  const value = args[key];
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    !value.every((item): item is string => typeof item === "string")
+  ) {
+    throw new Error(`${key} must be a non-empty array of strings.`);
+  }
+  return value;
 }
 
 function _requireString(args: Record<string, unknown>, key: string): string {

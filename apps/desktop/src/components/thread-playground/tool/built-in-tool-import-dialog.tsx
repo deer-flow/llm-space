@@ -54,6 +54,7 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
   "glob",
   "bash",
   "skill",
+  "present_files",
 ]);
 
 const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search"]);

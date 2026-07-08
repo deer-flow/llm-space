@@ -1,7 +1,5 @@
 import type { BuiltinTool } from "@llm-space/core";
 
-import { revealInFileManager } from "../../fs";
-
 // -- weather_report -----------------------------------------------------------
 
 interface WeatherReport {
@@ -108,46 +106,6 @@ export async function weather_report(city: string): Promise<WeatherReport> {
   };
 }
 
-// -- present_files ------------------------------------------------------------
-
-export const presentFilesTool: BuiltinTool = {
-  type: "builtin",
-  name: "present_files",
-  icon: "files",
-  description:
-    'You should always use this tool to present the artifacts and foundings after each creation or edit. Other wise the user won\'t be able to "see" them. Use when delivering final artifacts, reports, charts, or other outputs the user should see or download.',
-  strict: true,
-  parameters: {
-    type: "object",
-    required: ["description", "paths"],
-    properties: {
-      description: {
-        type: "string",
-        description:
-          "Must be the first parameter in the tool call. A short human-readable summary explaining what files are being presented and why",
-      },
-      paths: {
-        type: "array",
-        items: {
-          type: "string",
-        },
-        description: "Absolute paths to the files to present to the user",
-      },
-    },
-    additionalProperties: false,
-  },
-};
-
-/**
- * Present files to the user by revealing each in the OS file manager (Finder on
- * macOS, Explorer on Windows, the enclosing folder on Linux) — the same reveal
- * used by the tree-view "Reveal in Finder" action.
- */
-export async function present_files(paths: string[]): Promise<"OK"> {
-  await Promise.all(paths.map((p) => revealInFileManager(p)));
-  return "OK";
-}
-
 // -- todo_write ---------------------------------------------------------------
 
 export const todoWriteTool: BuiltinTool = {
@@ -188,6 +146,41 @@ export const todoWriteTool: BuiltinTool = {
 
 export async function todo_write(): Promise<"OK"> {
   return Promise.resolve("OK");
+}
+
+// -- sleep --------------------------------------------------------------------
+
+export const sleepTool: BuiltinTool = {
+  type: "builtin",
+  name: "sleep",
+  icon: "timer",
+  description:
+    "Pause for a given number of milliseconds before returning. Use to wait between polling steps or to space out actions.",
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "duration_ms"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter in the tool call. A short human-readable summary explaining why the sleep is being performed",
+      },
+      duration_ms: {
+        type: "number",
+        description: "How long to sleep, in milliseconds.",
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+export async function sleep(durationMs: number): Promise<"OK"> {
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error("duration_ms must be a non-negative number.");
+  }
+  await new Promise((resolve) => setTimeout(resolve, durationMs));
+  return "OK";
 }
 
 // -- ask_user_question --------------------------------------------------------
@@ -279,15 +272,19 @@ export const miscBuiltInTools = [
     },
   },
   {
-    tool: presentFilesTool,
-    async execute(args: Record<string, unknown>) {
-      return present_files(_requireStringArray(args, "paths"));
-    },
-  },
-  {
     tool: todoWriteTool,
     async execute() {
       return todo_write();
+    },
+  },
+  {
+    tool: sleepTool,
+    async execute(args: Record<string, unknown>) {
+      const durationMs = args.duration_ms;
+      if (typeof durationMs !== "number") {
+        throw new Error("duration_ms must be a number.");
+      }
+      return sleep(durationMs);
     },
   },
   {
@@ -303,21 +300,3 @@ export const miscBuiltInTools = [
     },
   },
 ];
-
-// -- helpers ------------------------------------------------------------------
-
-/** Read a non-empty array of strings from `args`, rejecting other shapes. */
-function _requireStringArray(
-  args: Record<string, unknown>,
-  key: string
-): string[] {
-  const value = args[key];
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    !value.every((item): item is string => typeof item === "string")
-  ) {
-    throw new Error(`${key} must be a non-empty array of strings.`);
-  }
-  return value;
-}
