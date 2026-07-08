@@ -17,6 +17,7 @@ LLM Space is a side project of our honored open source project [DeerFlow](https:
 - [Run the app](#run-the-app)
 - [User guide](#user-guide)
 - [Contributing](#contributing)
+- [Sponsors](#sponsors)
 - [Donate](#donate)
 - [License](#license)
 
@@ -83,6 +84,24 @@ The full user manual lives here:
 For now, we only merge pull requests from the [DeerFlow](https://github.com/bytedance/deer-flow) core team members.
 
 Everyone else is very welcome to help by [opening an issue](https://github.com/llm-space/llm-space/issues) — bug reports, ideas, and feedback all make the project better.
+
+## Sponsors
+
+LLM Space is free and open source, and it stays that way thanks to our sponsors. We are proud and grateful to be backed by them.
+
+### 🏆 Platinum sponsor
+
+<p align="center">
+  <a href="https://superdesign.dev" target="_blank" rel="noopener">
+    <img src="./docs/images/sponsor-superdesign.svg" alt="Superdesign - AI product design agent that turns prompts into designs on an infinite canvas (Platinum Sponsor)" width="600" />
+  </a>
+</p>
+
+<p align="center">
+  <strong><a href="https://superdesign.dev">Superdesign</a></strong> is an AI product design agent that turns natural-language prompts into UI mockups, components, and full designs on an infinite canvas. Thank you for making LLM Space possible. 💜
+</p>
+
+Want to see your logo here? We would love to talk - [reach out by opening an issue](https://github.com/llm-space/llm-space/issues) or [support the project](#donate).
 
 ## Donate
 
