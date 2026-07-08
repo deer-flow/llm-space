@@ -467,6 +467,9 @@ function RenameInput({
     <span className="relative min-w-0 grow">
       <input
         autoFocus
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
         value={value}
         aria-invalid={!validation.valid}
         aria-describedby="tree-rename-error"
