@@ -7,6 +7,7 @@ import {
   AlertCircleIcon,
   CheckIcon,
   CopyIcon,
+  EyeIcon,
   Loader2,
   PlayIcon,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
+import { PreviewDialog } from "@/components/preview-dialog-lazy";
 import { Tooltip } from "@/components/tooltip";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
@@ -45,6 +47,7 @@ function _ToolCallListItem({
   const tool = resolveTool(toolCall.input.name);
   const executable = tool !== undefined && isExecutableTool(tool);
   const [calling, setCalling] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
   const toolCallStatus = useMemo(() => getToolCallStatus(toolCall), [toolCall]);
   const isError = toolCall.output?.isError ?? false;
@@ -149,28 +152,40 @@ function _ToolCallListItem({
       <div className="flex w-full flex-col gap-1">
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
           <Marker role="status" className="gap-1">
-            <MarkerContent className="text-xs">
+            <MarkerContent className="flex items-center text-xs">
               Response
-              {toolCallStatus === "needsResponse"
-                ? isError
-                  ? " · (Needs error text)"
-                  : " · (Needs response)"
-                : toolCallStatus === "error"
-                  ? " · (Error result)"
-                  : ""}
+              <Tooltip content="Preview response">
+                <Button
+                  className="invisible shrink-0 group-hover/message:visible"
+                  size="xs"
+                  variant="ghost"
+                  disabled={outputText === ""}
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <EyeIcon className="size-3" />
+                </Button>
+              </Tooltip>
             </MarkerContent>
           </Marker>
-          <Button
-            className="invisible shrink-0 group-hover/message:visible"
-            size="xs"
-            variant={isError ? "destructive" : "ghost"}
-            disabled={readonly}
-            onClick={toggleError}
-          >
-            <AlertCircleIcon />
-            {isError ? "Clear error" : "Mark as error"}
-          </Button>
+          <div className="flex items-center">
+            <Button
+              className="invisible shrink-0 group-hover/message:visible"
+              size="xs"
+              variant={isError ? "destructive" : "ghost"}
+              disabled={readonly}
+              onClick={toggleError}
+            >
+              <AlertCircleIcon />
+              {isError ? "Clear error" : "Mark as error"}
+            </Button>
+          </div>
         </div>
+        <PreviewDialog
+          open={previewOpen}
+          title={`Response of ${toolCall.input.name}()`}
+          value={outputText}
+          onOpenChange={setPreviewOpen}
+        />
         <ToolCallResponseEditor
           input={toolCall.input}
           readonly={readonly}
