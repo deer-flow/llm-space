@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { writeClipboardFilePaths } from "clip-filepaths";
 import { Utils, type BrowserWindow } from "electrobun/bun";
 
 import { COMMAND_META, type Command } from "../shared/commands";
@@ -70,6 +71,16 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
     }
     case "reportBugs": {
       Utils.openExternal(ISSUES_URL);
+      return;
+    }
+    case "copyFile": {
+      // Put the file on the OS clipboard as a file reference so it can be pasted
+      // into Finder/Explorer or other apps. `path` is absolute.
+      try {
+        writeClipboardFilePaths([command.args.path]);
+      } catch (err) {
+        console.error("Failed to copy to clipboard:", err);
+      }
       return;
     }
     case "openWorkspaceFolder": {

@@ -118,9 +118,14 @@ export function ToolListView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={openAddDialog}>
-              <FunctionSquareIcon />
-              Function tool
+            <DropdownMenuItem
+              onSelect={() => {
+                setInitialBuiltInToolName(null);
+                setBuiltInOpen(true);
+              }}
+            >
+              <PackageCheckIcon />
+              Add Built-in Tools
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {
@@ -130,17 +135,12 @@ export function ToolListView({
               }}
             >
               <CableIcon />
-              Add MCP tools
+              Add MCP Tools
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => {
-                setInitialBuiltInToolName(null);
-                setBuiltInOpen(true);
-              }}
-            >
-              <PackageCheckIcon />
-              Add built-in tools
+            <DropdownMenuItem onSelect={openAddDialog}>
+              <FunctionSquareIcon />
+              Add Custom Function Tool
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -7,14 +7,7 @@ import {
   GlobeIcon,
   type LucideIcon,
 } from "lucide-react";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { listBuiltInTools } from "@/client/built-in-tools";
@@ -142,9 +135,6 @@ function _BuiltInToolImportDialog({
     return result;
   }, [tools]);
   const selectedTools = toolsByCategory.get(selectedCategoryId) ?? [];
-  const selectedCategory = BUILT_IN_TOOL_CATEGORIES.find(
-    (category) => category.id === selectedCategoryId
-  )!;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,7 +156,7 @@ function _BuiltInToolImportDialog({
                   key={category.id}
                   type="button"
                   className={cn(
-                    "focus-visible:ring-ring/30 flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs outline-none transition-colors focus-visible:ring-2",
+                    "focus-visible:ring-ring/30 flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors outline-none focus-visible:ring-2",
                     selected
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
@@ -177,21 +167,15 @@ function _BuiltInToolImportDialog({
                   <span className="min-w-0 flex-1 truncate">
                     {category.label}
                   </span>
-                  <span className="text-muted-foreground font-mono text-[0.625rem]">
+                  <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[0.625rem]">
                     {count}
                   </span>
                 </button>
               );
             })}
           </aside>
-          <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-muted-foreground text-xs">
-                {selectedCategory.label} · {selectedTools.length} tool
-                {selectedTools.length === 1 ? "" : "s"}
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {selectedTools.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-center text-sm">
                   No built-in tools in this category.

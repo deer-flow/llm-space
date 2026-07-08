@@ -47,6 +47,12 @@ export class LocalFileSystemClient implements FileSystem, ThreadStorage {
     await this._rpc().request.fsReveal({ path });
   }
 
+  /** Resolve a workspace-relative path to its absolute on-disk path. */
+  async realpath(path: string): Promise<string> {
+    const { path: abs } = await this._rpc().request.fsRealpath({ path });
+    return abs;
+  }
+
   private _rpc() {
     const rpc = electrobun.rpc;
     if (!rpc) {

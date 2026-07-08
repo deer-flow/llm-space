@@ -159,6 +159,8 @@ export interface DesktopRPCType {
       fsWrite: { params: { path: string; thread: Thread }; response: null };
       // Reveal a file/directory in the OS file manager (Finder/Explorer).
       fsReveal: { params: { path: string }; response: null };
+      // Resolve a workspace-relative path to its absolute on-disk path.
+      fsRealpath: { params: { path: string }; response: { path: string } };
       mcpListServers: {
         params: Record<string, never>;
         response: McpServerView[];

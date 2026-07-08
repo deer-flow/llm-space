@@ -1,37 +1,21 @@
 "use client";
 
 import { type McpTool } from "@llm-space/core";
-import { Cable, Loader2, RefreshCw } from "lucide-react";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Cable, Loader2, RefreshCw, Settings2 } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { format } from "timeago.js";
 
 import { listMcpServers, listMcpTools } from "@/client/mcp";
 import { useCommands } from "@/commands";
-import { Tooltip } from "@/components/tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -73,8 +57,7 @@ function _McpToolImportDialog({
     [selectedServerId, servers]
   );
   const diagnostic = selectedServer?.readiness?.diagnostic;
-  const diagnosticHeadline = diagnostic?.headline;
-  const errorText = diagnosticHeadline ?? selectedServer?.lastError;
+  const errorText = diagnostic?.headline ?? selectedServer?.lastError;
   const isErrorText =
     Boolean(selectedServer?.lastError) || diagnostic?.outcome === "failed";
 
@@ -195,98 +178,108 @@ function _McpToolImportDialog({
     });
   };
 
+  const openMcpSettings = () => {
+    onOpenChange(false);
+    executeCommand({ type: "openSettings", args: { tab: "mcp" } });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100vh-4rem)] w-[min(720px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>Add MCP tools</DialogTitle>
           <DialogDescription>
             Choose a server, then add one or more MCP tools to this thread.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex min-h-0 flex-col gap-3 overflow-hidden p-4">
-          <div className="flex items-center gap-2">
-            <Select
-              value={selectedServerId}
-              onValueChange={setSelectedServerId}
-              disabled={servers.length === 0}
-            >
-              <SelectTrigger className="min-w-0 flex-1" aria-label="MCP server">
-                <SelectValue placeholder="Select MCP server" />
-              </SelectTrigger>
-              <SelectContent>
-                {servers.map((server) => (
-                  <SelectItem key={server.id} value={server.id}>
-                    {server.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Tooltip content="Refresh MCP tools">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Refresh MCP tools"
-                disabled={!selectedServerId || loadingTools}
-                onClick={() => void refreshTools(selectedServerId)}
-              >
-                {loadingTools || loadingServers ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-4" />
-                )}
-              </Button>
-            </Tooltip>
-          </div>
-
-          {selectedServer ? (
-            <div className="bg-muted/40 flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5">
-              <div className="min-w-0">
-                <div className="text-xs font-medium">
-                  {_serverReadinessLabel(selectedServer)}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <aside className="flex w-44 shrink-0 flex-col border-r p-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+              {servers.length === 0 ? (
+                <div className="text-muted-foreground px-2 py-6 text-center text-xs">
+                  {loadingServers ? "Loading…" : "No servers"}
                 </div>
-                {errorText ? (
-                  <div
+              ) : (
+                servers.map((server) => {
+                  const count = server.toolCount ?? server.readiness?.toolCount;
+                  const selected = server.id === selectedServerId;
+                  return (
+                    <button
+                      key={server.id}
+                      type="button"
+                      className={cn(
+                        "focus-visible:ring-ring/30 flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors outline-none focus-visible:ring-2",
+                        selected
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
+                      )}
+                      onClick={() => setSelectedServerId(server.id)}
+                    >
+                      <Cable className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {server.name}
+                      </span>
+                      {count != null ? (
+                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[0.625rem]">
+                          {count}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground mt-2 w-full"
+              onClick={openMcpSettings}
+            >
+              <Settings2 className="size-3.5" />
+              Configure MCP
+            </Button>
+          </aside>
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {servers.length === 0 ? (
+                <div className="text-muted-foreground flex flex-col items-center gap-3 px-3 py-8 text-center text-sm">
+                  <span>No MCP servers configured.</span>
+                  <Button size="sm" variant="outline" onClick={openMcpSettings}>
+                    Open settings
+                  </Button>
+                </div>
+              ) : tools.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 px-3 py-8 text-center text-sm">
+                  <span
                     className={cn(
-                      "truncate text-xs",
                       isErrorText ? "text-destructive" : "text-muted-foreground"
                     )}
                   >
-                    {errorText}
+                    {errorText ??
+                      `${_serverReadinessLabel(selectedServer)} · no tools loaded`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={loadingTools}
+                      onClick={() => void refreshTools(selectedServerId)}
+                    >
+                      {loadingTools ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-4" />
+                      )}
+                      Test server
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={openMcpSettings}>
+                      Open settings
+                    </Button>
                   </div>
-                ) : null}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="shrink-0"
-                onClick={() => {
-                  onOpenChange(false);
-                  executeCommand({
-                    type: "openSettings",
-                    args: { tab: "mcp" },
-                  });
-                }}
-              >
-                Open settings
-              </Button>
-            </div>
-          ) : null}
-
-          <div className="min-h-0 overflow-y-auto">
-            {servers.length === 0 ? (
-              <div className="text-muted-foreground px-1 py-6 text-center text-sm">
-                No MCP servers.
-              </div>
-            ) : tools.length === 0 && !loadingTools ? (
-              <div className="text-muted-foreground px-1 py-6 text-center text-sm">
-                No tools loaded. Refresh to test this server.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {tools.map((tool) => {
+                </div>
+              ) : (
+                tools.map((tool) => {
                   const exists = existingToolNames.has(tool.directName);
-                  const disabledReason = tool.disabledReason;
                   const highlighted = highlightedToolName === tool.directName;
                   return (
                     <div
@@ -299,30 +292,40 @@ function _McpToolImportDialog({
                         }
                       }}
                       className={cn(
-                        "hover:bg-accent flex min-w-0 items-start gap-3 rounded-md px-2 py-2 text-left transition-colors duration-500",
-                        highlighted && "bg-accent text-accent-foreground",
+                        "flex min-w-0 items-center gap-3 border-b px-3 py-2 transition-colors duration-500 last:border-b-0",
+                        highlighted && "bg-primary/10 text-primary",
                         !tool.available && "opacity-50"
                       )}
                     >
-                      <Cable className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
-                      <span className="min-w-0 grow">
-                        <span className="block truncate font-mono text-xs">
+                      <Cable
+                        className={cn(
+                          "size-4 shrink-0",
+                          highlighted ? "text-primary" : "text-muted-foreground"
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-mono text-sm">
                           {tool.directName}
-                        </span>
+                        </div>
                         {tool.description ? (
-                          <span className="text-muted-foreground line-clamp-2 text-xs">
+                          <div
+                            className={cn(
+                              "line-clamp-2 text-xs",
+                              highlighted
+                                ? "text-primary/80"
+                                : "text-muted-foreground"
+                            )}
+                          >
                             {tool.description}
-                          </span>
+                          </div>
                         ) : null}
-                        {disabledReason ? (
-                          <span className="text-destructive block text-xs">
-                            {disabledReason}
-                          </span>
+                        {tool.disabledReason ? (
+                          <div className="text-destructive text-xs">
+                            {tool.disabledReason}
+                          </div>
                         ) : null}
-                      </span>
+                      </div>
                       <Switch
-                        className="mt-0.5"
-                        size="sm"
                         checked={exists}
                         disabled={!tool.available}
                         aria-label={`${exists ? "Remove" : "Add"} ${tool.directName}`}
@@ -332,26 +335,11 @@ function _McpToolImportDialog({
                       />
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
-
-          {diagnosticHeadline ? (
-            <div className="text-muted-foreground text-xs">
-              Open settings for the full redacted diagnostic timeline.
-            </div>
-          ) : selectedServer?.lastError ? (
-            <div className="text-destructive text-xs">
-              {selectedServer.lastError}
-            </div>
-          ) : null}
         </div>
-        <DialogFooter className="border-t px-4 py-3">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Done
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -359,15 +347,13 @@ function _McpToolImportDialog({
 
 export const McpToolImportDialog = memo(_McpToolImportDialog);
 
-function _serverReadinessLabel(server: McpServerView): string {
+function _serverReadinessLabel(server: McpServerView | null): string {
+  if (!server) {
+    return "Untested";
+  }
   const readiness = server.readiness;
   const label = getMcpReadinessLabel(readiness);
   const parts = [label];
-  if (readiness?.toolCount !== null && readiness?.toolCount !== undefined) {
-    parts.push(
-      `${readiness.toolCount} tool${readiness.toolCount === 1 ? "" : "s"}`
-    );
-  }
   if (readiness?.testedAt) {
     parts.push(`tested ${format(readiness.testedAt)}`);
   }

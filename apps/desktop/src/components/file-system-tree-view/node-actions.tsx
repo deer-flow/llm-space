@@ -2,10 +2,12 @@
 
 import type { FileNode } from "@llm-space/core";
 import {
-  Copy,
+  ClipboardCopy,
   FilePlus,
+  FilesIcon,
   FolderOpen,
   FolderPlus,
+  FoldersIcon,
   Import,
   MoreHorizontal,
   RefreshCw,
@@ -13,7 +15,9 @@ import {
   TextCursorInput,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { localFs } from "@/client";
 import { useCommands } from "@/commands";
 import {
   DropdownMenu,
@@ -126,6 +130,16 @@ export function NodeActions({
 }) {
   const { executeCommand } = useCommands();
   const isDir = node.type === "directory";
+  // Copy the file to the OS clipboard as a file reference. The bun-side command
+  // takes an absolute path, so resolve the workspace-relative node path first.
+  const copyToClipboard = async () => {
+    try {
+      const path = await localFs.realpath(node.path);
+      executeCommand({ type: "copyFile", args: { path } });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
   return (
     <span className="flex items-center gap-0.5">
       {isDir && (
@@ -183,6 +197,12 @@ export function NodeActions({
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
+          {!isDir && (
+            <DropdownMenuItem onSelect={() => void copyToClipboard()}>
+              <ClipboardCopy />
+              Copy
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onSelect={() =>
               executeCommand({
@@ -191,7 +211,7 @@ export function NodeActions({
               })
             }
           >
-            <Copy />
+            {isDir ? <FoldersIcon /> : <FilesIcon />}
             Duplicate
           </DropdownMenuItem>
           <DropdownMenuItem

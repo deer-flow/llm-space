@@ -49,6 +49,12 @@ function _MessageListItemHeader({
     [message]
   );
   const runnable = message.role === "user" || toolResultsReady;
+  // Hide the Run button entirely for an assistant message with no tool calls —
+  // there's nothing to continue from, so a disabled button is just noise. It
+  // still shows (disabled) for an assistant message whose tool results aren't
+  // ready yet, since that can become runnable.
+  const showRun =
+    message.role === "user" || (message.role === "assistant" && !!message.toolCalls?.length);
   const runTooltip = runnable ? "Run from this message" : "No runnable content";
   const runAriaLabel = runnable
     ? "Run from this message"
@@ -175,17 +181,19 @@ function _MessageListItemHeader({
         {message.role === "user" && (
           <AddImagesMenu messageId={message.id} disabled={readonly} />
         )}
-        <Tooltip content={runTooltip}>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={runAriaLabel}
-            disabled={readonly || !runnable}
-            onClick={handleRun}
-          >
-            <PlayCircleIcon className="size-4" />
-          </Button>
-        </Tooltip>
+        {showRun && (
+          <Tooltip content={runTooltip}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={runAriaLabel}
+              disabled={readonly || !runnable}
+              onClick={handleRun}
+            >
+              <PlayCircleIcon className="size-4" />
+            </Button>
+          </Tooltip>
+        )}
         <Tooltip content="Remove message">
           <Button
             variant="ghost"

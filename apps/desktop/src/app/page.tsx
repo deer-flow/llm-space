@@ -133,6 +133,7 @@ const COMMAND_PALETTE_BLACKLIST = [
   "duplicateFile",
   "deleteFile",
   "revealFile",
+  "copyFile",
   "openLink",
   "openCommandPalette",
   "newFileFromPromptExample",

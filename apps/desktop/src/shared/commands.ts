@@ -78,6 +78,16 @@ export interface RevealFileCommand extends GenericCommand<
   { path: string }
 > {}
 
+/**
+ * Copy the file at the **absolute** `path` to the OS clipboard as a file
+ * reference, so it can be pasted into Finder/Explorer or other apps. Runs in the
+ * bun process (native clipboard). macOS/Windows only.
+ */
+export interface CopyFileCommand extends GenericCommand<
+  "copyFile",
+  { path: string }
+> {}
+
 /** Refresh (re-list) the file tree. */
 export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
 
@@ -239,6 +249,7 @@ export type Command =
   | DuplicateFileCommand
   | DeleteFileCommand
   | RevealFileCommand
+  | CopyFileCommand
   | RefreshTreeCommand
   | ImportFilesCommand
   | CreateTraceProjectCommand
@@ -299,6 +310,7 @@ export const COMMAND_META: Record<
   duplicateFile: { label: "Duplicate", target: "webview" },
   deleteFile: { label: "Move to Trash", target: "webview" },
   revealFile: { label: "Reveal in Finder", target: "webview" },
+  copyFile: { label: "Copy", target: "bun" },
   refreshTree: { label: "Refresh", target: "webview" },
   importFiles: { label: "Import from Files...", target: "webview" },
   createTraceProject: { label: "New Trace Project", target: "webview" },

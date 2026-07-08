@@ -165,6 +165,8 @@ export const mainWindowRPC: MainWindowRPC =
           await revealInFileManager(localFs.realpath(path));
           return null;
         },
+        fsRealpath: ({ path }) =>
+          Promise.resolve({ path: localFs.realpath(path) }),
         mcpListServers: () => mcpManager.listServers(),
         mcpAddServer: ({ server }) => {
           const servers = mcpManager.addServer(server);
