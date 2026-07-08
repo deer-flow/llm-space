@@ -68,6 +68,14 @@ function _MessageListItem({
         : null,
     [message]
   );
+  const toolCallsOnlyBody = useMemo(
+    () =>
+      message.role === "assistant" &&
+      !message.thinking &&
+      message.content.length === 0 &&
+      (message.toolCalls?.length ?? 0) > 0,
+    [message]
+  );
   const {
     addMessageImageContent,
     insertMessageBefore,
@@ -168,6 +176,7 @@ function _MessageListItem({
         />
       )}
       <MessageListItemHeader
+        className={toolCallsOnlyBody ? "pb-2" : undefined}
         message={message}
         readonly={readonly}
         collapsed={collapsed}

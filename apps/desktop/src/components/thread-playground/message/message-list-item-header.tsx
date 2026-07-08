@@ -23,11 +23,13 @@ import { TokenUsageSummary } from "./token-usage-summary";
 import { summarizeToolCalls } from "./tool-call-status";
 
 function _MessageListItemHeader({
+  className,
   message,
   readonly = false,
   collapsed,
   dragHandleProps,
 }: {
+  className?: string;
   message: Message;
   readonly?: boolean;
   collapsed?: boolean;
@@ -94,7 +96,12 @@ function _MessageListItemHeader({
     setPreviewOpen(true);
   }, []);
   return (
-    <header className="relative flex w-full shrink-0 items-center px-2 pt-2">
+    <header
+      className={cn(
+        "relative flex w-full shrink-0 items-center px-2 pt-2",
+        className
+      )}
+    >
       <Tooltip content="Drag to reorder">
         <div
           {...dragHandleProps}
