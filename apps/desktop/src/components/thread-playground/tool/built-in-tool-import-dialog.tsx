@@ -5,6 +5,7 @@ import {
   CloudSunIcon,
   FilesIcon,
   GlobeIcon,
+  SearchIcon,
   type LucideIcon,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +70,7 @@ function _BuiltInToolImportDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [tools, setTools] = useState<BuiltinTool[]>([]);
+  const [query, setQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] =
     useState<BuiltInToolCategoryId>("fileSystem");
   const [highlightedToolName, setHighlightedToolName] = useState<string | null>(
@@ -125,15 +128,26 @@ function _BuiltInToolImportDialog({
     }
     onAdd(tool);
   };
+  const filteredTools = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      return tools;
+    }
+    return tools.filter(
+      (tool) =>
+        tool.name.toLowerCase().includes(q) ||
+        (tool.description?.toLowerCase().includes(q) ?? false)
+    );
+  }, [tools, query]);
   const toolsByCategory = useMemo(() => {
     const result = new Map<BuiltInToolCategoryId, BuiltinTool[]>(
       BUILT_IN_TOOL_CATEGORIES.map((category) => [category.id, []])
     );
-    for (const tool of tools) {
+    for (const tool of filteredTools) {
       result.get(_categoryForTool(tool.name))!.push(tool);
     }
     return result;
-  }, [tools]);
+  }, [filteredTools]);
   const selectedTools = toolsByCategory.get(selectedCategoryId) ?? [];
 
   return (
@@ -146,7 +160,18 @@ function _BuiltInToolImportDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <aside className="flex w-44 shrink-0 flex-col gap-1 border-r p-3">
+          <aside className="flex w-44 shrink-0 flex-col gap-2 border-r p-3">
+            <div className="relative">
+              <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search tools"
+                aria-label="Search tools"
+                className="h-8 pl-7 text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
             {BUILT_IN_TOOL_CATEGORIES.map((category) => {
               const CategoryIcon = category.icon;
               const count = toolsByCategory.get(category.id)?.length ?? 0;
@@ -173,12 +198,15 @@ function _BuiltInToolImportDialog({
                 </button>
               );
             })}
+            </div>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {selectedTools.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-center text-sm">
-                  No built-in tools in this category.
+                  {query.trim()
+                    ? "No tools match your search."
+                    : "No built-in tools in this category."}
                 </div>
               ) : (
                 selectedTools.map((tool) => {
