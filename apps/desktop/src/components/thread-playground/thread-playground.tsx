@@ -307,7 +307,12 @@ function ThreadPlaygroundContent({
               </Tooltip>
             </div>
             <div className="flex items-center px-3">
-              <ButtonGroup className={cn(readonlyFromProps && "hidden")}>
+              <ButtonGroup
+                className={cn(
+                  "transition-transform active:translate-y-px",
+                  readonlyFromProps && "hidden"
+                )}
+              >
                 <Tooltip
                   content={
                     <div>
@@ -321,7 +326,7 @@ function ThreadPlaygroundContent({
                   }
                 >
                   <Button
-                    className="border-r-primary border-none pr-1 pl-4"
+                    className="border-r-primary border-none pr-1 pl-4 active:translate-y-0!"
                     aria-label={
                       status === "running"
                         ? "Stop running thread"
@@ -343,7 +348,7 @@ function ThreadPlaygroundContent({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="border-none pr-1.5 pl-0.5"
+                      className="border-none pr-1.5 pl-0.5 active:translate-y-0!"
                       aria-label="Run settings"
                       disabled={
                         readonlyFromProps || (status !== "running" && !hasModel)
