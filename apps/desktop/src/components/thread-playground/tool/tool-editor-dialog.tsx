@@ -45,6 +45,22 @@ export function ToolEditorDialog({
   const threadModel = useThreadStore((s) => s.thread.model);
   const [text, setText] = useState("");
   const [originalName, setOriginalName] = useState<string | null>(null);
+  // Track the last (open, tool) we initialized from so we can reinitialize
+  // during render instead of in an effect.
+  const [prevOpen, setPrevOpen] = useState(false);
+  const [prevTool, setPrevTool] = useState(tool);
+
+  // Reinitialize the editor when the dialog opens or the edited tool changes.
+  // Adjusting during render (not via useEffect) avoids a stale frame between
+  // the two commits. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (open !== prevOpen || tool !== prevTool) {
+    setPrevOpen(open);
+    setPrevTool(tool);
+    if (open) {
+      setOriginalName(tool ? tool.name : null);
+      setText(JSON.stringify(tool ?? DEFAULT_TOOL, null, 2));
+    }
+  }
 
   const {
     text: generated,
@@ -90,19 +106,6 @@ export function ToolEditorDialog({
       userPrompt: `<user-input>\n${prompt}\n</user-input>`,
     });
   };
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    if (tool) {
-      setOriginalName(tool.name);
-      setText(JSON.stringify(tool, null, 2));
-    } else {
-      setOriginalName(null);
-      setText(JSON.stringify(DEFAULT_TOOL, null, 2));
-    }
-  }, [open, tool]);
 
   const handleSave = () => {
     let parsed: FunctionTool;
