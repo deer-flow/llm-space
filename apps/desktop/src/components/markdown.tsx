@@ -1,8 +1,10 @@
 import { memo, useMemo } from "react";
-import ReactMarkdown, { type Options } from "react-markdown";
+import ReactMarkdown, { Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
+
+import { Link } from "./link";
 
 export type MarkdownProps = Omit<Options, "children"> & {
   children: string;
@@ -10,9 +12,27 @@ export type MarkdownProps = Omit<Options, "children"> & {
 };
 
 function _Markdown({ children, className, ...props }: MarkdownProps) {
-  const remarkPlugins = useMemo(
-    () => [remarkGfm, ...(props.remarkPlugins ?? [])],
-    [props.remarkPlugins]
+  const remarkPlugins = useMemo(() => [remarkGfm], []);
+  const components = useMemo(
+    () =>
+      ({
+        a: ({
+          children,
+          href,
+        }: {
+          children: React.ReactNode;
+          href: string;
+        }) => (
+          <Link
+            href={href}
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children}
+          </Link>
+        ),
+      }) as Components,
+    []
   );
 
   return (
@@ -31,7 +51,11 @@ function _Markdown({ children, className, ...props }: MarkdownProps) {
         className
       )}
     >
-      <ReactMarkdown {...props} remarkPlugins={remarkPlugins}>
+      <ReactMarkdown
+        {...props}
+        remarkPlugins={remarkPlugins}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>

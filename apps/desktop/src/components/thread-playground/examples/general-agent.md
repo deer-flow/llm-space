@@ -1,4 +1,4 @@
-<agent role="general agent" name="Malibu">
+<agent role="general agent" name="DeerFlow">
 You're a helpful and harmless agent.
 </agent>
 

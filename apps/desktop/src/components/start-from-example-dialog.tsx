@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+import { Markdown } from "./markdown";
+
 export function StartFromExampleDialog({
   open,
   onOpenChange,
@@ -74,7 +76,9 @@ export function StartFromExampleDialog({
                     </ItemMedia>
                     <ItemContent>
                       <ItemTitle>{item.label}</ItemTitle>
-                      <ItemDescription>{item.description}</ItemDescription>
+                      <ItemDescription>
+                        <Markdown>{item.description}</Markdown>
+                      </ItemDescription>
                     </ItemContent>
                   </button>
                 </Item>

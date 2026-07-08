@@ -7,7 +7,6 @@ import {
   ImageIcon,
   LanguagesIcon,
   SparklesIcon,
-  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,7 +19,6 @@ import deepWikiPrompt from "./deep-wiki.md?raw";
 import generalAgentPrompt from "./general-agent.md?raw";
 import metaImagePrompt from "./meta-image-prompt.md?raw";
 import metaPromptWithTools from "./meta-prompt-with-tools.md?raw";
-import metaToolPrompt from "./meta-tool.md?raw";
 import { ASK_USER_QUESTION_BUILTIN_TOOL, TOOL_EXAMPLES } from "./tools";
 import translationPrompt from "./translation.md?raw";
 
@@ -265,7 +263,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     label: "General Agent",
     fileStem: "general-agent",
     description:
-      "Broad-purpose assistant prompt with practical tool-use rules.",
+      "A [DeerFlow-like](https://github.com/bytedance/deer-flow) assistant for coding, deep-research and more.",
     content: generalAgentPrompt,
     icon: BotIcon,
     tools: [
@@ -326,15 +324,6 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     description: "Prompt-writing assistant that improves instructions.",
     content: metaPromptWithTools,
     icon: SparklesIcon,
-  },
-  {
-    type: "example",
-    id: "meta-tool",
-    label: "Meta Tool",
-    fileStem: "meta-tool",
-    description: "Function-tool designer prompt for producing JSON schemas.",
-    content: metaToolPrompt,
-    icon: WrenchIcon,
   },
   {
     type: "example",
