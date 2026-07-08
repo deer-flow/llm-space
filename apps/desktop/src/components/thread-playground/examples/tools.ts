@@ -160,34 +160,46 @@ const WRITE_FILE_TOOL: FunctionTool = _functionTool({
 const EDIT_TOOL: FunctionTool = _functionTool({
   name: "edit",
   description:
-    "Performs exact string replacement in a file. The old_string must match the file contents exactly (including whitespace and indentation). Use for surgical edits; prefer write_file when replacing the entire file.",
+    "Performs exact string replacements in a file. Each edit's old_string must match the file contents exactly (including whitespace and indentation). Edits are applied in order, so a later edit sees the result of earlier ones. Use for surgical edits; prefer write when replacing the entire file.",
   strict: true,
   parameters: {
     type: "object",
-    required: ["description", "path", "old_string", "new_string"],
+    required: ["description", "path", "edits"],
     properties: {
       description: {
         type: "string",
         description:
-          "Must be the first parameter in the tool call. A short human-readable summary explaining the edit being made",
+          "Must be the first parameter in the tool call. A short human-readable summary explaining the edits being made",
       },
       path: {
         type: "string",
         description: "Absolute path to the file to edit",
       },
-      old_string: {
-        type: "string",
+      edits: {
+        type: "array",
         description:
-          "The exact text to replace (must be unique within the file unless replace_all is true)",
-      },
-      new_string: {
-        type: "string",
-        description: "The replacement text (must differ from old_string)",
-      },
-      replace_all: {
-        type: "boolean",
-        description:
-          "Replace all occurrences of old_string. Defaults to false (first match only).",
+          "The ordered list of replacements to apply to the file, each performed on the result of the previous one.",
+        items: {
+          type: "object",
+          required: ["old_string", "new_string"],
+          properties: {
+            old_string: {
+              type: "string",
+              description:
+                "The exact text to replace (must be unique within the file unless replace_all is true)",
+            },
+            new_string: {
+              type: "string",
+              description: "The replacement text (must differ from old_string)",
+            },
+            replace_all: {
+              type: "boolean",
+              description:
+                "Replace all occurrences of old_string. Defaults to false (first match only).",
+            },
+          },
+          additionalProperties: false,
+        },
       },
     },
     additionalProperties: false,

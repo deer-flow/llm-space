@@ -201,65 +201,91 @@ export const editTool: BuiltinTool = {
   name: "edit",
   icon: "pencil",
   description:
-    "Performs exact string replacement in a file. The old_string must match the file contents exactly (including whitespace and indentation). Use for surgical edits; prefer write_file when replacing the entire file.",
+    "Performs exact string replacements in a file. Each edit's old_string must match the file contents exactly (including whitespace and indentation). Edits are applied in order, so a later edit sees the result of earlier ones. Use for surgical edits; prefer write when replacing the entire file.",
   strict: true,
   parameters: {
     type: "object",
-    required: ["description", "path", "old_string", "new_string"],
+    required: ["description", "path", "edits"],
     properties: {
       description: {
         type: "string",
         description:
-          "Must be the first parameter in the tool call. A short human-readable summary explaining the edit being made",
+          "Must be the first parameter in the tool call. A short human-readable summary explaining the edits being made",
       },
       path: {
         type: "string",
         description: "Absolute path to the file to edit",
       },
-      old_string: {
-        type: "string",
+      edits: {
+        type: "array",
         description:
-          "The exact text to replace (must be unique within the file unless replace_all is true)",
-      },
-      new_string: {
-        type: "string",
-        description: "The replacement text (must differ from old_string)",
-      },
-      replace_all: {
-        type: "boolean",
-        description:
-          "Replace all occurrences of old_string. Defaults to false (first match only).",
+          "The ordered list of replacements to apply to the file, each performed on the result of the previous one.",
+        items: {
+          type: "object",
+          required: ["old_string", "new_string"],
+          properties: {
+            old_string: {
+              type: "string",
+              description:
+                "The exact text to replace (must be unique within the file unless replace_all is true)",
+            },
+            new_string: {
+              type: "string",
+              description: "The replacement text (must differ from old_string)",
+            },
+            replace_all: {
+              type: "boolean",
+              description:
+                "Replace all occurrences of old_string. Defaults to false (first match only).",
+            },
+          },
+          additionalProperties: false,
+        },
       },
     },
     additionalProperties: false,
   },
 };
 
+export interface EditOperation {
+  old_string: string;
+  new_string: string;
+  replace_all?: boolean;
+}
+
 export async function edit(
   filePath: string,
-  oldString: string,
-  newString: string,
-  replaceAll = false
+  edits: EditOperation[]
 ): Promise<string> {
-  if (oldString === newString) {
-    throw new Error("new_string must differ from old_string.");
+  if (edits.length === 0) {
+    throw new Error("edits must contain at least one replacement.");
   }
-  const content = await fs.readFile(filePath, "utf8");
-  const occurrences = content.split(oldString).length - 1;
-  if (occurrences === 0) {
-    throw new Error("old_string was not found in the file.");
-  }
-  if (!replaceAll && occurrences > 1) {
-    throw new Error(
-      `old_string is not unique (${occurrences} matches). Provide a larger unique string or set replace_all.`
-    );
-  }
-  const updated = replaceAll
-    ? content.split(oldString).join(newString)
-    : content.replace(oldString, newString);
-  await fs.writeFile(filePath, updated, "utf8");
-  const replaced = replaceAll ? occurrences : 1;
-  return `Replaced ${replaced} occurrence${replaced === 1 ? "" : "s"} in ${filePath}`;
+  let content = await fs.readFile(filePath, "utf8");
+  let totalReplaced = 0;
+  edits.forEach((operation, index) => {
+    const { old_string: oldString, new_string: newString } = operation;
+    const replaceAll = operation.replace_all ?? false;
+    if (oldString === newString) {
+      throw new Error(
+        `edits[${index}]: new_string must differ from old_string.`
+      );
+    }
+    const occurrences = content.split(oldString).length - 1;
+    if (occurrences === 0) {
+      throw new Error(`edits[${index}]: old_string was not found in the file.`);
+    }
+    if (!replaceAll && occurrences > 1) {
+      throw new Error(
+        `edits[${index}]: old_string is not unique (${occurrences} matches). Provide a larger unique string or set replace_all.`
+      );
+    }
+    content = replaceAll
+      ? content.split(oldString).join(newString)
+      : content.replace(oldString, newString);
+    totalReplaced += replaceAll ? occurrences : 1;
+  });
+  await fs.writeFile(filePath, content, "utf8");
+  return `Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? "" : "s"} across ${edits.length} edit${edits.length === 1 ? "" : "s"} in ${filePath}`;
 }
 
 // -- ls -----------------------------------------------------------------------
@@ -697,12 +723,7 @@ export const fsBuiltInTools = [
   {
     tool: editTool,
     async execute(args: Record<string, unknown>) {
-      return edit(
-        _requireString(args, "path"),
-        _requireString(args, "old_string"),
-        _requireString(args, "new_string"),
-        _optionalBoolean(args, "replace_all") ?? false
-      );
+      return edit(_requireString(args, "path"), _requireEdits(args, "edits"));
     },
   },
   {
@@ -791,6 +812,40 @@ function _run(
       }
       resolve({ stdout, stderr, code: code ?? 0 });
     });
+  });
+}
+
+/** Read a non-empty, well-formed list of edit operations from `args`. */
+function _requireEdits(
+  args: Record<string, unknown>,
+  key: string
+): EditOperation[] {
+  const value = args[key];
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${key} must be a non-empty array of edits.`);
+  }
+  return value.map((item, index) => {
+    if (typeof item !== "object" || item === null) {
+      throw new Error(`${key}[${index}] must be an object.`);
+    }
+    const operation = item as Record<string, unknown>;
+    if (typeof operation.old_string !== "string") {
+      throw new Error(`${key}[${index}].old_string must be a string.`);
+    }
+    if (typeof operation.new_string !== "string") {
+      throw new Error(`${key}[${index}].new_string must be a string.`);
+    }
+    if (
+      operation.replace_all !== undefined &&
+      typeof operation.replace_all !== "boolean"
+    ) {
+      throw new Error(`${key}[${index}].replace_all must be a boolean.`);
+    }
+    return {
+      old_string: operation.old_string,
+      new_string: operation.new_string,
+      replace_all: operation.replace_all,
+    };
   });
 }
 
