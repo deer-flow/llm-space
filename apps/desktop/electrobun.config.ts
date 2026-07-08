@@ -6,13 +6,20 @@ const desktopRenderer = Bun.env.LLM_SPACE_DESKTOP_RENDERER;
 const useCefRenderer = desktopRenderer === "cef";
 const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT ?? "9333";
 
-// Local-testing escape hatches — CI leaves both unset:
+// Local-testing escape hatches — CI leaves all of these unset:
 //   LLM_SPACE_SKIP_SIGNING=1  → unsigned canary/stable build (no Apple creds
 //                               needed; locally-built apps have no quarantine
 //                               flag, so Gatekeeper doesn't mind)
+//   LLM_SPACE_SKIP_NOTARIZE=1 → sign but skip notarization; pair with
+//                               ELECTROBUN_DEVELOPER_ID="-" for a zero-cost
+//                               ad-hoc signed build that still exercises the
+//                               full signing path (entitlements, hardened
+//                               runtime, the x64 headerpad hook)
 //   LLM_SPACE_UPDATE_BASE_URL → point the update feed at a local static
 //                               server to exercise the auto-update loop
 const skipSigning = Boolean(Bun.env.LLM_SPACE_SKIP_SIGNING);
+const skipNotarize =
+  skipSigning || Boolean(Bun.env.LLM_SPACE_SKIP_NOTARIZE);
 const updateBaseUrl =
   Bun.env.LLM_SPACE_UPDATE_BASE_URL ??
   "https://github.com/llm-space/llm-space/releases/download/updates";
@@ -41,7 +48,7 @@ export default {
       // Signing/notarization run only on canary/stable builds and require the
       // ELECTROBUN_DEVELOPER_ID + App Store Connect API key env vars (CI).
       codesign: !skipSigning,
-      notarize: !skipSigning,
+      notarize: !skipNotarize,
       bundleCEF: useCefRenderer,
       ...(useCefRenderer
         ? {
