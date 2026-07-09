@@ -120,22 +120,23 @@ const PlainTextCodeEditor = forwardRef<
   },
   ref
 ) {
-  const [draft, setDraft] = useState(value);
   const draftRef = useRef(value);
   const committedRef = useRef(value);
   const focusedRef = useRef(false);
-
-  const setDraftValue = useCallback((next: string) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
+  // Uncontrolled: the DOM textarea owns its value while the user types, so a
+  // keystroke writes only to `draftRef` and never re-renders React. External
+  // updates are pushed in imperatively by the effect below.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!focusedRef.current || readonly) {
-      setDraftValue(value);
+      draftRef.current = value;
       committedRef.current = value;
+      if (textareaRef.current && textareaRef.current.value !== value) {
+        textareaRef.current.value = value;
+      }
     }
-  }, [readonly, setDraftValue, value]);
+  }, [readonly, value]);
 
   const commit = useCallback(() => {
     if (onChange && draftRef.current !== committedRef.current) {
@@ -153,12 +154,9 @@ const PlainTextCodeEditor = forwardRef<
     [commit]
   );
 
-  const handleChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => {
-      setDraftValue(event.currentTarget.value);
-    },
-    [setDraftValue]
-  );
+  const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
+    draftRef.current = event.currentTarget.value;
+  }, []);
 
   return (
     <div
@@ -175,11 +173,12 @@ const PlainTextCodeEditor = forwardRef<
       )}
     >
       <Textarea
+        ref={textareaRef}
         className="text-foreground/80 my-0 min-h-0! w-full shrink-0 resize-none border-none bg-transparent! px-2 pt-2 pb-0 font-mono text-sm! outline-none focus-visible:border-transparent focus-visible:ring-0"
         autoFocus={autoFocus}
         placeholder={placeholder}
         readOnly={readonly}
-        value={draft}
+        defaultValue={value}
         onBlur={() => {
           focusedRef.current = false;
           commit();
