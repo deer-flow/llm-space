@@ -3,6 +3,8 @@ import { ApplicationMenu, type BrowserWindow } from "electrobun/bun";
 import type { Command } from "../../shared/commands";
 import { executeCommandInBun } from "../commands";
 
+import { isChineseLocale } from "./locales";
+
 ApplicationMenu.setApplicationMenu([
   {
     submenu: [
@@ -200,12 +202,8 @@ ApplicationMenu.setApplicationMenu([
         action: "openGitHubProject",
       },
       {
-        label: "Visit Harness 101 - English",
-        action: "openHarness101English",
-      },
-      {
-        label: "Visit Harness 101 - Chinese",
-        action: "openHarness101Chinese",
+        label: "Visit Harness 101",
+        action: "openHarness101",
       },
       {
         type: "divider",
@@ -267,14 +265,12 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
     args: { url: "https://my.feishu.cn/wiki/OvLBwVuSkiCR1ik5wGEcBXZfnye" },
   },
   onboard: { type: "openOnboard", args: {} },
-  openHarness101English: {
-    type: "openLink",
-    args: { url: "https://my.feishu.cn/docx/G8CGdg2PQoGjsRxspKAc9XZYnKT" },
-  },
-  openHarness101Chinese: {
+  openHarness101: {
     type: "openLink",
     args: {
-      url: "https://my.feishu.cn/wiki/L082wubkdie8uMkRUjgceKYQnIe?fromScene=spaceOverview",
+      url: isChineseLocale()
+        ? "https://my.feishu.cn/wiki/L082wubkdie8uMkRUjgceKYQnIe?fromScene=spaceOverview"
+        : "https://my.feishu.cn/docx/G8CGdg2PQoGjsRxspKAc9XZYnKT",
     },
   },
 };

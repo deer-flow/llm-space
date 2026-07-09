@@ -7,6 +7,7 @@ import { Utils, type BrowserWindow } from "electrobun/bun";
 
 import { COMMAND_META, type Command } from "../shared/commands";
 
+import { isChineseLocale } from "./app/locales";
 import { saveZoom } from "./app/window-state";
 import {
   importFilesWithNativePicker,
@@ -15,7 +16,11 @@ import {
 import { mainWindowRPC } from "./rpc";
 
 /** The documentation website opened by the `openDocument` command. */
-const DOCS_URL = "https://my.feishu.cn/wiki/QnGGwGkoti8nwok2cEOc2oMvnrd";
+const DOCS_URL =
+  "https://github.com/deer-flow/llm-space/blob/main/docs/index.md";
+
+/** The Chinese documentation opened when the OS locale is Chinese. */
+const DOCS_ZH_CN_URL = "https://my.feishu.cn/wiki/QnGGwGkoti8nwok2cEOc2oMvnrd";
 
 /** The GitHub issues page opened by the `reportBugs` command. */
 const ISSUES_URL = "https://github.com/deer-flow/llm-space/issues";
@@ -72,8 +77,9 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
       return;
     }
     case "openDocument": {
-      // `path` is ignored for now — always open the docs home.
-      Utils.openExternal(DOCS_URL);
+      // `path` is ignored for now — always open the docs home, picking the
+      // Chinese docs for Chinese locales and the English wiki otherwise.
+      Utils.openExternal(isChineseLocale() ? DOCS_ZH_CN_URL : DOCS_URL);
       return;
     }
     case "reportBugs": {
