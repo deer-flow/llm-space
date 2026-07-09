@@ -24,6 +24,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { UpdateIndicator } from "@/components/update-indicator";
+import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
 import { track } from "@/lib/analytics";
 import { electrobun } from "@/lib/electrobun";
@@ -121,7 +123,9 @@ function _SidebarModeSwitch({
 export function Page() {
   return (
     <CommandProvider>
-      <PageInner />
+      <UpdateStatusProvider>
+        <PageInner />
+      </UpdateStatusProvider>
     </CommandProvider>
   );
 }
@@ -144,6 +148,9 @@ const COMMAND_PALETTE_BLACKLIST = [
   "createConnectedTraceProject",
   "importLangfuseTraceFiles",
   "syncLangfuseTraceIds",
+  // Only meaningful from the "ready to install" toast; a bare palette
+  // invocation would silently no-op (or restart mid-work).
+  "applyUpdateAndRestart",
 ];
 
 /** Whether a drag carries OS files (vs. the tree's internal node-reorder drag). */
@@ -446,6 +453,7 @@ function PageInner() {
                 onMove={tabs.handleMove}
                 onTraceTitleChange={tabs.handleTraceTitleChange}
                 onToggleSidebar={handleToggleSidebar}
+                toolbarSlot={<UpdateIndicator />}
               />
             )}
           </ResizablePanel>

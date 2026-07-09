@@ -14,6 +14,7 @@ import {
   importTextFromClipboard,
 } from "./import-files";
 import { mainWindowRPC } from "./rpc";
+import { applyUpdateAndRestart, checkForUpdates } from "./updates";
 
 /** The documentation website opened by the `openDocument` command. */
 const DOCS_URL =
@@ -100,6 +101,14 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
       const workspacePath = path.join(getLlmSpaceHomePath(), "workspace");
       mkdirSync(workspacePath, { recursive: true });
       Utils.openPath(workspacePath);
+      return;
+    }
+    case "checkForUpdates": {
+      void checkForUpdates(true);
+      return;
+    }
+    case "applyUpdateAndRestart": {
+      void applyUpdateAndRestart();
       return;
     }
     default:

@@ -20,6 +20,11 @@ import {
 } from "../streaming";
 import { callBuiltInTool, listBuiltInTools } from "../tools/built-in";
 import { traceManager } from "../traces";
+import {
+  getInstalledVersion,
+  getUpdateModeSetting,
+  setUpdateModeSetting,
+} from "../updates";
 
 async function getModelProviderGroups() {
   const models = await modelManager.getAvailableModels();
@@ -233,6 +238,12 @@ export const mainWindowRPC: MainWindowRPC =
           await traceManager.writeWorkbench(projectId, traceKey, thread);
           return null;
         },
+        updateMode: () => getUpdateModeSetting(),
+        setUpdateMode: async ({ mode }) => {
+          await setUpdateModeSetting(mode);
+          return null;
+        },
+        pendingInstalledVersion: () => getInstalledVersion(),
       },
       messages: {
         sendStreamThreadRequest: (payload) => {

@@ -254,6 +254,18 @@ export interface ReportBugsCommand extends GenericCommand<"reportBugs"> {}
 /** Open the workspace folder (`LLM_SPACE_HOME/workspace`) in the OS file manager. */
 export interface OpenWorkspaceFolderCommand extends GenericCommand<"openWorkspaceFolder"> {}
 
+// --- Updates ---------------------------------------------------------------
+
+/**
+ * Manually check for an app update (and download it when one is found). The
+ * bun-side updater reports progress back over the `updateStatusChanged` RPC
+ * message; see `shared/updates.ts`.
+ */
+export interface CheckForUpdatesCommand extends GenericCommand<"checkForUpdates"> {}
+
+/** Apply a downloaded update: quit, swap the app bundle, relaunch. */
+export interface ApplyUpdateAndRestartCommand extends GenericCommand<"applyUpdateAndRestart"> {}
+
 /** The discriminated union of every command. */
 export type Command =
   | NewFileCommand
@@ -292,7 +304,9 @@ export type Command =
   | OpenLinkCommand
   | OpenDocumentCommand
   | ReportBugsCommand
-  | OpenWorkspaceFolderCommand;
+  | OpenWorkspaceFolderCommand
+  | CheckForUpdatesCommand
+  | ApplyUpdateAndRestartCommand;
 
 /** The `type` string of any command. */
 export type CommandType = Command["type"];
@@ -362,4 +376,6 @@ export const COMMAND_META: Record<
   openDocument: { label: "Documents", target: "bun" },
   reportBugs: { label: "Report Bug", target: "bun" },
   openWorkspaceFolder: { label: "Open Workspace Folder", target: "bun" },
+  checkForUpdates: { label: "Check for Updates...", target: "bun" },
+  applyUpdateAndRestart: { label: "Restart to Update", target: "bun" },
 };

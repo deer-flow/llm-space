@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   type MouseEvent,
+  type ReactNode,
 } from "react";
 
 import { useTheme } from "@/components/theme-provider";
@@ -77,6 +78,8 @@ interface ThreadTabsProps {
     title: string
   ) => void;
   onToggleSidebar?: () => void;
+  /** Extra content pinned at the right end of the tab strip, before "+". */
+  toolbarSlot?: ReactNode;
 }
 
 export function ThreadTabs({
@@ -97,6 +100,7 @@ export function ThreadTabs({
   onMove,
   onTraceTitleChange,
   onToggleSidebar,
+  toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
   // The chrome-tabs lib renders tab DOM imperatively and exposes no tooltip prop,
@@ -279,7 +283,8 @@ export function ThreadTabs({
                 active: tab.id === activeId,
               }))}
               pinnedRight={
-                <div className="flex h-full items-center pt-0.5 pl-1.5">
+                <div className="flex h-full items-center gap-0.5 pt-0.5 pl-1.5">
+                  {toolbarSlot}
                   <Tooltip content="New blank thread">
                     <Button
                       className="hover:bg-primary! rounded-full"
