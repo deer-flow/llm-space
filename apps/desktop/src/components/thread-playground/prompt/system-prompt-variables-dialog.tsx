@@ -30,7 +30,11 @@ function _SystemPromptVariablesDialog({
 }: SystemPromptVariablesDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[620px] max-h-[calc(100vh-4rem)] w-[min(920px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        className="flex h-[620px] max-h-[calc(100vh-4rem)] w-[min(920px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="border-border/70 shrink-0 border-b px-4 py-3 pr-10">
           <DialogTitle>Variables</DialogTitle>
           <DialogDescription>
