@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { getAnalyticsSettings, setAnalyticsSettings } from "@/client/analytics";
 import { getWorkspacePath } from "@/client/paths";
+import { useCommands } from "@/commands";
 import {
   isModelAvailable,
   useDefaultModel,
@@ -35,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
@@ -64,6 +64,29 @@ function SettingsRow({
       <span className="text-sm">{label}</span>
       {children}
     </div>
+  );
+}
+
+/**
+ * A titled category: an uppercase section label above a grouped card whose rows
+ * are separated by hairline dividers. Gives the flat settings list hierarchy.
+ */
+function SettingsSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-muted-foreground px-1 text-[0.6875rem] font-medium tracking-wider uppercase">
+        {title}
+      </h3>
+      <div className="border-border/60 divide-border/60 bg-muted/15 divide-y rounded-xl border px-4">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -268,6 +291,7 @@ function useUpdateMode(): [UpdateMode, (mode: UpdateMode) => void] {
 
 export function GeneralPage() {
   const { theme, setTheme } = useTheme();
+  const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
   const [updateMode, setUpdateMode] = useUpdateMode();
   const {
@@ -278,149 +302,159 @@ export function GeneralPage() {
   } = usePrimaryColor();
   const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
   return (
-    <SettingsPage title="General">
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Language"
-            hint="English only for now — more languages are coming."
-          />
-        }
-      >
-        <Select defaultValue="en-US" disabled>
-          <SelectTrigger className="w-32" aria-label="Language">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="en-US">English (US)</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingsRow>
+    <SettingsPage title="General" className="overflow-y-auto">
+      <div className="flex flex-col gap-7 pb-2">
+        <SettingsSection title="Appearance">
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Language"
+                hint="English only for now — more languages are coming."
+              />
+            }
+          >
+            <Select defaultValue="en-US" disabled>
+              <SelectTrigger className="w-32" aria-label="Language">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en-US">English (US)</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
 
-      <Separator />
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Theme"
+                hint="Match your system setting, or force light or dark."
+              />
+            }
+          >
+            <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
+              <SelectTrigger className="w-32" aria-label="Theme">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
 
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Appearance"
-            hint="Match your system setting, or force light or dark."
-          />
-        }
-      >
-        <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
-          <SelectTrigger className="w-32" aria-label="Appearance">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="light">Light</SelectItem>
-            <SelectItem value="dark">Dark</SelectItem>
-            <SelectItem value="system">System</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingsRow>
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Primary color"
+                hint="The accent color for buttons, links, and highlights."
+              />
+            }
+          >
+            <div className="flex items-center gap-2">
+              {showResetPrimaryColor ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={resetPrimaryColor}
+                >
+                  Reset
+                </Button>
+              ) : null}
+              <PrimaryColorPicker
+                key={resetPrimaryColorVersion}
+                value={primaryColor}
+                onChange={setPrimaryColor}
+              />
+            </div>
+          </SettingsRow>
 
-      <Separator />
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Rendering"
+                hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
+              />
+            }
+          >
+            <Select
+              value={fidelity}
+              onValueChange={(v) => setFidelity(v as RenderingFidelity)}
+            >
+              <SelectTrigger className="w-32" aria-label="Rendering fidelity">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rich">Full</SelectItem>
+                <SelectItem value="lite">Fast</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+        </SettingsSection>
 
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Primary color"
-            hint="The accent color for buttons, links, and highlights."
-          />
-        }
-      >
-        <div className="flex items-center gap-2">
-          {showResetPrimaryColor ? (
-            <Button size="sm" variant="secondary" onClick={resetPrimaryColor}>
-              Reset
-            </Button>
-          ) : null}
-          <PrimaryColorPicker
-            key={resetPrimaryColorVersion}
-            value={primaryColor}
-            onChange={setPrimaryColor}
-          />
-        </div>
-      </SettingsRow>
+        <SettingsSection title="Defaults">
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Default model"
+                hint="Used for new threads, and when a thread's model is no longer available."
+              />
+            }
+          >
+            <DefaultModelSelect />
+          </SettingsRow>
+        </SettingsSection>
 
-      <Separator />
+        <SettingsSection title="Data & privacy">
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Workspace folder"
+                hint="Where your threads are stored on disk."
+              />
+            }
+          >
+            <WorkspaceFolderLink />
+          </SettingsRow>
 
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Rendering"
-            hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
-          />
-        }
-      >
-        <Select
-          value={fidelity}
-          onValueChange={(v) => setFidelity(v as RenderingFidelity)}
-        >
-          <SelectTrigger className="w-32" aria-label="Rendering fidelity">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="rich">Full</SelectItem>
-            <SelectItem value="lite">Fast</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingsRow>
+          <AnalyticsRow />
+        </SettingsSection>
 
-      <Separator />
-
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Default model"
-            hint="Used for new threads, and when a thread's model is no longer available."
-          />
-        }
-      >
-        <DefaultModelSelect />
-      </SettingsRow>
-
-      <Separator />
-
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Software updates"
-            hint="Automatic downloads updates in the background and prompts you to restart."
-          />
-        }
-      >
-        <Select
-          value={updateMode}
-          onValueChange={(v) => setUpdateMode(v as UpdateMode)}
-        >
-          <SelectTrigger className="w-40" aria-label="Software updates">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="automatic">Automatic</SelectItem>
-            <SelectItem value="manual">Check manually</SelectItem>
-            <SelectItem value="off">Off</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingsRow>
-
-      <Separator />
-
-      <SettingsRow
-        label={
-          <RowLabel
-            title="Workspace folder"
-            hint="Where your threads are stored on disk."
-          />
-        }
-      >
-        <WorkspaceFolderLink />
-      </SettingsRow>
-
-      <Separator />
-
-      <AnalyticsRow />
+        <SettingsSection title="Updates">
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Software updates"
+                hint="Automatic downloads updates in the background and prompts you to restart."
+              />
+            }
+          >
+            <div className="flex items-center gap-2">
+              <Select
+                value={updateMode}
+                onValueChange={(v) => setUpdateMode(v as UpdateMode)}
+              >
+                <SelectTrigger className="w-40" aria-label="Software updates">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automatic">Automatic</SelectItem>
+                  <SelectItem value="manual">Check manually</SelectItem>
+                  <SelectItem value="off">Off</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="lg"
+                onClick={() =>
+                  executeCommand({ type: "checkForUpdates", args: {} })
+                }
+              >
+                Check now
+              </Button>
+            </div>
+          </SettingsRow>
+        </SettingsSection>
+      </div>
     </SettingsPage>
   );
 }

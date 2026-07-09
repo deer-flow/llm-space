@@ -352,3 +352,13 @@ html.lite *::after {
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
+
+/* Indeterminate progress bar used by the manual "Check for Updates" dialog. */
+@keyframes update-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}

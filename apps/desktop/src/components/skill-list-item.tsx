@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder } from "lucide-react";
+import { SparklesIcon } from "lucide-react";
 import { memo } from "react";
 
 import {
@@ -31,7 +31,7 @@ function _SkillListItem({
   return (
     <Item variant="muted" size="sm">
       <ItemMedia>
-        <Folder className="text-muted-foreground size-4" />
+        <SparklesIcon className="text-muted-foreground size-4" />
       </ItemMedia>
       <ItemContent className={cn(!checked && "opacity-50")}>
         <ItemTitle>{name}</ItemTitle>
