@@ -217,25 +217,18 @@ jobs:
       - name: Publish versioned release
         env:
           TAG: ${{ needs.meta.outputs.tag }}
-          VERSION: ${{ needs.meta.outputs.version }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
         run: |
-          # Extract this version's section from CHANGELOG.md as release notes.
-          awk -v ver="$VERSION" '
-            !found && $0 ~ ("^#{1,3} \\[?" ver "\\]?[ (]") { found = 1; next }
-            found && /^#{1,3} \[?[0-9]/ { exit }
-            found { print }
-          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md" || true
-          NOTES_ARGS=(--notes-file "$RUNNER_TEMP/notes.md")
-          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
-            NOTES_ARGS=(--generate-notes)
-          fi
+          # Static notes only. No changelog extraction and no --generate-notes:
+          # both list commits/authors and a "New Contributors" section, which
+          # we deliberately don't surface.
+          NOTES="Download the DMG below. Existing installs update in place."
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "canary" ]; then
             PRERELEASE_ARGS=(--prerelease)
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "$TAG" "${NOTES_ARGS[@]}" "${PRERELEASE_ARGS[@]}"
+              --title "$TAG" --notes "$NOTES" "${PRERELEASE_ARGS[@]}"
           gh release upload "$TAG" artifacts/*.dmg \
             --repo "$GITHUB_REPOSITORY" --clobber
