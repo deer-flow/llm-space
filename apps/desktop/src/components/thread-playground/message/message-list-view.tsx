@@ -69,7 +69,7 @@ export function MessageListView({
   }, [status, scrollToBottom]);
 
   return (
-    <ScrollArea className={cn("size-full", className)}>
+    <ScrollArea type="auto" className={cn("size-full", className)}>
       <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
         {isSnapshotView ? (
           <StaticMessageList
