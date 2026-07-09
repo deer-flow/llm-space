@@ -22,7 +22,7 @@ const skipNotarize =
   skipSigning || Boolean(Bun.env.LLM_SPACE_SKIP_NOTARIZE);
 const updateBaseUrl =
   Bun.env.LLM_SPACE_UPDATE_BASE_URL ??
-  "https://github.com/llm-space/llm-space/releases/download/updates";
+  "https://github.com/deer-flow/llm-space/releases/download/updates";
 
 export default {
   app: {

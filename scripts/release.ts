@@ -42,5 +42,5 @@ const { version } = (await Bun.file("apps/desktop/package.json").json()) as {
   version: string;
 };
 console.info(
-  `\n✔ v${version} pushed — release CI: https://github.com/llm-space/llm-space/actions`
+  `\n✔ v${version} pushed — release CI: https://github.com/deer-flow/llm-space/actions`
 );

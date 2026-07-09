@@ -16,7 +16,7 @@ import { electrobun } from "@/lib/electrobun";
 import type { UpdateStatusChangedPayload } from "@/shared/updates";
 
 /** GitHub versioned-release page, opened from the "Updated to …" toast. */
-const RELEASE_TAG_URL = "https://github.com/llm-space/llm-space/releases/tag";
+const RELEASE_TAG_URL = "https://github.com/deer-flow/llm-space/releases/tag";
 /** One stable id so successive states of one flow replace each other. */
 const UPDATE_TOAST_ID = "app-update";
 const READY_TOAST_DURATION_MS = 8000;
