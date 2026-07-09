@@ -82,22 +82,51 @@ function _CodeEditor(
 ) {
   const { resolvedTheme } = useTheme();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
-  const [draft, setDraft] = useState(value);
   const draftRef = useRef(value);
   const committedRef = useRef(value);
   const isFocusedRef = useRef(false);
+  // CodeMirror owns the document while the user types; `syncedValue` only
+  // changes when we push an *external* update in (the effect below), so a
+  // keystroke never re-renders React or trips react-codemirror's value diff.
+  const [syncedValue, setSyncedValue] = useState(value);
 
-  const setDraftValue = useCallback((next: string) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
+  const detectLanguage = useCallback(
+    (text: string): "markdown" | "json" => {
+      if (streaming) {
+        return "markdown";
+      }
+      if (language) {
+        return language;
+      }
+      return text.startsWith("{") || text.startsWith("[") ? "json" : "markdown";
+    },
+    [language, streaming]
+  );
+
+  // Re-detect on every keystroke, but only flip state when the result actually
+  // changes — an unchanged return value makes React bail the re-render, so
+  // typing stays render-free until the language genuinely switches.
+  const [detectedLanguage, setDetectedLanguage] = useState(() =>
+    detectLanguage(value)
+  );
+  const refreshLanguage = useCallback(
+    (text: string) => {
+      setDetectedLanguage((prev) => {
+        const next = detectLanguage(text);
+        return next === prev ? prev : next;
+      });
+    },
+    [detectLanguage]
+  );
 
   useEffect(() => {
     if (!isFocusedRef.current || readonly) {
-      setDraftValue(value);
+      draftRef.current = value;
       committedRef.current = value;
+      setSyncedValue(value);
+      refreshLanguage(value);
     }
-  }, [value, readonly, setDraftValue]);
+  }, [value, readonly, refreshLanguage]);
 
   const commit = useCallback(() => {
     if (onChange && draftRef.current !== committedRef.current) {
@@ -117,9 +146,10 @@ function _CodeEditor(
 
   const handleChange = useCallback(
     (next: string) => {
-      setDraftValue(next);
+      draftRef.current = next;
+      refreshLanguage(next);
     },
-    [setDraftValue]
+    [refreshLanguage]
   );
 
   const handleBlur = useCallback(() => {
@@ -156,22 +186,9 @@ function _CodeEditor(
     [commit, onKeyDown]
   );
 
-  const resolvedLanguage = useMemo(() => {
-    if (streaming) {
-      return "markdown";
-    }
-    if (language) {
-      return language;
-    }
-    if (draft.startsWith("{") || draft.startsWith("[")) {
-      return "json";
-    } else {
-      return "markdown";
-    }
-  }, [draft, language, streaming]);
   const extensions = useMemo(
-    () => createExtensions(resolvedLanguage),
-    [resolvedLanguage]
+    () => createExtensions(detectedLanguage),
+    [detectedLanguage]
   );
   return (
     <div
@@ -208,7 +225,7 @@ function _CodeEditor(
         placeholder={placeholder}
         extensions={extensions}
         readOnly={readonly}
-        value={draft}
+        value={syncedValue}
         onChange={handleChange}
         onBlur={handleBlur}
         onFocus={handleFocus}
