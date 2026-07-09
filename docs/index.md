@@ -1,10 +1,10 @@
-# LLM Space Documentation
+# User Manual
 
-This directory contains user-facing LLM Space documentation. Start with the quick start guide, then read the core concepts, UI layout, settings, and shortcut keys.
+This is the English user manual for LLM Space. Start with the quick start guide, then read the core concepts, UI layout, settings, and shortcut keys.
 
 # Documents
 
-> For Chinese documents, please see [中文文档](./index.zh-CN.md).
+> For Chinese documents, please see [用户手册](./index.zh-CN.md).
 
 | Document | Description |
 | --- | --- |
