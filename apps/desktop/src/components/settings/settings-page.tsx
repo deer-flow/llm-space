@@ -33,7 +33,7 @@ export function SettingsPage({
           <p className="text-muted-foreground text-xs">{description}</p>
         ) : null}
       </header>
-      <div className={cn("min-h-0 flex-1 px-6 pb-6", className)}>
+      <div className={cn("min-h-0 flex-1 overflow-x-hidden px-6 pb-6", className)}>
         {children}
       </div>
     </div>
