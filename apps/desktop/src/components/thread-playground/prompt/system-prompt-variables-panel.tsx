@@ -607,7 +607,7 @@ function CurrentDateVariableDetail({
           </Select>
         </Field>
       </div>
-      <Field label="Example">
+      <Field label="Value">
         <PreviewBlock value={formatCurrentDateVariable(variable.format)} />
       </Field>
     </DetailShell>
