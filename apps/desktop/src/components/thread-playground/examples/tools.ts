@@ -100,7 +100,7 @@ const BASH_TOOL: FunctionTool = _functionTool({
 const READ_FILE_TOOL: FunctionTool = _functionTool({
   name: "read",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a visual representation. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a text placeholder with the file's size rather than the image itself. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files.",
   strict: true,
   parameters: {
     type: "object",
@@ -160,46 +160,34 @@ const WRITE_FILE_TOOL: FunctionTool = _functionTool({
 const EDIT_TOOL: FunctionTool = _functionTool({
   name: "edit",
   description:
-    "Performs exact string replacements in a file. Each edit's old_string must match the file contents exactly (including whitespace and indentation). Edits are applied in order, so a later edit sees the result of earlier ones. Use for surgical edits; prefer write when replacing the entire file.",
+    "Performs an exact string replacement in a file. old_string must match the file contents exactly (including whitespace and indentation) and be unique unless replace_all is set. Use for surgical edits; prefer write when replacing the entire file.",
   strict: true,
   parameters: {
     type: "object",
-    required: ["description", "path", "edits"],
+    required: ["description", "path", "old_string", "new_string"],
     properties: {
       description: {
         type: "string",
         description:
-          "Must be the first parameter in the tool call. A short human-readable summary explaining the edits being made",
+          "Must be the first parameter in the tool call. A short human-readable summary explaining the edit being made",
       },
       path: {
         type: "string",
         description: "Absolute path to the file to edit",
       },
-      edits: {
-        type: "array",
+      old_string: {
+        type: "string",
         description:
-          "The ordered list of replacements to apply to the file, each performed on the result of the previous one.",
-        items: {
-          type: "object",
-          required: ["old_string", "new_string"],
-          properties: {
-            old_string: {
-              type: "string",
-              description:
-                "The exact text to replace (must be unique within the file unless replace_all is true)",
-            },
-            new_string: {
-              type: "string",
-              description: "The replacement text (must differ from old_string)",
-            },
-            replace_all: {
-              type: "boolean",
-              description:
-                "Replace all occurrences of old_string. Defaults to false (first match only).",
-            },
-          },
-          additionalProperties: false,
-        },
+          "The exact text to replace (must be unique within the file unless replace_all is true)",
+      },
+      new_string: {
+        type: "string",
+        description: "The replacement text (must differ from old_string)",
+      },
+      replace_all: {
+        type: "boolean",
+        description:
+          "Replace all occurrences of old_string. Defaults to false (first match only).",
       },
     },
     additionalProperties: false,
@@ -260,7 +248,7 @@ const TREE_TOOL: FunctionTool = _functionTool({
 const GREP_TOOL: FunctionTool = _functionTool({
   name: "grep",
   description:
-    "Search file contents with ripgrep. Supports regex patterns, glob filters, and context lines. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
+    "Search file contents with ripgrep. Supports regex patterns, glob filters, case-insensitive matching, and surrounding context lines. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
   strict: true,
   parameters: {
     type: "object",
@@ -288,6 +276,11 @@ const GREP_TOOL: FunctionTool = _functionTool({
       case_insensitive: {
         type: "boolean",
         description: "Case insensitive search",
+      },
+      context_lines: {
+        type: "number",
+        description:
+          "Number of context lines to show before and after each match (maps to rg -C). Defaults to 0.",
       },
     },
     additionalProperties: false,

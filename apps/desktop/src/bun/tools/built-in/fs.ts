@@ -82,7 +82,7 @@ export const readTool: BuiltinTool = {
   name: "read",
   icon: "file-text",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a visual representation. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files. Do NOT use read to load a skill's SKILL.md — use the skill tool instead, unless you specifically need to edit that skill.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a text placeholder with the file's size rather than the image itself. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files. Do NOT use read to load a skill's SKILL.md — use the skill tool instead, unless you specifically need to edit that skill.",
   strict: true,
   parameters: {
     type: "object",
@@ -201,91 +201,65 @@ export const editTool: BuiltinTool = {
   name: "edit",
   icon: "pencil",
   description:
-    "Performs exact string replacements in a file. Each edit's old_string must match the file contents exactly (including whitespace and indentation). Edits are applied in order, so a later edit sees the result of earlier ones. Use for surgical edits; prefer write when replacing the entire file.",
+    "Performs an exact string replacement in a file. old_string must match the file contents exactly (including whitespace and indentation) and be unique unless replace_all is set. Use for surgical edits; prefer write when replacing the entire file.",
   strict: true,
   parameters: {
     type: "object",
-    required: ["description", "path", "edits"],
+    required: ["description", "path", "old_string", "new_string"],
     properties: {
       description: {
         type: "string",
         description:
-          "Must be the first parameter in the tool call. A short human-readable summary explaining the edits being made",
+          "Must be the first parameter in the tool call. A short human-readable summary explaining the edit being made",
       },
       path: {
         type: "string",
         description: "Absolute path to the file to edit",
       },
-      edits: {
-        type: "array",
+      old_string: {
+        type: "string",
         description:
-          "The ordered list of replacements to apply to the file, each performed on the result of the previous one.",
-        items: {
-          type: "object",
-          required: ["old_string", "new_string"],
-          properties: {
-            old_string: {
-              type: "string",
-              description:
-                "The exact text to replace (must be unique within the file unless replace_all is true)",
-            },
-            new_string: {
-              type: "string",
-              description: "The replacement text (must differ from old_string)",
-            },
-            replace_all: {
-              type: "boolean",
-              description:
-                "Replace all occurrences of old_string. Defaults to false (first match only).",
-            },
-          },
-          additionalProperties: false,
-        },
+          "The exact text to replace (must be unique within the file unless replace_all is true)",
+      },
+      new_string: {
+        type: "string",
+        description: "The replacement text (must differ from old_string)",
+      },
+      replace_all: {
+        type: "boolean",
+        description:
+          "Replace all occurrences of old_string. Defaults to false (first match only).",
       },
     },
     additionalProperties: false,
   },
 };
 
-export interface EditOperation {
-  old_string: string;
-  new_string: string;
-  replace_all?: boolean;
-}
-
 export async function edit(
   filePath: string,
-  edits: EditOperation[]
+  oldString: string,
+  newString: string,
+  replaceAll = false
 ): Promise<string> {
-  if (edits.length === 0) {
-    throw new Error("edits must contain at least one replacement.");
+  if (oldString === newString) {
+    throw new Error("new_string must differ from old_string.");
   }
-  let content = await fs.readFile(filePath, "utf8");
-  let totalReplaced = 0;
-  edits.forEach((operation, index) => {
-    const { old_string: oldString, new_string: newString } = operation;
-    const replaceAll = operation.replace_all ?? false;
-    if (oldString === newString) {
-      throw new Error(
-        `edits[${index}]: new_string must differ from old_string.`
-      );
-    }
-    const occurrences = content.split(oldString).length - 1;
-    if (occurrences === 0) {
-      throw new Error(`edits[${index}]: old_string was not found in the file.`);
-    }
-    if (!replaceAll && occurrences > 1) {
-      throw new Error(
-        `edits[${index}]: old_string is not unique (${occurrences} matches). Provide a larger unique string or set replace_all.`
-      );
-    }
-    content = replaceAll
-      ? content.split(oldString).join(newString)
-      : content.replace(oldString, newString);
-    totalReplaced += replaceAll ? occurrences : 1;
-  });
-  await fs.writeFile(filePath, content, "utf8");
-  return `Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? "" : "s"} across ${edits.length} edit${edits.length === 1 ? "" : "s"} in ${filePath}`;
+  const content = await fs.readFile(filePath, "utf8");
+  const occurrences = content.split(oldString).length - 1;
+  if (occurrences === 0) {
+    throw new Error("old_string was not found in the file.");
+  }
+  if (!replaceAll && occurrences > 1) {
+    throw new Error(
+      `old_string is not unique (${occurrences} matches). Provide a larger unique string or set replace_all.`
+    );
+  }
+  const updated = replaceAll
+    ? content.split(oldString).join(newString)
+    : content.replace(oldString, newString);
+  await fs.writeFile(filePath, updated, "utf8");
+  const totalReplaced = replaceAll ? occurrences : 1;
+  return `Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? "" : "s"} in ${filePath}`;
 }
 
 // -- ls -----------------------------------------------------------------------
@@ -448,7 +422,7 @@ export const grepTool: BuiltinTool = {
   name: "grep",
   icon: "file-search",
   description:
-    "Search file contents with ripgrep. Supports regex patterns, glob filters, and context lines. Common noise directories (node_modules, .git, build output, etc.) are excluded. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
+    "Search file contents with ripgrep. Supports regex patterns, glob filters, case-insensitive matching, and surrounding context lines. Common noise directories (node_modules, .git, build output, etc.) are excluded. Use to find symbols, usages, or text across the codebase. Prefer this over bash grep/rg for searching.",
   strict: true,
   parameters: {
     type: "object",
@@ -477,6 +451,11 @@ export const grepTool: BuiltinTool = {
         type: "boolean",
         description: "Case insensitive search",
       },
+      context_lines: {
+        type: "number",
+        description:
+          "Number of context lines to show before and after each match (maps to rg -C). Defaults to 0.",
+      },
     },
     additionalProperties: false,
   },
@@ -486,7 +465,8 @@ export async function grep(
   pattern: string,
   searchPath: string,
   glob?: string,
-  caseInsensitive = false
+  caseInsensitive = false,
+  contextLines?: number
 ): Promise<string> {
   const args = ["--line-number", "--with-filename", "--color=never"];
   // Prune common noise dirs/files regardless of any .gitignore presence.
@@ -498,6 +478,9 @@ export async function grep(
   }
   if (glob) {
     args.push("--glob", glob);
+  }
+  if (contextLines !== undefined && contextLines > 0) {
+    args.push("--context", String(Math.floor(contextLines)));
   }
   args.push("--regexp", pattern, "--", searchPath);
 
@@ -738,7 +721,12 @@ export const fsBuiltInTools = [
   {
     tool: editTool,
     async execute(args: Record<string, unknown>) {
-      return edit(_requireString(args, "path"), _requireEdits(args, "edits"));
+      return edit(
+        _requireString(args, "path"),
+        _requireString(args, "old_string"),
+        _requireStringAllowEmpty(args, "new_string"),
+        _optionalBoolean(args, "replace_all") ?? false
+      );
     },
   },
   {
@@ -760,7 +748,8 @@ export const fsBuiltInTools = [
         _requireString(args, "pattern"),
         _requireString(args, "path"),
         _optionalString(args, "glob"),
-        _optionalBoolean(args, "case_insensitive") ?? false
+        _optionalBoolean(args, "case_insensitive") ?? false,
+        _optionalNumber(args, "context_lines")
       );
     },
   },
@@ -830,38 +819,16 @@ function _run(
   });
 }
 
-/** Read a non-empty, well-formed list of edit operations from `args`. */
-function _requireEdits(
+/** Read a string that may be empty (e.g. `new_string` when deleting text). */
+function _requireStringAllowEmpty(
   args: Record<string, unknown>,
   key: string
-): EditOperation[] {
+): string {
   const value = args[key];
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`${key} must be a non-empty array of edits.`);
+  if (typeof value !== "string") {
+    throw new Error(`${key} must be a string.`);
   }
-  return value.map((item, index) => {
-    if (typeof item !== "object" || item === null) {
-      throw new Error(`${key}[${index}] must be an object.`);
-    }
-    const operation = item as Record<string, unknown>;
-    if (typeof operation.old_string !== "string") {
-      throw new Error(`${key}[${index}].old_string must be a string.`);
-    }
-    if (typeof operation.new_string !== "string") {
-      throw new Error(`${key}[${index}].new_string must be a string.`);
-    }
-    if (
-      operation.replace_all !== undefined &&
-      typeof operation.replace_all !== "boolean"
-    ) {
-      throw new Error(`${key}[${index}].replace_all must be a boolean.`);
-    }
-    return {
-      old_string: operation.old_string,
-      new_string: operation.new_string,
-      replace_all: operation.replace_all,
-    };
-  });
+  return value;
 }
 
 /** Read a non-empty array of strings from `args`, rejecting other shapes. */
