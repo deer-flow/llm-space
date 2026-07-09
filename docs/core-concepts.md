@@ -9,6 +9,7 @@ A Thread is the basic unit of work in LLM Space. A Thread usually contains:
 - Title: shown in the file tree and tab bar.
 - Model: the default model used when this Thread runs.
 - System Prompt: global instructions sent to the model.
+- Variables: placeholders that can be referenced in the System Prompt, messages, and tool results.
 - Tools: tool definitions the model can call.
 - Messages: the conversation history made of User and Assistant messages.
 - Tool Calls: tool call requests and results recorded on Assistant messages.
@@ -81,6 +82,35 @@ MCP tools also save which MCP Server they come from, such as `serverId`, `server
 The System Prompt is the Thread's global instruction. It is usually used to define the assistant's identity, goals, constraints, output format, and tool usage policy.
 
 The System Prompt is not shown as a normal user message, but it is sent to the model as part of the context. Compared with repeating rules in every user message, putting stable behavior requirements in the System Prompt is easier to reuse and compare.
+
+# Variables
+
+Variables are placeholders you can reuse in the System Prompt, messages, and tool results. You write `{{variable_name}}` in the text, and at run time LLM Space replaces it with the variable's real value. This lets you pull out content that changes or is reused (the current date, the list of available skills, common snippets, and so on) and manage it in one place instead of hand-writing and maintaining it in many spots.
+
+The reference syntax is always double curly braces, for example `{{current_date}}`. There are two kinds of variables: built-in and custom.
+
+## Built-in Variables
+
+Built-in variables compute their value automatically from the current environment or configuration. You only reference them; you don't fill in a value:
+
+| Variable | Description | Options |
+| --- | --- | --- |
+| `current_date` | The current system date and time, in the local time zone. | Format: readable date, ISO date, or local date and time. |
+| `available_skills` | The list of currently enabled Skills (names and descriptions), so the model knows what capabilities are available. | Format: Markdown list or XML; indentation; includes all enabled Skills by default, or you can pick only some. |
+
+`available_skills` expands to all enabled Skills by default. If you only want to expose a subset, select specific Skills in the variable settings; an empty selection means "all enabled Skills."
+
+## Custom Variables
+
+A custom variable is a "name → value" pair you define manually, where the value is a fixed piece of text. It suits snippets you reuse in multiple places, such as a shared tone-of-voice note, company information, or common constraints. Once defined, you reference it with `{{variable_name}}` as well.
+
+A variable name must start with a letter or underscore and contain only letters, digits, and underscores.
+
+## Resolution and Storage
+
+- At run time, `{{variable_name}}` in the text is replaced with the variable's current value, while the stored Thread template stays unchanged.
+- Built-in variable definitions are stored under `context.variables`, and custom variable values are stored under `context.variableVariants`.
+- If you reference a variable that doesn't exist or has an empty value, the UI shows a hint.
 
 # Messages
 
