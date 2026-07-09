@@ -212,6 +212,16 @@ export interface OpenOnboardCommand extends GenericCommand<"openOnboard"> {}
 /** Run the active thread. No-op when there is no active thread tab. */
 export interface RunThreadCommand extends GenericCommand<"runThread"> {}
 
+/**
+ * Open the Variables dialog for the active thread. When `variableName` is given,
+ * the dialog opens focused on that variable; otherwise it opens at the default
+ * selection. Webview only, and intentionally excluded from the command palette.
+ */
+export interface OpenVariablesCommand extends GenericCommand<
+  "openVariables",
+  { variableName?: string }
+> {}
+
 // --- Window (bun-side) -----------------------------------------------------
 
 /** Zoom the page in one step. */
@@ -274,6 +284,7 @@ export type Command =
   | OpenCommandPaletteCommand
   | OpenOnboardCommand
   | RunThreadCommand
+  | OpenVariablesCommand
   | ZoomInCommand
   | ZoomOutCommand
   | ResetZoomCommand
@@ -342,6 +353,7 @@ export const COMMAND_META: Record<
   openCommandPalette: { label: "Command Palette", target: "webview" },
   openOnboard: { label: "Onboard...", target: "webview" },
   runThread: { label: "Run Thread", target: "webview" },
+  openVariables: { label: "Variables", target: "webview" },
   zoomIn: { label: "Zoom In", target: "bun" },
   zoomOut: { label: "Zoom Out", target: "bun" },
   resetZoom: { label: "Reset Zoom", target: "bun" },

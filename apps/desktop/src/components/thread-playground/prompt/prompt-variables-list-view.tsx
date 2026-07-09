@@ -5,15 +5,16 @@ import type {
   ThreadVariable,
 } from "@llm-space/core";
 import {
+  BracesIcon,
   CalendarDaysIcon,
   CopyIcon,
   PlusIcon,
   SparklesIcon,
-  TypeIcon,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useCommands, useRegisterCommands } from "@/commands";
 import { Tooltip } from "@/components/tooltip";
 import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
@@ -48,9 +49,12 @@ type VariableListItem =
 export function PromptVariablesListView({
   className,
   disabled,
+  active,
 }: {
   className?: string;
   disabled?: boolean;
+  /** Whether this belongs to the active tab — gates the single-slot command. */
+  active?: boolean;
 }) {
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
@@ -98,15 +102,39 @@ export function PromptVariablesListView({
   const [initialSelection, setInitialSelection] =
     useState<PromptVariableSelection | null>(null);
   const [animationContainerRef] = useAutoAnimation({ duration: 150 });
+  const { executeCommand } = useCommands();
 
-  const openVariable = useCallback((item: VariableListItem) => {
-    setInitialSelection({ kind: item.kind, name: item.name });
-    setDialogOpen(true);
-  }, []);
+  // The single opener: everything (chips, "Add", the editor hover tooltip) goes
+  // through the `openVariables` command so the dialog has one entry point.
+  useRegisterCommands(
+    {
+      openVariables: ({ variableName }) => {
+        if (!variableName) {
+          setInitialSelection(null);
+        } else {
+          setInitialSelection({
+            kind: variableName in variables ? "builtIn" : "custom",
+            name: variableName,
+          });
+        }
+        setDialogOpen(true);
+      },
+    },
+    active
+  );
+
+  const openVariable = useCallback(
+    (item: VariableListItem) => {
+      executeCommand({
+        type: "openVariables",
+        args: { variableName: item.name },
+      });
+    },
+    [executeCommand]
+  );
 
   const openManage = () => {
-    setInitialSelection(null);
-    setDialogOpen(true);
+    executeCommand({ type: "openVariables", args: {} });
   };
 
   return (
@@ -233,7 +261,7 @@ const VariableEntry = memo(_VariableEntry);
 
 function _variableIcon(item: VariableListItem) {
   if (item.kind === "custom") {
-    return TypeIcon;
+    return BracesIcon;
   }
   return item.variable.type === "currentDate" ? CalendarDaysIcon : SparklesIcon;
 }

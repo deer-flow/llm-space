@@ -430,6 +430,7 @@ function ThreadPlaygroundContent({
                     <div className="flex grow items-center">
                       <PromptVariablesListView
                         disabled={readonly || systemPromptStreaming}
+                        active={active}
                       />
                     </div>
                   </div>

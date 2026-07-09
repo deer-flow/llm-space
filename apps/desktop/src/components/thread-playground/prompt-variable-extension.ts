@@ -37,6 +37,11 @@ export type PromptVariableLister = () => PromptVariableCompletion[];
 export interface PromptVariableExtensionOptions {
   resolve: PromptVariableResolver;
   listVariables: PromptVariableLister;
+  /**
+   * Opens the Variables dialog focused on `name`. When provided, the hover
+   * tooltip shows a header button (for defined variables only) that calls it.
+   */
+  onInspect?: (name: string) => void;
 }
 
 // How much of a variable's value preview to show in the dropdown before "…".
@@ -81,6 +86,7 @@ const theme = EditorView.theme({
     fontWeight: "500",
   },
   ".cm-prompt-variable-tooltip": {
+    minWidth: "260px",
     maxWidth: "360px",
     maxHeight: "15rem",
     overflowY: "auto",
@@ -113,14 +119,46 @@ const theme = EditorView.theme({
     backgroundColor:
       "color-mix(in oklab, var(--muted-foreground) 70%, transparent)",
   },
+  ".cm-prompt-variable-tooltip .cm-pv-header": {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "5px",
+    paddingBottom: "5px",
+    borderBottom: "1px solid var(--border)",
+  },
   ".cm-prompt-variable-tooltip .cm-pv-label": {
+    flex: "1 1 auto",
+    minWidth: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
     color: "var(--cm-variable)",
     fontFamily: "var(--font-mono)",
     fontSize: "13px",
     fontWeight: "600",
-    marginBottom: "5px",
-    paddingBottom: "5px",
-    borderBottom: "1px solid var(--border)",
+  },
+  ".cm-prompt-variable-tooltip .cm-pv-inspect": {
+    display: "inline-flex",
+    flexShrink: "0",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "20px",
+    height: "20px",
+    padding: "0",
+    border: "none",
+    borderRadius: "4px",
+    background: "transparent",
+    color: "var(--muted-foreground)",
+    cursor: "pointer",
+  },
+  ".cm-prompt-variable-tooltip .cm-pv-inspect:hover": {
+    background: "var(--accent)",
+    color: "var(--foreground)",
+  },
+  ".cm-prompt-variable-tooltip .cm-pv-inspect svg": {
+    width: "14px",
+    height: "14px",
   },
   ".cm-prompt-variable-tooltip .cm-pv-value": {
     fontFamily: "var(--font-mono)",
@@ -130,8 +168,10 @@ const theme = EditorView.theme({
   ".cm-prompt-variable-tooltip .cm-pv-warning": {
     color: "var(--destructive)",
   },
-  // `{{`-triggered variable completion dropdown — match the app popover.
-  "&.cm-editor .cm-tooltip.cm-tooltip-autocomplete": {
+  // `{{`-triggered variable completion dropdown — match the app popover. Not
+  // scoped under `.cm-editor`: with tooltips parented to document.body their
+  // container only carries the theme scope class, not `.cm-editor`.
+  ".cm-tooltip-autocomplete": {
     background: "var(--popover)",
     border: "1px solid var(--border)",
     borderRadius: "6px",
@@ -140,24 +180,40 @@ const theme = EditorView.theme({
   },
   ".cm-tooltip-autocomplete > ul": {
     fontFamily: "var(--font-mono)",
-    maxHeight: "15rem",
+    // At least ~5 rows tall so the popup has presence with few variables.
+    minHeight: "5rem",
+    maxHeight: "10rem",
+    padding: "3px",
   },
   ".cm-tooltip-autocomplete > ul > li": {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    padding: "3px 8px",
+    gap: "8px",
+    padding: "6px 10px",
+    borderRadius: "5px",
+    fontSize: "13px",
+    lineHeight: "1.5",
     color: "var(--popover-foreground)",
   },
   ".cm-tooltip-autocomplete > ul > li[aria-selected]": {
-    background: "var(--accent)",
-    color: "var(--accent-foreground)",
+    background: "var(--primary)",
+    color: "var(--primary-foreground)",
+  },
+  ".cm-pv-completion-icon": {
+    display: "inline-flex",
+    flexShrink: "0",
+    color: "var(--cm-variable)",
+  },
+  ".cm-pv-completion-icon svg": {
+    width: "14px",
+    height: "14px",
   },
   ".cm-tooltip-autocomplete .cm-completionLabel": {
     fontWeight: "500",
   },
   ".cm-tooltip-autocomplete .cm-completionDetail": {
+    marginLeft: "auto",
+    paddingLeft: "12px",
     fontStyle: "normal",
     color: "var(--muted-foreground)",
     overflow: "hidden",
@@ -165,20 +221,61 @@ const theme = EditorView.theme({
     whiteSpace: "nowrap",
     maxWidth: "18rem",
   },
+  // Keep the icon and value readable on the primary-colored selected row.
+  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-pv-completion-icon": {
+    color: "var(--primary-foreground)",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail": {
+    color: "var(--primary-foreground)",
+    opacity: "0.8",
+  },
 });
+
+// Curly-braces glyph (lucide "braces") marking each option as a variable.
+// Static, trusted markup — never interpolates user data.
+function variableIconDom(): HTMLElement {
+  const wrap = document.createElement("span");
+  wrap.className = "cm-pv-completion-icon";
+  wrap.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>';
+  return wrap;
+}
 
 function renderTooltipDom(
   name: string,
-  resolution: VariableResolution
+  resolution: VariableResolution,
+  onInspect?: (name: string) => void
 ): HTMLElement {
   const root = document.createElement("div");
   root.className = "cm-prompt-variable-tooltip";
 
-  // Title: the variable name, shown in the same color as the editor highlight.
+  // Header: the variable name (in the highlight color) + an optional button to
+  // open the Variables dialog focused on this variable.
+  const header = document.createElement("div");
+  header.className = "cm-pv-header";
   const label = document.createElement("div");
   label.className = "cm-pv-label";
   label.textContent = name;
-  root.appendChild(label);
+  header.appendChild(label);
+  const defined = resolution.status === "ok" || resolution.status === "empty";
+  if (onInspect && defined) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cm-pv-inspect";
+    button.title = "View variable details";
+    button.setAttribute("aria-label", "View variable details");
+    button.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+    // Keep editor focus/selection so opening the dialog doesn't disturb it.
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onInspect(name);
+    });
+    header.appendChild(button);
+  }
+  root.appendChild(header);
 
   const body = document.createElement("div");
   if (resolution.status === "ok") {
@@ -201,7 +298,10 @@ function renderTooltipDom(
   return root;
 }
 
-function createHoverTooltip(resolve: PromptVariableResolver): Extension {
+function createHoverTooltip(
+  resolve: PromptVariableResolver,
+  onInspect?: (name: string) => void
+): Extension {
   return hoverTooltip(
     (view, pos) => {
       const line = view.state.doc.lineAt(pos);
@@ -221,7 +321,7 @@ function createHoverTooltip(resolve: PromptVariableResolver): Extension {
           pos: from,
           end: to,
           above: true,
-          create: () => ({ dom: renderTooltipDom(name, resolution) }),
+          create: () => ({ dom: renderTooltipDom(name, resolution, onInspect) }),
         });
         const resolution = resolve(name);
         return resolution instanceof Promise
@@ -274,16 +374,22 @@ function createVariableCompletion(list: PromptVariableLister): Extension {
     }
     return { from, options, filter: true };
   };
-  return autocompletion({ override: [source], icons: false });
+  return autocompletion({
+    override: [source],
+    // Replace the default icon column with our own variable (braces) icon.
+    icons: false,
+    addToOptions: [{ render: () => variableIconDom(), position: 20 }],
+  });
 }
 
 export function createPromptVariableExtension({
   resolve,
   listVariables,
+  onInspect,
 }: PromptVariableExtensionOptions): Extension[] {
   return [
     placeholderHighlighter,
-    createHoverTooltip(resolve),
+    createHoverTooltip(resolve, onInspect),
     createVariableCompletion(listVariables),
     // Render tooltips (hover + the completion dropdown) under document.body so
     // the editor's own overflow clipping (scroll containers) can't cut them off.

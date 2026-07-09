@@ -6,12 +6,12 @@ import type {
   ThreadVariable,
 } from "@llm-space/core";
 import {
+  BracesIcon,
   CalendarDaysIcon,
   ListFilterIcon,
   PlusIcon,
   SparklesIcon,
   Trash2Icon,
-  TypeIcon,
 } from "lucide-react";
 import {
   memo,
@@ -779,7 +779,7 @@ function CustomVariableDetail({
 }) {
   return (
     <DetailShell
-      icon={<TypeIcon className="text-muted-foreground size-4" />}
+      icon={<BracesIcon className="text-muted-foreground size-4" />}
       title="User defined variable"
       disabled={disabled}
       action={
@@ -964,7 +964,7 @@ function VariableNameInput({
 
 function _variableIcon(item: VariableListItem): ReactNode {
   if (item.kind === "custom") {
-    return <TypeIcon className="text-muted-foreground size-4 shrink-0" />;
+    return <BracesIcon className="text-muted-foreground size-4 shrink-0" />;
   }
   if (item.variable.type === "currentDate") {
     return (

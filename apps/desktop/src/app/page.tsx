@@ -136,6 +136,7 @@ const COMMAND_PALETTE_BLACKLIST = [
   "copyFile",
   "openLink",
   "openCommandPalette",
+  "openVariables",
   "newFileFromPromptExample",
   "closeTab",
   "closeOtherTabs",

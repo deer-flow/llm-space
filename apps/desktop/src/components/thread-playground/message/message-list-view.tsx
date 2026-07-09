@@ -7,14 +7,7 @@ import {
 } from "@hello-pangea/dnd";
 import type { AssistantMessage, Message, ThreadContext } from "@llm-space/core";
 import { PlusIcon } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -188,7 +181,7 @@ function DroppableMessageList({
                 // to size the placeholder and compute drag displacement — a
                 // `gap` is invisible to it and offsets every item mid-drag.
                 className="mb-3.5"
-                style={style as CSSProperties | undefined}
+                style={style}
               >
                 <MessageListItem
                   message={message}

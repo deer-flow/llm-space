@@ -2,6 +2,7 @@ import { type Extension } from "@codemirror/state";
 import type { ThreadContext } from "@llm-space/core";
 import { useContext, useMemo } from "react";
 
+import { useCommands } from "@/commands";
 import type { SkillInfo } from "@/shared/skills";
 
 import { createPromptVariableExtension } from "./prompt-variable-extension";
@@ -41,7 +42,8 @@ const extensionByStore = new WeakMap<ThreadStore, Map<string, Extension[]>>();
 
 function getExtensionForStore(
   store: ThreadStore,
-  placeKey: string | undefined
+  placeKey: string | undefined,
+  onInspect: (name: string) => void
 ): Extension[] {
   let byPlace = extensionByStore.get(store);
   if (!byPlace) {
@@ -64,6 +66,7 @@ function getExtensionForStore(
         ),
       listVariables: () =>
         listPromptVariableCompletions(store.getState().thread.context),
+      onInspect,
     });
     byPlace.set(key, extension);
   }
@@ -94,22 +97,27 @@ export function usePromptVariableExtensionForContext(
 ): Extension[] {
   const fallbackStore = useContext(ThreadStoreContext);
   const resolvedStore = store ?? fallbackStore;
-  return useMemo(
-    () =>
-      context
-        ? createPromptVariableExtension({
-            resolve: (name) =>
-              resolvePromptVariableValueForPlace(
-                name,
-                context,
-                placeKey,
-                loadSkillsCached
-              ),
-            listVariables: () => listPromptVariableCompletions(context),
-          })
-        : resolvedStore
-          ? getExtensionForStore(resolvedStore, placeKey)
-          : EMPTY,
-    [context, placeKey, resolvedStore]
-  );
+  const { executeCommand } = useCommands();
+  return useMemo(() => {
+    // Readonly snapshot: frozen values from the saved context, and no inspect
+    // button (its variables are historical, not the live thread's).
+    if (context) {
+      return createPromptVariableExtension({
+        resolve: (name) =>
+          resolvePromptVariableValueForPlace(
+            name,
+            context,
+            placeKey,
+            loadSkillsCached
+          ),
+        listVariables: () => listPromptVariableCompletions(context),
+      });
+    }
+    if (!resolvedStore) return EMPTY;
+    // `executeCommand` is app-stable; the tooltip's "view details" button routes
+    // through the `openVariables` command handled by the active thread.
+    return getExtensionForStore(resolvedStore, placeKey, (name) =>
+      executeCommand({ type: "openVariables", args: { variableName: name } })
+    );
+  }, [context, placeKey, resolvedStore, executeCommand]);
 }

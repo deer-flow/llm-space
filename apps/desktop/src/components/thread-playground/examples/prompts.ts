@@ -198,25 +198,17 @@ async function listEnabledSkills(): Promise<SkillInfo[]> {
  * creation via the {@link Resolvable} factory form.
  */
 async function generalAgentMessages(): Promise<Message[]> {
-  const [skills, rootPath] = await Promise.all([
+  const [, rootPath] = await Promise.all([
     listEnabledSkills(),
     ensureRootDir("tmp/deep-research"),
   ]);
-  const skillsSection =
-    skills.length === 0
-      ? "No skills are currently available. The `skill()` tool has nothing to invoke — do not call it; rely on your other tools instead."
-      : `The following skills are available for use with the \`skill()\` tool:
-
-${skills
-  .map((skill) => `- **${skill.name}**: ${skill.description}`)
-  .join("\n\n")}`;
   const reminder = `<system-reminder>
+<today>{{current_date}}</today>
 <workspace>
 <root path="${rootPath}" />
 </workspace>
-
 <available-skills>
-${skillsSection}
+{{available_skills}}
 </available-skills>
 </system-reminder>`;
   return [

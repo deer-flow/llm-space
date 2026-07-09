@@ -1027,10 +1027,9 @@ function _formatSkillsXml(skills: SkillInfo[]): string {
   return [
     "<available-skills>",
     ...skills.flatMap((skill) => [
-      `  <skill name="${_escapeXml(skill.name)}">`,
-      `    <description>${_escapeXml(_singleLine(skill.description))}</description>`,
-      `    <path>${_escapeXml(skill.path)}</path>`,
-      "  </skill>",
+      `<skill name="${_escapeXml(skill.name)}" path="${_escapeXml(skill.path)}">`,
+      `${_escapeXml(_singleLine(skill.description))}`,
+      "</skill>",
     ]),
     "</available-skills>",
   ].join("\n");
