@@ -89,7 +89,15 @@ export function abortStreamThread({
   activeStreams.get(streamId)?.abort();
 }
 
-/** Run a minimal completion to verify that a configured model can respond. */
+/**
+ * Verify that a provider's Base URL and API key are valid by running a real —
+ * but minimal — completion through the exact same `streamAgent` path used for
+ * normal runs. The prompt just asks the model to reply "ok"; we don't check
+ * *what* it replied, only that the provider accepted the request. A rejected
+ * request (bad key, wrong Base URL, unknown model) surfaces as an `errorMessage`
+ * on the streamed result rather than a thrown error, so we inspect for that and
+ * rethrow — otherwise every request, even with a bogus key, would "succeed".
+ */
 export async function testModelConnection({
   providerId,
   modelId,
@@ -98,30 +106,53 @@ export async function testModelConnection({
   modelId: string;
 }): Promise<void> {
   const abortController = new AbortController();
-  for await (const event of streamAgent(
-    {
-      model: { provider: providerId, id: modelId },
-      context: {
-        systemPrompt: "Reply with ok.",
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: "Test connection." }],
-            timestamp: Date.now(),
-          },
-        ],
-        tools: [],
+  try {
+    for await (const event of streamAgent(
+      {
+        model: { provider: providerId, id: modelId },
+        context: {
+          systemPrompt: "You are a connection tester.",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: 'Reply with "ok".' }],
+              timestamp: Date.now(),
+            },
+          ],
+          tools: [],
+        },
       },
-    },
-    {
-      models: await modelManager.getAvailableModels(),
-      getApiKey: modelManager.getApiKey.bind(modelManager),
-      getBaseUrl: modelManager.getBaseUrl.bind(modelManager),
-      getHeaders: modelManager.getHeaders.bind(modelManager),
-      signal: abortController.signal,
+      {
+        models: await modelManager.getAvailableModels(),
+        getApiKey: modelManager.getApiKey.bind(modelManager),
+        getBaseUrl: modelManager.getBaseUrl.bind(modelManager),
+        getHeaders: modelManager.getHeaders.bind(modelManager),
+        signal: abortController.signal,
+      }
+    )) {
+      // A bad API key / Base URL does NOT throw: per the StreamFn contract,
+      // `streamAgent` encodes request and auth failures as a final assistant
+      // message carrying an `errorMessage` and streams normally. Mirror the
+      // client reducer and surface that error, otherwise any random key would
+      // "succeed" just because the stream completed.
+      if (event.type === "agent_end") {
+        for (const message of event.messages) {
+          if (message.role === "assistant" && message.errorMessage) {
+            throw new Error(message.errorMessage);
+          }
+        }
+      }
     }
-  )) {
-    void event;
-    // Drain the stream; success only means the provider completed the request.
+  } catch (error) {
+    // Always reject with a real, non-empty Error message. The provider SDK may
+    // throw a non-Error value (or an Error with an empty message); the RPC layer
+    // drops non-Error throws entirely, which would hang the caller until it
+    // times out instead of telling the user what went wrong.
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      detail.trim() ||
+        `Could not reach ${providerId}/${modelId}. Check the Base URL and API key.`,
+      { cause: error }
+    );
   }
 }

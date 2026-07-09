@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
 /**
  * On a fresh install `LLM_SPACE_HOME/workspace` does not exist yet. Create the
@@ -10,7 +10,7 @@ import { getLlmSpaceRoot } from "@llm-space/core/server";
  * workspace directory exists.
  */
 export function seedWorkspace(): void {
-  const workspace = path.join(getLlmSpaceRoot(), "workspace");
+  const workspace = path.join(getLlmSpaceHomePath(), "workspace");
   if (existsSync(workspace)) {
     return;
   }

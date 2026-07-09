@@ -13,7 +13,7 @@ import {
   type Thread,
   type ToolCall,
 } from "@llm-space/core";
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
 import type {
   TraceConnectedProjectInput,
@@ -64,13 +64,13 @@ interface ParsedLangfuseFile {
   projectNames: Set<string>;
 }
 
-const TRACE_ROOT = path.join(getLlmSpaceRoot(), "traces", "projects");
+const TRACE_ROOT = path.join(getLlmSpaceHomePath(), "traces", "projects");
 const TRACE_PROJECT_ID_PREFIX = "proj";
 const TRACE_KEY_MAX_SLUG = 48;
 const CODEX_PROVIDER_ID = "openai-codex";
 
 /**
- * Owns trace-project storage under `LLM_SPACE_ROOT/traces`.
+ * Owns trace-project storage under `LLM_SPACE_HOME/traces`.
  *
  * Boundary: trace files are not workspace threads. Only `workbench.json` uses
  * the normal Thread shape so the existing ThreadPlayground can debug a trace.

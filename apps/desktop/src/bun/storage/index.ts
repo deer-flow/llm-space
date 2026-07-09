@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { getLlmSpaceRoot, LocalFileSystem } from "@llm-space/core/server";
+import { getLlmSpaceHomePath, LocalFileSystem } from "@llm-space/core/server";
 
-const root = path.join(getLlmSpaceRoot(), "workspace");
+const root = path.join(getLlmSpaceHomePath(), "workspace");
 
 // Ensure the storage root exists so a fresh install works out of the box.
 mkdirSync(root, { recursive: true });

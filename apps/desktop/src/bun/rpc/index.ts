@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 import { BrowserView, Utils } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
@@ -130,7 +130,7 @@ export const mainWindowRPC: MainWindowRPC =
           return { fullScreen: mainWindow.isFullScreen() };
         },
         ensureRootDir: ({ relativePath }) => {
-          const dir = path.join(getLlmSpaceRoot(), relativePath);
+          const dir = path.join(getLlmSpaceHomePath(), relativePath);
           mkdirSync(dir, { recursive: true });
           return Promise.resolve({ path: dir });
         },

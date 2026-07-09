@@ -26,7 +26,7 @@ export type TraceProjectSource =
     };
 
 /**
- * A top-level trace collection in `LLM_SPACE_ROOT/traces/projects`. One project
+ * A top-level trace collection in `LLM_SPACE_HOME/traces/projects`. One project
  * is intended to map to one Langfuse source, with `updatedAt` changing whenever
  * imports add traces or source metadata.
  */

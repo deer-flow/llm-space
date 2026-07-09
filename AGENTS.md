@@ -36,7 +36,7 @@ repo:
 
 ```sh
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
-LLM_SPACE_ROOT="$TMP_ROOT" bun run dev:cef
+LLM_SPACE_HOME="$TMP_ROOT" bun run dev:cef
 ```
 
 Only keep durable evidence in the repo, such as audit screenshots, notes, logs,
@@ -51,7 +51,7 @@ Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
 - **`@llm-space/core`** (`packages/core`) — domain library, **no build step**; its TypeScript is consumed directly via the `exports` map. Entrypoints:
   - `.` → re-exports `./client`, `./types`, `./utils`.
   - `./client` — browser-safe pieces: the `streamThread()` client (`client/api`), the `reduceMessages()` streaming reducer (`client/reducer`), and the `AgentTransport` interface (`client/transport`).
-  - `./server` — Node/Bun-only implementations: `streamAgent()` (`server/agent/stream`), filesystem paths (`server/paths` — `getLlmSpaceRoot()`, `getSettingsDir()`), `LocalFileSystem` thread storage (`server/storage`), and window-state persistence (`server/window-state`).
+  - `./server` — Node/Bun-only implementations: `streamAgent()` (`server/agent/stream`), filesystem paths (`server/paths` — `getLlmSpaceHomePath()`, `getSettingsDir()`), `LocalFileSystem` thread storage (`server/storage`), and window-state persistence (`server/window-state`).
   - `./types` — `Thread`/`Message`/`ModelConfig`/`Tool`/`FileNode`/`ModelProviderGroup` and the converters to/from the `@earendil-works/pi-*` formats.
 - **`@llm-space/desktop`** (`apps/desktop`) — the Electrobun app. Built with Vite (React 19) for the renderer and `electrobun` for the shell. Two runtime contexts bridged by a single typed RPC channel:
   - **bun main process** (`src/bun/`) — owns the native window, menu, filesystem, model config, and agent streaming.
@@ -80,7 +80,7 @@ Each open thread owns its own Zustand store (`stores/thread-store.ts`), created 
 
 ### Persistence
 
-State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_ROOT` or `LLM_SPACE_HOME`):
+State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_HOME`):
 - `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`) and `window.json` (frame/zoom/maximized).
 

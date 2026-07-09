@@ -119,7 +119,7 @@ export interface ImportFromClipboardCommand extends GenericCommand<
 // --- Traces ----------------------------------------------------------------
 
 /**
- * Create a trace project in `LLM_SPACE_ROOT/traces`. The caller supplies a
+ * Create a trace project in `LLM_SPACE_HOME/traces`. The caller supplies a
  * non-empty display `name`; the trace panel handler selects the created project
  * and refreshes the trace-project list.
  */
@@ -241,7 +241,7 @@ export interface OpenDocumentCommand extends GenericCommand<
 /** Open the GitHub issues page in the user's default browser to report a bug. */
 export interface ReportBugsCommand extends GenericCommand<"reportBugs"> {}
 
-/** Open the workspace folder (`LLM_SPACE_ROOT/workspace`) in the OS file manager. */
+/** Open the workspace folder (`LLM_SPACE_HOME/workspace`) in the OS file manager. */
 export interface OpenWorkspaceFolderCommand extends GenericCommand<"openWorkspaceFolder"> {}
 
 /** The discriminated union of every command. */

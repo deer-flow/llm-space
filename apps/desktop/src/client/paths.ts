@@ -17,7 +17,7 @@ export async function ensureRootDir(relativePath: string): Promise<string> {
   return path;
 }
 
-/** Absolute path to `LLM_SPACE_ROOT/workspace`, creating it if missing. */
+/** Absolute path to `LLM_SPACE_HOME/workspace`, creating it if missing. */
 export async function getWorkspacePath(): Promise<string> {
   return ensureRootDir("workspace");
 }

@@ -1010,7 +1010,7 @@ function ModelListItem({
       </ItemContent>
       <ItemActions>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-          <Tooltip content="Test Connection">
+          <Tooltip content="Test connection">
             <button
               type="button"
               aria-label={`Test connection for ${model.name}`}

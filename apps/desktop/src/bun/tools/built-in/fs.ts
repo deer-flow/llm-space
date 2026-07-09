@@ -4,14 +4,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { BuiltinTool } from "@llm-space/core";
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
 import { openPath, revealInFileManager } from "../../fs";
 import { skillsManager } from "../../skills";
 
 /** Workspace root that path-less tools (e.g. `glob`) default to. */
 function _workspaceRoot(): string {
-  return path.join(getLlmSpaceRoot(), "workspace");
+  return path.join(getLlmSpaceHomePath(), "workspace");
 }
 
 /**

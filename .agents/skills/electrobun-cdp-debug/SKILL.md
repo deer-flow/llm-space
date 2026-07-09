@@ -57,7 +57,7 @@ repo:
 
 ```sh
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
-LLM_SPACE_ROOT="$TMP_ROOT" bun run dev:cef
+LLM_SPACE_HOME="$TMP_ROOT" bun run dev:cef
 ```
 
 ## Inspect Electrobun With The Raw CDP AXI Wrapper

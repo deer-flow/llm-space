@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
 // The Deep Research skill ships with the app; inline its SKILL.md text so the
 // bundle is self-contained (no runtime file read of the renderer source tree).
@@ -9,7 +9,7 @@ import deepResearchSkill from "../../components/thread-playground/examples/deep-
 
 /** The llm-space-managed skills discovery folder (`<root>/skills`). */
 export function getManagedSkillsDir(): string {
-  return path.join(getLlmSpaceRoot(), "skills");
+  return path.join(getLlmSpaceHomePath(), "skills");
 }
 
 /**

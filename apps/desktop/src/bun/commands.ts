@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { getLlmSpaceRoot } from "@llm-space/core/server";
+import { getLlmSpaceHomePath } from "@llm-space/core/server";
 import { writeClipboardFilePaths } from "clip-filepaths";
 import { Utils, type BrowserWindow } from "electrobun/bun";
 
@@ -91,7 +91,7 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
       return;
     }
     case "openWorkspaceFolder": {
-      const workspacePath = path.join(getLlmSpaceRoot(), "workspace");
+      const workspacePath = path.join(getLlmSpaceHomePath(), "workspace");
       mkdirSync(workspacePath, { recursive: true });
       Utils.openPath(workspacePath);
       return;

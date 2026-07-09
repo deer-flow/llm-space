@@ -1,3 +1,5 @@
+# English | [中文](./README.zh-CN.md)
+
 # LLM Space 4
 
 ![screenshot](https://github.com/user-attachments/assets/7fe0a937-a7fa-4a3c-9417-34ee5a35b19d)
