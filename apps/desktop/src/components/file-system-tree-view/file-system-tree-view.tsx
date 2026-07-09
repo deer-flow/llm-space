@@ -3,6 +3,7 @@
 import type { FileNode, Message, Tool } from "@llm-space/core";
 import { MessagesSquare } from "lucide-react";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -47,7 +48,7 @@ const TRASH_NAME =
     ? "Recycle Bin"
     : "Trash";
 
-export function FileSystemTreeView({
+function _FileSystemTreeView({
   className,
   headerStart,
   onSelectFile,
@@ -450,6 +451,11 @@ export function FileSystemTreeView({
     </div>
   );
 }
+
+// Memoized so opening/closing a thread tab (which re-renders the page shell it
+// sits in) doesn't redraw the whole tree — its props (the tab callbacks and the
+// mode-derived className) are stable across tab changes.
+export const FileSystemTreeView = memo(_FileSystemTreeView);
 
 /** In-place rename input: Enter confirms, Esc / blur cancels. */
 function RenameInput({
