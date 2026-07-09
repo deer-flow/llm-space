@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-08
-- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, Trace Workbench Header/Protocol Repair, and System Prompt Variables V2 layout polish; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity, and system prompts now support a resizable persistent Variables panel with thread-owned built-ins, selected skill groups, and custom variable scenario switching while preserving editable templates.
+- Last updated: 2026-07-09
+- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, Trace Workbench Header/Protocol Repair, System Prompt Variables V2 layout polish, and the Variables row relocation; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity, and system prompts now manage thread-owned variables from a dedicated Variables row below Tools and a dialog while preserving editable templates.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -58,15 +58,15 @@
   - `apps/desktop/src/components/start-from-example-dialog.tsx` exposes the chooser.
   - `apps/desktop/src/components/thread-playground/prompt/prompt-examples.ts` defines the available prompt examples and stable file stems.
   - `apps/desktop/src/components/thread-playground/thread-playground.tsx` resolves a fallback model and enables run when a model exists.
-- Boundary: user can choose built-in prompt examples or blank threads, manually edit model/tools/system prompt/messages, manage thread-owned prompt variables below the system prompt editor, insert simple `{{variable_name}}` placeholders, configure current date and selected skill groups, switch custom variable scenarios, preview formatted values, and run with those variables resolved while keeping the stored system prompt as a reusable template.
+- Boundary: user can choose built-in prompt examples or blank threads, manually edit model/tools/system prompt/messages, manage thread-owned prompt variables from a dedicated Variables row below Tools, configure current date and selected skill groups, add default custom variable values, preview formatted values in the Variables dialog, type simple `{{variable_name}}` placeholders into the system prompt, and run with those variables resolved while keeping the stored system prompt as a reusable template.
 - Explicit non-goals: multi-file prompt projects, template marketplace, automated prompt optimization.
 - Visible gaps: no smart spacing between consecutive inserted placeholders, no dedicated rendered-vs-template diff panel, no full keyboard/screen-reader audit for the variables panel, no guided task setup after choosing an example, and no automated CEF regression smoke for first-thread editing yet.
 
 ## System Prompt Variables
 
-- Status: shipped V2 with layout polish
+- Status: shipped V3 with dedicated Variables row and dialog
 - Freshness: confirmed
-- Last checked: 2026-07-08
+- Last checked: 2026-07-09
 - Evidence:
   - Discovery CEF screenshot `audits/2026-07-08-173643-system-prompt-variables/01-current-system-prompt-editor.png` confirmed the original prompt editor gap: no Variables affordance beside `Generate` and `Examples`.
   - Source inspection confirmed skill discovery and runtime loading already existed through Settings/RPC and the built-in `skill()` tool, so V1 reused existing enabled-skill data instead of introducing a new discovery model.
@@ -84,10 +84,19 @@
   - Live CEF resolver checks rendered simple placeholders and returned blocking errors for legacy `llm_space.*` expressions, missing skills, and empty custom values.
   - Layout polish screenshot `audits/2026-07-08-220831-variable-panel-redesign/03-final-skills-detail.png` shows the Variables panel as a resizable section under the system prompt editor with a full-width header divider, compact rows, and a selected-row detail editor.
   - CEF drag verification on port `9333` moved the horizontal resize handle and changed the Variables panel from `243.39px` to `333.39px` without horizontal overflow.
+  - Initial relocation screenshot `audits/2026-07-09-101033-variables-tools-entry/02-tools-row-variables-entry.png` showed `Variables` as a compact entry inside the Tools row; UI review corrected this to a separate row.
+  - Correction screenshot `audits/2026-07-09-101033-variables-tools-entry/06-variables-separate-row.png` shows a dedicated `Variables` row below `Tools`, with `current_date` and `available_skills` visible as chips plus `Add`.
+  - Correction screenshot `audits/2026-07-09-101033-variables-tools-entry/07-variable-chip-opens-detail.png` shows clicking `available_skills` opens the Variables dialog focused on the Skills detail.
+  - CEF DOM checks on 2026-07-09 confirmed the row order `Tools` -> `Variables` -> `System prompt`, `documentElement.scrollWidth - innerWidth === 0`, and `0` visible `Insert` buttons.
+  - Dialog screenshot `audits/2026-07-09-101033-variables-tools-entry/03-variables-dialog.png` shows the Variables management dialog reusing the variable list and selected-detail layout.
+  - Skill-preview screenshot `audits/2026-07-09-101033-variables-tools-entry/05-skills-preview.png` shows the skills detail using `Add` to open skill selection and previewing the selected `deep-research` skill.
+  - CEF DOM checks on 2026-07-09 found `0` visible `Insert` buttons in the Variables flow, `documentElement.scrollWidth - innerWidth === 0`, and no relevant console errors.
+  - Isolated runtime file `workspace/untitled.json` persisted `context.variables.available_skills.skillNames = ["deep-research"]` and `context.variableVariants.variants.default.custom_variable = ""` after editing through the dialog.
+  - Product-design audit notes `audits/2026-07-09-101033-variables-tools-entry/audit-notes.md` found the entry relocation healthy, with keyboard/screen-reader QA as the main remaining risk.
   - TypeScript, lint, diff check, console, and overflow checks passed for the implementation.
-- Boundary: users can manage variables in a persistent resizable panel below the system prompt editor; scan compact variable rows; open a selected variable detail editor; rename/configure built-in current-date and skills variables; select an ordered group of enabled skills; choose `xml` or `markdown-list` skills format plus skills-only indentation; add custom variables; switch whole custom-value scenarios such as `baseline` and `scenario_2`; insert simple `{{variable_name}}` placeholders; persist all variable config in the thread; and render those variables before the model call. Saved run snapshots store the rendered system prompt used for that run.
+- Boundary: users can scan variables directly in a dedicated Variables row below Tools; click a variable chip to open the dialog focused on that variable; use `Add` to open the same dialog for management; rename/configure built-in current-date and skills variables; select an ordered group of enabled skills; choose `xml` or `markdown-list` skills format plus skills-only indentation; add default custom variables; persist all variable config in the thread; type simple `{{variable_name}}` placeholders in the system prompt; and render those variables before the model call. Saved run snapshots preserve the template system prompt rather than replacing it with rendered text.
 - Explicit non-goals: no broad templating language, no prompt marketplace, no automatic skill invocation, no secret/env-variable interpolation, no background skill indexing beyond current discovery folders.
-- Visible gaps: no smart whitespace/newline insertion between consecutive placeholders, no rendered-template diff UI, no full accessibility audit beyond DOM labels/screenshot review, and no paid-provider smoke run in this loop.
+- Visible gaps: no direct variable Insert shortcut in the current dialog, no smart whitespace/newline insertion between consecutive placeholders, no rendered-template diff UI, no full accessibility audit beyond DOM labels/screenshot review, and no paid-provider smoke run in this loop.
 
 ## Thread Editor Reliability
 

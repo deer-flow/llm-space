@@ -1,27 +1,15 @@
 import { uuid, type Message } from "@llm-space/core";
-import {
-  forwardRef,
-  memo,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  type ForwardedRef,
-} from "react";
+import { memo, useCallback, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { CodeEditor, type CodeEditorHandle } from "../../code-editor";
+import { CodeEditor } from "../../code-editor";
 import metaPrompt from "../examples/meta-prompt.md?raw";
 import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
-
-export interface SystemPromptEditorHandle {
-  insertText(text: string): void;
-}
 
 interface SystemPromptEditorProps {
   className?: string;
@@ -33,8 +21,7 @@ function _SystemPromptEditor({
   className,
   readonly,
   onStreamingChange,
-}: SystemPromptEditorProps, ref: ForwardedRef<SystemPromptEditorHandle>) {
-  const editorRef = useRef<CodeEditorHandle>(null);
+}: SystemPromptEditorProps) {
   const systemPrompt = useThreadStore(
     (s) => s.thread.context?.systemPrompt ?? ""
   );
@@ -117,20 +104,6 @@ function _SystemPromptEditor({
     [generate, systemPrompt, tools]
   );
 
-  const insertText = useCallback(
-    (text: string) => {
-      const editor = editorRef.current;
-      if (editor) {
-        editor.insertText(text);
-        return;
-      }
-      updateSystemPrompt(`${systemPrompt}${text}`);
-    },
-    [systemPrompt, updateSystemPrompt]
-  );
-
-  useImperativeHandle(ref, () => ({ insertText }), [insertText]);
-
   return (
     <div className={cn("flex size-full flex-col", className)}>
       <div className="flex shrink-0 items-center justify-between py-2">
@@ -151,7 +124,6 @@ function _SystemPromptEditor({
         </div>
       </div>
       <CodeEditor
-        ref={editorRef}
         className="hover:border-accent-foreground/20 grow transition-[border-color]"
         value={systemPrompt ?? ""}
         language="markdown"
@@ -163,4 +135,4 @@ function _SystemPromptEditor({
   );
 }
 
-export const SystemPromptEditor = memo(forwardRef(_SystemPromptEditor));
+export const SystemPromptEditor = memo(_SystemPromptEditor);

@@ -6,9 +6,9 @@ import type {
   ThreadVariable,
 } from "@llm-space/core";
 import {
-  BracesIcon,
   CalendarDaysIcon,
   PlusIcon,
+  Settings2Icon,
   SparklesIcon,
   Trash2Icon,
   TypeIcon,
@@ -18,11 +18,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Tooltip } from "@/components/tooltip";
 import { cn } from "@/lib/utils";
 import type { SkillInfo } from "@/shared/skills";
 
@@ -38,7 +40,6 @@ import {
 } from "../../ui/select";
 import { Textarea } from "../../ui/textarea";
 import {
-  createPromptVariablePlaceholder,
   DEFAULT_VARIABLE_VARIANT_NAME,
   formatCurrentDateVariable,
   formatSkillsVariable,
@@ -56,10 +57,10 @@ import { SkillSelectionDialog } from "./skill-selection-dialog";
 interface SystemPromptVariablesPanelProps {
   className?: string;
   disabled?: boolean;
-  onInsert: (placeholder: string) => void;
+  initialSelection?: PromptVariableSelection | null;
 }
 
-type VariableSelection =
+export type PromptVariableSelection =
   { kind: "builtIn"; name: string } | { kind: "custom"; name: string };
 
 type VariableListItem =
@@ -81,7 +82,7 @@ type VariableListItem =
 function _SystemPromptVariablesPanel({
   className,
   disabled,
-  onInsert,
+  initialSelection,
 }: SystemPromptVariablesPanelProps) {
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
@@ -117,21 +118,27 @@ function _SystemPromptVariablesPanel({
   const customValues =
     variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
 
-  const [selection, setSelection] = useState<VariableSelection | null>(null);
+  const [selection, setSelection] = useState<PromptVariableSelection | null>(
+    null
+  );
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [pendingRemoveCustom, setPendingRemoveCustom] = useState<string | null>(
     null
   );
+  const initialSelectionKey = initialSelection
+    ? `${initialSelection.kind}:${initialSelection.name}`
+    : null;
+  const appliedInitialSelectionKeyRef = useRef<string | null>(null);
 
   const skillsByName = useMemo(
     () => new Map(skills.map((skill) => [skill.name, skill])),
     [skills]
   );
 
-  const items = useMemo<VariableListItem[]>(() => {
-    const builtIns = Object.entries(variables).map(([name, variable]) => {
+  const { builtInItems, customItems } = useMemo(() => {
+    const builtInItems = Object.entries(variables).map(([name, variable]) => {
       if (variable.type === "currentDate") {
         return {
           kind: "builtIn" as const,
@@ -165,8 +172,27 @@ function _SystemPromptVariablesPanel({
       status: value.trim() ? "Value set" : "Empty",
       warning: value.trim() === "",
     }));
-    return [...builtIns, ...custom];
+    return { builtInItems, customItems: custom };
   }, [customValues, skillsByName, skillsError, variables]);
+
+  // Apply a chip-open target once, then let in-dialog selection stay user-owned
+  // across variable edits.
+  useEffect(() => {
+    if (!initialSelectionKey) {
+      appliedInitialSelectionKeyRef.current = null;
+      return;
+    }
+    if (appliedInitialSelectionKeyRef.current === initialSelectionKey) {
+      return;
+    }
+    appliedInitialSelectionKeyRef.current = initialSelectionKey;
+    if (
+      initialSelection &&
+      _selectionExists(initialSelection, variables, customValues)
+    ) {
+      setSelection(initialSelection);
+    }
+  }, [customValues, initialSelection, initialSelectionKey, variables]);
 
   // Keep the selected detail stable across edits, but fall back when a selected
   // variable is removed.
@@ -211,13 +237,6 @@ function _SystemPromptVariablesPanel({
     };
   }, []);
 
-  const insertVariable = useCallback(
-    (name: string) => {
-      onInsert(createPromptVariablePlaceholder(name));
-    },
-    [onInsert]
-  );
-
   const addCustom = useCallback(() => {
     const used = new Set([...Object.keys(variables), ...customNames]);
     const name = _uniqueName("custom_variable", used);
@@ -243,28 +262,65 @@ function _SystemPromptVariablesPanel({
   return (
     <section
       className={cn(
-        "border-border/80 bg-background/40 flex size-full min-h-0 flex-col overflow-hidden",
+        "bg-background/40 flex min-h-0 flex-col overflow-hidden",
         className
       )}
     >
-      <VariablesPanelHeader disabled={disabled} onAddCustom={addCustom} />
       <div className="grid min-h-0 grow grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
         <ScrollArea className="border-border/60 min-h-0 border-r">
-          <div className="grid gap-1 p-2">
-            {items.map((item) => (
-              <VariableListRow
-                key={`${item.kind}:${item.name}`}
-                item={item}
-                selected={
-                  selection?.kind === item.kind && selection.name === item.name
-                }
-                disabled={disabled}
-                onSelect={() =>
-                  setSelection({ kind: item.kind, name: item.name })
-                }
-                onInsert={insertVariable}
-              />
-            ))}
+          <div className="grid gap-3 p-2">
+            <VariableListGroup title="Built-in">
+              {builtInItems.map((item) => (
+                <VariableListRow
+                  key={`${item.kind}:${item.name}`}
+                  item={item}
+                  selected={
+                    selection?.kind === item.kind &&
+                    selection.name === item.name
+                  }
+                  disabled={disabled}
+                  onSelect={() =>
+                    setSelection({ kind: item.kind, name: item.name })
+                  }
+                />
+              ))}
+            </VariableListGroup>
+            <VariableListGroup
+              title="Custom"
+              action={
+                <Button
+                  className="h-6 px-1.5 text-[0.6875rem]"
+                  size="sm"
+                  variant="ghost"
+                  disabled={disabled}
+                  onClick={addCustom}
+                >
+                  <PlusIcon className="size-3" />
+                  Add variable
+                </Button>
+              }
+            >
+              {customItems.length > 0 ? (
+                customItems.map((item) => (
+                  <VariableListRow
+                    key={`${item.kind}:${item.name}`}
+                    item={item}
+                    selected={
+                      selection?.kind === item.kind &&
+                      selection.name === item.name
+                    }
+                    disabled={disabled}
+                    onSelect={() =>
+                      setSelection({ kind: item.kind, name: item.name })
+                    }
+                  />
+                ))
+              ) : (
+                <div className="text-muted-foreground px-2 py-1 text-[0.6875rem]">
+                  No custom variables.
+                </div>
+              )}
+            </VariableListGroup>
           </div>
         </ScrollArea>
         <ScrollArea
@@ -284,7 +340,6 @@ function _SystemPromptVariablesPanel({
             skillsByName={skillsByName}
             skillsLoading={skillsLoading}
             skillsError={skillsError}
-            onInsert={insertVariable}
             onRenameBuiltIn={(oldName, newName) => {
               const renamed = renamePromptVariable(oldName, newName);
               if (renamed) {
@@ -330,30 +385,22 @@ function _SystemPromptVariablesPanel({
   );
 }
 
-function VariablesPanelHeader({
-  disabled,
-  onAddCustom,
+function VariableListGroup({
+  title,
+  action,
+  children,
 }: {
-  disabled?: boolean;
-  onAddCustom: () => void;
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="border-border/80 flex min-h-7 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-2 py-0 pb-2">
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <BracesIcon className="size-4" />
-        Variables
+    <div className="grid gap-1">
+      <div className="text-muted-foreground flex min-h-6 items-center justify-between gap-2 px-1 text-[0.6875rem] font-medium tracking-wide uppercase">
+        <span>{title}</span>
+        {action}
       </div>
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          onClick={onAddCustom}
-        >
-          <PlusIcon data-icon="inline-start" />
-          Add variable
-        </Button>
-      </div>
+      {children}
     </div>
   );
 }
@@ -363,13 +410,11 @@ function VariableListRow({
   selected,
   disabled,
   onSelect,
-  onInsert,
 }: {
   item: VariableListItem;
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
-  onInsert: (name: string) => void;
 }) {
   return (
     <div
@@ -381,7 +426,7 @@ function VariableListRow({
     >
       <button
         type="button"
-        className="hover:bg-muted/40 focus-visible:ring-ring/30 flex min-w-0 grow items-center gap-2 rounded-l-md px-2 py-1 text-left transition-colors outline-none focus-visible:ring-2"
+        className="hover:bg-muted/40 focus-visible:ring-ring/30 flex min-w-0 grow items-center gap-2 rounded-md px-2 py-1 text-left transition-colors outline-none focus-visible:ring-2"
         disabled={disabled}
         aria-pressed={selected}
         onClick={onSelect}
@@ -401,15 +446,6 @@ function VariableListRow({
           </span>
         </span>
       </button>
-      <Button
-        className="mr-1"
-        size="sm"
-        variant="ghost"
-        disabled={disabled}
-        onClick={() => onInsert(item.name)}
-      >
-        Insert
-      </Button>
     </div>
   );
 }
@@ -424,14 +460,13 @@ function VariableDetail({
   skillsByName,
   skillsLoading,
   skillsError,
-  onInsert,
   onRenameBuiltIn,
   onUpdateBuiltIn,
   onRenameCustom,
   onUpdateCustom,
   onRemoveCustom,
 }: {
-  selection: VariableSelection | null;
+  selection: PromptVariableSelection | null;
   disabled?: boolean;
   variables: Record<string, ThreadVariable>;
   customNames: Set<string>;
@@ -440,7 +475,6 @@ function VariableDetail({
   skillsByName: Map<string, SkillInfo>;
   skillsLoading: boolean;
   skillsError: string | null;
-  onInsert: (name: string) => void;
   onRenameBuiltIn: (oldName: string, newName: string) => boolean;
   onUpdateBuiltIn: (name: string, variable: ThreadVariable) => void;
   onRenameCustom: (oldName: string, newName: string) => boolean;
@@ -471,7 +505,6 @@ function VariableDetail({
         disabled={disabled}
         variables={variables}
         customNames={customNames}
-        onInsert={onInsert}
         onRename={onRenameCustom}
         onUpdate={onUpdateCustom}
         onRemove={onRemoveCustom}
@@ -496,7 +529,6 @@ function VariableDetail({
         disabled={disabled}
         variables={variables}
         customNames={customNames}
-        onInsert={onInsert}
         onRename={onRenameBuiltIn}
         onUpdate={(name, next) => onUpdateBuiltIn(name, next)}
       />
@@ -526,7 +558,6 @@ function CurrentDateVariableDetail({
   disabled,
   variables,
   customNames,
-  onInsert,
   onRename,
   onUpdate,
 }: {
@@ -535,7 +566,6 @@ function CurrentDateVariableDetail({
   disabled?: boolean;
   variables: Record<string, ThreadVariable>;
   customNames: Set<string>;
-  onInsert: (name: string) => void;
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadCurrentDateVariable) => void;
 }) {
@@ -543,9 +573,7 @@ function CurrentDateVariableDetail({
     <DetailShell
       icon={<CalendarDaysIcon className="text-muted-foreground size-4" />}
       title="Current date"
-      name={name}
       disabled={disabled}
-      onInsert={onInsert}
     >
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <Field label="Name">
@@ -630,12 +658,22 @@ function SkillsVariableDetail({
     <DetailShell
       icon={<SparklesIcon className="text-muted-foreground size-4" />}
       title="Skills"
-      name={name}
       disabled={disabled}
-      primaryActionLabel="Config"
+      action={
+        <Tooltip content="Configure skills">
+          <Button
+            size="icon-sm"
+            variant="outline"
+            aria-label="Configure skills"
+            disabled={disabled}
+            onClick={() => setSkillsDialogOpen(true)}
+          >
+            <Settings2Icon className="size-3.5" />
+          </Button>
+        </Tooltip>
+      }
       className="flex min-h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
-      onPrimaryAction={() => setSkillsDialogOpen(true)}
     >
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
         <Field label="Name">
@@ -716,7 +754,6 @@ function CustomVariableDetail({
   disabled,
   variables,
   customNames,
-  onInsert,
   onRename,
   onUpdate,
   onRemove,
@@ -726,7 +763,6 @@ function CustomVariableDetail({
   disabled?: boolean;
   variables: Record<string, ThreadVariable>;
   customNames: Set<string>;
-  onInsert: (name: string) => void;
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, value: string) => void;
   onRemove: (name: string) => void;
@@ -736,7 +772,6 @@ function CustomVariableDetail({
     <DetailShell
       icon={<TypeIcon className="text-muted-foreground size-4" />}
       title="Custom"
-      name={name}
       disabled={disabled}
       action={
         <Button
@@ -749,7 +784,6 @@ function CustomVariableDetail({
           <Trash2Icon className="size-3.5" />
         </Button>
       }
-      onInsert={onInsert}
     >
       <Field label="Name">
         <VariableNameInput
@@ -785,54 +819,29 @@ function CustomVariableDetail({
 function DetailShell({
   icon,
   title,
-  name,
-  disabled,
   action,
   children,
-  onInsert,
   className,
   contentClassName,
-  primaryActionLabel = "Insert",
-  onPrimaryAction,
 }: {
   icon: ReactNode;
   title: string;
-  name: string;
   disabled?: boolean;
   action?: ReactNode;
   children: ReactNode;
-  onInsert?: (name: string) => void;
   className?: string;
   contentClassName?: string;
-  primaryActionLabel?: string;
-  onPrimaryAction?: () => void;
 }) {
-  const runPrimaryAction = () => {
-    if (onPrimaryAction) {
-      onPrimaryAction();
-      return;
-    }
-    onInsert?.(name);
-  };
-
   return (
-    <div className={cn("grid w-full gap-3", className)}>
-      <div className="flex min-w-0 items-center gap-2 p-2">
+    <div className={cn("grid w-full gap-3 p-2", className)}>
+      <div className="flex min-w-0 items-center gap-2">
         {icon}
         <div className="min-w-0 grow">
           <div className="truncate text-sm font-medium">{title}</div>
         </div>
         {action}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled || (!onPrimaryAction && !onInsert)}
-          onClick={runPrimaryAction}
-        >
-          {primaryActionLabel}
-        </Button>
       </div>
-      <div className={cn("grid gap-2 px-2", contentClassName)}>{children}</div>
+      <div className={cn("grid gap-2", contentClassName)}>{children}</div>
     </div>
   );
 }
@@ -908,7 +917,7 @@ function VariableNameInput({
     <div className={cn("grid gap-1", className)}>
       <Input
         className={cn(
-          "h-8 font-mono text-xs",
+          "h-7 font-mono text-xs",
           !showFeedback && "h-7",
           (!valid || !available) && "border-destructive"
         )}
@@ -961,7 +970,7 @@ function _dateFormatLabel(value: ThreadCurrentDateVariable["format"]): string {
 }
 
 function _selectionExists(
-  selection: VariableSelection,
+  selection: PromptVariableSelection,
   variables: Record<string, ThreadVariable>,
   customValues: Record<string, string>
 ): boolean {
