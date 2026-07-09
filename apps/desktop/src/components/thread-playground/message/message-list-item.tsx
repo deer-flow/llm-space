@@ -22,6 +22,7 @@ import { Marker, MarkerContent } from "../../ui/marker";
 import { ShineBorder } from "../../ui/shine-border";
 import { Skeleton } from "../../ui/skeleton";
 import { useThreadStore, useThreadStoreActions } from "../stores";
+import { usePromptVariableExtension } from "../use-prompt-variable-extension";
 
 import { ImageContentList } from "./image-content-view";
 import { MessageListItemHeader } from "./message-list-item-header";
@@ -51,6 +52,7 @@ function _MessageListItem({
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
   const { fidelity } = useRenderingFidelity();
+  const variableExtension = usePromptVariableExtension();
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageDataContent; contentIndex: number }[] = [];
@@ -214,6 +216,7 @@ function _MessageListItem({
               streaming={streaming}
               readonly={readonly}
               value={text}
+              extraExtensions={variableExtension}
               onChange={handleTextContentChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}

@@ -11,23 +11,23 @@ import {
 } from "../../ui/dialog";
 
 import {
-  SystemPromptVariablesPanel,
+  PromptVariablesPanel,
   type PromptVariableSelection,
-} from "./system-prompt-variables-panel";
+} from "./prompt-variables-panel";
 
-interface SystemPromptVariablesDialogProps {
+interface PromptVariablesDialogProps {
   open: boolean;
   disabled?: boolean;
   initialSelection?: PromptVariableSelection | null;
   onOpenChange: (open: boolean) => void;
 }
 
-function _SystemPromptVariablesDialog({
+function _PromptVariablesDialog({
   open,
   disabled,
   initialSelection,
   onOpenChange,
-}: SystemPromptVariablesDialogProps) {
+}: PromptVariablesDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -43,7 +43,7 @@ function _SystemPromptVariablesDialog({
             {"{{current_date}}"}` will be replaced with the current date.
           </DialogDescription>
         </DialogHeader>
-        <SystemPromptVariablesPanel
+        <PromptVariablesPanel
           className="min-h-0 grow"
           disabled={disabled}
           initialSelection={initialSelection}
@@ -53,4 +53,4 @@ function _SystemPromptVariablesDialog({
   );
 }
 
-export const SystemPromptVariablesDialog = memo(_SystemPromptVariablesDialog);
+export const PromptVariablesDialog = memo(_PromptVariablesDialog);

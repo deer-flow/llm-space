@@ -34,6 +34,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@base-ui/react": "^1.6.0",
+        "@codemirror/autocomplete": "6.20.3",
         "@codemirror/lang-json": "^6.0.2",
         "@codemirror/lang-markdown": "^6.5.0",
         "@codemirror/language": "6.12.4",
@@ -105,6 +106,10 @@
         "typebox": "catalog:",
       },
     },
+  },
+  "overrides": {
+    "@codemirror/state": "6.7.0",
+    "@codemirror/view": "6.43.5",
   },
   "catalog": {
     "@earendil-works/pi-agent-core": "^0.80.3",

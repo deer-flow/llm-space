@@ -54,7 +54,7 @@ import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import { SkillSelectionDialog } from "./skill-selection-dialog";
 
-interface SystemPromptVariablesPanelProps {
+interface PromptVariablesPanelProps {
   className?: string;
   disabled?: boolean;
   initialSelection?: PromptVariableSelection | null;
@@ -79,11 +79,11 @@ type VariableListItem =
       warning?: boolean;
     };
 
-function _SystemPromptVariablesPanel({
+function _PromptVariablesPanel({
   className,
   disabled,
   initialSelection,
-}: SystemPromptVariablesPanelProps) {
+}: PromptVariablesPanelProps) {
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
     (s) => s.thread.context?.variableVariants
@@ -118,8 +118,14 @@ function _SystemPromptVariablesPanel({
   const customValues =
     variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
 
+  // Seed from the chip-open target so the fallback effect below (which runs in
+  // the same mount commit) doesn't clobber it back to the first variable.
   const [selection, setSelection] = useState<PromptVariableSelection | null>(
-    null
+    () =>
+      initialSelection &&
+      _selectionExists(initialSelection, variables, customValues)
+        ? initialSelection
+        : null
   );
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
@@ -1040,4 +1046,4 @@ function _escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export const SystemPromptVariablesPanel = memo(_SystemPromptVariablesPanel);
+export const PromptVariablesPanel = memo(_PromptVariablesPanel);

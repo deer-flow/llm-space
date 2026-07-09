@@ -53,8 +53,8 @@ import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
+import { PromptVariablesListView } from "./prompt/prompt-variables-list-view";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
-import { SystemPromptVariablesListView } from "./prompt/system-prompt-variables-list-view";
 import { RunHistoryListView } from "./run-history-list-view";
 import {
   canRedo,
@@ -428,7 +428,7 @@ function ThreadPlaygroundContent({
                       Variables
                     </div>
                     <div className="flex grow items-center">
-                      <SystemPromptVariablesListView
+                      <PromptVariablesListView
                         disabled={readonly || systemPromptStreaming}
                       />
                     </div>

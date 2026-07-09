@@ -9,6 +9,7 @@ import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
+import { usePromptVariableExtension } from "../use-prompt-variable-extension";
 import { useStreamText } from "../use-stream-text";
 
 interface SystemPromptEditorProps {
@@ -28,6 +29,7 @@ function _SystemPromptEditor({
   const tools = useThreadStore((s) => s.thread.context?.tools);
   const threadModel = useThreadStore((s) => s.thread.model);
   const { updateSystemPrompt } = useThreadStoreActions();
+  const variableExtension = usePromptVariableExtension();
   const handleChange = useCallback(
     (value: string) => {
       updateSystemPrompt(value);
@@ -129,6 +131,7 @@ function _SystemPromptEditor({
         language="markdown"
         readonly={readonly || streaming}
         placeholder="Enter system prompt here"
+        extraExtensions={variableExtension}
         onChange={handleChange}
       />
     </div>

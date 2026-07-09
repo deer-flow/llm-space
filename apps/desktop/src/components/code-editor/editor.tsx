@@ -1,3 +1,4 @@
+import { type Extension } from "@codemirror/state";
 import CodeMirror, {
   type BasicSetupOptions,
   type ReactCodeMirrorRef,
@@ -58,6 +59,13 @@ export interface CodeEditorProps {
   streaming?: boolean;
   value: string;
   readonly?: boolean;
+  /**
+   * Extra CodeMirror extensions merged in after the base setup. Lets a caller
+   * layer editor-agnostic behavior (e.g. `{{variable}}` highlighting) without
+   * this component knowing anything domain-specific. Ignored by the plain-text
+   * (Lite) fallback. Pass a stable reference to avoid reconfiguring the editor.
+   */
+  extraExtensions?: Extension[];
   onChange?: (value: string) => void;
   onKeyDown?: (e: KeyboardEvent) => void;
   onPaste?: (e: ClipboardEvent) => void;
@@ -75,6 +83,7 @@ function _CodeEditor(
     value,
     streaming,
     readonly,
+    extraExtensions,
     onChange,
     onKeyDown,
     onPaste,
@@ -223,8 +232,8 @@ function _CodeEditor(
   );
 
   const extensions = useMemo(
-    () => createExtensions(detectedLanguage),
-    [detectedLanguage]
+    () => [...createExtensions(detectedLanguage), ...(extraExtensions ?? [])],
+    [detectedLanguage, extraExtensions]
   );
   return (
     <div

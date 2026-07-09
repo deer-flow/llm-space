@@ -24,6 +24,10 @@
     "react-dom": "^19.0.0",
     "typebox": "^1.2.8"
   },
+  "overrides": {
+    "@codemirror/state": "6.7.0",
+    "@codemirror/view": "6.43.5"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/bun": "latest",

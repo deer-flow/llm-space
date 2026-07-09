@@ -31,6 +31,20 @@ export interface RenderedSystemPrompt {
   variables: { placeholder: string; value: string }[];
 }
 
+/** A selectable variable for `{{`-triggered autocompletion. */
+export interface PromptVariableCompletion {
+  name: string;
+  /** One-line value preview for the dropdown (skills show a short summary). */
+  hint: string;
+}
+
+/** Outcome of resolving a single `{{name}}` placeholder for hover display. */
+export type VariableResolution =
+  | { status: "ok"; value: string }
+  | { status: "empty"; name: string } // defined but blank/whitespace value
+  | { status: "unknown"; name: string } // neither built-in nor a custom key
+  | { status: "invalid"; name: string }; // name fails VARIABLE_NAME_RE
+
 export class PromptVariableError extends Error {
   constructor(message: string) {
     super(message);
@@ -236,6 +250,100 @@ export async function renderSystemPromptVariables({
 
   output += systemPrompt.slice(lastIndex);
   return { systemPrompt: output, variables: rendered };
+}
+
+/**
+ * Resolve one variable by name WITHOUT any async work. Handles currentDate and
+ * custom-string variables directly; returns `needsSkills` when the name is a
+ * skills built-in so the caller can await the async path only when required.
+ * Keeps the common hover (date / custom) fully synchronous.
+ */
+export function resolvePromptVariableValueSync(
+  name: string,
+  context: ThreadContext | undefined
+): VariableResolution | { status: "needsSkills"; variable: ThreadSkillsVariable } {
+  if (!VARIABLE_NAME_RE.test(name)) {
+    return { status: "invalid", name };
+  }
+  const state = normalizePromptVariableState(context);
+  const builtIn = state.variables[name];
+  if (builtIn?.type === "currentDate") {
+    return { status: "ok", value: formatCurrentDateVariable(builtIn.format) };
+  }
+  if (builtIn?.type === "skills") {
+    return { status: "needsSkills", variable: builtIn };
+  }
+  const customValues =
+    state.variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
+  if (!(name in customValues)) {
+    return { status: "unknown", name };
+  }
+  const raw = customValues[name];
+  return raw?.trim()
+    ? { status: "ok", value: raw }
+    : { status: "empty", name };
+}
+
+/**
+ * Resolve one variable by name for hover display. Never throws. Mirrors the
+ * three branches of the runtime resolver but is lenient (drops missing skills,
+ * degrades load failures to `unknown`) since this is display-only. `loadSkills`
+ * is injected so callers can share a cached skills list across many hovers.
+ */
+export async function resolvePromptVariableValue(
+  name: string,
+  context: ThreadContext | undefined,
+  loadSkills: () => Promise<SkillInfo[]> = listEnabledPromptVariableSkills
+): Promise<VariableResolution> {
+  const fast = resolvePromptVariableValueSync(name, context);
+  if (fast.status !== "needsSkills") {
+    return fast;
+  }
+  try {
+    const all = await loadSkills();
+    const byName = new Map(all.map((skill) => [skill.name, skill]));
+    // An empty selection means "all enabled skills".
+    const selected =
+      fast.variable.skillNames.length === 0
+        ? all
+        : fast.variable.skillNames.flatMap((skillName) => {
+            const skill = byName.get(skillName);
+            return skill ? [skill] : [];
+          });
+    const value = formatSkillsVariable(selected, fast.variable);
+    return value.trim() ? { status: "ok", value } : { status: "empty", name };
+  } catch {
+    return { status: "unknown", name };
+  }
+}
+
+/**
+ * List every variable available for `{{`-triggered autocompletion (built-ins +
+ * custom), each with a one-line, synchronous value preview. Skills show a short
+ * summary rather than their full resolved list (which would require async IO).
+ */
+export function listPromptVariableCompletions(
+  context: ThreadContext | undefined
+): PromptVariableCompletion[] {
+  const state = normalizePromptVariableState(context);
+  const items: PromptVariableCompletion[] = [];
+  for (const [name, variable] of Object.entries(state.variables)) {
+    const hint =
+      variable.type === "currentDate"
+        ? formatCurrentDateVariable(variable.format)
+        : variable.skillNames.length === 0
+          ? "All enabled skills"
+          : `${variable.skillNames.length} selected skill${
+              variable.skillNames.length === 1 ? "" : "s"
+            }`;
+    items.push({ name, hint });
+  }
+  const customValues =
+    state.variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
+  for (const [name, value] of Object.entries(customValues)) {
+    items.push({ name, hint: value.trim() ? _singleLine(value) : "(empty)" });
+  }
+  return items.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function _normalizeThreadVariables(

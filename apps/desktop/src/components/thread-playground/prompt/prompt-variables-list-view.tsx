@@ -11,7 +11,7 @@ import {
   SparklesIcon,
   TypeIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Tooltip } from "@/components/tooltip";
@@ -26,8 +26,8 @@ import {
 } from "../prompt-variables";
 import { useThreadStore } from "../stores";
 
-import { SystemPromptVariablesDialog } from "./system-prompt-variables-dialog";
-import type { PromptVariableSelection } from "./system-prompt-variables-panel";
+import { PromptVariablesDialog } from "./prompt-variables-dialog";
+import type { PromptVariableSelection } from "./prompt-variables-panel";
 
 type VariableListItem =
   | {
@@ -45,7 +45,7 @@ type VariableListItem =
       warning?: boolean;
     };
 
-export function SystemPromptVariablesListView({
+export function PromptVariablesListView({
   className,
   disabled,
 }: {
@@ -99,10 +99,10 @@ export function SystemPromptVariablesListView({
     useState<PromptVariableSelection | null>(null);
   const [animationContainerRef] = useAutoAnimation({ duration: 150 });
 
-  const openVariable = (item: VariableListItem) => {
+  const openVariable = useCallback((item: VariableListItem) => {
     setInitialSelection({ kind: item.kind, name: item.name });
     setDialogOpen(true);
-  };
+  }, []);
 
   const openManage = () => {
     setInitialSelection(null);
@@ -136,7 +136,7 @@ export function SystemPromptVariablesListView({
           <PlusIcon className="size-3" />
           Add
         </Button>
-        <SystemPromptVariablesDialog
+        <PromptVariablesDialog
           open={dialogOpen}
           disabled={disabled}
           initialSelection={initialSelection}
@@ -152,7 +152,7 @@ export function SystemPromptVariablesListView({
   );
 }
 
-function VariableEntry({
+function _VariableEntry({
   item,
   disabled,
   onOpen,
@@ -228,6 +228,8 @@ function VariableEntry({
     </div>
   );
 }
+
+const VariableEntry = memo(_VariableEntry);
 
 function _variableIcon(item: VariableListItem) {
   if (item.kind === "custom") {

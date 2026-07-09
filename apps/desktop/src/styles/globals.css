@@ -157,6 +157,9 @@
   --color-4: oklch(80.2% 0.134 225);
   --color-5: oklch(90.7% 0.231 133);
 
+  /* {{variable}} placeholder highlight — deeper amber for contrast on light. */
+  --cm-variable: oklch(0.6 0.14 80);
+
   font-weight: 300;
 }
 
@@ -197,6 +200,9 @@
   --tab-bar-bottom: #323639;
 
   font-weight: 300;
+
+  /* {{variable}} placeholder highlight — brighter yellow for the dark theme. */
+  --cm-variable: oklch(0.86 0.15 95);
 
   --color-1: oklch(66.2% 0.225 25.9);
 
