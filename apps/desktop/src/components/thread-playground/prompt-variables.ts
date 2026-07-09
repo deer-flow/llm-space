@@ -375,21 +375,21 @@ async function _renderVariableValue(
     if (builtIn.type === "currentDate") {
       return formatCurrentDateVariable(builtIn.format);
     }
-    if (builtIn.skillNames.length === 0) {
-      throw new PromptVariableError(
-        `Variable "${name}" has no skills selected. Select at least one skill in the Variables panel.`
-      );
-    }
     await loadSkills();
-    const selected = builtIn.skillNames.map((skillName) => {
-      const skill = skills.get(skillName);
-      if (!skill) {
-        throw new PromptVariableError(
-          `Skill "${skillName}" in variable "${name}" is not enabled or cannot be found.`
-        );
-      }
-      return skill;
-    });
+    // An empty selection means "all enabled skills" — the default that keeps
+    // newly-added skills included without re-editing the variable.
+    const selected =
+      builtIn.skillNames.length === 0
+        ? [...skills.values()]
+        : builtIn.skillNames.map((skillName) => {
+            const skill = skills.get(skillName);
+            if (!skill) {
+              throw new PromptVariableError(
+                `Skill "${skillName}" in variable "${name}" is not enabled or cannot be found.`
+              );
+            }
+            return skill;
+          });
     return formatSkillsVariable(selected, builtIn);
   }
 
@@ -444,7 +444,7 @@ function _formatSkillsMarkdownList(skills: SkillInfo[]): string {
       (skill) =>
         `- **${_escapeMarkdownCode(skill.name)}**: ${_singleLine(skill.description)}`
     )
-    .join("\n");
+    .join("\n\n");
 }
 
 function _indentLines(value: string, indent: number): string {

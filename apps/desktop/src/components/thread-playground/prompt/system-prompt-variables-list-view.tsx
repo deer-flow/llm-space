@@ -80,17 +80,15 @@ export function SystemPromptVariablesListView({
         variable,
         status:
           variable.skillNames.length === 0
-            ? "No skills selected"
+            ? "All skills"
             : `${variable.skillNames.length} selected`,
-        warning: variable.skillNames.length === 0,
       };
     });
     const custom = Object.entries(customValues).map(([name, value]) => ({
       kind: "custom" as const,
       name,
       value,
-      status: value.trim() ? "Value set" : "Empty",
-      warning: value.trim() === "",
+      status: value.trim() ? value : "(empty)",
     }));
     return [...builtIns, ...custom];
   }, [customValues, variables]);
@@ -170,7 +168,7 @@ function VariableEntry({
             <div className="font-mono font-medium">{item.name}</div>
             <div
               className={cn(
-                "text-muted-foreground",
+                "text-muted-foreground max-w-64 truncate",
                 item.warning && "text-orange-300"
               )}
             >

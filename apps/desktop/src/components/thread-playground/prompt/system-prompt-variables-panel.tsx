@@ -7,8 +7,8 @@ import type {
 } from "@llm-space/core";
 import {
   CalendarDaysIcon,
+  ListFilterIcon,
   PlusIcon,
-  Settings2Icon,
   SparklesIcon,
   Trash2Icon,
   TypeIcon,
@@ -157,20 +157,18 @@ function _SystemPromptVariablesPanel({
         variable,
         status:
           selectedCount === 0
-            ? "No skills selected"
+            ? "All skills"
             : missingCount > 0
               ? `${missingCount} missing`
               : `${selectedCount} selected`,
-        warning:
-          selectedCount === 0 || missingCount > 0 || Boolean(skillsError),
+        warning: missingCount > 0 || Boolean(skillsError),
       };
     });
     const custom = Object.entries(customValues).map(([name, value]) => ({
       kind: "custom" as const,
       name,
       value,
-      status: value.trim() ? "Value set" : "Empty",
-      warning: value.trim() === "",
+      status: value.trim() ? value : "(empty)",
     }));
     return { builtInItems, customItems: custom };
   }, [customValues, skillsByName, skillsError, variables]);
@@ -256,8 +254,9 @@ function _SystemPromptVariablesPanel({
     [removeCustomVariable, systemPrompt]
   );
   const detailFillsAvailableHeight =
-    selection?.kind === "builtIn" &&
-    variables[selection.name]?.type === "skills";
+    selection?.kind === "custom" ||
+    (selection?.kind === "builtIn" &&
+      variables[selection.name]?.type === "skills");
 
   return (
     <section
@@ -594,7 +593,7 @@ function CurrentDateVariableDetail({
               onUpdate(name, { ...variable, format })
             }
           >
-            <SelectTrigger aria-label="Current date format">
+            <SelectTrigger className="w-full" aria-label="Current date format">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -644,13 +643,18 @@ function SkillsVariableDetail({
     const skill = skillsByName.get(skillName);
     return skill ? [skill] : [];
   });
+  // Empty selection means "all enabled skills".
+  const usingAllSkills = variable.skillNames.length === 0;
+  const someMissing =
+    !usingAllSkills && selectedSkills.length !== variable.skillNames.length;
   const preview =
     skillsError ??
-    (variable.skillNames.length === 0
-      ? "No skills selected."
-      : selectedSkills.length !== variable.skillNames.length
-        ? "Some selected skills are no longer enabled."
-        : formatSkillsVariable(selectedSkills, variable));
+    (someMissing
+      ? "Some selected skills are no longer enabled."
+      : formatSkillsVariable(
+          usingAllSkills ? skills : selectedSkills,
+          variable
+        ));
 
   const update = (next: Partial<ThreadSkillsVariable>) => {
     onUpdate(name, { ...variable, ...next });
@@ -659,18 +663,18 @@ function SkillsVariableDetail({
   return (
     <DetailShell
       icon={<SparklesIcon className="text-muted-foreground size-4" />}
-      title="Skills"
+      title="Available skills"
       disabled={disabled}
       action={
-        <Tooltip content="Configure skills">
+        <Tooltip content="Select skills">
           <Button
             size="icon-sm"
             variant="outline"
-            aria-label="Configure skills"
+            aria-label="Select skills"
             disabled={disabled}
             onClick={() => setSkillsDialogOpen(true)}
           >
-            <Settings2Icon className="size-3.5" />
+            <ListFilterIcon className="size-3.5" />
           </Button>
         </Tooltip>
       }
@@ -696,7 +700,7 @@ function SkillsVariableDetail({
               update({ format })
             }
           >
-            <SelectTrigger aria-label="Skills format">
+            <SelectTrigger className="w-full" aria-label="Skills format">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -714,27 +718,23 @@ function SkillsVariableDetail({
             disabled={disabled}
             onValueChange={(indent) => update({ indent: Number(indent) })}
           >
-            <SelectTrigger aria-label="Skills indentation">
+            <SelectTrigger className="w-full" aria-label="Skills indentation">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {PROMPT_SKILLS_INDENTS.map((indent) => (
                 <SelectItem key={indent} value={String(indent)}>
-                  {indent} spaces
+                  {indent === 0 ? "Default" : `${indent} spaces`}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
       </div>
-      <Field label="Example" className="flex min-h-0 grow flex-col">
+      <Field label="Value" className="flex min-h-0 grow flex-col">
         <PreviewBlock
           className="max-h-none min-h-32 grow"
-          muted={
-            skillsLoading ||
-            Boolean(skillsError) ||
-            selectedSkills.length !== variable.skillNames.length
-          }
+          muted={skillsLoading || Boolean(skillsError) || someMissing}
           value={skillsLoading ? "Loading skills..." : preview}
         />
       </Field>
@@ -771,11 +771,10 @@ function CustomVariableDetail({
   onUpdate: (name: string, value: string) => void;
   onRemove: (name: string) => void;
 }) {
-  const empty = value.trim() === "";
   return (
     <DetailShell
       icon={<TypeIcon className="text-muted-foreground size-4" />}
-      title="Custom"
+      title="User defined variable"
       disabled={disabled}
       action={
         <Button
@@ -788,6 +787,8 @@ function CustomVariableDetail({
           <Trash2Icon className="size-3.5" />
         </Button>
       }
+      className="flex h-full flex-col"
+      contentClassName="flex min-h-0 grow flex-col"
     >
       <Field label="Name">
         <VariableNameInput
@@ -799,23 +800,15 @@ function CustomVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Value">
+      <Field label="Value" className="flex min-h-0 grow flex-col">
         <Textarea
-          className={cn(
-            "min-h-20 resize-y font-mono text-xs",
-            empty && "border-destructive"
-          )}
+          className="min-h-32 grow resize-none font-mono text-xs"
           value={value}
           disabled={disabled}
           placeholder="Variable value"
           onChange={(event) => onUpdate(name, event.currentTarget.value)}
         />
       </Field>
-      {empty ? (
-        <div className="text-destructive text-xs">
-          Empty custom variables block runs when referenced.
-        </div>
-      ) : null}
     </DetailShell>
   );
 }

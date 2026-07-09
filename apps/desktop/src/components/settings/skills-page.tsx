@@ -29,19 +29,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
-import { Switch } from "@/components/ui/switch";
 import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
 import type { SkillInfo, SkillsSettings } from "@/shared/skills";
 
 import { ConfirmDialog } from "../confirm-dialog";
+import { SkillListItem } from "../skill-list-item";
 import { ScrollArea } from "../ui/scroll-area";
 
 import { SettingsPage } from "./settings-page";
@@ -378,8 +371,10 @@ function PathSkills({ path }: { path: string | null }) {
         {skills.map((skill) => (
           <SkillListItem
             key={skill.name}
-            skill={skill}
-            onToggle={(enabled) => void handleToggle(skill.name, enabled)}
+            name={skill.name}
+            description={skill.description}
+            checked={skill.enabled}
+            onCheckedChange={(enabled) => void handleToggle(skill.name, enabled)}
           />
         ))}
       </div>
@@ -392,35 +387,5 @@ function PathSkills({ path }: { path: string | null }) {
         <div className="flex flex-col gap-2 pr-4 pl-6">{content}</div>
       </ScrollArea>
     </div>
-  );
-}
-
-function SkillListItem({
-  skill,
-  onToggle,
-}: {
-  skill: SkillInfo;
-  onToggle: (enabled: boolean) => void;
-}) {
-  return (
-    <Item variant="muted" size="sm">
-      <ItemMedia>
-        <Folder className="text-muted-foreground size-4" />
-      </ItemMedia>
-      <ItemContent className={cn(!skill.enabled && "opacity-50")}>
-        <ItemTitle>{skill.name}</ItemTitle>
-        {skill.description && (
-          <ItemDescription>{skill.description}</ItemDescription>
-        )}
-      </ItemContent>
-      <Switch
-        size="sm"
-        checked={skill.enabled}
-        onCheckedChange={onToggle}
-        aria-label={
-          skill.enabled ? `Disable ${skill.name}` : `Enable ${skill.name}`
-        }
-      />
-    </Item>
   );
 }
