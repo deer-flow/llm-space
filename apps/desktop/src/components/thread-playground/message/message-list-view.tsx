@@ -7,7 +7,7 @@ import {
 } from "@hello-pangea/dnd";
 import type { AssistantMessage, Message, ThreadContext } from "@llm-space/core";
 import { PlusIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -163,42 +163,70 @@ function DroppableMessageList({
       {...droppableProvided.droppableProps}
     >
       {messages.map((message, index) => (
-        <Draggable
+        <DraggableMessageRow
           key={message.id}
-          draggableId={message.id}
+          message={message}
           index={index}
-          isDragDisabled={readonly}
-        >
-          {(draggableProvided) => {
-            const { style, ...draggableProps } =
-              draggableProvided.draggableProps;
-            return (
-              <div
-                ref={draggableProvided.innerRef}
-                {...draggableProps}
-                // Spacing lives on the draggable as a margin (not a flex `gap`
-                // on the list) because @hello-pangea/dnd measures item margins
-                // to size the placeholder and compute drag displacement — a
-                // `gap` is invisible to it and offsets every item mid-drag.
-                className="mb-3.5"
-                style={style}
-              >
-                <MessageListItem
-                  message={message}
-                  readonly={readonly}
-                  autoFocus={message.id === autoFocusMessageId}
-                  collapsed={collapsedMessageIds.includes(message.id)}
-                  dragHandleProps={draggableProvided.dragHandleProps}
-                />
-              </div>
-            );
-          }}
-        </Draggable>
+          readonly={readonly}
+          autoFocus={message.id === autoFocusMessageId}
+          collapsed={collapsedMessageIds.includes(message.id)}
+        />
       ))}
       {droppableProvided.placeholder}
     </div>
   );
 }
+
+// One draggable row. The `memo` boundary sits *above* the `<Draggable>` (not
+// inside its render prop) so that editing one message doesn't re-render every
+// row: @hello-pangea/dnd hands the render prop a fresh `draggableProvided` (with
+// a new `dragHandleProps` object) on every parent render, which would defeat a
+// memo placed on MessageListItem alone. With only stable data props here, the
+// rows whose message/flags are unchanged bail — their `Draggable` and
+// MessageListItem never re-render. Drags still work: the dragging/displaced rows
+// re-render via the dnd store subscription inside `Draggable`, not via props.
+const _DraggableMessageRow = function DraggableMessageRow({
+  message,
+  index,
+  readonly,
+  autoFocus,
+  collapsed,
+}: {
+  message: Message;
+  index: number;
+  readonly: boolean;
+  autoFocus: boolean;
+  collapsed: boolean;
+}) {
+  return (
+    <Draggable draggableId={message.id} index={index} isDragDisabled={readonly}>
+      {(draggableProvided) => {
+        const { style, ...draggableProps } = draggableProvided.draggableProps;
+        return (
+          <div
+            ref={draggableProvided.innerRef}
+            {...draggableProps}
+            // Spacing lives on the draggable as a margin (not a flex `gap` on the
+            // list) because @hello-pangea/dnd measures item margins to size the
+            // placeholder and compute drag displacement — a `gap` is invisible to
+            // it and offsets every item mid-drag.
+            className="mb-3.5"
+            style={style}
+          >
+            <MessageListItem
+              message={message}
+              readonly={readonly}
+              autoFocus={autoFocus}
+              collapsed={collapsed}
+              dragHandleProps={draggableProvided.dragHandleProps}
+            />
+          </div>
+        );
+      }}
+    </Draggable>
+  );
+};
+const DraggableMessageRow = memo(_DraggableMessageRow);
 
 function StreamingMessageListItem({ streaming }: { streaming: boolean }) {
   let streamingMessage: AssistantMessage | null = useThreadStore(
