@@ -40,6 +40,12 @@ function ThemedToaster() {
       position="top-center"
       offset={28}
       closeButton
+      toastOptions={{
+        classNames: {
+          toast: "cn-toast",
+          description: "text-muted-foreground!",
+        },
+      }}
     />
   );
 }

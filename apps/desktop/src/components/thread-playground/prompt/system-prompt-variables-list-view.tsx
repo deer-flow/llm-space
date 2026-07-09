@@ -6,11 +6,13 @@ import type {
 } from "@llm-space/core";
 import {
   CalendarDaysIcon,
+  CopyIcon,
   PlusIcon,
   SparklesIcon,
   TypeIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Tooltip } from "@/components/tooltip";
 import { useAutoAnimation } from "@/lib/use-auto-animation";
@@ -160,6 +162,7 @@ function VariableEntry({
   onOpen: (item: VariableListItem) => void;
 }) {
   const VariableIcon = _variableIcon(item);
+  const token = `{{${item.name}}}`;
   return (
     <div className="group/variable bg-secondary hover:text-accent-foreground inline-flex h-6 shrink-0 items-center rounded-md text-xs/relaxed transition-colors">
       <Tooltip
@@ -181,7 +184,7 @@ function VariableEntry({
           <button
             type="button"
             className={cn(
-              "focus-visible:ring-ring/30 text-muted-foreground group-hover/variable:text-foreground inline-flex h-full items-center gap-1 rounded-md px-2 outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50",
+              "focus-visible:ring-ring/30 text-muted-foreground group-hover/variable:text-foreground inline-flex h-full items-center gap-1 rounded-l-md pl-2 outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50",
               item.warning &&
                 "text-orange-300 group-hover/variable:text-orange-300"
             )}
@@ -193,6 +196,34 @@ function VariableEntry({
             <span className="font-mono">{item.name}</span>
           </button>
         </span>
+      </Tooltip>
+      <Tooltip
+        content={
+          <div className="max-w-56">
+            <div>
+              Copy <span className="font-mono">{token}</span>
+            </div>
+            <div className="text-muted-foreground pt-1">
+              Paste it into your prompt, messages, or tool results to reference
+              this variable.
+            </div>
+          </div>
+        }
+      >
+        <button
+          type="button"
+          aria-label={`Copy ${token}`}
+          className="text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 opacity-0 outline-none group-hover/variable:opacity-100 hover:opacity-100 focus-visible:ring-2"
+          onClick={() => {
+            void navigator.clipboard.writeText(token);
+            toast.success(`Copied ${token}`, {
+              description:
+                "Paste it into your prompt, messages, or tool results to reference this variable.",
+            });
+          }}
+        >
+          <CopyIcon className="size-3" />
+        </button>
       </Tooltip>
     </div>
   );

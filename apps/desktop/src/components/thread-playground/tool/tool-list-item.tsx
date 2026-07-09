@@ -1,11 +1,7 @@
 "use client";
 
 import { type Tool } from "@llm-space/core";
-import {
-  CableIcon,
-  FunctionSquareIcon,
-  XIcon,
-} from "lucide-react";
+import { CableIcon, FunctionSquareIcon, XIcon } from "lucide-react";
 import React, { memo, useCallback, useMemo } from "react";
 
 import { cn } from "@/lib/utils";
@@ -105,7 +101,7 @@ function _ToolListItem({
           disabled={readonly}
           aria-label={`Remove ${tool.name} tool`}
           className={cn(
-            "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 transition-opacity outline-none hover:opacity-100 focus-visible:ring-2",
+            "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 outline-none hover:opacity-100 focus-visible:ring-2",
             readonly ? "opacity-0!" : "opacity-0 group-hover/tool:opacity-100"
           )}
           onClick={handleRemove}
