@@ -79,8 +79,8 @@ bun run build:canary
 
 中文用户指南在这个仓库中：
 
-- [文档索引](./docs/index.zh-CN.md)
 - [快速开始](./docs/get-started.zh-CN.md)
+- [用户手册](./docs/index.zh-CN.md)
 - [核心概念](./docs/core-concepts.zh-CN.md)
 
 ## 参与贡献

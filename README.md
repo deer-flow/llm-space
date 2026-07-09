@@ -79,8 +79,8 @@ bun run build:canary
 
 The user guide lives in this repository:
 
-- [Documentation index](./docs/index.md)
 - [Quick start](./docs/get-started.md)
+- [User manual](./docs/index.md)
 - [Core concepts](./docs/core-concepts.md)
 
 ## Contributing
