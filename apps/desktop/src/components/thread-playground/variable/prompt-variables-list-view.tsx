@@ -20,13 +20,13 @@ import { useAutoAnimation } from "@/lib/use-auto-animation";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../../ui/button";
+import { useThreadStore } from "../stores";
+
 import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   normalizePromptVariableState,
   PROMPT_DATE_FORMATS,
-} from "../prompt-variables";
-import { useThreadStore } from "../stores";
-
+} from "./prompt-variables";
 import { PromptVariablesDialog } from "./prompt-variables-dialog";
 import type { PromptVariableSelection } from "./prompt-variables-panel";
 

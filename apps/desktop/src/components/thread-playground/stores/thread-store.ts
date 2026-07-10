@@ -35,6 +35,7 @@ import { createStore, useStore, type StoreApi } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/shallow";
 
+import { aggregateMessageUsage } from "../token-usage";
 import {
   createMessagePromptVariablePlaceKey,
   createToolResultPromptVariablePlaceKey,
@@ -46,8 +47,7 @@ import {
   replaceThreadPromptVariableReferences,
   renderThreadPromptVariables,
   SYSTEM_PROMPT_PLACE_KEY,
-} from "../prompt-variables";
-import { aggregateMessageUsage } from "../token-usage";
+} from "../variable/prompt-variables";
 
 import {
   createInitialHistory,

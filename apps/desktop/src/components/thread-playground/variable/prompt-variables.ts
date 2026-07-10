@@ -780,13 +780,23 @@ async function _renderTextPromptVariables({
       continue;
     }
     const placeholder = match[0];
-    const name = _placeholderName(match[1], placeholder);
-    let value = placeValues[name] ?? frozenPlaceValues[name];
+    const name = match[1].trim();
+    // Arbitrary "{{...}}" text can appear in message and tool-result content
+    // (e.g. a web-search response). Leave any placeholder whose name isn't a
+    // valid variable reference untouched rather than failing the whole run.
+    if (!VARIABLE_NAME_RE.test(name)) {
+      continue;
+    }
+    let value: string | undefined = placeValues[name] ?? frozenPlaceValues[name];
     if (value === undefined) {
       value = await _renderVariableValue(name, renderState.state, {
         loadSkills: renderState.loadSkills,
         skills: renderState.skills,
       });
+      // Unknown variable name — keep the original placeholder text as-is.
+      if (value === undefined) {
+        continue;
+      }
     }
     placeValues[name] = value;
     output += text.slice(lastIndex, index);
@@ -967,7 +977,7 @@ async function _renderVariableValue(
     loadSkills: () => Promise<void>;
     skills: Map<string, SkillInfo>;
   }
-): Promise<string> {
+): Promise<string | undefined> {
   const builtIn = state.variables[name];
   if (builtIn) {
     if (builtIn.type === "currentDate") {
@@ -994,27 +1004,14 @@ async function _renderVariableValue(
   const customValues =
     state.variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
   if (!(name in customValues)) {
-    throw new PromptVariableError(`Variable "${name}" is missing.`);
+    // Not a known variable — signal the caller to keep the literal placeholder.
+    return undefined;
   }
   const value = customValues[name]?.trim();
   if (!value) {
     throw new PromptVariableError(`Variable "${name}" is empty.`);
   }
   return customValues[name];
-}
-
-function _placeholderName(raw: string, placeholder: string): string {
-  const name = raw.trim();
-  if (name.startsWith("llm_space.")) {
-    throw new PromptVariableError(
-      `Legacy prompt variable "${placeholder}" is no longer supported. Configure it in the Variables panel and use {{variable_name}}.`
-    );
-  }
-  _assertVariableName(
-    name,
-    `Invalid prompt variable "${placeholder}". Use {{variable_name}}.`
-  );
-  return name;
 }
 
 function _assertVariableName(name: string, message: string): void {

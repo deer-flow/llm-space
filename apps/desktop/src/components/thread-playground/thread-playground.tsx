@@ -53,7 +53,6 @@ import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
-import { PromptVariablesListView } from "./prompt/prompt-variables-list-view";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
 import {
@@ -70,6 +69,7 @@ import {
 import { ToolListView } from "./tool/tool-list-view";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
+import { PromptVariablesListView } from "./variable/prompt-variables-list-view";
 
 export interface ThreadPlaygroundProps {
   className?: string;

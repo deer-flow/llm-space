@@ -39,6 +39,8 @@ import {
   SelectValue,
 } from "../../ui/select";
 import { Textarea } from "../../ui/textarea";
+import { useThreadStore, useThreadStoreActions } from "../stores";
+
 import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   formatCurrentDateVariable,
@@ -49,9 +51,7 @@ import {
   PROMPT_SKILLS_FORMATS,
   PROMPT_SKILLS_INDENTS,
   VARIABLE_NAME_RE,
-} from "../prompt-variables";
-import { useThreadStore, useThreadStoreActions } from "../stores";
-
+} from "./prompt-variables";
 import { SkillSelectionDialog } from "./skill-selection-dialog";
 
 interface PromptVariablesPanelProps {

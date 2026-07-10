@@ -22,9 +22,9 @@ import { CollapsibleContent } from "../../ui/collapsible-content";
 import { Marker, MarkerContent } from "../../ui/marker";
 import { ShineBorder } from "../../ui/shine-border";
 import { Skeleton } from "../../ui/skeleton";
-import { createMessagePromptVariablePlaceKey } from "../prompt-variables";
 import { useThreadStore, useThreadStoreActions } from "../stores";
-import { usePromptVariableExtensionForContext } from "../use-prompt-variable-extension";
+import { createMessagePromptVariablePlaceKey } from "../variable/prompt-variables";
+import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ImageContentList } from "./image-content-view";
 import { MessageListItemHeader } from "./message-list-item-header";

@@ -25,9 +25,9 @@ import { cn } from "@/lib/utils";
 import { CodeEditor, type CodeEditorProps } from "../../code-editor";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
-import { createToolResultPromptVariablePlaceKey } from "../prompt-variables";
 import { useThreadStoreActions } from "../stores";
-import { usePromptVariableExtensionForContext } from "../use-prompt-variable-extension";
+import { createToolResultPromptVariablePlaceKey } from "../variable/prompt-variables";
+import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ToolCallInputView } from "./tool-call-input-view";
 import { getToolCallOutputText } from "./tool-call-status";

@@ -8,10 +8,10 @@ import metaPrompt from "../examples/meta-prompt.md?raw";
 import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
-import { SYSTEM_PROMPT_PLACE_KEY } from "../prompt-variables";
 import { useThreadStore, useThreadStoreActions } from "../stores";
-import { usePromptVariableExtension } from "../use-prompt-variable-extension";
 import { useStreamText } from "../use-stream-text";
+import { SYSTEM_PROMPT_PLACE_KEY } from "../variable/prompt-variables";
+import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
 
 interface SystemPromptEditorProps {
   className?: string;
