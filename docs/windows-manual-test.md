@@ -1,112 +1,114 @@
-# Windows 手动测试指南（首个 Windows 移植验证）
+# Windows Manual Test Guide (first Windows port verification)
 
-> 目标读者：拥有 Windows 11 测试环境的测试人员 / agent。
-> 预计耗时：30–45 分钟。请按顺序执行，逐项记录 ✅ / ❌ / 备注（含截图更佳）。
+> For Chinese, see [Windows 手动测试指南](./windows-manual-test.zh-CN.md).
+>
+> Audience: a tester / agent with a Windows 11 test environment.
+> Estimated time: 30–45 minutes. Work through the sections in order and record ✅ / ❌ / notes for each item (screenshots welcome).
 
-## 0. 获取被测包
+## 0. Get the build under test
 
-1. 打开仓库 GitHub → Actions → **Windows branch build** workflow → 最新一次成功 run。
-2. 下载 artifact `llm-space-win-x64-canary`，解压得到 `canary-win-x64-LLMSpace-Setup-canary.zip` 等文件。
-3. 再解压 `*-Setup*.zip` 得到 Setup exe。
+1. Open the repository on GitHub → Actions → **Windows branch build** workflow → the latest successful run.
+2. Download the `llm-space-win-x64-canary` artifact and unzip it; it contains `canary-win-x64-LLMSpace-Setup-canary.zip` and friends.
+3. Unzip `*-Setup*.zip` to get the Setup exe.
 
-环境要求：Windows 11 x64（§8 有一条可选的 Win10 冒烟项）。系统需有 WebView2 Runtime（Win11 自带）。
+Environment: Windows 11 x64 (§8 has one optional Win10 smoke item). The system needs the WebView2 Runtime (bundled with Windows 11).
 
-## 1. 安装与首启（阻塞级）
+## 1. Install and first launch (blocking)
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 1.1 | 双击 Setup exe | SmartScreen 警告属预期（未签名）：「更多信息 → 仍要运行」后正常继续 |
-| 1.2 | 完成自解压安装并启动 | 应用启动，出现深色主界面（欢迎页或工作区），无控制台窗口 |
-| 1.3 | 任务栏图标 | 显示 LLM Space 图标（非默认 exe 图标），16px 下不模糊 |
-| 1.4 | 数据目录 | `%APPDATA%\llm-space` 被创建，含 `workspace/`、`settings/` |
+| 1.1 | Double-click the Setup exe | A SmartScreen warning is expected (unsigned build): "More info → Run anyway" continues normally |
+| 1.2 | Finish the self-extracting install and launch | The app starts with the dark main UI (welcome screen or workspace), no console window |
+| 1.3 | Taskbar icon | Shows the LLM Space icon (not the default exe icon), crisp at 16px |
+| 1.4 | Data directory | `%APPDATA%\llm-space` is created, containing `workspace/` and `settings/` |
 
-启动失败时：PowerShell 里 `$env:ELECTROBUN_CONSOLE=1; & "<安装路径>\LLM Space.exe"` 抓控制台输出附在报告里。
+If launch fails: in PowerShell run `$env:ELECTROBUN_CONSOLE=1; & "<install path>\LLM Space.exe"` and attach the console output to your report.
 
-## 2. 窗口 chrome（本移植的最大风险面）
+## 2. Window chrome (the biggest risk area of this port)
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 2.1 | 观察窗口 | 无系统标题栏；右上角有自绘的 ➖ ▢ ✕ 三键 |
-| 2.2 | 悬停 ✕ | 背景变红（#C42B1C），图标变白 |
-| 2.3 | 三键逐个点击 | 最小化 / 最大化↔还原 / 关闭均生效 |
-| 2.4 | 拖动顶部标签条空白区 | 可拖动窗口 |
-| 2.5 | 双击标签条空白区 | 最大化 ↔ 还原 |
-| 2.6 | 窗口边缘拖拽 | 八方向均可调整大小，窗口有阴影 |
-| 2.7 | **Snap**：Win+←/→、拖到屏幕边缘 | 正常贴边分屏 |
-| 2.8 | **Snap Layouts**：悬停自绘最大化按钮 | （已知风险项）记录是否出现布局面板；不出现不算失败，请标注 |
-| 2.9 | 最大化状态下关闭重开 | 恢复最大化；普通状态下移动/缩放后重开恢复位置 |
-| 2.10 | 侧栏收起（Ctrl+B 两次观察） | 左上角切换按钮不悬空、无为 mac 红绿灯预留的空白；侧栏头部显示 "LLM Space 4" 标题 |
+| 2.1 | Observe the window | No system title bar; self-drawn ➖ ▢ ✕ buttons in the top-right corner |
+| 2.2 | Hover ✕ | Background turns red (#C42B1C), glyph turns white |
+| 2.3 | Click each of the three buttons | Minimize / maximize↔restore / close all work |
+| 2.4 | Drag the empty area of the top tab strip | Window moves |
+| 2.5 | Double-click the empty tab-strip area | Maximize ↔ restore |
+| 2.6 | Drag the window edges | Resizable in all eight directions; the window has a DWM shadow |
+| 2.7 | **Snap**: Win+←/→, drag to screen edges | Normal snap/split behavior |
+| 2.8 | **Snap Layouts**: hover the self-drawn maximize button | (Known risk item) Record whether the layout flyout appears; its absence is not a failure, but note it |
+| 2.9 | Close while maximized, then reopen | Restores maximized; after moving/resizing in normal state, position is restored on reopen |
+| 2.10 | Collapse the sidebar (press Ctrl+B twice and watch) | The toggle button in the top-left doesn't float oddly and there is no blank inset reserved for macOS traffic lights; the sidebar header shows the "LLM Space 4" title |
 
-## 3. 快捷键（Windows 无菜单栏，全部来自应用内 keymap）
+## 3. Keyboard shortcuts (no menu bar on Windows — all from the in-app keymap)
 
-逐条验证，重点关注与浏览器默认行为的冲突（WebView2 可能吞掉 Ctrl+N/W 等——发现被吞必须记录）：
+Verify each row. Pay special attention to conflicts with browser default behavior (WebView2 may swallow Ctrl+N/W etc. — any swallowed chord MUST be recorded):
 
-| 快捷键 | 预期 |
+| Shortcut | Expected |
 |---|---|
-| `Ctrl + Shift + P` | 打开 Command Palette |
-| `Ctrl + ,` | 打开 Settings |
-| `Ctrl + N` / `Ctrl + Shift + N` | 新建 Thread / 新建文件夹 |
-| `Ctrl + W` / `Ctrl + Shift + T` | 关闭标签页 / 重新打开 |
-| `Ctrl + B` | 切换侧栏 |
-| `Ctrl + +` `Ctrl + -` `Ctrl + 0` | 缩放（见 §4） |
-| `Ctrl + Alt + ←/→` | 切换标签页 |
-| `F11` | 进入/退出全屏；全屏时自绘窗口按钮隐藏 |
-| `Ctrl + Shift + R` | 重载应用 |
-| 编辑器内 `Ctrl + Enter` | 运行 Thread（需先配好模型，可与 §6 合并验证） |
+| `Ctrl + Shift + P` | Opens the Command Palette |
+| `Ctrl + ,` | Opens Settings |
+| `Ctrl + N` / `Ctrl + Shift + N` | New Thread / new folder |
+| `Ctrl + W` / `Ctrl + Shift + T` | Close tab / reopen closed tab |
+| `Ctrl + B` | Toggle sidebar |
+| `Ctrl + +` `Ctrl + -` `Ctrl + 0` | Zoom (see §4) |
+| `Ctrl + Alt + ←/→` | Switch tabs |
+| `F11` | Enter/exit fullscreen; the self-drawn window buttons hide in fullscreen |
+| `Ctrl + Shift + R` | Reload the app |
+| `Ctrl + Enter` inside an editor | Run the Thread (needs a configured model; can be combined with §6) |
 
-## 4. 页面缩放（CSS zoom 兜底路径）
+## 4. Page zoom (the CSS-zoom fallback path)
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 4.1 | `Ctrl + +` ×3 | 界面整体放大，布局不破 |
-| 4.2 | `Ctrl + 0` → `Ctrl + -` ×2 | 恢复 100% → 缩小 |
-| 4.3 | 设为 120% 后 `Ctrl + Shift + R` 重载 | 缩放保持 120% |
-| 4.4 | 设为 120% 后退出应用重开 | 缩放保持 120% |
+| 4.1 | `Ctrl + +` ×3 | The whole UI scales up without breaking layout |
+| 4.2 | `Ctrl + 0` → `Ctrl + -` ×2 | Back to 100% → scales down |
+| 4.3 | Set 120%, then `Ctrl + Shift + R` to reload | Zoom stays at 120% |
+| 4.4 | Set 120%, quit and relaunch | Zoom stays at 120% |
 
-## 5. 文件操作与 OS 集成
+## 5. File operations and OS integration
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 5.1 | 侧栏新建文件/文件夹、重命名、复制 | 均正常 |
-| 5.2 | 文件右键 → 「Reveal in Explorer」 | 打开资源管理器并选中该文件（文案不是 "Finder"） |
-| 5.3 | 文件右键 → 「Move to Recycle Bin」 | 确认框 → 文件进回收站（可还原） |
-| 5.4 | Command Palette 搜 "Reveal" / "Recycle" | 命令面板同样显示 Explorer / Recycle Bin 文案 |
-| 5.5 | Help 类命令（View Documentation 等，经 Command Palette） | 默认浏览器打开链接 |
-| 5.6 | 运行按钮 tooltip / 侧栏 tooltip | 显示 `Ctrl` 而非 `⌘` |
+| 5.1 | Create file/folder in the sidebar, rename, duplicate | All work |
+| 5.2 | File context menu → "Reveal in Explorer" | Opens File Explorer with the file selected (label is NOT "Finder") |
+| 5.3 | File context menu → "Move to Recycle Bin" | Confirm dialog → file goes to the Recycle Bin (restorable) |
+| 5.4 | Search "Reveal" / "Recycle" in the Command Palette | Palette shows the Explorer / Recycle Bin wording too |
+| 5.5 | Help-style commands (View Documentation etc., via the palette) | Open in the default browser |
+| 5.6 | Run-button tooltip / sidebar tooltip | Show `Ctrl`, not `⌘` |
 
-## 6. Agent 运行与内置工具（需任一模型 API key）
+## 6. Agent runs and built-in tools (needs any model API key)
 
-在 Settings → Models 配置一个可用模型后，新建 Thread：
+Configure a working model in Settings → Models, then create a Thread:
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 6.1 | 简单对话 run | 流式输出正常、可中断（Ctrl+Enter 再按一次停止） |
-| 6.2 | 启用内置 bash 工具，让模型执行 `列出当前目录` | **装有 Git Bash 的机器**：按 bash 语义执行；**未装**：工具描述显示 PowerShell，命令按 PowerShell 执行成功 |
-| 6.3 | 启用 grep 工具，让模型在 workspace 里搜索文本 | 正常返回结果（验证捆绑的 rg.exe） |
-| 6.4 | ls / read / write 等文件工具 | 路径显示为 Windows 反斜杠风格，读写正常 |
+| 6.1 | Simple conversation run | Streaming output works and can be aborted (press Ctrl+Enter again to stop) |
+| 6.2 | Enable the built-in bash tool, ask the model to "list the current directory" | **Machines with Git Bash**: executes with bash semantics; **without**: the tool description says PowerShell and the command succeeds as PowerShell |
+| 6.3 | Enable the grep tool, ask the model to search text in the workspace | Returns results normally (validates the bundled rg.exe) |
+| 6.4 | ls / read / write and other file tools | Paths display in Windows backslash style; reads/writes work |
 
-## 7. 自动更新链（分支包可只验前半段）
+## 7. Auto-update chain (branch builds can only verify the first half)
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 7.1 | Command Palette → "Check for Updates..." | 不崩溃；分支包无 feed，报「无更新/检查失败」均可接受，但需记录提示文案 |
-| 7.2 | （待第一个正式 canary tag 发布后）安装旧版 → 检查更新 | 下载 → "Restart to update" → 重启后为新版本（此项由发布流程回归，可跳过） |
+| 7.1 | Command Palette → "Check for Updates..." | No crash; a branch build has no feed, so "no update / check failed" is acceptable — record the exact message |
+| 7.2 | (After the first tagged canary ships) install an older version → check for updates | Download → "Restart to update" → relaunches on the new version (covered by the release flow; may skip) |
 
-## 8. 可选扩展项
+## 8. Optional extras
 
-| # | 步骤 | 预期 |
+| # | Step | Expected |
 |---|---|---|
-| 8.1 | Win10 x64 虚拟机重复 §1 + §2.1-2.6 | 尽力兼容项：能跑最好，问题记录为已知限制，不阻塞 |
-| 8.2 | 150% 系统 DPI 缩放显示器 | 界面清晰不模糊 |
-| 8.3 | 浅色系统主题下观察窗口阴影/边框 | 无明显视觉瑕疵 |
+| 8.1 | Repeat §1 + §2.1–2.6 in a Win10 x64 VM | Best-effort support: working is great, problems are recorded as known limitations, non-blocking |
+| 8.2 | A display at 150% system DPI scaling | UI stays sharp, no blurriness |
+| 8.3 | Observe window shadow/border under a light system theme | No obvious visual glitches |
 
-## 报告格式
+## Report format
 
 ```
-环境：Windows 11 <版本号> / <物理机|VM> / DPI 缩放 <100%|150%> / Git Bash <有|无>
-结果：§1 ✅✅✅✅ · §2 ... （逐项）
-阻塞问题：<编号 + 现象 + 复现步骤 + 截图/控制台输出>
-非阻塞观察：<...>
+Environment: Windows 11 <build> / <physical|VM> / DPI scaling <100%|150%> / Git Bash <yes|no>
+Results: §1 ✅✅✅✅ · §2 ... (item by item)
+Blocking issues: <number + symptom + repro steps + screenshot/console output>
+Non-blocking observations: <...>
 ```
 
-已知预期差异（不算 bug）：SmartScreen 首装警告（未签名）；§2.8 Snap Layouts 面板可能不出现；§7.1 分支包检查更新报错。
+Known expected differences (not bugs): the SmartScreen warning on first install (unsigned); the Snap Layouts flyout in §2.8 may not appear; the update check error in §7.1 on branch builds.
