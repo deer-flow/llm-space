@@ -173,14 +173,28 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
   ];
 }
 
-ApplicationMenu.setApplicationMenu(_buildMenu(false));
+/**
+ * The native application menu is macOS-only. On Windows the app ships a
+ * frameless window with no menu bar; every menu action is reachable through
+ * the command palette / context menus, and the accelerators are reproduced by
+ * the renderer-side keymap (`lib/use-app-keymap.ts`), which also sidesteps
+ * Electrobun's single-character accelerator limitation on Windows. Linux has
+ * no Electrobun application-menu support at all.
+ */
+const HAS_NATIVE_MENU = process.platform === "darwin";
+
+if (HAS_NATIVE_MENU) {
+  ApplicationMenu.setApplicationMenu(_buildMenu(false));
+}
 
 /**
  * Flip the app menu's update item between "Check for Updates…" and
  * "Restart to Update". Called by the updater service when a download becomes
- * ready. `null` restores the default item.
+ * ready. `null` restores the default item. No-op where there is no native
+ * menu; those platforms surface update state via the in-app indicator only.
  */
 export function setUpdateReadyInMenu(version: string | null) {
+  if (!HAS_NATIVE_MENU) return;
   ApplicationMenu.setApplicationMenu(_buildMenu(version !== null));
 }
 
@@ -239,6 +253,7 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
  * exists (the menu itself is set at import time above).
  */
 export function registerMenuActions(window: BrowserWindow) {
+  if (!HAS_NATIVE_MENU) return;
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
     const command = MENU_ACTION_COMMANDS[action];

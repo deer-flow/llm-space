@@ -144,6 +144,13 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { maximized: boolean };
       };
+      // The persisted page-zoom level. Windows-only consumer: Electrobun's
+      // native setPageZoom is a no-op there, so the renderer pulls this on
+      // mount and applies CSS zoom itself (see `lib/use-css-zoom.ts`).
+      getZoomState: {
+        params: Record<string, never>;
+        response: { zoom: number };
+      };
       isFullScreen: {
         params: Record<string, never>;
         response: { fullScreen: boolean };
@@ -363,6 +370,9 @@ export interface DesktopRPCType {
       receiveStreamThreadResponse: StreamThreadResponsePayload;
       // OS-level fullscreen state changed (entered/exited).
       fullScreenChanged: { fullScreen: boolean };
+      // Windows-only: apply this zoom level via CSS (native page zoom is a
+      // no-op there). Pushed by the bun-side zoom commands.
+      applyPageZoom: { zoom: number };
       // App-update flow progress from the bun-side updater service.
       updateStatusChanged: UpdateStatusChangedPayload;
       // A unified command dispatched from the bun process (native menu / global

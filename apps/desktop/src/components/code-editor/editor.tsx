@@ -19,6 +19,7 @@ import {
 
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+import { isModEnter } from "@/shared/platform";
 
 import { createExtensions } from "./extensions";
 import * as themes from "./themes";
@@ -223,7 +224,7 @@ function _CodeEditor(
 
   const handleKeyDownCapture = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) {
+      if (isModEnter(e)) {
         commit();
       }
       onKeyDown?.(e);

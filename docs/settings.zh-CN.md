@@ -8,10 +8,12 @@ Settings 是 LLM Space 的全局配置中心。这里管理应用外观、默认
 
 在 macOS 顶部菜单栏中，单击 `LLM Space` 或开发版本中的 `LLM Space-dev`，然后选择 `Settings...`。
 
+Windows 上没有菜单栏；可以直接使用下面的快捷键，或在 Command Palette（`Ctrl + Shift + P`）中运行 `Settings`。
+
 也可以使用快捷键：
 
 ```text
-Command + ,
+Command + ,   （Windows：Ctrl + ,）
 ```
 
 Settings 打开后，左侧是设置分类，右侧是当前分类的配置表单。当前文档介绍以下页面：

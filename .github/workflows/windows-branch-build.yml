@@ -1,0 +1,65 @@
+name: Windows branch build
+
+# Build-only pipeline for Windows-port verification: produces an installable
+# unsigned canary win-x64 build from a branch, WITHOUT touching the update
+# feed or any release. Grab the artifact from the run page and follow
+# docs/windows-manual-test.md. Delete this workflow once Windows ships in the
+# regular tag-driven release flow.
+
+on:
+  push:
+    branches: ["feat/windows-release"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-branch-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+
+      - run: bun install --frozen-lockfile
+
+      - name: Download ripgrep
+        shell: pwsh
+        working-directory: apps/desktop
+        run: |
+          $version = "14.1.1"
+          $zip = "ripgrep-$version-x86_64-pc-windows-msvc"
+          New-Item -ItemType Directory -Force -Path resources/win | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/BurntSushi/ripgrep/releases/download/$version/$zip.zip" -OutFile "$env:RUNNER_TEMP/rg.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP/rg.zip" -DestinationPath "$env:RUNNER_TEMP/rg"
+          Copy-Item "$env:RUNNER_TEMP/rg/$zip/rg.exe" resources/win/rg.exe
+          & resources/win/rg.exe --version
+
+      - name: Build (unsigned canary)
+        working-directory: apps/desktop
+        shell: bash
+        run: bun run build:canary
+
+      - name: Validate artifacts
+        shell: pwsh
+        working-directory: apps/desktop
+        run: |
+          $setupZip = Get-ChildItem artifacts -Filter "*-Setup*.zip"
+          if (-not $setupZip) {
+            Write-Error "no Setup zip produced"
+            exit 1
+          }
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: llm-space-win-x64-canary
+          path: apps/desktop/artifacts/
+          if-no-files-found: error
+          retention-days: 14

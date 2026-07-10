@@ -28,20 +28,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-const _isWindows =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
-
-/**
- * The OS file manager's name, for the "Reveal in …" menu label. Windows calls
- * it Explorer; macOS (and our Linux fallback) say Finder.
- */
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-
-/** The "Move to …" delete label, matching the OS trash's name. */
-const MOVE_TO_TRASH_LABEL = _isWindows
-  ? "Move to Recycle Bin"
-  : "Move to Trash";
+import { MOVE_TO_TRASH_LABEL, REVEAL_LABEL } from "@/shared/platform";
 
 /** Shared styling for the small square hover-action triggers. */
 const actionClass = cn(

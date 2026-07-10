@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Windows 发行版本方案 · llm-space</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Noto+Serif+SC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* planning-with-html · Editorial Brutalist theme
+ * Drop into <style> block of the generated HTML. Override only the accent
+ * if user prefers a different color. Keep typography stack to avoid
+ * AI-slop look. */
+
+:root {
+  --paper:        oklch(94.5% 0.022 75);     /* warm off-white */
+  --paper-sunk:   oklch(91% 0.025 75);
+  --paper-deep:   oklch(88% 0.028 70);
+  --paper-line:   oklch(82% 0.03 70);
+  --ink:          oklch(18% 0.025 60);       /* deep brown-black */
+  --ink-soft:     oklch(35% 0.022 65);
+  --ink-mute:     oklch(50% 0.018 70);
+  --accent:       oklch(48% 0.175 32);       /* 煎药红 vermillion */
+  --accent-soft:  oklch(48% 0.175 32 / 0.12);
+  --accent-hot:   oklch(52% 0.2 30);
+
+  --serif-display:'Fraunces','Noto Serif SC','Source Han Serif SC',Georgia,serif;
+  --serif-body:   'Source Serif 4','Noto Serif SC','Source Han Serif SC',Georgia,serif;
+  --mono:         'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+
+/* Required Google Fonts <link> tag (place in <head>):
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Noto+Serif+SC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+*/
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif-body);
+  font-size: 17px;
+  line-height: 1.75;
+  font-feature-settings: "ss01","kern","liga";
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 240px;   /* room for sticky export drawer */
+}
+
+/* Paper-texture noise via inline SVG turbulence (zero network cost) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.10  0 0 0 0 0.05  0 0 0 0.045 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+  opacity: .55;
+  mix-blend-mode: multiply;
+}
+main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 80px 32px 60px; }
+
+/* Hero */
+.hero h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 900;
+  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+  font-size: clamp(48px, 8vw, 108px);
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  margin: 0 0 28px;
+}
+.hero .verdict em {
+  font-style: normal;
+  color: var(--accent);
+  position: relative;
+  white-space: nowrap;
+}
+.hero .verdict em::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -4px;
+  height: 6px;
+  background: var(--accent-soft);
+  z-index: -1;
+}
+
+/* Section heads */
+.sec-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+h2 {
+  font-family: var(--serif-display);
+  font-weight: 700;
+  font-variation-settings: "opsz" 60;
+  font-size: clamp(30px, 4.4vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  margin: 0 0 32px;
+}
+.lead {
+  font-family: var(--serif-display);
+  font-style: italic;
+  font-size: 19px;
+  color: var(--ink-soft);
+  max-width: 680px;
+  margin: 0 0 32px;
+}
+
+/* Code */
+code {
+  font-family: var(--mono);
+  font-size: .86em;
+  background: var(--paper-sunk);
+  padding: 2px 6px;
+  border: 1px solid var(--paper-line);
+}
+pre {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--paper-sunk);
+  border: 1px solid var(--paper-line);
+  padding: 18px 20px;
+  overflow-x: auto;
+}
+
+/* Decision widgets */
+.check-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+.check-row label {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 13px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.check-row input[type=checkbox] {
+  appearance: none;
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--ink-soft);
+  background: var(--paper);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 120ms;
+}
+.check-row input[type=checkbox]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.check-row input[type=checkbox]:checked::after {
+  content: '✓';
+  color: var(--paper);
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: bold;
+}
+.check-row .reason {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+  font-family: var(--serif-body);
+  text-align: right;
+  max-width: 280px;
+}
+
+/* Export drawer (sticky bottom) */
+.export-drawer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--paper-deep);
+  border-top: 2px solid var(--ink);
+  box-shadow: 0 -8px 30px oklch(20% 0 0 / 0.08);
+  z-index: 50;
+  padding: 18px 32px 22px;
+  max-height: 80vh;
+  overflow: hidden;
+  transition: max-height 280ms ease;
+}
+.export-drawer.collapsed { max-height: 88px; }
+.copy-btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--paper);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+}
+.copy-btn:hover { background: var(--accent-hot); }
+.copy-btn .check { opacity: 0; margin-left: 6px; }
+.copy-btn.copied .check { opacity: 1; }
+
+/* ===== supplemental layout (classes referenced by template, absent from theme) ===== */
+
+/* top nav */
+.toc {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; gap: 28px;
+  padding: 14px 32px;
+  background: color-mix(in oklch, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--paper-line);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .08em;
+}
+.toc a { color: var(--ink-soft); text-decoration: none; }
+.toc a:hover { color: var(--accent); }
+
+/* hero extras */
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink-mute);
+  display: flex; align-items: center; gap: 10px; margin-bottom: 26px;
+}
+.eyebrow .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+.hero .verdict { font-size: 21px; max-width: 720px; }
+.hero .verdict em { white-space: normal; }
+.hero .intro { max-width: 720px; color: var(--ink-soft); }
+.stats { display: flex; gap: 40px; margin-top: 40px; flex-wrap: wrap; }
+.stat {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-mute);
+  display: flex; flex-direction: column; gap: 6px;
+  border-left: 2px solid var(--paper-line); padding-left: 14px;
+}
+.stat strong { font-family: var(--serif-display); font-size: 24px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.stat strong em { font-style: normal; color: var(--accent); }
+section { margin-top: 110px; }
+
+/* category cards */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+.cat-card { border: 1.5px solid var(--ink); background: var(--paper-sunk); padding: 20px 22px; }
+.cat-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--paper-line); padding-bottom: 10px; margin-bottom: 8px; }
+.cat-title { font-family: var(--serif-display); font-weight: 700; font-size: 19px; }
+.cat-count { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.cat-purpose { font-size: 13.5px; color: var(--ink-mute); font-style: italic; margin-bottom: 12px; }
+.cat-entries { list-style: none; margin: 0; padding: 0; }
+.cat-entries li { display: flex; gap: 10px; align-items: baseline; padding: 4.5px 0; font-size: 14px; line-height: 1.5; border-top: 1px dashed var(--paper-line); }
+.cat-entries li:first-child { border-top: 0; }
+.cat-entries .mark { font-family: var(--mono); font-size: 12px; flex-shrink: 0; width: 14px; text-align: center; }
+.cat-entries li.keep .mark { color: oklch(52% 0.14 150); }
+.cat-entries li.install .mark { color: oklch(58% 0.13 75); }
+.cat-entries li.archive .mark { color: var(--accent); }
+
+/* audit table */
+.wf-table-wrap { overflow-x: auto; border: 1.5px solid var(--ink); }
+.wf-table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--paper-sunk); }
+.wf-table th {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  text-align: left; color: var(--paper); background: var(--ink);
+  padding: 10px 14px;
+}
+.wf-table td { padding: 12px 14px; border-top: 1px solid var(--paper-line); vertical-align: top; line-height: 1.55; }
+.wf-table td:first-child { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+.wf-table .pick .item { display: inline-flex; gap: 6px; font-size: 13px; }
+.wf-table .pick .mk { font-family: var(--mono); }
+.wf-table .pick .item.keep .mk { color: oklch(52% 0.14 150); }
+.wf-table .pick .item.install .mk { color: oklch(58% 0.13 75); }
+
+/* presets */
+.preset-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
+.preset-btn {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .06em;
+  padding: 10px 16px; cursor: pointer;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--ink);
+  transition: all 120ms;
+}
+.preset-btn:hover { background: var(--paper-deep); }
+.preset-btn.active { background: var(--ink); color: var(--paper); }
+
+/* decision groups */
+.checklist { display: flex; flex-direction: column; gap: 22px; }
+.check-group { border: 1.5px solid var(--ink); background: var(--paper-sunk); padding: 16px 20px 12px; }
+.group-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 6px;
+}
+.group-title { font-family: var(--serif-display); font-weight: 700; font-size: 17px; }
+.group-count { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); }
+.group-count em { font-style: normal; color: var(--accent); font-weight: 600; }
+.check-row + .check-row { border-top: 1px dashed var(--paper-line); }
+.check-row > label > span:first-child { font-family: var(--serif-body); font-size: 15px; }
+.check-row .reason { line-height: 1.55; }
+
+/* radio buckets */
+.radio-bucket-group { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 260px; }
+.radio-bucket-group label {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 12.5px; cursor: pointer;
+  padding: 4px 10px; border: 1px solid var(--paper-line); background: var(--paper);
+  width: 100%;
+}
+.radio-bucket-group label:hover { border-color: var(--ink-soft); }
+.radio-bucket-group input[type=radio] {
+  appearance: none; width: 13px; height: 13px; border-radius: 50%;
+  border: 1.5px solid var(--ink-soft); background: var(--paper);
+  cursor: pointer; flex-shrink: 0; position: relative; transition: all 120ms;
+}
+.radio-bucket-group input[type=radio]:checked { border-color: var(--accent); }
+.radio-bucket-group input[type=radio]:checked::after {
+  content: ''; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--accent);
+}
+.radio-bucket-group label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+
+.total-bar {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border: 1.5px solid var(--ink); background: var(--ink); color: var(--paper);
+  padding: 12px 20px; font-family: var(--mono); font-size: 13px; letter-spacing: .06em;
+}
+.total-bar strong { font-size: 18px; }
+.total-bar strong span { color: oklch(85% 0.09 45); }
+
+/* exec blocks */
+.exec-block { border-left: 3px solid var(--accent); background: var(--paper-sunk); padding: 18px 24px; margin-bottom: 18px; }
+.exec-block .why { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.exec-block h4 { font-family: var(--serif-display); font-size: 19px; margin: 0 0 8px; }
+.exec-block p { margin: 0; font-size: 15px; color: var(--ink-soft); }
+
+/* drawer internals */
+.drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.drawer-title { display: flex; align-items: center; gap: 14px; font-size: 14.5px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid var(--ink); padding: 4px 10px; background: var(--paper);
+}
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.actions { display: flex; gap: 10px; }
+.toggle-btn {
+  font-family: var(--mono); font-size: 12px; padding: 10px 16px; cursor: pointer;
+  background: var(--paper); border: 1.5px solid var(--ink); color: var(--ink);
+}
+.toggle-btn:hover { background: var(--paper-deep); }
+.drawer-body { margin-top: 18px; }
+.drawer-pane { border: 1px solid var(--paper-line); background: var(--paper); }
+.pane-head { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--paper-line); }
+.pane-title { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); }
+.drawer-pane pre { margin: 0; border: 0; max-height: 46vh; overflow: auto; }
+
+@media (max-width: 760px) {
+  .check-row > label { grid-template-columns: 1fr !important; }
+  .radio-bucket-group { min-width: 0; }
+  .toc { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<nav class="toc" aria-label="目录">
+  <a href="#overview">00 / 调研结论</a>
+  <a href="#mapping">01 / 现状审计</a>
+  <a href="#decisions">02 / 决策</a>
+  <a href="#exec">03 / 落地路径</a>
+</nav>
+
+<main>
+
+  <!-- ============== HERO ============== -->
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span>llm-space · Electrobun 桌面应用 · 2026-07-10</div>
+    <h1>Windows<br>Release</h1>
+    <p class="verdict">结论：<em>可行，工作量集中在发布管线与窗口 chrome，核心业务代码零改动</em>。</p>
+    <p class="intro">
+      Electrobun ^1.18.1 官方支持 Windows 11+（x64，WebView2 内核）；v1.18.0 稳定了 Windows
+      无边框窗口，v1.18.1 修好了 Windows 自动更新与 bsdiff 补丁——恰好是我们锁定的版本线。
+      全代码库审计显示 fs reveal/回收站/locale/路径处理已提前具备 win32 分支；
+      真正要动的是 CI 发布矩阵、标题栏方案、菜单与快捷键、以及 bash/rg 两个内置 agent 工具。
+      本页汇总调研与审计，收集 8 组方案决策 + 2 组执行清单。
+    </p>
+    <div class="stats">
+      <div class="stat">框架基线<strong>Electrobun 1.18.1</strong></div>
+      <div class="stat">当前勾选<strong><em id="stat-archive">14</em> 项</strong></div>
+      <div class="stat">审计改造点<strong>24 处 · 8 处已就绪</strong></div>
+    </div>
+  </header>
+
+  <!-- ============== 00 调研结论 ============== -->
+  <section id="overview">
+    <div class="sec-num">§ 00 — 框架能力 × Windows UI 规范</div>
+    <h2>框架给了什么，规范要求什么。</h2>
+    <p class="lead">先分清三类事实：Electrobun 已经替我们做掉的、它做不了需要我们自接的、以及 Windows 用户肌肉记忆强制要求的。</p>
+
+    <div class="cat-grid">
+      <div class="cat-card">
+        <div class="cat-head"><span class="cat-title">Electrobun 就绪面</span><span class="cat-count">直接用</span></div>
+        <div class="cat-purpose">框架内置，Windows 上开箱可用</div>
+        <ul class="cat-entries">
+          <li class="keep"><span class="mark">●</span><span class="name">WebView2 系统内核（Chromium 系，Win11 自带 runtime）</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">自动更新全链路：update.json + tar.zst + bsdiff 补丁（1.18.1 修复）</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">产物命名 {channel}-win-x64-*，与现有 updates feed 模型一致</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">自解压 Setup.exe 安装器（打包进 -Setup.zip）</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">build.win.icon 指 .png 自动转 .ico</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">titleBarStyle 跨平台；1.18 修复无边框 resize 边框/DWM 阴影/Aero Snap</span></li>
+        </ul>
+      </div>
+      <div class="cat-card">
+        <div class="cat-head"><span class="cat-title">Electrobun 受限面</span><span class="cat-count">要自接</span></div>
+        <div class="cat-purpose">框架缺口，需要我们绕行或补齐</div>
+        <ul class="cat-entries">
+          <li class="archive"><span class="mark">✕</span><span class="name">Windows 代码签名：CLI 无 signtool 集成（mac 签名是内置的）→ hook 自接</span></li>
+          <li class="archive"><span class="mark">✕</span><span class="name">setPageZoom / getPageZoom：文档标注 Windows no-op → 渲染层兜底</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">菜单 accelerator 仅可靠支持 Ctrl+单字符；Ctrl+Shift+P 类不保证</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">trafficLightOffset / hiddenInset 语义在 Windows 退化为 hidden</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">无交叉编译：必须 Windows runner 本机构建</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">URL scheme / 文件关联 Windows 未支持（本应用未用，无影响）</span></li>
+        </ul>
+      </div>
+      <div class="cat-card">
+        <div class="cat-head"><span class="cat-title">Windows UI 硬规范</span><span class="cat-count">必须守</span></div>
+        <div class="cat-purpose">用户肌肉记忆级约定（Fluent + 主流工具惯例）</div>
+        <ul class="cat-entries">
+          <li class="install"><span class="mark">+</span><span class="name">窗口控制在右侧：最小化/最大化/关闭，关闭键 hover 红</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">自绘标题栏须保住：双击最大化、右键系统菜单、Snap Layouts、贴边分屏</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">Ctrl 替代 Cmd；F11 全屏；UI 显示 Ctrl+ 而非 ⌘</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">文案：文件资源管理器 / 回收站（不再是 Finder / Trash）</span></li>
+          <li class="install"><span class="mark">+</span><span class="name">未签名 exe 触发 SmartScreen 拦截页（签名+装机量积累信誉后消失）</span></li>
+        </ul>
+      </div>
+      <div class="cat-card">
+        <div class="cat-head"><span class="cat-title">已达标 / 明确不做</span><span class="cat-count">零成本</span></div>
+        <div class="cat-purpose">现有实现直接过关，或收益趋零主动排除</div>
+        <ul class="cat-entries">
+          <li class="keep"><span class="mark">●</span><span class="name">深色主题 + 自绘细滚动条（WebView2 同为 Chromium，::-webkit-scrollbar 生效）</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">字体栈 "Geist Variable", system-ui（Segoe UI 自动兜底）</span></li>
+          <li class="keep"><span class="mark">●</span><span class="name">高 DPI：WebView2 自动处理</span></li>
+          <li class="archive"><span class="mark">✕</span><span class="name">Mica/Acrylic 材质：框架未暴露 DWM API，且应用为不透明深色，主动排除</span></li>
+          <li class="archive"><span class="mark">✕</span><span class="name">Jump List / 托盘 / 系统通知：当前功能面不需要</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== 01 现状审计 ============== -->
+  <section id="mapping">
+    <div class="sec-num">§ 01 — 全代码库平台耦合审计</div>
+    <h2>24 处要动，8 处已就绪。</h2>
+    <p class="lead">
+      好消息：fs reveal / 回收站 / locale 检测 / env hydrate / 路径拼接 / headerpad 脚本已全部具备
+      win32 分支或自动 no-op，<code>win: { bundleCEF: false }</code> 配置桩也已存在。下表只列需要动手的。
+    </p>
+    <div class="wf-table-wrap">
+      <table class="wf-table">
+        <thead><tr><th>#</th><th>位置</th><th>问题</th><th>处置</th></tr></thead>
+        <tbody>
+          <tr><td>B1</td><td><code>.github/workflows/release.yml</code></td><td>矩阵仅 macos-15 / macos-15-intel；签名、冒烟测试、发布 glob（*.dmg）全 mac 专属</td><td class="pick"><span class="item install"><span class="mk">+</span>加 windows-latest 矩阵 + win 冒烟 + Setup.zip glob</span></td></tr>
+          <tr><td>B2</td><td><code>icon.iconset/</code> · <code>electrobun.config.ts</code></td><td>无 .ico；win 块无 icon 字段</td><td class="pick"><span class="item install"><span class="mk">+</span>从 512px PNG 生成多尺寸 .ico</span></td></tr>
+          <tr><td>B3</td><td><code>bun/app/window.ts:43-48</code></td><td>hiddenInset + trafficLightOffset：Windows 下=无边框且没有任何窗口按钮</td><td class="pick"><span class="item keep"><span class="mk">●</span>决策 A</span></td></tr>
+          <tr><td>B4</td><td><code>bun/app/menu.ts</code></td><td>mac 应用菜单结构（hide/hideOthers/showAll/quit）；Option+方向键；全屏非 F11</td><td class="pick"><span class="item keep"><span class="mk">●</span>决策 B + 基础项 5</span></td></tr>
+          <tr><td>B5</td><td><code>tools/built-in/fs.ts:604,487</code></td><td>agent bash 工具 spawn bash -c；grep 工具 spawn rg——裸 Windows 均无</td><td class="pick"><span class="item keep"><span class="mk">●</span>决策 D1 / D2</span></td></tr>
+          <tr><td>B6</td><td>更新 feed</td><td>updater 代码零改动，但 CI 不产 win 产物则无 feed 可拉</td><td class="pick"><span class="item install"><span class="mk">+</span>随 B1 解决</span></td></tr>
+          <tr><td>V1</td><td><code>thread-tabs.tsx:243</code> · <code>file-system-tree-view.tsx:390</code></td><td>mac 红绿灯预留 padding / 侧栏标题隐藏逻辑，Windows 下错位</td><td class="pick"><span class="item install"><span class="mk">+</span>按平台 gate（基础项 4）</span></td></tr>
+          <tr><td>V2</td><td>4 处：code-editor ×2 · message-list-item · tool-call-list-item</td><td>仅判 e.metaKey，无 ctrlKey 兜底 → Windows 快捷键静默失效</td><td class="pick"><span class="item install"><span class="mk">+</span>isModEnter() 工具（基础项 1）</span></td></tr>
+          <tr><td>V3</td><td><code>thread-tabs.tsx:256</code> · <code>thread-playground.tsx:325</code></td><td>硬编码 ⌘ B / ⌘ Enter 标签</td><td class="pick"><span class="item install"><span class="mk">+</span>Kbd 平台自适应（基础项 2）</span></td></tr>
+          <tr><td>V4</td><td><code>shared/commands.ts:342</code></td><td>命令注册表硬编码 "Reveal in Finder" / "Move to Trash"（命令面板会露出）</td><td class="pick"><span class="item install"><span class="mk">+</span>与右键菜单 _isWindows 逻辑合流（基础项 3）</span></td></tr>
+          <tr><td>V5</td><td><code>window-state.ts</code> · 菜单缩放项</td><td>setPageZoom Windows no-op，缩放失效</td><td class="pick"><span class="item keep"><span class="mk">●</span>决策 F</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============== 02 决策 ============== -->
+  <section id="decisions">
+    <div class="sec-num">§ 02 — 决策清单</div>
+    <h2>8 组方案决策 + 2 组执行清单。</h2>
+    <p class="lead">每组已预选推荐项。A 与 B 存在联动：选 A2（自绘标题栏）则 B2（无原生菜单）更协调；选 A1（系统标题栏）则 B1（原生菜单栏）更自然。</p>
+
+    <div class="preset-row">
+      <button class="preset-btn" data-preset="conservative">稳妥（系统标题栏+原生菜单）</button>
+      <button class="preset-btn active" data-preset="user">推荐（自绘 chrome，先发未签名 canary）</button>
+      <button class="preset-btn" data-preset="aggressive">全上（含签名+全部阶段）</button>
+    </div>
+
+    <div class="checklist" id="decision-list">
+
+      <!-- A 窗口 chrome -->
+      <div class="check-group" data-group="A">
+        <div class="group-head"><span class="group-title">A · Windows 窗口 chrome · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>标题栏形态<br><span class="reason">现 UI 顶部 tab 条已是拖拽区，mac 上就是 frameless 形态；A2 延续之，右侧补自绘 ➖ ▢ ✕（含关闭键 hover 红、双击最大化、Snap Layouts 实测）。A1 稳但深色应用顶一条随系统主题的原生栏，且 mac/win 形态分叉。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="A" value="A1"> A1 系统标题栏</label>
+              <label><input type="radio" name="A" value="A2" checked> A2 无边框自绘（推荐）</label>
+              <label><input type="radio" name="A" value="A3"> A3 先 A1 二期 A2</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- B 菜单 -->
+      <div class="check-group" data-group="B">
+        <div class="group-head"><span class="group-title">B · Windows 应用菜单 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>菜单与快捷键承载<br><span class="reason">menu.ts 的动作本就全部路由到 Command 层。B2：Windows 不装原生菜单，渲染层做统一 keymap（单一跨平台事实源，绕开 accelerator 单字符限制），入口=命令面板+右键+（若 A2）标题栏 ☰。B1：装原生窗内菜单栏，结构重排，复杂快捷键仍需渲染层兜底。mac 两案均保留原生菜单不动。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="B" value="B1"> B1 原生菜单栏</label>
+              <label><input type="radio" name="B" value="B2" checked> B2 渲染层 keymap（推荐）</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- C 签名 -->
+      <div class="check-group" data-group="C">
+        <div class="group-head"><span class="group-title">C · Windows 代码签名 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>Authenticode 策略<br><span class="reason">CLI 无内置 win 签名，须 hook 自接 signtool。本仓库 MIT + 公开 + CI 构建，满足 SignPath Foundation 免费 OSS 签名全部条件（发布者显示 "SignPath Foundation"，申请有审核周期，不阻塞 canary）。SmartScreen 只拦带 MOTW 的首装 exe——自动更新写入的文件不会弹，未签名痛点仅首装一下。Azure Trusted Signing $9.99/月的差异化价值=发布者显示自己的身份。签名须在补丁哈希生成前完成（hook 时序 P0 验证）。排除：Store（MSIX 与 bsdiff 自更新冲突）、自签名（对 SmartScreen 无效）。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="C" value="C0" checked> C0 canary 不签名 → stable 用 SignPath OSS，$0（推荐）</label>
+              <label><input type="radio" name="C" value="C1"> C1 全程不签名</label>
+              <label><input type="radio" name="C" value="C2"> C2 Azure Trusted Signing（$9.99/月）</label>
+              <label><input type="radio" name="C" value="C3"> C3 OV/EV 证书</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- D1 bash -->
+      <div class="check-group" data-group="D1">
+        <div class="group-head"><span class="group-title">D1 · agent 内置 bash 工具 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>Windows 上的 shell 策略<br><span class="reason">工具直接暴露给 LLM。探测方案：注册表/常见路径找 Git Bash（开发者机器普遍有）→ 有则语义不变；无则回退 PowerShell 并动态改写工具描述，模型自然切换语法。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="D1" value="detect" checked> 探测 Git Bash→回退 PowerShell（推荐）</label>
+              <label><input type="radio" name="D1" value="pwsh"> 纯 PowerShell</label>
+              <label><input type="radio" name="D1" value="require"> 无 Git Bash 则禁用+提示</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- D2 rg -->
+      <div class="check-group" data-group="D2">
+        <div class="group-head"><span class="group-title">D2 · agent 内置 grep 工具（ripgrep）· 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>rg.exe 供给方式<br><span class="reason">rg 单文件约 2MB，MIT/UNLICENSE 双许可，随包捆绑（build.copy 平台分支）即所有用户开箱可用；PATH 探测则零体积但裸机必坏。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="D2" value="bundle" checked> 随包捆绑 rg.exe（推荐）</label>
+              <label><input type="radio" name="D2" value="path"> PATH 探测+友好报错</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- E 数据目录 -->
+      <div class="check-group" data-group="E">
+        <div class="group-head"><span class="group-title">E · 数据目录 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>llm-space 根目录位置<br><span class="reason">维持 ~/.llm-space（即 C:\Users\&lt;u&gt;\.llm-space）零改动，LLM_SPACE_HOME 覆盖机制不变；%APPDATA% 更合 Windows 惯例但首发就引入迁移逻辑，不值。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="E" value="keep" checked> 维持 ~/.llm-space（推荐）</label>
+              <label><input type="radio" name="E" value="appdata"> %APPDATA%\llm-space</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- F 缩放 -->
+      <div class="check-group" data-group="F">
+        <div class="group-head"><span class="group-title">F · 页面缩放 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>setPageZoom Windows no-op 的对策<br><span class="reason">P0 先实测 WebView2 下是否真 no-op（文档口径以 CEF 为主）；若坐实，win 分支走渲染层 CSS zoom（window-state 持久化逻辑复用），mac 继续原生。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="F" value="css" checked> 渲染层 CSS zoom 兜底（推荐）</label>
+              <label><input type="radio" name="F" value="hide"> Windows 隐藏缩放命令等上游</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- H Win10 口径 -->
+      <div class="check-group" data-group="H">
+        <div class="group-head"><span class="group-title">H · Win10 支持口径 · 单选</span></div>
+        <div class="check-row">
+          <label style="display:grid;grid-template-columns:1fr auto;width:100%;gap:14px;align-items:start;">
+            <span>Windows 11 以下怎么办<br><span class="reason">Electrobun 官方仅承诺 Win11+（上游只在 Win11 测试），但 WebView2 / Bun / DirectComposition 技术栈完整覆盖 Win10。Win10 已于 2025-10 EOL（消费者 ESU 至 2026-10），存量仍大但快速萎缩。H1：文档写 Win11+，安装器不阻止 Win10，P0 顺手在 Win10 VM 冒烟一次，Win10 专属 bug 记为已知限制不修。</span></span>
+            <span class="radio-bucket-group">
+              <label><input type="radio" name="H" value="H1" checked> H1 Win11+ 口径，Win10 尽力不承诺（推荐）</label>
+              <label><input type="radio" name="H" value="H2"> H2 严格 Win11+，明确拒绝 Win10</label>
+              <label><input type="radio" name="H" value="H3"> H3 正式支持 Win10（承诺修 bug）</label>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 基础适配 -->
+      <div class="check-group" data-group="base">
+        <div class="group-head">
+          <span class="group-title">基础适配 · 多选（无争议项，默认全做）</span>
+          <span class="group-count"><em data-grp-count>10</em>/10</span>
+        </div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-1-modkey" checked> 1 · 四处 metaKey → metaKey||ctrlKey（提取 isModEnter）</label><span class="reason">V2 · 快捷键静默失效</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-2-kbd" checked> 2 · lib/platform.ts + Kbd 快捷键展示 Ctrl/⌘ 自适应</label><span class="reason">V3 · 沿用 navigator.userAgent 先例</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-3-labels" checked> 3 · commands.ts 标签平台化（Finder/Trash → 资源管理器/回收站）</label><span class="reason">V4 · 与右键菜单逻辑合流</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-4-padding" checked> 4 · 红绿灯 padding / 侧栏标题隐藏按平台 gate</label><span class="reason">V1 · Windows 下错位</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-5-accel" checked> 5 · menu.ts Option→Alt、全屏 accelerator 平台化（F11）</label><span class="reason">B4 · mac 专属键名</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-6-config" checked> 6 · electrobun.config win 块补 icon + dev:cef 逃生舱作用于 win</label><span class="reason">调试对齐</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-7-ico" checked> 7 · 从现 iconset 512px 生成多尺寸 .ico</label><span class="reason">B2 · 16/32/48/256</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-8-ci" checked> 8 · release.yml 加 windows-latest 矩阵 + win 冒烟 + 发布 glob</label><span class="reason">B1/B6 · 发行硬前置</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-9-docs" checked> 9 · AGENTS.md / docs/settings / shortcut-keys 文档更新</label><span class="reason">口径同步</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="base-10-winget" checked> 10 · 提交 winget manifest（P3，随 stable 首发）</label><span class="reason">零成本 · 开发者主流安装路径，无 SmartScreen 弹窗</span></div>
+      </div>
+
+      <!-- 执行阶段 -->
+      <div class="check-group" data-group="phase">
+        <div class="group-head">
+          <span class="group-title">执行阶段 · 多选（本轮批准的范围）</span>
+          <span class="group-count"><em data-grp-count>4</em>/4</span>
+        </div>
+        <div class="check-row"><label><input type="checkbox" data-item="P0-本地跑通" checked> P0 · Windows 实机/VM 跑通 bun dev + 回归 + 实测缩放/无边框/Snap</label><span class="reason">硬前置：需要一台 Win11 环境</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="P1-CI-canary" checked> P1 · CI 出第一个未签名 canary-win-x64，验证安装→自动更新链</label><span class="reason">含基础项 6-8</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="P2-UI适配" checked> P2 · 决策 A/B 落地 + 基础项 1-5 + D1/D2/F</label><span class="reason">视觉与快捷键收尾</span></div>
+        <div class="check-row"><label><input type="checkbox" data-item="P3-stable签名" checked> P3 · stable 发行 + 决策 C 落地 + 文档（基础项 9）</label><span class="reason">签名时序先行验证</span></div>
+      </div>
+
+      <div class="total-bar">
+        <span>当前勾选合计</span>
+        <strong><span id="archive-count">14</span> 项</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== 03 落地路径 ============== -->
+  <section id="exec">
+    <div class="sec-num">§ 03 — 落地路径</div>
+    <h2>勾选确认后，粘回对话。</h2>
+    <p class="lead">本页只阐述方案和收集决定。粘回对话后由 Claude 按阶段执行——每阶段独立可验证、可回滚。</p>
+    <div class="exec-block">
+      <div class="why">P0 → P1</div>
+      <h4>先证明能跑，再证明能发</h4>
+      <p>P0 在 Windows 11 实机/VM 上跑通开发链路并实测三个不确定点（setPageZoom、无边框 Snap Layouts、WebView2 渲染差异）——A2/F 两个决策的最终确认依赖这里的实测结果，A1 始终作为回退项保留。P1 让 CI 产出第一个可安装、可自动更新的未签名 canary。</p>
+    </div>
+    <div class="exec-block">
+      <div class="why">P2 → P3</div>
+      <h4>先好用，再好看官方</h4>
+      <p>P2 把窗口 chrome、菜单/keymap、内置工具、缩放兜底、全部视觉细节收掉，达到与 mac 等价的日常可用。P3 处理签名（含签名与补丁哈希的时序验证）、文档口径与对外 release notes，升级 stable 通道。</p>
+    </div>
+    <div class="exec-block">
+      <div class="why">风险</div>
+      <h4>四个已知风险与对策</h4>
+      <p>① Windows 验证环境是 P0 硬前置；② 自绘标题栏依赖 Electrobun 1.18 的新代码，成熟度未知——P0 实测后再终审 A2，留 A1 回退；③ Windows 签名与 updater 补丁哈希的时序（C2 前专项研究）；④ WebView2 与 mac WKWebView 渲染差异（双方都对 Chromium 友好，风险低但 P0 过一遍）。</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============== EXPORT DRAWER ============== -->
+<div class="export-drawer collapsed" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-title">
+      <span class="pill"><span class="live-dot"></span>导出</span>
+      <span>你的选择 · <em id="summary-line" style="font-style:normal;color:var(--accent);">推荐方案</em></span>
+    </div>
+    <div class="actions">
+      <button class="copy-btn" id="copy-chat">复制决策回贴<span class="check">✓</span></button>
+      <button class="toggle-btn" id="drawer-toggle">展开 ↑</button>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-pane">
+      <div class="pane-head">
+        <span class="pane-title">决策回贴 · 粘回当前对话给 Claude</span>
+        <span class="pane-title" id="chat-len">0 lines</span>
+      </div>
+      <pre id="chat-preview"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  const state = { decisions: new Set(), choices: new Map() };
+
+  const RADIO_LABELS = {
+    A:  { A1: 'A1 系统标题栏', A2: 'A2 无边框自绘标题栏 + 自绘窗口控制', A3: 'A3 先系统标题栏，二期自绘' },
+    B:  { B1: 'B1 Windows 原生窗内菜单栏', B2: 'B2 不装原生菜单，渲染层统一 keymap' },
+    C:  { C0: 'C0 canary 不签名 → stable 用 SignPath Foundation 免费 OSS 签名（$0，P1 起并行申请）', C1: 'C1 全程不签名（SmartScreen 仅首装触发）', C2: 'C2 Azure Trusted Signing（$9.99/月，发布者显示自己身份）', C3: 'C3 传统 OV/EV 证书' },
+    D1: { detect: '探测 Git Bash，无则回退 PowerShell 并改写工具描述', pwsh: '纯 PowerShell', require: '无 Git Bash 则禁用 bash 工具并提示' },
+    D2: { bundle: '随包捆绑 rg.exe', path: 'PATH 探测 + 缺失友好报错' },
+    E:  { keep: '维持 ~/.llm-space（LLM_SPACE_HOME 机制不变）', appdata: 'Windows 改用 %APPDATA%\\llm-space' },
+    F:  { css: '渲染层 CSS zoom 兜底（P0 先实测 WebView2）', hide: 'Windows 隐藏缩放命令等上游' },
+    H:  { H1: 'H1 系统要求 Win11+，Win10 不阻止安装、尽力兼容不承诺（P0 加一次 Win10 冒烟）', H2: 'H2 严格 Win11+，明确拒绝 Win10', H3: 'H3 正式支持 Win10（承诺修 bug）' },
+  };
+  const RADIO_TITLES = { A: 'A · 窗口 chrome', B: 'B · 应用菜单', C: 'C · 代码签名', D1: 'D1 · bash 工具', D2: 'D2 · ripgrep', E: 'E · 数据目录', F: 'F · 页面缩放', H: 'H · Win10 支持口径' };
+
+  document.querySelectorAll('#decision-list input[type=checkbox]').forEach(cb => {
+    if (cb.checked) state.decisions.add(cb.dataset.item);
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.decisions.add(cb.dataset.item);
+      else state.decisions.delete(cb.dataset.item);
+      updateAll();
+    });
+  });
+
+  document.querySelectorAll('#decision-list input[type=radio]').forEach(r => {
+    if (r.checked) state.choices.set(r.name, r.value);
+    r.addEventListener('change', () => {
+      if (r.checked) state.choices.set(r.name, r.value);
+      updateAll();
+    });
+  });
+
+  const ALL_CHECKS = [...document.querySelectorAll('#decision-list input[type=checkbox]')].map(cb => cb.dataset.item);
+  const PRESETS = {
+    conservative: {
+      radios: { A: 'A1', B: 'B1', C: 'C1', D1: 'pwsh', D2: 'bundle', E: 'keep', F: 'hide', H: 'H2' },
+      checks: ALL_CHECKS.filter(k => k !== 'P3-stable签名' && k !== 'base-10-winget'),
+    },
+    user: {
+      radios: { A: 'A2', B: 'B2', C: 'C0', D1: 'detect', D2: 'bundle', E: 'keep', F: 'css', H: 'H1' },
+      checks: ALL_CHECKS,
+    },
+    aggressive: {
+      radios: { A: 'A2', B: 'B2', C: 'C2', D1: 'detect', D2: 'bundle', E: 'keep', F: 'css', H: 'H1' },
+      checks: ALL_CHECKS,
+    },
+  };
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = PRESETS[btn.dataset.preset];
+      if (p) {
+        document.querySelectorAll('#decision-list input[type=checkbox]').forEach(cb => {
+          cb.checked = p.checks.includes(cb.dataset.item);
+          cb.dispatchEvent(new Event('change'));
+        });
+        Object.entries(p.radios).forEach(([name, val]) => {
+          const r = document.querySelector(`#decision-list input[type=radio][name="${name}"][value="${val}"]`);
+          if (r) { r.checked = true; r.dispatchEvent(new Event('change')); }
+        });
+      }
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  function chatReply() {
+    const lines = [];
+    lines.push('我的最终选择如下，请按此执行 Windows 发行版本方案：');
+    lines.push('');
+    lines.push('## 方案决策');
+    for (const [name, title] of Object.entries(RADIO_TITLES)) {
+      const v = state.choices.get(name);
+      if (v) lines.push('- ' + title + '：' + (RADIO_LABELS[name][v] ?? v));
+    }
+    lines.push('');
+    const base = [...state.decisions].filter(k => k.startsWith('base-'));
+    lines.push('## 基础适配（' + base.length + '/10）');
+    base.forEach(k => lines.push('- ' + k));
+    const skippedBase = ALL_CHECKS.filter(k => k.startsWith('base-') && !state.decisions.has(k));
+    skippedBase.forEach(k => lines.push('- [跳过] ' + k));
+    lines.push('');
+    const phases = [...state.decisions].filter(k => k.startsWith('P'));
+    lines.push('## 批准执行阶段（' + phases.length + '/4）');
+    phases.forEach(k => lines.push('- ' + k));
+    lines.push('');
+    lines.push('## 安全约定');
+    lines.push('- 破坏性动作先备份；每阶段独立可验证、可回滚');
+    lines.push('- A2/F 若 P0 实测不达预期，回退 A1/hide 前先与我确认');
+    lines.push('');
+    lines.push('请开始执行。');
+    return lines.join('\n');
+  }
+
+  function updateAll() {
+    document.getElementById('archive-count').textContent = state.decisions.size;
+    document.getElementById('stat-archive').textContent = state.decisions.size;
+    const a = state.choices.get('A') ?? '—', b = state.choices.get('B') ?? '—', c = state.choices.get('C') ?? '—';
+    document.getElementById('summary-line').textContent = a + ' · ' + b + ' · ' + c + ' · 勾选 ' + state.decisions.size + ' 项';
+    document.querySelectorAll('.check-group').forEach(g => {
+      const el = g.querySelector('[data-grp-count]');
+      if (el) el.textContent = [...g.querySelectorAll('input[type=checkbox]')].filter(cb => cb.checked).length;
+    });
+    const chat = chatReply();
+    document.getElementById('chat-preview').textContent = chat;
+    document.getElementById('chat-len').textContent = chat.split('\n').length + ' lines';
+  }
+
+  document.getElementById('drawer-toggle').addEventListener('click', () => {
+    const d = document.getElementById('drawer');
+    d.classList.toggle('collapsed');
+    document.getElementById('drawer-toggle').textContent = d.classList.contains('collapsed') ? '展开 ↑' : '收起 ↓';
+  });
+
+  function copyToClipboard(text, btn) {
+    const done = () => {
+      btn.classList.add('copied');
+      const original = btn.firstChild.textContent;
+      btn.firstChild.textContent = '已复制 ';
+      setTimeout(() => { btn.classList.remove('copied'); btn.firstChild.textContent = original; }, 1500);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done);
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch(e) {}
+      document.body.removeChild(ta);
+    }
+  }
+  document.getElementById('copy-chat').addEventListener('click', e => copyToClipboard(chatReply(), e.currentTarget));
+
+  updateAll();
+</script>
+</body>
+</html>

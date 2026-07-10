@@ -40,12 +40,16 @@ const savedZoom = getWindowZoom(windowState) ?? 1;
 export const mainWindow = new BrowserWindow({
   title: "LLM Space",
   url,
+  // On macOS this shows the traffic lights overlaid on our content; on Windows
+  // it yields a frameless window (with resize borders + DWM shadow + Aero
+  // Snap) whose caption buttons we draw ourselves (`components/window-controls`).
   titleBarStyle: "hiddenInset",
   rpc: mainWindowRPC,
-  trafficLightOffset: {
-    x: 2,
-    y: 16,
-  },
+  // macOS-only: position the traffic lights. Ignored on Windows/Linux, but
+  // don't even pass it there to keep the options honest per-platform.
+  ...(process.platform === "darwin"
+    ? { trafficLightOffset: { x: 2, y: 16 } }
+    : {}),
   frame: savedFrame,
 });
 

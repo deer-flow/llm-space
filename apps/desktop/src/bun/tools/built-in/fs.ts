@@ -9,6 +9,8 @@ import { getLlmSpaceHomePath } from "@llm-space/core/server";
 import { openPath, revealInFileManager } from "../../fs";
 import { skillsManager } from "../../skills";
 
+import { resolveRgPath, shell, shellInvocation } from "./shell";
+
 /** Workspace root that path-less tools (e.g. `glob`) default to. */
 function _workspaceRoot(): string {
   return path.join(getLlmSpaceHomePath(), "workspace");
@@ -484,7 +486,15 @@ export async function grep(
   }
   args.push("--regexp", pattern, "--", searchPath);
 
-  const { stdout, stderr, code } = await _run("rg", args);
+  const rgPath = resolveRgPath();
+  if (!rgPath) {
+    throw new Error(
+      "ripgrep (rg) was not found. Install it and make sure `rg` is on PATH " +
+        "(Windows: `winget install BurntSushi.ripgrep.MSVC`; " +
+        "macOS: `brew install ripgrep`), then retry."
+    );
+  }
+  const { stdout, stderr, code } = await _run(rgPath, args);
   if (code === 1) {
     return "No matches found.";
   }
@@ -555,12 +565,22 @@ export async function glob(
 
 // -- bash ---------------------------------------------------------------------
 
+// On Windows without Git Bash the tool transparently runs PowerShell instead;
+// the descriptions must say so, or the model keeps writing bash syntax at a
+// PowerShell prompt. The tool NAME stays "bash" so saved threads and tool
+// configs keep working across platforms.
+const _SHELL_NAME = shell.kind === "bash" ? "bash" : "PowerShell";
+
 export const bashTool: BuiltinTool = {
   type: "builtin",
   name: "bash",
   icon: "terminal",
   description:
-    "Executes a bash command and returns stdout, stderr, and exit code. Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-export env vars, and re-source files as needed on every call.",
+    `Executes a ${_SHELL_NAME} command and returns stdout, stderr, and exit code. ` +
+    (shell.kind === "powershell"
+      ? "NOTE: this system has no bash; commands are run with PowerShell (powershell -Command), so use PowerShell syntax. "
+      : "") +
+    "Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-set env vars, and re-source files as needed on every call.",
   strict: true,
   parameters: {
     type: "object",
@@ -574,7 +594,8 @@ export const bashTool: BuiltinTool = {
       command: {
         type: "string",
         description:
-          "The bash command to execute. Must be self-contained — include cd, export, and any other setup inline, because prior invocations leave no lasting shell state.",
+          `The ${_SHELL_NAME} command to execute. Must be self-contained — include cd, ` +
+          "env-var setup, and any other setup inline, because prior invocations leave no lasting shell state.",
       },
       timeout: {
         type: "number",
@@ -601,7 +622,12 @@ export async function bash(
     timeout ?? BASH_DEFAULT_TIMEOUT_MS,
     BASH_MAX_TIMEOUT_MS
   );
-  const { stdout, stderr, code } = await _run("bash", ["-c", command], timeoutMs);
+  const invocation = shellInvocation(command);
+  const { stdout, stderr, code } = await _run(
+    invocation.command,
+    invocation.args,
+    timeoutMs
+  );
   return { stdout, stderr, exitCode: code };
 }
 

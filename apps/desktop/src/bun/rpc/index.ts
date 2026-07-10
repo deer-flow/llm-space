@@ -135,6 +135,10 @@ export const mainWindowRPC: MainWindowRPC =
           const { mainWindow } = await import("../app/window");
           return { fullScreen: mainWindow.isFullScreen() };
         },
+        getZoomState: async () => {
+          const { getDesiredZoom } = await import("../app/window-state");
+          return { zoom: getDesiredZoom() };
+        },
         ensureRootDir: ({ relativePath }) => {
           const dir = path.join(getLlmSpaceHomePath(), relativePath);
           mkdirSync(dir, { recursive: true });

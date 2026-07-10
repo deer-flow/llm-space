@@ -8,7 +8,7 @@ import { Utils, type BrowserWindow } from "electrobun/bun";
 import { COMMAND_META, type Command } from "../shared/commands";
 
 import { isChineseLocale } from "./app/locales";
-import { saveZoom } from "./app/window-state";
+import { getDesiredZoom, saveZoom } from "./app/window-state";
 import {
   importFilesWithNativePicker,
   importTextFromClipboard,
@@ -32,6 +32,26 @@ const ZOOM_MAX = 3.0;
 const clampZoom = (zoom: number) =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 
+const IS_WINDOWS = process.platform === "win32";
+
+/**
+ * Electrobun's native page zoom is a no-op on Windows, so zoom there is
+ * tracked bun-side (`getDesiredZoom`) and applied by the renderer as CSS zoom
+ * (the `applyPageZoom` message → `lib/use-css-zoom.ts`).
+ */
+function _currentZoom(window: BrowserWindow): number {
+  return IS_WINDOWS ? getDesiredZoom() : window.getPageZoom();
+}
+
+function _applyZoom(window: BrowserWindow, zoom: number) {
+  if (IS_WINDOWS) {
+    mainWindowRPC.send.applyPageZoom({ zoom });
+  } else {
+    window.setPageZoom(zoom);
+  }
+  saveZoom(zoom);
+}
+
 /**
  * Run a {@link Command} from the main process. `webview`-target commands are
  * forwarded to the renderer over RPC; `bun`-target commands (window zoom /
@@ -53,24 +73,39 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
   }
   switch (command.type) {
     case "zoomIn": {
-      const zoom = clampZoom(window.getPageZoom() + ZOOM_STEP);
-      window.setPageZoom(zoom);
-      saveZoom(zoom);
+      _applyZoom(window, clampZoom(_currentZoom(window) + ZOOM_STEP));
       return;
     }
     case "zoomOut": {
-      const zoom = clampZoom(window.getPageZoom() - ZOOM_STEP);
-      window.setPageZoom(zoom);
-      saveZoom(zoom);
+      _applyZoom(window, clampZoom(_currentZoom(window) - ZOOM_STEP));
       return;
     }
     case "resetZoom": {
-      window.setPageZoom(1);
-      saveZoom(1);
+      _applyZoom(window, 1);
       return;
     }
     case "reload": {
       window.webview?.executeJavascript("location.reload()");
+      return;
+    }
+    case "windowMinimize": {
+      window.minimize();
+      return;
+    }
+    case "windowToggleMaximize": {
+      if (window.isMaximized()) {
+        window.unmaximize();
+      } else {
+        window.maximize();
+      }
+      return;
+    }
+    case "windowClose": {
+      window.close();
+      return;
+    }
+    case "toggleFullScreen": {
+      window.setFullScreen(!window.isFullScreen());
       return;
     }
     case "openLink": {

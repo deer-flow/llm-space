@@ -21,6 +21,7 @@ import { useRenderingFidelity } from "@/components/theme-provider";
 import { Tooltip } from "@/components/tooltip";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
+import { isModEnter } from "@/shared/platform";
 
 import { CodeEditor, type CodeEditorProps } from "../../code-editor";
 import { Button } from "../../ui/button";
@@ -89,7 +90,7 @@ function _ToolCallListItem({
   ]);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) {
+      if (isModEnter(e)) {
         e.preventDefault();
         e.stopPropagation();
         if (canContinue) {

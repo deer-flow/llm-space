@@ -17,6 +17,12 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import { electrobun } from "@/lib/electrobun";
 import { cn } from "@/lib/utils";
+import {
+  isWindows,
+  MOD_KEY_LABEL,
+  MOVE_TO_TRASH_LABEL,
+  REVEAL_LABEL,
+} from "@/shared/platform";
 
 import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
@@ -29,18 +35,11 @@ import {
   ContextMenuTrigger,
 } from "../ui/context-menu";
 import { Kbd, KbdGroup } from "../ui/kbd";
+import { WindowControls } from "../window-controls";
 
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
-
-const _isWindows =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
-
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-const MOVE_TO_TRASH_LABEL = _isWindows
-  ? "Move to Recycle Bin"
-  : "Move to Trash";
 
 // Suppress focus on mouse-down so a click doesn't leave these toolbar icons
 // with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
@@ -241,11 +240,12 @@ export function ThreadTabs({
                 // area, so its color must match that bar (--tab-bar-bottom), not
                 // the default --border.
                 "flex h-full items-center border-b-4 [border-color:var(--tab-bar-bottom)] pt-1 transition-[width]",
-                fullScreen
-                  ? "w-6 pl-1"
-                  : sidebarOpen
-                    ? "w-6 pl-1"
-                    : "w-23 pl-18"
+                // The wide left inset reserves room for the macOS traffic
+                // lights when the sidebar is closed; Windows draws its caption
+                // buttons on the right instead, so no inset there.
+                !isWindows && !fullScreen && !sidebarOpen
+                  ? "w-23 pl-18"
+                  : "w-6 pl-1"
               )}
             >
               <Tooltip
@@ -253,7 +253,7 @@ export function ThreadTabs({
                   <>
                     {sidebarOpen ? "Hide sidebar" : "Show sidebar"}{" "}
                     <KbdGroup>
-                      <Kbd className="text-foreground!">⌘ B</Kbd>
+                      <Kbd className="text-foreground!">{MOD_KEY_LABEL} B</Kbd>
                     </KbdGroup>
                   </>
                 }
@@ -303,6 +303,11 @@ export function ThreadTabs({
               onTabClose={close}
               onTabReorder={(_id, from, to) => reorder(from, to)}
             />
+            {isWindows && !fullScreen ? (
+              <div className="flex border-b-4 [border-color:var(--tab-bar-bottom)]">
+                <WindowControls />
+              </div>
+            ) : null}
           </div>
         </ContextMenuTrigger>
         {contextMenuId !== null ? (

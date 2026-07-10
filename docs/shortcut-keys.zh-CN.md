@@ -4,14 +4,14 @@ LLM Space 的桌面菜单和 Thread 编辑器都支持快捷键。本文用 macO
 
 # 菜单快捷键
 
-这些快捷键来自桌面应用顶部菜单。
+macOS 上这些快捷键来自原生应用菜单；Windows / Linux 没有菜单栏，同样的快捷键由应用自身提供，所有操作也都可以在 Command Palette 中找到。
 
 | 菜单 | 操作 | macOS 快捷键 | Windows / Linux |
 | --- | --- | --- | --- |
 | LLM Space | 打开 Settings | `Command + ,` | `Ctrl + ,` |
-| LLM Space | 隐藏应用 | `Command + H` | `Ctrl + H` |
-| LLM Space | 隐藏其他应用 | `Command + Shift + H` | `Ctrl + Shift + H` |
-| LLM Space | 退出应用 | `Command + Q` | `Ctrl + Q` |
+| LLM Space | 隐藏应用 | `Command + H` | —（仅 macOS） |
+| LLM Space | 隐藏其他应用 | `Command + Shift + H` | —（仅 macOS） |
+| LLM Space | 退出应用 | `Command + Q` | `Alt + F4` |
 | File | 新建 Thread 文件 | `Command + N` | `Ctrl + N` |
 | File | 新建文件夹 | `Command + Shift + N` | `Ctrl + Shift + N` |
 | File | 关闭当前标签页 | `Command + W` | `Ctrl + W` |
@@ -24,7 +24,7 @@ LLM Space 的桌面菜单和 Thread 编辑器都支持快捷键。本文用 macO
 | View | 重置缩放 | `Command + 0` | `Ctrl + 0` |
 | Window | 选择上一个标签页 | `Command + Option + ←` | `Ctrl + Alt + ←` |
 | Window | 选择下一个标签页 | `Command + Option + →` | `Ctrl + Alt + →` |
-| Window | 切换全屏 | `Command + Shift + F` | `Ctrl + Shift + F` |
+| Window | 切换全屏 | `Command + Shift + F` | `F11` |
 
 # Command Palette
 

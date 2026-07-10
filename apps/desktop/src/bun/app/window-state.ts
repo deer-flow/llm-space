@@ -73,9 +73,14 @@ let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 /**
  * Restore a saved zoom level onto the window and keep re-applying it: WebKit
  * page zoom can reset on (re)load, so we re-set it once the DOM is ready.
+ *
+ * On Windows Electrobun's native page zoom is a no-op, so restore is
+ * renderer-driven instead: `lib/use-css-zoom.ts` pulls `getZoomState` on every
+ * mount (including reloads) and applies CSS zoom itself.
  */
 function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
   desiredZoom = initialZoom;
+  if (process.platform === "win32") return;
   if (initialZoom !== 1) {
     win.setPageZoom(initialZoom);
   }
@@ -106,4 +111,13 @@ export function saveZoom(zoom: number) {
   zoomTimer = setTimeout(() => {
     void saveWindowZoom(desiredZoom);
   }, SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * The zoom level we want applied. On Windows this is the source of truth for
+ * the zoom commands and the renderer's CSS-zoom restore — `getPageZoom()`
+ * always reports 1.0 there.
+ */
+export function getDesiredZoom(): number {
+  return desiredZoom;
 }

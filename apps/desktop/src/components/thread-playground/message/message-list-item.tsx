@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+import { isModEnter } from "@/shared/platform";
 
 import { CodeEditor } from "../../code-editor";
 import { Tooltip } from "../../tooltip";
@@ -141,7 +142,7 @@ function _MessageListItem({
   );
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) {
+      if (isModEnter(e)) {
         void handleRun();
         e.preventDefault();
         e.stopPropagation();

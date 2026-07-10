@@ -8,10 +8,12 @@ Settings is the global configuration center for LLM Space. It manages applicatio
 
 On the macOS menu bar, click `LLM Space`, or `LLM Space-dev` in the development build, then choose `Settings...`.
 
+On Windows there is no menu bar; open Settings with the shortcut below, or run `Settings` from the Command Palette (`Ctrl + Shift + P`).
+
 You can also use the shortcut:
 
 ```text
-Command + ,
+Command + ,   (Windows: Ctrl + ,)
 ```
 
 After Settings opens, the left side shows categories, and the right side shows the configuration form for the selected category. This document covers:

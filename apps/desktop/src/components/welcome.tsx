@@ -11,6 +11,7 @@ import { useCallback, type MouseEvent } from "react";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
 import { cn } from "@/lib/utils";
+import { isWindows } from "@/shared/platform";
 
 import { Button } from "./ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "./ui/empty";
+import { WindowControls } from "./window-controls";
 
 interface WelcomeProps {
   className?: string;
@@ -59,7 +61,11 @@ export function Welcome({
       <div
         className="electrobun-webkit-app-region-drag absolute top-0 right-0 left-0 h-11.5"
         onDoubleClick={handleHeaderDoubleClick}
-      ></div>
+      >
+        {isWindows ? (
+          <WindowControls className="absolute top-0 right-0 h-full" />
+        ) : null}
+      </div>
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">

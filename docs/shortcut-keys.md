@@ -6,12 +6,14 @@ LLM Space supports shortcuts from both the desktop menu and the Thread editor. T
 
 These shortcuts come from the desktop application menu.
 
+On macOS these come from the native application menu. Windows / Linux have no menu bar — the same shortcuts are provided by the app itself, and every action is also reachable from the Command Palette.
+
 | Menu | Action | macOS shortcut | Windows / Linux |
 | --- | --- | --- | --- |
 | LLM Space | Open Settings | `Command + ,` | `Ctrl + ,` |
-| LLM Space | Hide app | `Command + H` | `Ctrl + H` |
-| LLM Space | Hide other apps | `Command + Shift + H` | `Ctrl + Shift + H` |
-| LLM Space | Quit app | `Command + Q` | `Ctrl + Q` |
+| LLM Space | Hide app | `Command + H` | — (macOS only) |
+| LLM Space | Hide other apps | `Command + Shift + H` | — (macOS only) |
+| LLM Space | Quit app | `Command + Q` | `Alt + F4` |
 | File | New Thread file | `Command + N` | `Ctrl + N` |
 | File | New folder | `Command + Shift + N` | `Ctrl + Shift + N` |
 | File | Close current tab | `Command + W` | `Ctrl + W` |
@@ -24,7 +26,7 @@ These shortcuts come from the desktop application menu.
 | View | Reset zoom | `Command + 0` | `Ctrl + 0` |
 | Window | Select previous tab | `Command + Option + Left` | `Ctrl + Alt + Left` |
 | Window | Select next tab | `Command + Option + Right` | `Ctrl + Alt + Right` |
-| Window | Toggle fullscreen | `Command + Shift + F` | `Ctrl + Shift + F` |
+| Window | Toggle fullscreen | `Command + Shift + F` | `F11` |
 
 # Command Palette
 

@@ -28,6 +28,7 @@ import {
 } from "@/components/model-provider";
 import { threadTitleFromPath } from "@/lib/thread-file";
 import { cn } from "@/lib/utils";
+import { MOD_KEY_LABEL } from "@/shared/platform";
 
 import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
@@ -322,7 +323,9 @@ function ThreadPlaygroundContent({
                         ? "Stop running"
                         : "Run this thread"}
                       <KbdGroup>
-                        <Kbd className="text-foreground!">⌘ Enter</Kbd>
+                        <Kbd className="text-foreground!">
+                          {MOD_KEY_LABEL} Enter
+                        </Kbd>
                       </KbdGroup>
                     </div>
                   }

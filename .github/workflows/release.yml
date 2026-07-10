@@ -4,8 +4,9 @@ name: Release
 # which bumps apps/desktop/package.json, updates CHANGELOG.md, commits and tags).
 # A `-canary` suffix in the tag selects the canary channel; otherwise stable.
 #
-# Jobs: meta (validate tag) → build (macOS arm64 + x64 matrix: sign, notarize,
-# smoke-test) → publish. Artifacts land in two places:
+# Jobs: meta (validate tag) → build (macOS arm64 + x64: sign, notarize,
+# smoke-test; Windows x64: unsigned for now, see the win smoke step) → publish.
+# Artifacts land in two places:
 #   - the rolling `updates` release — the machine-readable update feed the
 #     in-app updater polls (`release.baseUrl` in electrobun.config.ts)
 #   - a versioned release per tag — DMGs + changelog for humans
@@ -81,8 +82,13 @@ jobs:
       matrix:
         include:
           - runner: macos-15
+            os: macos
             arch: arm64
           - runner: macos-15-intel
+            os: macos
+            arch: x64
+          - runner: windows-latest
+            os: win
             arch: x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -98,7 +104,23 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Bundle ripgrep for the built-in `grep` tool — stock Windows has no rg.
+      # Version-pinned; electrobun.config.ts `build.copy` picks the file up.
+      - name: Download ripgrep (Windows)
+        if: matrix.os == 'win'
+        shell: pwsh
+        working-directory: apps/desktop
+        run: |
+          $version = "14.1.1"
+          $zip = "ripgrep-$version-x86_64-pc-windows-msvc"
+          New-Item -ItemType Directory -Force -Path resources/win | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/BurntSushi/ripgrep/releases/download/$version/$zip.zip" -OutFile "$env:RUNNER_TEMP/rg.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP/rg.zip" -DestinationPath "$env:RUNNER_TEMP/rg"
+          Copy-Item "$env:RUNNER_TEMP/rg/$zip/rg.exe" resources/win/rg.exe
+          & resources/win/rg.exe --version
+
       - name: Import signing certificate
+        if: matrix.os == 'macos'
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
@@ -125,6 +147,7 @@ jobs:
           echo "ELECTROBUN_DEVELOPER_ID=$IDENTITY" >> "$GITHUB_ENV"
 
       - name: Write App Store Connect API key
+        if: matrix.os == 'macos'
         env:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
         run: |
@@ -132,8 +155,12 @@ jobs:
           printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
           echo "ELECTROBUN_APPLEAPIKEYPATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      # Windows ships unsigned for now (SmartScreen shows "More info → Run
+      # anyway" on first install; auto-updates never re-prompt). SignPath
+      # Foundation OSS signing lands with the first stable Windows release.
       - name: Build, sign and notarize
         working-directory: apps/desktop
+        shell: bash
         env:
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.ASC_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
@@ -141,6 +168,7 @@ jobs:
         run: bun run "build:$CHANNEL"
 
       - name: Smoke test the signed app
+        if: matrix.os == 'macos'
         working-directory: apps/desktop
         env:
           CHANNEL: ${{ needs.meta.outputs.channel }}
@@ -170,14 +198,39 @@ jobs:
           }
           pkill -f "$APP/Contents/MacOS/" || true
 
+      # Windows launch/behavior verification is manual for now (the wrapper
+      # exe pops the extraction UI, which a headless runner can't exercise
+      # meaningfully); this validates the artifact set instead.
+      - name: Smoke test artifacts (Windows)
+        if: matrix.os == 'win'
+        shell: pwsh
+        working-directory: apps/desktop
+        env:
+          CHANNEL: ${{ needs.meta.outputs.channel }}
+        run: |
+          $setupZip = Get-ChildItem artifacts -Filter "*-Setup*.zip"
+          $tarZst = Get-ChildItem artifacts -Filter "*.tar.zst"
+          $updateJson = Get-ChildItem artifacts -Filter "*update.json"
+          if (-not $setupZip -or -not $tarZst -or -not $updateJson) {
+            Write-Error "missing Windows artifacts (Setup zip / tar.zst / update.json)"
+            exit 1
+          }
+          Expand-Archive -Path $setupZip[0].FullName -DestinationPath "$env:RUNNER_TEMP/setup-check"
+          $exe = Get-ChildItem "$env:RUNNER_TEMP/setup-check" -Recurse -Filter "*.exe"
+          if (-not $exe) {
+            Write-Error "Setup zip contains no exe"
+            exit 1
+          }
+          Get-Content $updateJson[0].FullName | ConvertFrom-Json | Out-Null
+
       - uses: actions/upload-artifact@v7
         with:
-          name: artifacts-${{ matrix.arch }}
+          name: artifacts-${{ matrix.os }}-${{ matrix.arch }}
           path: apps/desktop/artifacts/
           if-no-files-found: error
 
       - name: Clean up keychain
-        if: always()
+        if: always() && matrix.os == 'macos'
         run: security delete-keychain build.keychain || true
 
   publish:
@@ -222,7 +275,7 @@ jobs:
           # Static notes only. No changelog extraction and no --generate-notes:
           # both list commits/authors and a "New Contributors" section, which
           # we deliberately don't surface.
-          NOTES="Download the DMG below. Existing installs update in place."
+          NOTES="Download the DMG (macOS) or the -Setup.zip (Windows) below. Existing installs update in place. Windows builds are unsigned for now: SmartScreen may show a warning on first install — choose \"More info\" → \"Run anyway\"."
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "canary" ]; then
             PRERELEASE_ARGS=(--prerelease)
@@ -238,3 +291,10 @@ jobs:
           fi
           gh release upload "$TAG" artifacts/*.dmg \
             --repo "$GITHUB_REPOSITORY" --clobber
+          # Windows installer (zip wrapping the Setup exe).
+          shopt -s nullglob
+          WIN_SETUP=(artifacts/*-Setup*.zip)
+          if [ ${#WIN_SETUP[@]} -gt 0 ]; then
+            gh release upload "$TAG" "${WIN_SETUP[@]}" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          fi

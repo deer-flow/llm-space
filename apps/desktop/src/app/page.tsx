@@ -34,6 +34,8 @@ import {
   importThreadFiles,
   type ThreadImportFile,
 } from "@/lib/import-threads";
+import { useAppKeymap } from "@/lib/use-app-keymap";
+import { useCssZoom } from "@/lib/use-css-zoom";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 import type { TraceRecord } from "@/shared/traces";
@@ -163,6 +165,10 @@ function PageInner() {
   const { executeCommand } = useCommands();
   const models = useModels();
   const { tracingEnabled } = useExperimental();
+  // Windows/Linux have no native menu, so their shortcuts live in the renderer.
+  useAppKeymap();
+  // Windows-only: native page zoom is a no-op there; apply CSS zoom instead.
+  useCssZoom();
 
   // The active tab is read through a ref so command handlers never go stale.
   const activeTabIdRef = useRef(tabs.activeId);

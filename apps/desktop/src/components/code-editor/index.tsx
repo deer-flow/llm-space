@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { cn } from "@/lib/utils";
+import { isModEnter } from "@/shared/platform";
 
 import { Tooltip } from "../tooltip";
 import { Textarea } from "../ui/textarea";
@@ -214,7 +215,7 @@ const PlainTextCodeEditor = forwardRef<
           focusedRef.current = true;
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && event.metaKey) {
+          if (isModEnter(event)) {
             commit();
           }
           onKeyDown?.(event);

@@ -38,6 +38,7 @@ import {
 } from "@/lib/thread-file";
 import { useFullScreen } from "@/lib/use-full-screen";
 import { cn } from "@/lib/utils";
+import { isWindows } from "@/shared/platform";
 
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree } from "./use-file-system-tree";
@@ -387,7 +388,14 @@ function _FileSystemTreeView({
     <div className={cn("flex h-full flex-col", className)}>
       <header className="text-muted-foreground electrobun-webkit-app-region-drag flex h-11.5 items-center justify-between px-3 text-xs font-medium">
         {headerStart ?? (
-          <span className={cn(fullScreen ? "opacity-100" : "opacity-0")}>
+          // Hidden outside fullscreen on macOS only: the traffic lights sit on
+          // top of this spot. Windows has no left-side window controls, so the
+          // title is always visible there.
+          <span
+            className={cn(
+              fullScreen || isWindows ? "opacity-100" : "opacity-0"
+            )}
+          >
             LLM Space 4
           </span>
         )}

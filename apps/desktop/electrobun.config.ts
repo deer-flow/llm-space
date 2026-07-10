@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import type { ElectrobunConfig } from "electrobun";
 
 import packageJson from "./package.json";
@@ -41,6 +43,12 @@ export default {
       "dist/index.html": "views/mainview/index.html",
       "dist/assets": "views/mainview/assets",
       "dist/images": "views/mainview/images",
+      // Windows-only: bundle ripgrep for the built-in `grep` tool (no rg on
+      // stock Windows). CI downloads it to resources/win/ before building;
+      // local builds without the file just fall back to PATH lookup.
+      ...(process.platform === "win32" && existsSync("resources/win/rg.exe")
+        ? { "resources/win/rg.exe": "resources/rg.exe" }
+        : {}),
     },
     // Ignore Vite output in watch mode — HMR handles view rebuilds separately
     watchIgnore: ["dist/**"],
@@ -64,7 +72,21 @@ export default {
       bundleCEF: false,
     },
     win: {
-      bundleCEF: false,
+      // Ships on the system WebView2 (Chromium) by default. The CEF escape
+      // hatch mirrors the mac block so `bun run dev:cef` (CDP debugging)
+      // works on Windows too.
+      bundleCEF: useCefRenderer,
+      ...(useCefRenderer
+        ? {
+            defaultRenderer: "cef" as const,
+            chromiumFlags: {
+              "remote-debugging-port": cdpPort,
+            },
+          }
+        : {}),
+      // Multi-size (16/32/48/256) Windows icon generated from
+      // icon.iconset/icon_512x512.png.
+      icon: "icon.ico",
     },
   },
   scripts: {

@@ -7,6 +7,7 @@
  * one-RPC-method-per-action sprawl.
  */
 
+import { MOVE_TO_TRASH_LABEL, REVEAL_LABEL } from "./platform";
 import type { TraceConnectedProjectInput, TraceImportFile } from "./traces";
 
 /** Base shape for every command: a string `type` and typed `args`. */
@@ -233,6 +234,21 @@ export interface ResetZoomCommand extends GenericCommand<"resetZoom"> {}
 /** Reload the webview. */
 export interface ReloadCommand extends GenericCommand<"reload"> {}
 
+/**
+ * Minimize the main window. Used by the custom window controls rendered on
+ * Windows (frameless window, no native caption buttons).
+ */
+export interface WindowMinimizeCommand extends GenericCommand<"windowMinimize"> {}
+
+/** Toggle the main window between maximized and restored. */
+export interface WindowToggleMaximizeCommand extends GenericCommand<"windowToggleMaximize"> {}
+
+/** Close the main window. */
+export interface WindowCloseCommand extends GenericCommand<"windowClose"> {}
+
+/** Toggle OS-level fullscreen (F11 on Windows/Linux; the green light on macOS). */
+export interface ToggleFullScreenCommand extends GenericCommand<"toggleFullScreen"> {}
+
 /** Open a URL in the user's default browser (via the OS). */
 export interface OpenLinkCommand extends GenericCommand<
   "openLink",
@@ -301,6 +317,10 @@ export type Command =
   | ZoomOutCommand
   | ResetZoomCommand
   | ReloadCommand
+  | WindowMinimizeCommand
+  | WindowToggleMaximizeCommand
+  | WindowCloseCommand
+  | ToggleFullScreenCommand
   | OpenLinkCommand
   | OpenDocumentCommand
   | ReportBugsCommand
@@ -339,8 +359,8 @@ export const COMMAND_META: Record<
   newFolder: { label: "New Folder", target: "webview" },
   renameFile: { label: "Rename", target: "webview" },
   duplicateFile: { label: "Duplicate", target: "webview" },
-  deleteFile: { label: "Move to Trash", target: "webview" },
-  revealFile: { label: "Reveal in Finder", target: "webview" },
+  deleteFile: { label: MOVE_TO_TRASH_LABEL, target: "webview" },
+  revealFile: { label: REVEAL_LABEL, target: "webview" },
   copyFile: { label: "Copy", target: "bun" },
   refreshTree: { label: "Refresh", target: "webview" },
   importFiles: { label: "Import from Files...", target: "webview" },
@@ -372,6 +392,10 @@ export const COMMAND_META: Record<
   zoomOut: { label: "Zoom Out", target: "bun" },
   resetZoom: { label: "Reset Zoom", target: "bun" },
   reload: { label: "Reload", target: "bun" },
+  windowMinimize: { label: "Minimize Window", target: "bun" },
+  windowToggleMaximize: { label: "Maximize or Restore Window", target: "bun" },
+  windowClose: { label: "Close Window", target: "bun" },
+  toggleFullScreen: { label: "Toggle Full Screen", target: "bun" },
   openLink: { label: "Open Link", target: "bun" },
   openDocument: { label: "Documents", target: "bun" },
   reportBugs: { label: "Report Bug", target: "bun" },
