@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
 import { getLlmSpaceHomePath } from "@llm-space/core/server";
+import { callEveTool, listEveProjectSkills } from "@llm-space/eve";
 import { BrowserView, Utils } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
@@ -69,7 +70,10 @@ export const mainWindowRPC: MainWindowRPC =
         addCustomProvider: async ({ id, name, baseUrl, api }) => {
           modelManager.addCustomProvider({ id, name, baseUrl, api });
           // Only the provider id is recorded — never the base URL or name.
-          analytics.capture("provider_added", { providerId: id, kind: "custom" });
+          analytics.capture("provider_added", {
+            providerId: id,
+            kind: "custom",
+          });
           return getModelProviderGroups();
         },
         updateProvider: async ({
@@ -185,6 +189,21 @@ export const mainWindowRPC: MainWindowRPC =
         builtInListTools: () => listBuiltInTools(),
         builtInCallTool: ({ name, arguments: args }) =>
           callBuiltInTool({ name, arguments: args }),
+        eveListSkills: ({ projectRoot }) => listEveProjectSkills(projectRoot),
+        eveCallTool: ({
+          projectRoot,
+          runtime,
+          toolName,
+          toolPath,
+          arguments: args,
+        }) =>
+          callEveTool({
+            projectRoot,
+            runtime,
+            toolName,
+            toolPath,
+            arguments: args,
+          }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>
           Promise.resolve(analytics.setEnabled(enabled)),
@@ -201,11 +220,14 @@ export const mainWindowRPC: MainWindowRPC =
           const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
           return { path };
         },
-        skillsAddPath: ({ path }) => Promise.resolve(skillsManager.addPath(path)),
+        skillsAddPath: ({ path }) =>
+          Promise.resolve(skillsManager.addPath(path)),
         skillsRemovePath: ({ path }) =>
           Promise.resolve(skillsManager.removePath(path)),
         skillsSetSkillHidden: ({ path, skillName, hidden }) =>
-          Promise.resolve(skillsManager.setSkillHidden(path, skillName, hidden)),
+          Promise.resolve(
+            skillsManager.setSkillHidden(path, skillName, hidden)
+          ),
         skillsSetAllSkillsHidden: ({ path, hidden }) =>
           Promise.resolve(skillsManager.setAllSkillsHidden(path, hidden)),
         skillsListSkills: ({ path }) =>

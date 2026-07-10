@@ -47,7 +47,7 @@ function _ToolListItem({
       : tool.type === "builtin"
         ? getBuiltInToolIcon(tool)
         : FunctionSquareIcon;
-  const editDisabled = readonly;
+  const editDisabled = readonly || tool.type === "eve";
 
   return (
     <div className="group/tool bg-secondary hover:text-accent-foreground inline-flex h-6 shrink-0 items-center rounded-md text-xs/relaxed transition-colors">
@@ -85,7 +85,13 @@ function _ToolListItem({
             aria-label={
               tool.type === "function"
                 ? `Edit ${tool.name} tool`
-                : `Manage ${tool.name} ${tool.type === "mcp" ? "MCP" : "built-in"} tool`
+                : `Manage ${tool.name} ${
+                    tool.type === "mcp"
+                      ? "MCP"
+                      : tool.type === "eve"
+                        ? "Eve"
+                        : "built-in"
+                  } tool`
             }
             disabled={editDisabled}
             onClick={() => onEdit(tool)}

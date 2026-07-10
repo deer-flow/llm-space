@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  ThreadContext,
   ThreadCurrentDateVariable,
   ThreadSkillsVariable,
   ThreadVariable,
@@ -91,6 +92,7 @@ function _PromptVariablesPanel({
   const systemPrompt = useThreadStore(
     (s) => s.thread.context?.systemPrompt ?? ""
   );
+  const eveContext = useThreadStore((s) => s.thread.context?.eve);
   const {
     updatePromptVariable,
     renamePromptVariable,
@@ -117,6 +119,11 @@ function _PromptVariablesPanel({
   );
   const customValues =
     variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
+  const skillContext = useMemo(
+    (): ThreadContext | undefined =>
+      eveContext ? { eve: eveContext } : undefined,
+    [eveContext]
+  );
 
   // Seed from the chip-open target so the fallback effect below (which runs in
   // the same mount commit) doesn't clobber it back to the first variable.
@@ -217,7 +224,7 @@ function _PromptVariablesPanel({
     let cancelled = false;
     setSkillsLoading(true);
     setSkillsError(null);
-    void listEnabledPromptVariableSkills()
+    void listEnabledPromptVariableSkills(skillContext)
       .then((loaded) => {
         if (!cancelled) {
           setSkills(loaded);
@@ -239,7 +246,7 @@ function _PromptVariablesPanel({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [skillContext]);
 
   const addCustom = useCallback(() => {
     const used = new Set([...Object.keys(variables), ...customNames]);

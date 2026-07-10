@@ -1,0 +1,21 @@
+{
+  "name": "@llm-space/eve",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "bun test",
+    "smoke": "bun run scripts/smoke.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@llm-space/core": "workspace:*",
+    "eve": "^0.22.1",
+    "gray-matter": "^4.0.3",
+    "skills-handler": "^0.1.2",
+    "zod": "^4.4.3"
+  }
+}

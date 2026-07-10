@@ -79,6 +79,38 @@ const BuiltinTool = Type.Intersect([
 ]);
 export type BuiltinTool = Static<typeof BuiltinTool>;
 
+/**
+ * The definition of a tool backed by a local Eve project. Eve tools execute in
+ * an explicitly scoped project root, so they do not fall through to global
+ * LLM Space skills, MCP servers, or built-in tool handlers.
+ */
+const EveTool = Type.Intersect([
+  ToolBase,
+  Type.Object({
+    type: Type.Literal("eve"),
+    /**
+     * Absolute local path to the Eve project root that owns this runtime.
+     */
+    projectRoot: Type.String(),
+    /**
+     * The Eve runtime primitive to execute. Project skills use the same manual
+     * tool-call UI as tools, but resolve against `agent/skills/` only.
+     */
+    runtime: Type.Union([Type.Literal("tool"), Type.Literal("skill")]),
+    /**
+     * Eve-facing tool name. For normal tools this is the filename stem under
+     * `agent/tools/`; for the scoped skill loader this is `skill`.
+     */
+    toolName: Type.String(),
+    /**
+     * Absolute local path to the tool implementation file when `runtime` is
+     * `tool`. Omitted for Eve's scoped skill loader.
+     */
+    toolPath: Type.Optional(Type.String()),
+  }),
+]);
+export type EveTool = Static<typeof EveTool>;
+
 export interface LegacyMcpToolSource {
   /**
    * The configured MCP server id that owns the raw MCP tool.
@@ -98,8 +130,8 @@ export interface LegacyMcpToolSource {
 /**
  * The union type of the tools.
  */
-export const Tool = Type.Union([FunctionTool, McpTool, BuiltinTool]);
-export type Tool = FunctionTool | McpTool | BuiltinTool;
+export const Tool = Type.Union([FunctionTool, McpTool, BuiltinTool, EveTool]);
+export type Tool = FunctionTool | McpTool | BuiltinTool | EveTool;
 
 export type LegacyTool = Omit<FunctionTool, "type"> & {
   type?: "function";
@@ -107,7 +139,7 @@ export type LegacyTool = Omit<FunctionTool, "type"> & {
 };
 
 export function normalizeTool(tool: Tool | LegacyTool): Tool {
-  if (tool.type === "mcp" || tool.type === "builtin") {
+  if (tool.type === "mcp" || tool.type === "builtin" || tool.type === "eve") {
     return tool;
   }
   const legacySource = _getLegacyMcpSource(tool);
@@ -140,15 +172,20 @@ export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
 }
 
 /**
- * Whether a tool has a runtime backend the app can invoke directly. MCP tools
- * call their server and built-in tools call the desktop registry; `function`
- * tools are user-defined stubs with no backend, so their results are supplied
- * by hand. Built-in tools flagged `terminate` (e.g. `ask_user_question`)
- * require human input, so they are treated as non-executable too. The single
- * source of truth for "can be auto-executed".
+ * Whether a tool has a runtime backend the app can invoke directly after an
+ * explicit call. MCP tools call their server, built-in tools call the desktop
+ * registry, and Eve tools call their scoped project runtime; `function` tools
+ * are user-defined stubs with no backend, so their results are supplied by
+ * hand. Built-in tools flagged `terminate` (e.g. `ask_user_question`) require
+ * human input, so they are treated as non-executable too.
  */
-export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
+export function isExecutableTool(
+  tool: Tool
+): tool is McpTool | BuiltinTool | EveTool {
   if (tool.type === "mcp") {
+    return true;
+  }
+  if (tool.type === "eve") {
     return true;
   }
   return tool.type === "builtin" && tool.terminate !== true;

@@ -19,6 +19,7 @@ export default defineConfig([
       "apps/desktop/electrobun.config.ts",
       "apps/desktop/src/components/ui/**",
       "apps/desktop/vite.config.ts",
+      "packages/eve/fixtures/**",
     ],
   },
 

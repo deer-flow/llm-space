@@ -8,6 +8,7 @@ import type {
   ModelProviderGroup,
   Thread,
 } from "@llm-space/core";
+import type { EveSkillInfo, EveToolCallResult } from "@llm-space/eve";
 import type { RPCSchema } from "electrobun";
 
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
@@ -203,6 +204,20 @@ export interface DesktopRPCType {
           arguments: Record<string, unknown>;
         };
         response: { contentText: string };
+      };
+      eveListSkills: {
+        params: { projectRoot: string };
+        response: EveSkillInfo[];
+      };
+      eveCallTool: {
+        params: {
+          projectRoot: string;
+          runtime: "tool" | "skill";
+          toolName: string;
+          toolPath?: string;
+          arguments: Record<string, unknown>;
+        };
+        response: EveToolCallResult;
       };
       // The user's anonymous-analytics opt-out preference plus whether the
       // hard gates allow sending at all (see `shared/analytics.ts`).

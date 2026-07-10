@@ -1,6 +1,7 @@
-import type { BuiltinTool, McpTool } from "@llm-space/core";
+import type { BuiltinTool, EveTool, McpTool } from "@llm-space/core";
 
 import { callBuiltInTool } from "@/client/built-in-tools";
+import { callEveTool } from "@/client/eve";
 import { callMcpTool } from "@/client/mcp";
 
 /**
@@ -18,7 +19,7 @@ export interface ToolCallResult {
  * {@link isExecutableTool} so `function` tools never reach here.
  */
 export async function executeTool(
-  tool: McpTool | BuiltinTool,
+  tool: McpTool | BuiltinTool | EveTool,
   args: Record<string, unknown>
 ): Promise<ToolCallResult> {
   if (tool.type === "mcp") {
@@ -27,7 +28,23 @@ export async function executeTool(
       toolName: tool.toolName,
       arguments: args,
     });
-    return { contentText: result.contentText, isError: result.isError ?? false };
+    return {
+      contentText: result.contentText,
+      isError: result.isError ?? false,
+    };
+  }
+  if (tool.type === "eve") {
+    const result = await callEveTool({
+      projectRoot: tool.projectRoot,
+      runtime: tool.runtime,
+      toolName: tool.toolName,
+      toolPath: tool.toolPath,
+      arguments: args,
+    });
+    return {
+      contentText: result.contentText,
+      isError: result.isError ?? false,
+    };
   }
   const result = await callBuiltInTool({ name: tool.name, arguments: args });
   return { contentText: result.contentText, isError: false };

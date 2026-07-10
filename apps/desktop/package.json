@@ -25,6 +25,7 @@
     "@formkit/auto-animate": "^0.9.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@llm-space/core": "workspace:*",
+    "@llm-space/eve": "workspace:*",
     "@lobehub/icons": "^5.10.1",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@radix-ui/react-slot": "^1.3.0",

@@ -392,6 +392,12 @@ export function createThreadStore(
           if (!tool || !isExecutableTool(tool)) {
             return null;
           }
+          // Eve project tools execute real local project code. V1 exposes them
+          // through the manual "Call this tool" button only, so auto-run stops
+          // here instead of executing the Eve environment implicitly.
+          if (tool.type === "eve") {
+            return null;
+          }
           // A destructive `bash` command must never be auto-executed, even under
           // "auto run tools" or the ReAct loop — treat it like a `terminate`
           // tool: stop the loop and leave it pending for the user to review and

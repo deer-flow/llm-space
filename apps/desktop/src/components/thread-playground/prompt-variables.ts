@@ -15,6 +15,7 @@ import type {
   ThreadVariables,
 } from "@llm-space/core";
 
+import { listEveSkills } from "@/client/eve";
 import { getSkillsSettings, listSkills } from "@/client/skills";
 import type { SkillInfo } from "@/shared/skills";
 
@@ -281,7 +282,13 @@ export function formatSkillsVariable(
  * name. Reuses the Settings skill model so prompt variables cannot see hidden
  * skills the runtime `skill()` tool would reject.
  */
-export async function listEnabledPromptVariableSkills(): Promise<SkillInfo[]> {
+export async function listEnabledPromptVariableSkills(
+  context?: ThreadContext
+): Promise<SkillInfo[]> {
+  if (context?.eve) {
+    return listEveSkills(context.eve.projectRoot);
+  }
+
   const { discoveryPaths } = await getSkillsSettings();
   const perPath = await Promise.all(
     discoveryPaths.map((entry) =>
@@ -311,7 +318,7 @@ export async function renderSystemPromptVariables({
   const state = normalizePromptVariableState(context);
   _assertValidVariableState(state);
 
-  const renderState = _createPromptVariableRenderState(state);
+  const renderState = _createPromptVariableRenderState(state, context);
   const rendered: RenderedPromptVariable[] = [];
   const snapshotVariables: SnapshotVariables = {};
   const output = await _renderTextPromptVariables({
@@ -338,7 +345,7 @@ export async function renderThreadPromptVariables({
   const state = normalizePromptVariableState(context);
   _assertValidVariableState(state);
 
-  const renderState = _createPromptVariableRenderState(state);
+  const renderState = _createPromptVariableRenderState(state, context);
   const rendered: RenderedPromptVariable[] = [];
   const snapshotVariables = _normalizeSnapshotVariables(
     context.snapshot?.variables
@@ -634,12 +641,13 @@ function _renamePromptVariableSnapshotReference(
 }
 
 function _createPromptVariableRenderState(
-  state: PromptVariableState
+  state: PromptVariableState,
+  context: ThreadContext | undefined
 ): PromptVariableRenderState {
   const skills = new Map<string, SkillInfo>();
   let loadedSkills: Promise<void> | null = null;
   const loadSkills = async () => {
-    loadedSkills ??= listEnabledPromptVariableSkills().then((items) => {
+    loadedSkills ??= listEnabledPromptVariableSkills(context).then((items) => {
       for (const item of items) {
         skills.set(item.name, item);
       }

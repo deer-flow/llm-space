@@ -13,26 +13,39 @@ import {
 } from "./prompt-variables";
 import { ThreadStoreContext, type ThreadStore } from "./stores";
 
-// Skills settings are global (not per-thread), so the resolved list is cached
-// module-wide with a short TTL and in-flight de-dupe. Repeated hovers over a
-// skills placeholder reuse the cache instead of re-firing the N+1 IPC load.
+// Skills are scoped: normal threads read global Skills settings, while Eve
+// threads read only their project `agent/skills/`. Cache by scope so Eve hovers
+// never leak global skills into an imported Eve environment.
 const SKILLS_TTL_MS = 30_000;
-let skillsCache: { at: number; skills: SkillInfo[] } | null = null;
-let skillsInflight: Promise<SkillInfo[]> | null = null;
+const skillsCache = new Map<string, { at: number; skills: SkillInfo[] }>();
+const skillsInflight = new Map<string, Promise<SkillInfo[]>>();
 
-function loadSkillsCached(): Promise<SkillInfo[]> {
-  if (skillsCache && Date.now() - skillsCache.at < SKILLS_TTL_MS) {
-    return Promise.resolve(skillsCache.skills);
+function skillScopeKey(context: ThreadContext | undefined): string {
+  return context?.eve ? `eve:${context.eve.projectRoot}` : "global";
+}
+
+function loadSkillsCached(
+  context: ThreadContext | undefined
+): Promise<SkillInfo[]> {
+  const key = skillScopeKey(context);
+  const cached = skillsCache.get(key);
+  if (cached && Date.now() - cached.at < SKILLS_TTL_MS) {
+    return Promise.resolve(cached.skills);
   }
-  skillsInflight ??= listEnabledPromptVariableSkills()
+  const existing = skillsInflight.get(key);
+  if (existing) {
+    return existing;
+  }
+  const loading = listEnabledPromptVariableSkills(context)
     .then((skills) => {
-      skillsCache = { at: Date.now(), skills };
+      skillsCache.set(key, { at: Date.now(), skills });
       return skills;
     })
     .finally(() => {
-      skillsInflight = null;
+      skillsInflight.delete(key);
     });
-  return skillsInflight;
+  skillsInflight.set(key, loading);
+  return loading;
 }
 
 // One identity-stable extension per thread store and prompt place. Stable
@@ -62,7 +75,7 @@ function getExtensionForStore(
           name,
           store.getState().thread.context,
           placeKey,
-          loadSkillsCached
+          () => loadSkillsCached(store.getState().thread.context)
         ),
       listVariables: () =>
         listPromptVariableCompletions(store.getState().thread.context),
@@ -104,11 +117,8 @@ export function usePromptVariableExtensionForContext(
     if (context) {
       return createPromptVariableExtension({
         resolve: (name) =>
-          resolvePromptVariableValueForPlace(
-            name,
-            context,
-            placeKey,
-            loadSkillsCached
+          resolvePromptVariableValueForPlace(name, context, placeKey, () =>
+            loadSkillsCached(context)
           ),
         listVariables: () => listPromptVariableCompletions(context),
       });

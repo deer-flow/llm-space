@@ -72,6 +72,20 @@ export const ThreadContextSnapshot = Type.Object({
 export type ThreadContextSnapshot = Static<typeof ThreadContextSnapshot>;
 
 /**
+ * Local Eve project runtime attached to this thread. The project root is
+ * persisted so manual Eve tool calls and scoped skill loads still work after a
+ * desktop restart, and so Eve threads never fall back to global LLM Space
+ * skills by accident.
+ */
+export const ThreadEveContext = Type.Object({
+  projectRoot: Type.String(),
+  source: Type.Optional(
+    Type.Union([Type.Literal("env"), Type.Literal("manual")])
+  ),
+});
+export type ThreadEveContext = Static<typeof ThreadEveContext>;
+
+/**
  * The context of a thread, including the system prompt, messages, and tools.
  */
 export const ThreadContext = Type.Object({
@@ -99,6 +113,13 @@ export const ThreadContext = Type.Object({
    * Runtime snapshot values captured while running the thread.
    */
   snapshot: Type.Optional(ThreadContextSnapshot),
+
+  /**
+   * Optional local Eve project runtime. When present, skills and Eve tools are
+   * resolved from this project only; global Skills settings are ignored for Eve
+   * prompt-variable rendering and `skill(name)` calls.
+   */
+  eve: Type.Optional(ThreadEveContext),
 
   /**
    * The messages of the thread.

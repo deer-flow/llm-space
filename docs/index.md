@@ -14,6 +14,12 @@ This is the English user manual for LLM Space. Start with the quick start guide,
 | [Settings](./settings.md) | Introduces the Settings entry point and the General, Models, MCP, Search, and Skills pages. |
 | [Shortcut Keys](./shortcut-keys.md) | Introduces menu shortcuts, the command palette, and Thread run shortcuts. |
 
+# Developer RFCs
+
+| RFC | Status | Description |
+| --- | --- | --- |
+| [Plugin Extension Architecture](./rfc-plugin-extension-architecture.md) | Proposed | Defines the trusted Bun-process plugin host, generic extension points, and Eve plugin migration. |
+
 # External Links
 
 - [GitHub repository](https://github.com/deer-flow/llm-space)
