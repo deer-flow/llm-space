@@ -1,7 +1,9 @@
 "use client";
 
 import type { CustomModel } from "@llm-space/core";
+import { CableIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +24,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-import { useUpdateProvider, useUpsertCustomModel } from "../model-provider";
+import {
+  useTestModelConnection,
+  useUpdateProvider,
+  useUpsertCustomModel,
+} from "../model-provider";
 import { ModelAvatar } from "../thread-playground/model-avatar";
 
 import {
@@ -100,9 +106,11 @@ export function ModelEditorDialog({
 }) {
   const updateProvider = useUpdateProvider();
   const upsertCustomModel = useUpsertCustomModel();
+  const testModelConnection = useTestModelConnection();
   const [form, setForm] = useState<FormState>(() =>
     initialState(model, providerApi)
   );
+  const [testing, setTesting] = useState(false);
 
   // Reset the form whenever the dialog opens (for a fresh create or a different
   // model to edit).
@@ -127,10 +135,11 @@ export function ModelEditorDialog({
   const trimmedId = form.id.trim();
   const canSave = trimmedId.length > 0;
 
-  const handleSave = () => {
-    if (!canSave) return;
+  // Assemble the model config from the current form values. Shared by Save and
+  // Test so the connection test verifies exactly what would be persisted.
+  const buildModel = (): CustomModel => {
     const trimmedIcon = form.icon.trim();
-    const built: CustomModel = {
+    return {
       id: trimmedId,
       name: form.name.trim() || trimmedId,
       ...(trimmedIcon ? { icon: trimmedIcon } : {}),
@@ -147,6 +156,11 @@ export function ModelEditorDialog({
           : {}),
       },
     };
+  };
+
+  const handleSave = () => {
+    if (!canSave) return;
+    const built = buildModel();
     void (async () => {
       if (providerApi && form.api !== providerApi) {
         await updateProvider(providerId, { api: form.api });
@@ -154,6 +168,26 @@ export function ModelEditorDialog({
       await upsertCustomModel(providerId, built, model?.id);
     })();
     onOpenChange(false);
+  };
+
+  // Test the current form values without persisting them, reusing the same
+  // provider-connection check as the model list's per-model test button.
+  const handleTest = async () => {
+    if (!canSave) return;
+    setTesting(true);
+    try {
+      await testModelConnection(providerId, trimmedId, buildModel());
+      toast.success("Model connected successfully", {
+        description: form.name.trim() || trimmedId,
+      });
+    } catch (error) {
+      toast.error("Failed to connect to model", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -302,13 +336,27 @@ export function ModelEditorDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+        <DialogFooter className="sm:justify-between">
+          <Button
+            variant="outline"
+            onClick={() => void handleTest()}
+            disabled={!canSave || testing}
+          >
+            {testing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CableIcon className="size-4" />
+            )}
+            Test
           </Button>
-          <Button onClick={handleSave} disabled={!canSave}>
-            {isEdit ? "Save" : "Add"}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={!canSave}>
+              {isEdit ? "Save" : "Add"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

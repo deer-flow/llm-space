@@ -116,8 +116,14 @@ export interface DesktopRPCType {
         params: { model: ModelConfig | null };
         response: ModelConfig | null;
       };
+      // `candidate` (from the editor dialog) tests an unsaved model config
+      // as-is; its `id` overrides `modelId`.
       testModelConnection: {
-        params: { providerId: string; modelId: string };
+        params: {
+          providerId: string;
+          modelId: string;
+          candidate?: CustomModel;
+        };
         response: null;
       };
       removeCustomModel: {

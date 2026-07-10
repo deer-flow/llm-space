@@ -109,8 +109,8 @@ export const mainWindowRPC: MainWindowRPC =
           modelManager.setDefaultModel(model);
           return Promise.resolve(modelManager.getDefaultModel());
         },
-        testModelConnection: async ({ providerId, modelId }) => {
-          await testModelConnection({ providerId, modelId });
+        testModelConnection: async ({ providerId, modelId, candidate }) => {
+          await testModelConnection({ providerId, modelId, candidate });
           return null;
         },
         removeCustomModel: async ({ providerId, modelId }) => {

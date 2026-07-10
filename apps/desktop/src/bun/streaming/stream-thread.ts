@@ -1,3 +1,4 @@
+import type { CustomModel } from "@llm-space/core";
 import { streamAgent } from "@llm-space/core/server";
 
 import type {
@@ -101,15 +102,24 @@ export function abortStreamThread({
 export async function testModelConnection({
   providerId,
   modelId,
+  candidate,
 }: {
   providerId: string;
   modelId: string;
+  // An unsaved model config to test as-is (from the editor dialog). When
+  // present, it is merged into the provider's catalog so the connection can be
+  // verified before the model is persisted; its `id` overrides `modelId`.
+  candidate?: CustomModel;
 }): Promise<void> {
+  const models = candidate
+    ? modelManager.buildModelsWithCandidate(providerId, candidate)
+    : await modelManager.getAvailableModels();
+  const targetId = candidate?.id ?? modelId;
   const abortController = new AbortController();
   try {
     for await (const event of streamAgent(
       {
-        model: { provider: providerId, id: modelId },
+        model: { provider: providerId, id: targetId },
         context: {
           systemPrompt: "You are a connection tester.",
           messages: [
@@ -123,7 +133,7 @@ export async function testModelConnection({
         },
       },
       {
-        models: await modelManager.getAvailableModels(),
+        models,
         getApiKey: modelManager.getApiKey.bind(modelManager),
         getBaseUrl: modelManager.getBaseUrl.bind(modelManager),
         getHeaders: modelManager.getHeaders.bind(modelManager),
@@ -151,7 +161,7 @@ export async function testModelConnection({
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       detail.trim() ||
-        `Could not reach ${providerId}/${modelId}. Check the Base URL and API key.`,
+        `Could not reach ${providerId}/${targetId}. Check the Base URL and API key.`,
       { cause: error }
     );
   }

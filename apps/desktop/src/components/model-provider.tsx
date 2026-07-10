@@ -44,7 +44,11 @@ interface ModelContextValue {
     enabled: boolean
   ) => Promise<void>;
   setAllModelsEnabled: (providerId: string, enabled: boolean) => Promise<void>;
-  testModelConnection: (providerId: string, modelId: string) => Promise<void>;
+  testModelConnection: (
+    providerId: string,
+    modelId: string,
+    candidate?: CustomModel
+  ) => Promise<void>;
   removeCustomModel: (providerId: string, modelId: string) => Promise<void>;
   upsertCustomModel: (
     providerId: string,
@@ -239,13 +243,14 @@ export function ModelProvider({
   );
 
   const testModelConnection = useCallback(
-    async (providerId: string, modelId: string) => {
+    async (providerId: string, modelId: string, candidate?: CustomModel) => {
       if (!electrobun.rpc) {
         throw new Error("Electrobun RPC is not initialized");
       }
       await electrobun.rpc.request.testModelConnection({
         providerId,
         modelId,
+        candidate,
       });
     },
     []
@@ -466,7 +471,8 @@ export function useSetAllModelsEnabled(): (
 
 export function useTestModelConnection(): (
   providerId: string,
-  modelId: string
+  modelId: string,
+  candidate?: CustomModel
 ) => Promise<void> {
   return useModelProvider().testModelConnection;
 }

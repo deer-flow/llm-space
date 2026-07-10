@@ -10,7 +10,11 @@ import {
   type Models,
   type Provider,
 } from "@earendil-works/pi-ai";
-import { ModelProviderGroup, type ModelConfig } from "@llm-space/core";
+import {
+  ModelProviderGroup,
+  type CustomModel,
+  type ModelConfig,
+} from "@llm-space/core";
 import { getSettingsDir } from "@llm-space/core/server";
 
 import {
@@ -55,6 +59,53 @@ export class ModelManager {
   /** The `Models` registry of configured providers. Built once, then cached. */
   async getAvailableModels(): Promise<Models> {
     return (this._models ??= await Promise.resolve(this._buildModels()));
+  }
+
+  /**
+   * Build a one-off `Models` registry that includes an unsaved `candidate`
+   * custom model merged into `providerId` (overriding any saved model with the
+   * same id). Used to test a model's connection from the editor dialog before it
+   * is persisted — for both new models and edited-but-unsaved config. The
+   * candidate is resolved through the same path as saved custom models so it
+   * reuses the provider's api/baseUrl. Never touches the cached registry.
+   */
+  buildModelsWithCandidate(
+    providerId: string,
+    candidate: CustomModel
+  ): Models {
+    const entry = this._config.providers.find(
+      (provider) => provider.id === providerId
+    );
+    if (!entry) {
+      throw new Error(`Provider not configured: ${providerId}`);
+    }
+    // Rebuild the target provider from a synthetic config entry that merges the
+    // candidate into its saved models (overriding any with the same id). For
+    // custom providers the candidate's chosen API mode is honored too, since a
+    // custom provider picks its API implementation from the provider-level
+    // `api` — so a changed "API type" is what actually gets tested.
+    const others = (entry.models ?? []).filter(
+      (model) => model.id !== candidate.id
+    );
+    const syntheticEntry: ProviderConfig = {
+      ...entry,
+      ...(entry.builtin === true
+        ? {}
+        : { api: candidate.api as CustomProviderApi }),
+      models: [...others, candidate],
+    };
+    const target = this._buildProvider(syntheticEntry);
+    if (!target) {
+      throw new Error(`Provider not configured: ${providerId}`);
+    }
+    const models = createModels();
+    for (const provider of this._buildProviders()) {
+      if (provider.id !== providerId) {
+        models.setProvider(provider);
+      }
+    }
+    models.setProvider(target);
+    return models;
   }
 
   async getBuiltinProviders(): Promise<ModelProviderGroup[]> {
