@@ -15,10 +15,22 @@ import {
  */
 export const TRACING_ENABLED_STORAGE_KEY = "llm-space-experimental-tracing";
 
+/**
+ * localStorage key for the react-scan render overlay. Read once at startup in
+ * `mainview/main.tsx` (react-scan must patch the reconciler before React
+ * renders), so toggling it only takes effect after a reload. Dev-only: the
+ * overlay is tree-shaken out of production builds.
+ */
+export const REACT_SCAN_ENABLED_STORAGE_KEY =
+  "llm-space-experimental-react-scan";
+
 interface ExperimentalContextValue {
   /** Whether the tracing (beta) experiment is enabled. */
   tracingEnabled: boolean;
   setTracingEnabled: (enabled: boolean) => void;
+  /** Whether the react-scan render overlay is enabled (applies on reload). */
+  reactScanEnabled: boolean;
+  setReactScanEnabled: (enabled: boolean) => void;
 }
 
 const ExperimentalContext = createContext<ExperimentalContextValue | null>(
@@ -29,9 +41,16 @@ function _readStoredTracingEnabled(): boolean {
   return localStorage.getItem(TRACING_ENABLED_STORAGE_KEY) === "true";
 }
 
+function _readStoredReactScanEnabled(): boolean {
+  return localStorage.getItem(REACT_SCAN_ENABLED_STORAGE_KEY) === "true";
+}
+
 export function ExperimentalProvider({ children }: { children: ReactNode }) {
   const [tracingEnabled, setTracingEnabledState] = useState<boolean>(
     _readStoredTracingEnabled
+  );
+  const [reactScanEnabled, setReactScanEnabledState] = useState<boolean>(
+    _readStoredReactScanEnabled
   );
 
   const setTracingEnabled = useCallback((next: boolean) => {
@@ -39,9 +58,19 @@ export function ExperimentalProvider({ children }: { children: ReactNode }) {
     setTracingEnabledState(next);
   }, []);
 
+  const setReactScanEnabled = useCallback((next: boolean) => {
+    localStorage.setItem(REACT_SCAN_ENABLED_STORAGE_KEY, String(next));
+    setReactScanEnabledState(next);
+  }, []);
+
   const value = useMemo(
-    (): ExperimentalContextValue => ({ tracingEnabled, setTracingEnabled }),
-    [tracingEnabled, setTracingEnabled]
+    (): ExperimentalContextValue => ({
+      tracingEnabled,
+      setTracingEnabled,
+      reactScanEnabled,
+      setReactScanEnabled,
+    }),
+    [tracingEnabled, setTracingEnabled, reactScanEnabled, setReactScanEnabled]
   );
 
   return (
