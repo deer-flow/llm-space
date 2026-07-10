@@ -32,6 +32,10 @@ import { usePromptVariableExtensionForContext } from "../variable/use-prompt-var
 import { ToolCallInputView } from "./tool-call-input-view";
 import { getToolCallOutputText } from "./tool-call-status";
 import { useToolCallRunner } from "./use-tool-call-runner";
+import {
+  parseWebSearchOutput,
+  WebSearchResultsView,
+} from "./web-search-results-view";
 
 function _ToolCallListItem({
   context,
@@ -243,6 +247,14 @@ function _ToolCallResponseEditor({
     () => parseAskUserQuestionInput(input),
     [input]
   );
+  const webSearchResults = useMemo(
+    () => parseWebSearchOutput(input, value),
+    [input, value]
+  );
+
+  if (webSearchResults) {
+    return <WebSearchResultsView results={webSearchResults} />;
+  }
 
   if (askUserQuestion) {
     return (

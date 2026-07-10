@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
@@ -169,6 +170,29 @@ export const mainWindowRPC: MainWindowRPC =
         fsReveal: async ({ path }) => {
           await revealInFileManager(localFs.realpath(path));
           return null;
+        },
+        revealAbsolutePath: async ({ path: abs }) => {
+          try {
+            await stat(abs);
+          } catch {
+            return { existed: false };
+          }
+          await revealInFileManager(abs);
+          return { existed: true };
+        },
+        revealSkill: async ({ name }) => {
+          const found = skillsManager.findSkill(name, { enabledOnly: false });
+          if (!found) {
+            return { existed: false };
+          }
+          const file = path.join(found.path, "SKILL.md");
+          try {
+            await stat(file);
+          } catch {
+            return { existed: false };
+          }
+          await revealInFileManager(file);
+          return { existed: true };
         },
         fsRealpath: ({ path }) =>
           Promise.resolve({ path: localFs.realpath(path) }),

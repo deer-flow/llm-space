@@ -46,9 +46,7 @@ export function parseTodoWriteInput(input: ToolCallInput): TodoItem[] | null {
 }
 
 function _normalizeStatus(value: unknown): TodoStatus {
-  return value === "completed" || value === "in_progress"
-    ? value
-    : "pending";
+  return value === "completed" || value === "in_progress" ? value : "pending";
 }
 
 /**
@@ -63,23 +61,19 @@ function _TodoWriteView({
   todos: TodoItem[];
   input: ToolCallInput;
 }) {
-  const completed = todos.filter((t) => t.status === "completed").length;
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewValue = useMemo(
     () => JSON.stringify(input.arguments, null, 2) ?? "",
     [input.arguments]
   );
   return (
-    <div className="flex w-full flex-col gap-2 select-auto">
+    <div className="flex w-full flex-col gap-2 rounded-lg bg-(--textarea) px-3 py-2.5 select-auto">
       <div className="text-muted-foreground flex items-center justify-between text-xs">
         <span className="font-mono">
           <span className="text-primary">todo_write</span>
           <span>()</span>
         </span>
         <div className="flex items-center gap-2">
-          <span className="tabular-nums">
-            {completed}/{todos.length} done
-          </span>
           <Tooltip content="View arguments">
             <Button
               className="invisible shrink-0 group-hover/message:visible"
