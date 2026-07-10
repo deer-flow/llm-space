@@ -10,9 +10,13 @@
     "./types": "./src/types/index.ts",
     "./package.json": "./package.json"
   },
+  "scripts": {
+    "test": "bun test"
+  },
   "dependencies": {
     "@earendil-works/pi-agent-core": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
+    "@llm-space/plugin-api": "workspace:*",
     "best-effort-json-parser": "^1.4.1",
     "parse-sse": "^0.1.0",
     "typebox": "catalog:"

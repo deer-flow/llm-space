@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
 - Last updated: 2026-07-10
-- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, Trace Workbench Header/Protocol Repair, System Prompt Variables V2 layout polish, the Variables row relocation, and Eve package hardening; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity, system prompts manage thread-owned variables from a dedicated Variables row below Tools and a dialog, and Eve local project import now has modular package code plus focused tests/examples for typed source import and manual tool calls.
+- Map status: updated after Plugin Extension Architecture V1 and the direct Eve plugin cutover; the trusted Bun-side plugin host, generic Thread plugin persistence, generic Tool/Skill routing, lifecycle settings, and bundled Eve acceptance plugin are shipped and verified in the real desktop renderer.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -324,48 +324,37 @@
 
 ## Eve Project Source Integration
 
-- Status: shipped env-driven V1, package hardened
+- Status: shipped as bundled plugin V1
 - Freshness: confirmed
 - Last checked: 2026-07-10
 - Evidence:
-  - User clarified the target workflow is not Eve runtime APIs, traces, Langfuse, or Vercel Agent Runs. The value is that Eve projects already contain clean prompt, tools, and skills that can be integrated into LLM Space.
-  - Initial source inspection found no `packages/eve`, no workspace dependency on Eve support code, no Eve project detector, and no parser that reads an `agent/` directory into a native LLM Space `Thread`.
-  - Existing file import support (`apps/desktop/src/lib/import-threads.ts`, `packages/core/src/parsers/*`) imports JSON chat/thread files only; it cannot import a directory-shaped agent project.
-  - `packages/core/src/types/tools/index.ts` now includes scoped `eve` tools, and `packages/core/src/types/threads/thread.ts` persists `context.eve.projectRoot` so Eve tool/skill execution can resolve against one local project after restart.
-  - `packages/eve/src/index.ts` detects Eve projects, imports `agent/instructions.md`, imports each `agent/tools/*` module to read the real `defineTool()` result, creates scoped Eve tool definitions, reads `agent/skills/*`, and executes manual Eve tool calls by importing the local tool module only when the user clicks the existing tool-call button.
-  - `apps/desktop/src/bun/eve/dev-env.ts` imports an Eve project at startup when `LLM_SPACE_EVE_PROJECT_ROOT` is set, writing an env-owned `*.eve.json` thread into the workspace without adding a rendered import UI.
-  - `apps/desktop/src/components/thread-playground/prompt-variables.ts` and `use-prompt-variable-extension.ts` route skills variables to `agent/skills/` only when `context.eve` is present; global LLM Space skills are not listed or loaded in Eve threads.
-  - `apps/desktop/src/components/thread-playground/stores/thread-store.ts` intentionally blocks Eve tools from the auto-run tools path, leaving them manual-only in V1.
-  - Fixture smoke `bun --filter @llm-space/eve smoke` imported a minimal Eve project, listed project skills, executed the `echo` Eve tool, loaded the scoped `research-helper` skill, and read tool parameters from Eve/Zod's exported `inputSchema.toJSONSchema()`.
-  - Env bootstrap smoke with isolated `LLM_SPACE_HOME` and `LLM_SPACE_EVE_PROJECT_ROOT=packages/eve/fixtures/minimal` generated `workspace/minimal.eve.json` with scoped Eve tools, scoped skill loader, and persisted `context.eve.projectRoot`; a collision check reused the env-owned thread on the second launch.
-  - Official Vercel Eve docs reviewed on 2026-07-09 describe a filesystem-first `agent/` source: `agent/instructions.md`, `agent/agent.ts`, `agent/tools/*.ts`, `agent/skills/*`, subagents, channels, connections, sandbox, and optional instrumentation.
-  - Vercel's Eve tools guide says Eve discovers `agent/tools/*.ts`, the filename becomes the model-facing tool name, and discovery advertises each tool's name, description, and input schema without running the tool.
-  - Vercel's Eve skills guide says Eve scans `agent/skills/`, advertises skill descriptions, supports markdown `SKILL.md` packages, and loads skill markdown into the turn when relevant.
-  - npm package inspection of `eve@0.22.1` shows public authoring exports such as `eve/tools`, `eve/skills`, and `eve/instructions`, while compiler/discover internals are not exposed as stable public package exports.
-  - Package hardening on 2026-07-10 split the Eve importer out of the original single-file implementation into `project`, `instructions`, `tools`, `skills`, `thread-import`, schema, path, and tool-context modules under `packages/eve/src/`.
-  - The hardened package imports Eve's public authoring types from `eve/tools`, `eve/instructions`, and `eve/skills`; tool descriptors come from imported `defineTool()` objects, instructions can come from imported `defineInstructions()` modules, and TypeScript skills can come from imported `defineSkill()` modules.
-  - Eve tool execution now provides a minimal typed `ToolContext`, applies Eve `toModelOutput()` when present, and uses Eve's sentinel guards to skip disabled/workflow tools instead of guessing from source.
-  - Example project `packages/eve/examples/basic-agent` demonstrates `defineInstructions`, `defineTool`, and `defineSkill`; `packages/eve/examples/import-basic-agent.ts` imports it and calls `get_weather`.
-  - Bun tests `packages/eve/tests/eve-project.test.ts` cover invalid project detection, markdown prompt/tool/skill import, Zod/defineTool parameter extraction, `toModelOutput`, `defineInstructions` and `defineSkill` imports, project-only skill lookup, and tool-path boundary rejection.
-- Boundary: local development can set `LLM_SPACE_EVE_PROJECT_ROOT=/absolute/eve/project` before `bun dev`/`bun run dev:cef`; LLM Space writes an env-owned Eve thread into the workspace with system prompt, scoped Eve tools, `context.eve.projectRoot`, project-only `available_skills`, and a project-only `skill` tool. The Eve package supports markdown/text instructions plus `defineInstructions()` modules, static `defineTool()` project tools, markdown/`SKILL.md` skills plus `defineSkill()` modules, `toModelOutput()` result projection, and focused diagnostics for skipped unsupported Eve sentinels. Eve tools execute only after the user clicks the existing manual `Call this tool` button; run-loop auto execution does not call Eve tools.
+  - `packages/plugin-eve/src/eve` privately owns Eve project detection/import, Tool description/execution, `toModelOutput`, and project Skill loading without creating LLM Space persistence objects; there is no separate Eve workspace package.
+  - The `packages/plugin-eve` root adapts those internal modules into the bundled `llm-space.eve` plugin with `eve.project`, `eve.tools`, `eve.skills`, and `eve.development` contributions.
+  - Isolated-home seeding with `LLM_SPACE_EVE_PROJECT_ROOT=packages/plugin-eve/fixtures/minimal` generated a Thread containing only generic `context.plugins[]` state and `type: "plugin"` Tools with opaque references; no Eve-specific core fields remain.
+  - Real Electrobun CEF evidence in `audits/2026-07-10-111402-plugin-settings-v1/07-enabled-tool-call.png` shows the imported `echo` call returning `echo:plugin smoke` through the generic plugin route.
+  - The same real Thread remained inspectable while Eve was disabled; `06-disabled-tool-call.png` shows the explicit result `Plugin is disabled: llm-space.eve` rather than losing prompt, messages, contexts, or Tools.
+  - Plugin-scoped `available_skills` and `skill` resolution use the generic Skill Provider route and never fall through to the global Skills manager.
+  - `plugin-eve` tests cover project detection/import, public `defineTool`/`defineInstructions`/`defineSkill` forms, `toModelOutput`, project-only Skill lookup, manual execution, path confinement, generic conversion, and plugin execution.
+- Boundary: local development can set `LLM_SPACE_EVE_PROJECT_ROOT` and optional `LLM_SPACE_EVE_THREAD_PATH`; the Eve Development Seeder routes that request through the generic Source Importer and writes a plugin-backed Thread. Eve Tools remain explicit manual calls and are blocked from model-loop auto execution.
 - Explicit non-goals: no Eve session/runtime API, no `/eve/v1/info`, no stream attachment, no trace import/sync, no Vercel dashboard integration, no project scaffolding, no deployment, no rendered import picker/review screen, no automatic Eve tool execution during model streaming, no global Skills fallback inside Eve threads, and no mutation of the Eve project.
-- Visible gaps: no UI folder picker/import review yet, no project-management list, no automatic tab open for env-imported threads, no special support for Eve-specific tool capabilities such as approval/auth/sandbox beyond clear minimal-context errors, no dynamic Eve resolver execution, and no rendered product audit for the future UI flow.
+- Visible gaps: no UI folder picker/import review yet, no project-management list, no automatic tab open for env-imported threads, and no Eve-specific approval/auth/sandbox or dynamic resolver execution. Pre-plugin Eve Thread data is intentionally unsupported and must be re-imported.
 
 ## Plugin Extension Architecture
 
-- Status: proposed technical design
+- Status: shipped trusted-plugin V1
 - Freshness: confirmed
 - Last checked: 2026-07-10
 - Evidence:
-  - User asked for LLM Space plugin extension capability design and explicitly said Eve support should move behind plugins.
-  - Current source inspection shows LLM Space already has several extension-like seams, but they are hard-coded: built-in tools in `apps/desktop/src/bun/tools/built-in`, MCP tools in `apps/desktop/src/bun/mcp/mcp-manager.ts`, global skills in `apps/desktop/src/bun/skills/skills-manager.ts`, Eve source/tool/skill support in `packages/eve` plus desktop-specific RPC handlers, and trace sources in `apps/desktop/src/bun/traces/trace-manager.ts`.
-  - `packages/core/src/types/tools/index.ts` currently has a bespoke `eve` tool union member; a plugin architecture would replace that with a generic plugin-backed tool type while keeping migration compatibility for existing Eve thread files.
-  - `apps/desktop/src/shared/rpc.ts` exposes one request family per backend (`builtIn*`, `mcp*`, `eve*`, `skills*`, `trace*`), which is exactly where a plugin host/router can reduce special-case growth.
-  - Eve package hardening on 2026-07-10 proved that Eve project support can be isolated into a pure package plus a thin desktop adapter, making it a good first bundled plugin.
-  - External scan on 2026-07-10 found that mature extension systems separate static manifest/contribution metadata from runtime activation/handlers; MCP similarly standardizes discoverable server capabilities such as tools while leaving execution routed through a host.
-- Boundary: proposed V1 would introduce a Bun-process plugin host, a stable plugin API package, manifest-validated bundled/local-dev plugins, generic plugin-backed tool descriptors, plugin-scoped source importers, plugin skill providers, and an Eve bundled plugin adapter that delegates to `@llm-space/eve`. Renderer code would see descriptors and RPC responses only; plugin code would not run in the webview.
+  - `packages/plugin-api` exposes stable JSON-only contracts, static manifest validation, lifecycle/diagnostic views, private storage, `definePlugin`, and four extension points without importing desktop internals.
+  - `apps/desktop/src/bun/plugins/plugin-manager.ts` owns bundled and trusted local discovery, compatibility checks, deterministic duplicate rejection, lazy concurrent activation, exact declared/runtime registrations, failure isolation, enable/disable, local reload, operation timeout/cancellation, private storage, safe diagnostics, and context migration on clones.
+  - `packages/core` persists one generic `ThreadPluginContext` collection and one generic `PluginTool`; Eve-specific Tool and Thread context members have been removed.
+  - `apps/desktop/src/shared/rpc.ts` and renderer clients expose one generic plugin request family for status, lifecycle, source import, Tools, and Skills. Source search found no Eve-specific RPC handlers or renderer dispatch branches.
+  - Black-box PluginManager tests cover the public flow, concurrent idempotent activation, activation failure isolation, duplicate IDs, incompatibility, cancellation, local reload, missing runtimes, and clone-only migration.
+  - Real Settings evidence in `audits/2026-07-10-111402-plugin-settings-v1/02-expanded-details.png` shows lifecycle, source/version, contributions, capabilities, compatibility, diagnostics, and enablement; `03-disable-confirmation.png` and `05-disabled-after-restart.png` verify confirmation and persisted disablement.
+  - CEF console capture contained no product errors, the 1280x800 renderer had no body overflow, and built renderer assets contained no Eve/plugin-eve runtime strings.
+- Boundary: V1 supports statically bundled plugins and explicitly trusted local-development paths. Plugin runtime code executes only in the Bun process; the renderer receives generic host-owned views and results. Plugin Tools are manual-only.
 - Explicit non-goals: no marketplace, no remote plugin install, no untrusted sandbox guarantee, no signed packages, no plugin-auth secret vault beyond existing settings patterns, no arbitrary renderer UI injection, and no automatic model-loop execution of plugin tools.
-- Visible gaps: needs implementation, migration from `context.eve`/`EveTool` to generic plugin context/tool, a plugin settings surface, and later hardened sandbox/signature work before third-party plugins can be trusted.
+- Visible gaps: V1 has no install/uninstall/path editor UI, source picker/review flow, process isolation, signing, or enforceable permissions. Marketplace and untrusted execution require a separate RFC.
 
 ## Langfuse Connected Trace Source
 

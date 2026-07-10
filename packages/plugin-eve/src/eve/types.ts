@@ -1,4 +1,4 @@
-import type { JSONSchema, Thread, Tool } from "@llm-space/core";
+import type { JSONSchema } from "@llm-space/core";
 import type { InstructionsDefinition as EveInstructionsDefinition } from "eve/instructions";
 import type { SkillDefinition as EveSkillDefinition } from "eve/skills";
 import type {
@@ -40,9 +40,26 @@ export interface EveProjectImportOptions {
 }
 
 export interface EveProjectImportResult {
-  thread: Thread;
+  title: string;
+  systemPrompt?: string;
+  tools: EveToolDescriptor[];
+  skills: EveSkillInfo[];
   diagnostics: EveDiagnostic[];
   project: EveProjectDetection;
+}
+
+/**
+ * Domain tool descriptor consumed by host adapters. It deliberately contains
+ * no LLM Space Tool discriminant or persisted plugin routing metadata.
+ */
+export interface EveToolDescriptor {
+  name: string;
+  description: string;
+  parameters: JSONSchema;
+  strict?: boolean;
+  runtime: "tool" | "skill";
+  toolName: string;
+  toolPath?: string;
 }
 
 export interface EveSkillInfo {
@@ -77,7 +94,7 @@ export interface EveToolModule {
 }
 
 export interface ParsedToolDescriptor {
-  tool?: Tool;
+  tool?: EveToolDescriptor;
   diagnostics: EveDiagnostic[];
 }
 

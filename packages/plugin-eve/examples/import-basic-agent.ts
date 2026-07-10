@@ -1,13 +1,13 @@
 import path from "node:path";
 
-import { callEveTool, importEveProjectToThread } from "../src";
+import { callEveTool, importEveProject } from "../src/eve";
 
 const projectRoot = path.join(import.meta.dir, "basic-agent");
 
-const result = await importEveProjectToThread({ projectRoot, source: "manual" });
-const tools = result.thread.context?.tools?.map((tool) => tool.name) ?? [];
+const result = await importEveProject({ projectRoot, source: "manual" });
+const tools = result.tools.map((tool) => tool.name);
 
-console.info("Imported thread:", result.thread.title);
+console.info("Imported project:", result.title);
 console.info("Tools:", tools.join(", "));
 
 const weather = await callEveTool({

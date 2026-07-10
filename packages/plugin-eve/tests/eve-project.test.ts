@@ -7,10 +7,10 @@ import { describe, expect, test } from "bun:test";
 import {
   callEveTool,
   detectEveProject,
-  importEveProjectToThread,
+  importEveProject,
   listEveProjectSkills,
   readEveProjectSkill,
-} from "../src";
+} from "../src/eve";
 
 const PACKAGE_ROOT = path.resolve(import.meta.dir, "..");
 const MINIMAL_PROJECT = path.join(PACKAGE_ROOT, "fixtures", "minimal");
@@ -21,7 +21,7 @@ const BASIC_EXAMPLE_PROJECT = path.join(
   "basic-agent"
 );
 
-describe("@llm-space/eve project import", () => {
+describe("plugin-eve project import", () => {
   test("rejects folders that are not Eve projects", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "llm-space-eve-"));
     try {
@@ -34,18 +34,17 @@ describe("@llm-space/eve project import", () => {
   });
 
   test("imports markdown instructions, tools, and project-scoped skills", async () => {
-    const result = await importEveProjectToThread({
+    const result = await importEveProject({
       projectRoot: MINIMAL_PROJECT,
       source: "manual",
     });
 
-    expect(result.thread.context?.systemPrompt).toContain(
-      "minimal Eve fixture"
-    );
-    expect(result.thread.context?.eve?.projectRoot).toBe(MINIMAL_PROJECT);
-    expect(result.thread.context?.tools?.map((tool) => tool.name).sort()).toEqual(
-      ["echo", "skill"]
-    );
+    expect(result.systemPrompt).toContain("minimal Eve fixture");
+    expect(result.project.projectRoot).toBe(MINIMAL_PROJECT);
+    expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      "echo",
+      "skill",
+    ]);
 
     const skills = await listEveProjectSkills(MINIMAL_PROJECT);
     expect(skills).toHaveLength(1);
@@ -56,12 +55,10 @@ describe("@llm-space/eve project import", () => {
   });
 
   test("reads parameters from the imported defineTool object", async () => {
-    const result = await importEveProjectToThread({
+    const result = await importEveProject({
       projectRoot: STATIC_ZOD_PROJECT,
     });
-    const score = result.thread.context?.tools?.find(
-      (tool) => tool.name === "score"
-    );
+    const score = result.tools.find((tool) => tool.name === "score");
 
     expect(score?.parameters).toMatchObject({
       type: "object",
@@ -88,17 +85,16 @@ describe("@llm-space/eve project import", () => {
   });
 
   test("imports Eve defineInstructions and defineSkill modules", async () => {
-    const result = await importEveProjectToThread({
+    const result = await importEveProject({
       projectRoot: BASIC_EXAMPLE_PROJECT,
     });
     const skills = await listEveProjectSkills(BASIC_EXAMPLE_PROJECT);
 
-    expect(result.thread.context?.systemPrompt).toContain(
-      "basic Eve example agent"
-    );
-    expect(result.thread.context?.tools?.map((tool) => tool.name).sort()).toEqual(
-      ["get_weather", "skill"]
-    );
+    expect(result.systemPrompt).toContain("basic Eve example agent");
+    expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      "get_weather",
+      "skill",
+    ]);
     expect(skills[0]).toMatchObject({
       name: "research-plan",
       description: "Plan a short research pass before answering.",

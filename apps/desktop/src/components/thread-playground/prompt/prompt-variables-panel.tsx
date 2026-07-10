@@ -92,7 +92,7 @@ function _PromptVariablesPanel({
   const systemPrompt = useThreadStore(
     (s) => s.thread.context?.systemPrompt ?? ""
   );
-  const eveContext = useThreadStore((s) => s.thread.context?.eve);
+  const pluginContexts = useThreadStore((s) => s.thread.context?.plugins);
   const {
     updatePromptVariable,
     renamePromptVariable,
@@ -121,8 +121,8 @@ function _PromptVariablesPanel({
     variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
   const skillContext = useMemo(
     (): ThreadContext | undefined =>
-      eveContext ? { eve: eveContext } : undefined,
-    [eveContext]
+      pluginContexts ? { plugins: pluginContexts } : undefined,
+    [pluginContexts]
   );
 
   // Seed from the chip-open target so the fallback effect below (which runs in

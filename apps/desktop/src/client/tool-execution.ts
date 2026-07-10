@@ -1,13 +1,18 @@
-import type { BuiltinTool, EveTool, McpTool } from "@llm-space/core";
+import type {
+  BuiltinTool,
+  McpTool,
+  PluginTool,
+  ThreadContext,
+} from "@llm-space/core";
 
 import { callBuiltInTool } from "@/client/built-in-tools";
-import { callEveTool } from "@/client/eve";
 import { callMcpTool } from "@/client/mcp";
+import { callPluginTool } from "@/client/plugins";
 
 /**
- * A tool call's result, normalized across the two backends. MCP surfaces
- * `isError` on the response; built-in tools signal failure by throwing, so a
- * successful built-in result is always `isError: false`.
+ * A tool call's result, normalized across the executable backends. MCP and
+ * plugins surface `isError` on the response; built-in tools signal failure by
+ * throwing, so a successful built-in result is always `isError: false`.
  */
 export interface ToolCallResult {
   contentText: string;
@@ -19,8 +24,9 @@ export interface ToolCallResult {
  * {@link isExecutableTool} so `function` tools never reach here.
  */
 export async function executeTool(
-  tool: McpTool | BuiltinTool | EveTool,
-  args: Record<string, unknown>
+  tool: McpTool | BuiltinTool | PluginTool,
+  args: Record<string, unknown>,
+  context?: ThreadContext
 ): Promise<ToolCallResult> {
   if (tool.type === "mcp") {
     const result = await callMcpTool({
@@ -33,12 +39,23 @@ export async function executeTool(
       isError: result.isError ?? false,
     };
   }
-  if (tool.type === "eve") {
-    const result = await callEveTool({
-      projectRoot: tool.projectRoot,
-      runtime: tool.runtime,
-      toolName: tool.toolName,
-      toolPath: tool.toolPath,
+  if (tool.type === "plugin") {
+    const pluginContext = tool.contextId
+      ? context?.plugins?.find(
+          (item) =>
+            item.pluginId === tool.pluginId && item.contextId === tool.contextId
+        )
+      : undefined;
+    if (tool.contextId && !pluginContext) {
+      throw new Error(
+        `Plugin context is unavailable: ${tool.pluginId}/${tool.contextId}`
+      );
+    }
+    const result = await callPluginTool({
+      pluginId: tool.pluginId,
+      providerId: tool.providerId,
+      context: pluginContext,
+      toolRef: tool.toolRef,
       arguments: args,
     });
     return {

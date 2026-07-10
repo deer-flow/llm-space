@@ -4,8 +4,8 @@
 import "./env/hydrate";
 // Seed a fresh workspace (before `./app` pulls in storage/RPC).
 import "./workspace/seed";
-// Seed an env-configured Eve dev thread before the workspace UI reads files.
-import "./eve/dev-env";
+// Discover plugins and run explicit development seeders before the UI reads files.
+import "./plugins/seed";
 // Seed the managed skills folder (before `./app` pulls in the SkillsManager).
 import "./skills/seed";
 import "./app";

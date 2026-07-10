@@ -1,7 +1,5 @@
 import path from "node:path";
 
-import { uuid, type Thread } from "@llm-space/core";
-
 import { readEveInstructions } from "./instructions";
 import { detectEveProject } from "./project";
 import { listEveProjectSkills } from "./skills";
@@ -14,10 +12,10 @@ import type {
 } from "./types";
 
 /**
- * Import an Eve project into a native LLM Space thread. Tool descriptors are
- * read from the actual `defineTool()` export, not inferred from source text.
+ * Read one Eve source tree into a domain draft. Host adapters decide how the
+ * prompt, tools, Skills, and provenance map into their persisted data model.
  */
-export async function importEveProjectToThread(
+export async function importEveProject(
   options: EveProjectImportOptions
 ): Promise<EveProjectImportResult> {
   const project = detectEveProject(options.projectRoot);
@@ -30,10 +28,10 @@ export async function importEveProjectToThread(
     diagnostics,
   });
   const tools = project.toolsDir
-    ? await listEveProjectTools(project.projectRoot, project.toolsDir, diagnostics)
+    ? await listEveProjectTools(project.toolsDir, diagnostics)
     : [];
   if (skills.length > 0 && !tools.some((tool) => tool.name === "skill")) {
-    tools.push(createScopedSkillTool(project.projectRoot));
+    tools.push(createScopedSkillTool());
   } else if (skills.length > 0) {
     diagnostics.push({
       level: "warning",
@@ -45,22 +43,14 @@ export async function importEveProjectToThread(
   }
 
   const systemPrompt = await _readSystemPrompt(project, skills, diagnostics);
-  const thread: Thread = {
+  return {
     title: `Eve: ${path.basename(project.projectRoot)}`,
-    context: {
-      ...(systemPrompt ? { systemPrompt } : {}),
-      tools,
-      eve: {
-        projectRoot: project.projectRoot,
-        source: options.source ?? "manual",
-      },
-      messages: [
-        { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
-      ],
-    },
+    ...(systemPrompt ? { systemPrompt } : {}),
+    tools,
+    skills,
+    diagnostics,
+    project,
   };
-
-  return { thread, diagnostics, project };
 }
 
 async function _readSystemPrompt(

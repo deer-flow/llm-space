@@ -53,14 +53,24 @@ Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
   - `./client` — browser-safe pieces: the `streamThread()` client (`client/api`), the `reduceMessages()` streaming reducer (`client/reducer`), and the `AgentTransport` interface (`client/transport`).
   - `./server` — Node/Bun-only implementations: `streamAgent()` (`server/agent/stream`), filesystem paths (`server/paths` — `getLlmSpaceHomePath()`, `getSettingsDir()`), `LocalFileSystem` thread storage (`server/storage`), and window-state persistence (`server/window-state`).
   - `./types` — `Thread`/`Message`/`ModelConfig`/`Tool`/`FileNode`/`ModelProviderGroup` and the converters to/from the `@earendil-works/pi-*` formats.
+- **`@llm-space/plugin-api`** (`packages/plugin-api`) — public, runtime-neutral plugin contracts: static manifest validation, JSON-only context/storage values, lifecycle views, diagnostics, and the Source Importer, Tool Provider, Skill Provider, and Development Seeder extension points.
+- **`@llm-space/plugin-eve`** (`packages/plugin-eve`) — bundled Bun-side Eve plugin. Its private `src/eve/` modules detect/import Eve projects, describe and execute project tools, and list/read project Skills; the package root adapts those modules into the `eve.project`, `eve.tools`, `eve.skills`, and `eve.development` contributions. It does not expose a separate Eve domain package.
 - **`@llm-space/desktop`** (`apps/desktop`) — the Electrobun app. Built with Vite (React 19) for the renderer and `electrobun` for the shell. Two runtime contexts bridged by a single typed RPC channel:
-  - **bun main process** (`src/bun/`) — owns the native window, menu, filesystem, model config, and agent streaming.
+  - **bun main process** (`src/bun/`) — owns the native window, menu, filesystem, model config, agent streaming, and trusted in-process plugin host.
   - **webview renderer** (`src/app`, `src/components`, `src/mainview`) — the React UI.
+
+### Plugin host
+
+`PluginManager` (`apps/desktop/src/bun/plugins/plugin-manager.ts`) discovers statically declared bundled plugins and trusted local-development plugins from `LLM_SPACE_PLUGIN_PATHS`. It validates manifests before runtime import, checks API/engine compatibility, lazily and idempotently activates declared contributions, isolates failures, applies operation timeouts/cancellation, owns private plugin storage, and persists safe diagnostics and enablement.
+
+Plugin runtime code is Bun-only. The renderer uses generic `plugin*` RPC requests and only receives host-owned descriptors, contexts, status views, diagnostics, and normalized results. Never import `@llm-space/plugin-eve` or a local plugin runtime into renderer code.
+
+Threads persist plugin state generically as `context.plugins[]` plus Tools with `type: "plugin"`, `pluginId`, `providerId`, an opaque `toolRef`, and an optional `contextId`. Plugin contexts and storage values must stay JSON-only. Plugin Tools are manual-only in V1; the model-loop auto-run path must not execute them.
 
 ### The RPC bridge
 
 The typed contract lives in `src/shared/rpc.ts` (`DesktopRPCType`). The bun side defines handlers in `src/bun/rpc/index.ts` (`mainWindowRPC`); the renderer holds the client in `src/lib/electrobun.ts` (`electrobun.rpc`). Two directions:
-- **requests** (webview → bun, request/response): `availableModels`, `addProvider`/`updateProvider`/`removeProvider`/`setModelEnabled`/…, and the filesystem ops `fsLs`/`fsRead`/`fsWrite`/`fsMkdir`/`fsCp`/`fsMv`/`fsRm`/`fsReveal` (mirroring what were HTTP routes).
+- **requests** (webview → bun, request/response): `availableModels`, provider/settings operations, filesystem ops, and generic plugin operations (`pluginList`, enable/reload, source probe/import, Tool list/call, and Skill list/read).
 - **messages** (fire-and-forget, both ways): agent streaming (`sendStreamThreadRequest` / `receiveStreamThreadResponse` / `abortStreamThread`), fullscreen sync, and `executeCommand` (see the command layer).
 
 Electrobun RPC has no native streaming, so agent runs **simulate a stream over fire-and-forget messages**, correlated by a per-run `streamId` (uuid):
@@ -82,7 +92,8 @@ Each open thread owns its own Zustand store (`stores/thread-store.ts`), created 
 
 State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_HOME`):
 - `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
-- `settings/` — `models.json` (configured providers, owned by `ModelManager`) and `window.json` (frame/zoom/maximized).
+- `settings/` — settings such as `models.json`, `window.json`, and `plugins.json`. Plugin settings persist enablement, trusted local paths, and redacted diagnostics.
+- `plugins/` — private JSON storage namespaces owned by plugin ID. This is an API ownership boundary for trusted in-process code, not a security sandbox.
 
 ### The command layer
 
@@ -92,7 +103,7 @@ Every cross-boundary user action (menus, context menus, toolbar buttons, shortcu
 
 - `mainview/` — the Vite entry: `index.html` + `main.tsx` mounting `<App>`.
 - `app/` — `index.tsx` (App), `layout.tsx` (providers: React Query, `ModelProvider`, tooltips, sonner toaster), `page.tsx` (resizable sidebar + tabs, settings/command-palette/onboard dialogs).
-- `bun/` — main-process code: `app/` (window, menu, window-state), `rpc/`, `streaming/`, `storage/`, `models/` (`ModelManager` + builtin/custom providers), `fs/` (trash/reveal), `env/hydrate` (loads login-shell env — API keys/PATH — before anything reads `process.env`), `workspace/seed`.
+- `bun/` — main-process code: `app/` (window, menu, window-state), `rpc/`, `streaming/`, `storage/`, `models/` (`ModelManager` + builtin/custom providers), `plugins/` (`PluginManager`, bundled discovery, private storage, development seeding), `fs/` (trash/reveal), `env/hydrate` (loads login-shell env — API keys/PATH — before anything reads `process.env`), `workspace/seed`.
 - `client/` — renderer-side RPC callers: `rpc-transport.ts` (streaming) and `local-file-system.ts` (the `fs*` requests).
 - `shared/` — code used by both contexts: `rpc.ts`, `commands.ts`.
 - `components/` — the UI: `thread-playground/` (main editor: messages, model config, system prompt, tools, run history; Zustand store + change history under `stores/`), `thread-tabs/`, `file-system-tree-view/`, `settings/`, `command-palette.tsx`, `onboard-dialog.tsx`, `model-provider.tsx`, `code-editor/` (CodeMirror wrapper), and `ui/` (generated shadcn/ui — **don't hand-edit**, also ESLint-ignored).
@@ -109,7 +120,7 @@ Prefer dropping new images into the existing `src/mainview/public/images/` folde
 ## Conventions
 
 - **TypeScript**: strict, ESNext, `moduleResolution: bundler`. In `apps/desktop`, `@/*` maps to `./src/*`.
-- **Layering**: `@llm-space/core` splits browser-safe code (`./client`, `./types`, `./utils`, root `.`) from Node/Bun-only server implementations (`./server`). The desktop **bun process** consumes `@llm-space/core/server`; the **renderer** consumes the client/types entrypoints and reaches the bun process over RPC (never imports `./server`).
+- **Layering**: `@llm-space/core` splits browser-safe code (`./client`, `./types`, `./utils`, root `.`) from Node/Bun-only server implementations (`./server`). The desktop **bun process** consumes `@llm-space/core/server` and plugin runtime packages; the **renderer** consumes client/types contracts and reaches both through RPC (never imports `./server` or plugin runtime packages).
 
 ### Naming
 

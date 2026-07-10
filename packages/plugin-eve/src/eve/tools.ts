@@ -1,7 +1,6 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 
-import type { EveTool, Tool } from "@llm-space/core";
 import {
   isDisabledToolSentinel,
   isEnableWorkflowToolSentinel,
@@ -17,6 +16,7 @@ import type {
   EveToolCallInput,
   EveToolCallResult,
   EveToolDefinition,
+  EveToolDescriptor,
   EveToolModelOutput,
   EveToolModule,
   ParsedToolDescriptor,
@@ -36,18 +36,17 @@ type ImportedToolExport =
  * exported `defineTool()` object, not from source parsing.
  */
 export async function listEveProjectTools(
-  projectRoot: string,
   toolsDir: string,
   diagnostics: EveDiagnostic[]
-): Promise<Tool[]> {
-  const tools: Tool[] = [];
+): Promise<EveToolDescriptor[]> {
+  const tools: EveToolDescriptor[] = [];
   for (const entry of readdirSync(toolsDir, { withFileTypes: true })) {
     const extension = path.extname(entry.name);
     if (!entry.isFile() || !TOOL_EXTENSIONS.some((ext) => ext === extension)) {
       continue;
     }
     const toolPath = path.join(toolsDir, entry.name);
-    const descriptor = await readEveToolDescriptor(projectRoot, toolPath);
+    const descriptor = await readEveToolDescriptor(toolPath);
     diagnostics.push(...descriptor.diagnostics);
     if (descriptor.tool) {
       tools.push(descriptor.tool);
@@ -95,7 +94,6 @@ export async function callEveTool(
  * Read one Eve tool descriptor from the direct module export.
  */
 export async function readEveToolDescriptor(
-  projectRoot: string,
   toolPath: string
 ): Promise<ParsedToolDescriptor> {
   const diagnostics: EveDiagnostic[] = [];
@@ -158,12 +156,10 @@ export async function readEveToolDescriptor(
 
   return {
     tool: {
-      type: "eve",
       runtime: "tool",
       name: toolName,
       description: imported.definition.description,
       parameters: schema ?? EMPTY_OBJECT_SCHEMA,
-      projectRoot,
       toolName,
       toolPath,
     },
@@ -174,9 +170,8 @@ export async function readEveToolDescriptor(
 /**
  * Create the project-scoped skill loader shown as an Eve tool.
  */
-export function createScopedSkillTool(projectRoot: string): EveTool {
+export function createScopedSkillTool(): EveToolDescriptor {
   return {
-    type: "eve",
     runtime: "skill",
     name: "skill",
     description:
@@ -193,12 +188,13 @@ export function createScopedSkillTool(projectRoot: string): EveTool {
       },
       additionalProperties: false,
     },
-    projectRoot,
     toolName: "skill",
   };
 }
 
-async function _importToolExport(toolPath: string): Promise<ImportedToolExport> {
+async function _importToolExport(
+  toolPath: string
+): Promise<ImportedToolExport> {
   const mod = (await import(moduleUrl(toolPath))) as EveToolModule;
   const exported = mod.default;
   if (isDisabledToolSentinel(exported)) {

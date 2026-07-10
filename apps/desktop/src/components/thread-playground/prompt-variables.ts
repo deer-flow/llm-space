@@ -15,7 +15,7 @@ import type {
   ThreadVariables,
 } from "@llm-space/core";
 
-import { listEveSkills } from "@/client/eve";
+import { listPluginSkills } from "@/client/plugins";
 import { getSkillsSettings, listSkills } from "@/client/skills";
 import type { SkillInfo } from "@/shared/skills";
 
@@ -278,15 +278,39 @@ export function formatSkillsVariable(
 }
 
 /**
- * List enabled skills across all configured discovery folders, de-duped by
- * name. Reuses the Settings skill model so prompt variables cannot see hidden
- * skills the runtime `skill()` tool would reject.
+ * List Skills visible to the current Thread, de-duped by name. Any declared
+ * plugin Skill Provider makes the scope plugin-only; otherwise this reuses the
+ * global Settings model and excludes hidden Skills.
  */
 export async function listEnabledPromptVariableSkills(
   context?: ThreadContext
 ): Promise<SkillInfo[]> {
-  if (context?.eve) {
-    return listEveSkills(context.eve.projectRoot);
+  const pluginScopes = (context?.plugins ?? []).filter(
+    (plugin) => plugin.skillProviderId
+  );
+  if (pluginScopes.length > 0) {
+    const scoped = await Promise.all(
+      pluginScopes.map(async (plugin) => {
+        const skills = await listPluginSkills({
+          pluginId: plugin.pluginId,
+          providerId: plugin.skillProviderId!,
+          context: plugin,
+        });
+        return skills.map((skill): SkillInfo => ({
+          name: skill.name,
+          description: skill.description,
+          path: `${plugin.pluginId}:${plugin.contextId}:${skill.resourceRef}`,
+          enabled: true,
+        }));
+      })
+    );
+    const byName = new Map<string, SkillInfo>();
+    for (const skill of scoped.flat()) {
+      if (!byName.has(skill.name)) {
+        byName.set(skill.name, skill);
+      }
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   const { discoveryPaths } = await getSkillsSettings();

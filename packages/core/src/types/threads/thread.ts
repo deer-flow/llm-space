@@ -1,3 +1,4 @@
+import { JSONObject } from "@llm-space/plugin-api";
 import { Type, type Static } from "typebox";
 
 import { Message, ModelUsage } from "../messages";
@@ -71,19 +72,18 @@ export const ThreadContextSnapshot = Type.Object({
 });
 export type ThreadContextSnapshot = Static<typeof ThreadContextSnapshot>;
 
-/**
- * Local Eve project runtime attached to this thread. The project root is
- * persisted so manual Eve tool calls and scoped skill loads still work after a
- * desktop restart, and so Eve threads never fall back to global LLM Space
- * skills by accident.
- */
-export const ThreadEveContext = Type.Object({
-  projectRoot: Type.String(),
-  source: Type.Optional(
-    Type.Union([Type.Literal("env"), Type.Literal("manual")])
-  ),
+/** Generic JSON-only runtime scope owned by one plugin. */
+export const ThreadPluginContext = Type.Object({
+  contextId: Type.String(),
+  pluginId: Type.String(),
+  sourceId: Type.String(),
+  schemaVersion: Type.Number(),
+  label: Type.String(),
+  data: JSONObject,
+  toolProviderId: Type.Optional(Type.String()),
+  skillProviderId: Type.Optional(Type.String()),
 });
-export type ThreadEveContext = Static<typeof ThreadEveContext>;
+export type ThreadPluginContext = Static<typeof ThreadPluginContext>;
 
 /**
  * The context of a thread, including the system prompt, messages, and tools.
@@ -114,12 +114,8 @@ export const ThreadContext = Type.Object({
    */
   snapshot: Type.Optional(ThreadContextSnapshot),
 
-  /**
-   * Optional local Eve project runtime. When present, skills and Eve tools are
-   * resolved from this project only; global Skills settings are ignored for Eve
-   * prompt-variable rendering and `skill(name)` calls.
-   */
-  eve: Type.Optional(ThreadEveContext),
+  /** JSON-only runtime scopes contributed by trusted plugins. */
+  plugins: Type.Optional(Type.Array(ThreadPluginContext)),
 
   /**
    * The messages of the thread.

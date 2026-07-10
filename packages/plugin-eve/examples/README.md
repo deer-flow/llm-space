@@ -10,5 +10,5 @@ debug path:
 Run the importer example from the repository root:
 
 ```sh
-bun run packages/eve/examples/import-basic-agent.ts
+bun run packages/plugin-eve/examples/import-basic-agent.ts
 ```

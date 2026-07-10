@@ -392,10 +392,9 @@ export function createThreadStore(
           if (!tool || !isExecutableTool(tool)) {
             return null;
           }
-          // Eve project tools execute real local project code. V1 exposes them
-          // through the manual "Call this tool" button only, so auto-run stops
-          // here instead of executing the Eve environment implicitly.
-          if (tool.type === "eve") {
+          // Plugin tools execute trusted extension code. V1 exposes them through
+          // the manual "Call this tool" button only, so auto-run stops here.
+          if (tool.type === "plugin") {
             return null;
           }
           // A destructive `bash` command must never be auto-executed, even under

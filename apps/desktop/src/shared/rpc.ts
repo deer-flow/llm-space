@@ -8,7 +8,17 @@ import type {
   ModelProviderGroup,
   Thread,
 } from "@llm-space/core";
-import type { EveSkillInfo, EveToolCallResult } from "@llm-space/eve";
+import type {
+  PluginContext,
+  PluginSkillContent,
+  PluginSkillSummary,
+  PluginSourceImportResult,
+  PluginSourceInput,
+  PluginSourceProbeResult,
+  PluginToolCallResult,
+  PluginToolDescriptor,
+  PluginView,
+} from "@llm-space/plugin-api";
 import type { RPCSchema } from "electrobun";
 
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
@@ -205,19 +215,68 @@ export interface DesktopRPCType {
         };
         response: { contentText: string };
       };
-      eveListSkills: {
-        params: { projectRoot: string };
-        response: EveSkillInfo[];
+      pluginList: {
+        params: Record<string, never>;
+        response: PluginView[];
       };
-      eveCallTool: {
+      pluginSetEnabled: {
+        params: { pluginId: string; enabled: boolean };
+        response: PluginView[];
+      };
+      pluginReload: {
+        params: { pluginId: string };
+        response: PluginView[];
+      };
+      pluginProbeSource: {
         params: {
-          projectRoot: string;
-          runtime: "tool" | "skill";
-          toolName: string;
-          toolPath?: string;
+          pluginId: string;
+          importerId: string;
+          source: PluginSourceInput;
+        };
+        response: PluginSourceProbeResult;
+      };
+      pluginImportSource: {
+        params: {
+          pluginId: string;
+          importerId: string;
+          source: PluginSourceInput;
+        };
+        response: PluginSourceImportResult<Thread>;
+      };
+      pluginListTools: {
+        params: {
+          pluginId: string;
+          providerId: string;
+          context: PluginContext;
+        };
+        response: PluginToolDescriptor[];
+      };
+      pluginCallTool: {
+        params: {
+          pluginId: string;
+          providerId: string;
+          context?: PluginContext;
+          toolRef: string;
           arguments: Record<string, unknown>;
         };
-        response: EveToolCallResult;
+        response: PluginToolCallResult;
+      };
+      pluginListSkills: {
+        params: {
+          pluginId: string;
+          providerId: string;
+          context: PluginContext;
+        };
+        response: PluginSkillSummary[];
+      };
+      pluginReadSkill: {
+        params: {
+          pluginId: string;
+          providerId: string;
+          context: PluginContext;
+          resourceRef: string;
+        };
+        response: PluginSkillContent | null;
       };
       // The user's anonymous-analytics opt-out preference plus whether the
       // hard gates allow sending at all (see `shared/analytics.ts`).

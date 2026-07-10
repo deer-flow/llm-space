@@ -1,0 +1,43 @@
+{
+  "id": "llm-space.eve",
+  "name": "Eve",
+  "version": "1.0.0",
+  "description": "Import and manually debug local Eve agent projects.",
+  "runtime": "./src/index.ts",
+  "apiVersion": "1.0.0",
+  "engines": {
+    "llmSpace": ">=0.0.1"
+  },
+  "source": "bundled",
+  "capabilities": ["environment", "filesystem", "process"],
+  "contributions": [
+    {
+      "kind": "sourceImporter",
+      "id": "eve.project",
+      "name": "Eve project",
+      "description": "Import an Eve agent/ source tree into a Thread."
+    },
+    {
+      "kind": "toolProvider",
+      "id": "eve.tools",
+      "name": "Eve tools",
+      "description": "Describe and manually execute project-scoped Eve tools."
+    },
+    {
+      "kind": "skillProvider",
+      "id": "eve.skills",
+      "name": "Eve Skills",
+      "description": "List and read Skills from the imported Eve project only."
+    },
+    {
+      "kind": "developmentSeeder",
+      "id": "eve.development",
+      "name": "Eve development environment",
+      "description": "Import an env-selected Eve project during local development.",
+      "environmentVariables": [
+        "LLM_SPACE_EVE_PROJECT_ROOT",
+        "LLM_SPACE_EVE_THREAD_PATH"
+      ]
+    }
+  ]
+}

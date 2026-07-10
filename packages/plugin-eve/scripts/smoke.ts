@@ -2,9 +2,9 @@ import path from "node:path";
 
 import {
   callEveTool,
-  importEveProjectToThread,
+  importEveProject,
   listEveProjectSkills,
-} from "../src";
+} from "../src/eve";
 
 const root = path.resolve(import.meta.dir, "..");
 const minimal = path.join(root, "fixtures", "minimal");
@@ -16,19 +16,19 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-const minimalResult = await importEveProjectToThread({
+const minimalResult = await importEveProject({
   projectRoot: minimal,
   source: "manual",
 });
 assert(
-  minimalResult.thread.context?.systemPrompt?.includes("minimal Eve fixture"),
+  minimalResult.systemPrompt?.includes("minimal Eve fixture"),
   "imports instructions into the system prompt"
 );
 assert(
-  minimalResult.thread.context?.eve?.projectRoot === minimal,
-  "persists the Eve project root"
+  minimalResult.project.projectRoot === minimal,
+  "keeps the Eve project root in domain provenance"
 );
-const tools = minimalResult.thread.context?.tools ?? [];
+const tools = minimalResult.tools;
 assert(
   tools.some((tool) => tool.name === "echo"),
   "imports echo tool"
@@ -61,10 +61,8 @@ assert(
   "loads a project-scoped skill"
 );
 
-const zodResult = await importEveProjectToThread({ projectRoot: zod });
-const score = zodResult.thread.context?.tools?.find(
-  (tool) => tool.name === "score"
-);
+const zodResult = await importEveProject({ projectRoot: zod });
+const score = zodResult.tools.find((tool) => tool.name === "score");
 const scoreParameters = score?.parameters as
   | {
       type?: string;

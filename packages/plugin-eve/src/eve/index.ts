@@ -1,6 +1,6 @@
 export { readEveInstructions } from "./instructions";
 export { detectEveProject } from "./project";
-export { importEveProjectToThread } from "./thread-import";
+export { importEveProject } from "./project-import";
 export {
   listEveProjectSkills,
   readEveProjectSkill,
@@ -26,5 +26,6 @@ export type {
   EveToolCallResult,
   EveToolContext,
   EveToolDefinition,
+  EveToolDescriptor,
   EveToolModelOutput,
 } from "./types";

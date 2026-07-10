@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
 import { getLlmSpaceHomePath } from "@llm-space/core/server";
-import { callEveTool, listEveProjectSkills } from "@llm-space/eve";
+import type { JSONObject } from "@llm-space/plugin-api";
 import { BrowserView, Utils } from "electrobun/bun";
 
 import type { DesktopRPCType } from "../../shared/rpc";
@@ -11,6 +11,7 @@ import { analytics } from "../analytics";
 import { moveToTrash, revealInFileManager } from "../fs";
 import { mcpManager } from "../mcp";
 import { modelManager } from "../models";
+import { pluginManager } from "../plugins";
 import { searchSettings } from "../search";
 import { skillsManager } from "../skills";
 import { localFs } from "../storage";
@@ -189,20 +190,38 @@ export const mainWindowRPC: MainWindowRPC =
         builtInListTools: () => listBuiltInTools(),
         builtInCallTool: ({ name, arguments: args }) =>
           callBuiltInTool({ name, arguments: args }),
-        eveListSkills: ({ projectRoot }) => listEveProjectSkills(projectRoot),
-        eveCallTool: ({
-          projectRoot,
-          runtime,
-          toolName,
-          toolPath,
+        pluginList: () => Promise.resolve(pluginManager.listPlugins()),
+        pluginSetEnabled: ({ pluginId, enabled }) =>
+          pluginManager.setEnabled(pluginId, enabled),
+        pluginReload: ({ pluginId }) => pluginManager.reload(pluginId),
+        pluginProbeSource: ({ pluginId, importerId, source }) =>
+          pluginManager.probeSource({ pluginId, importerId, source }),
+        pluginImportSource: ({ pluginId, importerId, source }) =>
+          pluginManager.importSource({ pluginId, importerId, source }),
+        pluginListTools: ({ pluginId, providerId, context }) =>
+          pluginManager.listTools({ pluginId, providerId, context }),
+        pluginCallTool: ({
+          pluginId,
+          providerId,
+          context,
+          toolRef,
           arguments: args,
         }) =>
-          callEveTool({
-            projectRoot,
-            runtime,
-            toolName,
-            toolPath,
-            arguments: args,
+          pluginManager.callTool({
+            pluginId,
+            providerId,
+            context,
+            toolRef,
+            arguments: args as JSONObject,
+          }),
+        pluginListSkills: ({ pluginId, providerId, context }) =>
+          pluginManager.listSkills({ pluginId, providerId, context }),
+        pluginReadSkill: ({ pluginId, providerId, context, resourceRef }) =>
+          pluginManager.readSkill({
+            pluginId,
+            providerId,
+            context,
+            resourceRef,
           }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>

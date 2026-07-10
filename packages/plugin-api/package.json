@@ -1,0 +1,15 @@
+{
+  "name": "@llm-space/plugin-api",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "typebox": "catalog:"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

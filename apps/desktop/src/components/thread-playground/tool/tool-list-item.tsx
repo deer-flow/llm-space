@@ -1,7 +1,7 @@
 "use client";
 
 import { type Tool } from "@llm-space/core";
-import { CableIcon, FunctionSquareIcon, XIcon } from "lucide-react";
+import { CableIcon, FunctionSquareIcon, PlugIcon, XIcon } from "lucide-react";
 import React, { memo, useCallback, useMemo } from "react";
 
 import { cn } from "@/lib/utils";
@@ -46,8 +46,10 @@ function _ToolListItem({
       ? CableIcon
       : tool.type === "builtin"
         ? getBuiltInToolIcon(tool)
-        : FunctionSquareIcon;
-  const editDisabled = readonly || tool.type === "eve";
+        : tool.type === "plugin"
+          ? PlugIcon
+          : FunctionSquareIcon;
+  const editDisabled = readonly || tool.type === "plugin";
 
   return (
     <div className="group/tool bg-secondary hover:text-accent-foreground inline-flex h-6 shrink-0 items-center rounded-md text-xs/relaxed transition-colors">
@@ -88,8 +90,8 @@ function _ToolListItem({
                 : `Manage ${tool.name} ${
                     tool.type === "mcp"
                       ? "MCP"
-                      : tool.type === "eve"
-                        ? "Eve"
+                      : tool.type === "plugin"
+                        ? "plugin"
                         : "built-in"
                   } tool`
             }

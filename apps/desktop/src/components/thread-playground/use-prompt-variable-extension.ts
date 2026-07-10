@@ -13,15 +13,22 @@ import {
 } from "./prompt-variables";
 import { ThreadStoreContext, type ThreadStore } from "./stores";
 
-// Skills are scoped: normal threads read global Skills settings, while Eve
-// threads read only their project `agent/skills/`. Cache by scope so Eve hovers
-// never leak global skills into an imported Eve environment.
+// Skills are scoped: normal threads read global Skills settings, while plugin
+// threads read only declared Skill Providers. Cache by scope so plugin hovers
+// never leak global skills into an imported environment.
 const SKILLS_TTL_MS = 30_000;
 const skillsCache = new Map<string, { at: number; skills: SkillInfo[] }>();
 const skillsInflight = new Map<string, Promise<SkillInfo[]>>();
 
 function skillScopeKey(context: ThreadContext | undefined): string {
-  return context?.eve ? `eve:${context.eve.projectRoot}` : "global";
+  const scopes = (context?.plugins ?? [])
+    .filter((plugin) => plugin.skillProviderId)
+    .map(
+      (plugin) =>
+        `${plugin.pluginId}:${plugin.skillProviderId}:${plugin.contextId}`
+    )
+    .sort();
+  return scopes.length > 0 ? `plugin:${scopes.join("|")}` : "global";
 }
 
 function loadSkillsCached(

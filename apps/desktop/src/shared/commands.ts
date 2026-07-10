@@ -192,7 +192,13 @@ export interface ToggleSidebarCommand extends GenericCommand<"toggleSidebar"> {}
 
 /** Which Settings tab to show. */
 export type SettingsTab =
-  "general" | "models" | "mcp" | "search" | "skills" | "experimental";
+  | "general"
+  | "models"
+  | "mcp"
+  | "search"
+  | "skills"
+  | "plugins"
+  | "experimental";
 
 /** Open the Settings dialog, optionally on a specific `tab`. */
 export interface OpenSettingsCommand extends GenericCommand<
