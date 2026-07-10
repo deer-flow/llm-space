@@ -51,6 +51,7 @@ import {
 
 import {
   createInitialHistory,
+  normalizeEvaluationRubrics,
   normalizeEvaluations,
   normalizeRunHistory,
   recordRun,
@@ -58,9 +59,14 @@ import {
   redo as redoHistory,
   undo as undoHistory,
   upsertEvaluation,
-  withRunHistory,
+  upsertEvaluationRubric,
+  withRunMetadata,
   type ChangeHistory,
   type EvaluationRecord,
+  type EvaluationRubricInput,
+  type EvaluationRubricRecord,
+  type EvaluationRubricSnapshot,
+  type EvaluationRunScores,
   type RunSnapshot,
 } from "./thread-history";
 
@@ -94,6 +100,8 @@ export interface ThreadState {
   runHistory: RunSnapshot[];
   /** Manual verdicts comparing durable run snapshots. */
   evaluations: EvaluationRecord[];
+  /** Reusable manual evaluation rubrics owned by this thread. */
+  evaluationRubrics: EvaluationRubricRecord[];
 
   run(fromMessageId?: string): Promise<void>;
   undo(): void;
@@ -105,8 +113,14 @@ export interface ThreadState {
     rightRunId: string;
     verdict: EvaluationRecord["verdict"];
     note?: string;
-  }): void;
+    rubric?: EvaluationRubricSnapshot;
+    runScores?: EvaluationRunScores[];
+  }): boolean;
   removeEvaluation(evaluation: EvaluationRecord): void;
+  saveEvaluationRubric(
+    input: EvaluationRubricInput
+  ): EvaluationRubricRecord | null;
+  removeEvaluationRubric(id: string): boolean;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
@@ -189,11 +203,14 @@ export function createThreadStore(
     normalizedInputThread.evaluations,
     initialRunHistory
   );
-  const normalizedInitialThread = withRunHistory(
-    normalizedInputThread,
-    initialRunHistory,
-    initialEvaluations
+  const initialEvaluationRubrics = normalizeEvaluationRubrics(
+    normalizedInputThread.evaluationRubrics
   );
+  const normalizedInitialThread = withRunMetadata(normalizedInputThread, {
+    runHistory: initialRunHistory,
+    evaluations: initialEvaluations,
+    evaluationRubrics: initialEvaluationRubrics,
+  });
 
   return createStore<ThreadState>()(
     subscribeWithSelector((set, get) => {
@@ -464,6 +481,7 @@ export function createThreadStore(
         changeHistory: createInitialHistory(normalizedInitialThread),
         runHistory: initialRunHistory,
         evaluations: initialEvaluations,
+        evaluationRubrics: initialEvaluationRubrics,
 
         appendMessage() {
           const message = createUserMessage();
@@ -995,11 +1013,11 @@ export function createThreadStore(
                 get().evaluations,
                 runHistory
               );
-              const thread = withRunHistory(
-                threadWithSnapshot,
+              const thread = withRunMetadata(threadWithSnapshot, {
                 runHistory,
-                evaluations
-              );
+                evaluations,
+                evaluationRubrics: get().evaluationRubrics,
+              });
               set({
                 thread,
                 changeHistory: recordSnapshot(get().changeHistory, thread),
@@ -1173,11 +1191,11 @@ export function createThreadStore(
           if (!result) {
             return;
           }
-          const thread = withRunHistory(
-            result.thread,
-            get().runHistory,
-            get().evaluations
-          );
+          const thread = withRunMetadata(result.thread, {
+            runHistory: get().runHistory,
+            evaluations: get().evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           set({
             thread,
             changeHistory: {
@@ -1196,11 +1214,11 @@ export function createThreadStore(
           if (!result) {
             return;
           }
-          const thread = withRunHistory(
-            result.thread,
-            get().runHistory,
-            get().evaluations
-          );
+          const thread = withRunMetadata(result.thread, {
+            runHistory: get().runHistory,
+            evaluations: get().evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           set({
             thread,
             changeHistory: {
@@ -1215,11 +1233,11 @@ export function createThreadStore(
           if (get().status === "running") {
             return;
           }
-          const next = withRunHistory(
-            thread,
-            get().runHistory,
-            get().evaluations
-          );
+          const next = withRunMetadata(thread, {
+            runHistory: get().runHistory,
+            evaluations: get().evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           if (next === get().thread) {
             return;
           }
@@ -1245,7 +1263,11 @@ export function createThreadStore(
           // Deleting a run is not an undoable edit — undo/redo re-attach the
           // live runHistory anyway — so update the current snapshot in place
           // instead of recording a new step.
-          const thread = withRunHistory(get().thread, runHistory, evaluations);
+          const thread = withRunMetadata(get().thread, {
+            runHistory,
+            evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           const history = get().changeHistory;
           set({
             thread,
@@ -1261,18 +1283,21 @@ export function createThreadStore(
         },
         saveEvaluation(input) {
           if (get().status === "running") {
-            return;
+            return false;
           }
           const evaluations = upsertEvaluation(
             get().evaluations,
             get().runHistory,
             input
           );
-          const thread = withRunHistory(
-            get().thread,
-            get().runHistory,
-            evaluations
-          );
+          if (!evaluations) {
+            return false;
+          }
+          const thread = withRunMetadata(get().thread, {
+            runHistory: get().runHistory,
+            evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           // Evaluation records are durable run metadata, not a text-edit undo
           // step; replace the current history tip so undo stays content-focused.
           const changeHistory = get().changeHistory;
@@ -1286,6 +1311,7 @@ export function createThreadStore(
               ),
             },
           });
+          return true;
         },
         removeEvaluation(evaluation: EvaluationRecord) {
           if (get().status === "running") {
@@ -1299,11 +1325,11 @@ export function createThreadStore(
           // Like removeRun, deleting an evaluation is not an undoable edit;
           // update the current history snapshot in place instead of recording
           // a new step.
-          const thread = withRunHistory(
-            get().thread,
-            get().runHistory,
-            evaluations
-          );
+          const thread = withRunMetadata(get().thread, {
+            runHistory: get().runHistory,
+            evaluations,
+            evaluationRubrics: get().evaluationRubrics,
+          });
           const changeHistory = get().changeHistory;
           set({
             thread,
@@ -1315,6 +1341,61 @@ export function createThreadStore(
               ),
             },
           });
+        },
+        saveEvaluationRubric(input) {
+          if (get().status === "running") {
+            return null;
+          }
+          const result = upsertEvaluationRubric(get().evaluationRubrics, input);
+          if (!result) {
+            return null;
+          }
+          const thread = withRunMetadata(get().thread, {
+            runHistory: get().runHistory,
+            evaluations: get().evaluations,
+            evaluationRubrics: result.rubrics,
+          });
+          const changeHistory = get().changeHistory;
+          set({
+            thread,
+            evaluationRubrics: result.rubrics,
+            changeHistory: {
+              ...changeHistory,
+              snapshots: changeHistory.snapshots.map((snapshot, index) =>
+                index === changeHistory.index ? thread : snapshot
+              ),
+            },
+          });
+          return result.rubric;
+        },
+        removeEvaluationRubric(id) {
+          if (get().status === "running") {
+            return false;
+          }
+          const current = get().evaluationRubrics;
+          const evaluationRubrics = current.filter(
+            (rubric) => rubric.id !== id
+          );
+          if (evaluationRubrics.length === current.length) {
+            return false;
+          }
+          const thread = withRunMetadata(get().thread, {
+            runHistory: get().runHistory,
+            evaluations: get().evaluations,
+            evaluationRubrics,
+          });
+          const changeHistory = get().changeHistory;
+          set({
+            thread,
+            evaluationRubrics,
+            changeHistory: {
+              ...changeHistory,
+              snapshots: changeHistory.snapshots.map((snapshot, index) =>
+                index === changeHistory.index ? thread : snapshot
+              ),
+            },
+          });
+          return true;
         },
         abort() {
           const { status } = get();
@@ -1349,6 +1430,8 @@ const selectActions = (s: ThreadState) => ({
   removeRun: s.removeRun,
   saveEvaluation: s.saveEvaluation,
   removeEvaluation: s.removeEvaluation,
+  saveEvaluationRubric: s.saveEvaluationRubric,
+  removeEvaluationRubric: s.removeEvaluationRubric,
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,

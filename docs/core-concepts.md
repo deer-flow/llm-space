@@ -18,6 +18,14 @@ A Thread is the basic unit of work in LLM Space. A Thread usually contains:
 
 In the UI, creating, opening, copying, moving, and deleting Threads is essentially managing Thread files in the workspace.
 
+# Evaluation Rubrics
+
+Run History lets you select two durable runs and compare their saved evidence. You can keep the simple overall verdict and note workflow, or select a reusable rubric owned by the current Thread.
+
+A rubric contains 2–6 ordered criteria. Each criterion has a name and optional description, and each compared run receives a score from 1 (poor) to 5 (excellent). LLM Space derives the unweighted average for Run A and Run B plus the `B - A` delta; the overall verdict remains a separate human decision.
+
+Saved evaluations contain an immutable snapshot of the rubric and scores keyed by stable run ID. Editing or deleting the reusable rubric definition does not rewrite historical evaluations. Rubrics, snapshots, scores, verdicts, and notes stay in the local Thread JSON and do not trigger another model call.
+
 # Model
 
 A Model is the language model actually called during a run, such as a model ID under OpenAI, Anthropic, Ark, or a custom compatible API.
@@ -260,7 +268,7 @@ A native Thread file is formatted JSON. The core structure looks like this:
 }
 ```
 
-Actual files may also contain `runHistory` and `evaluations`. These fields are mainly used for debugging, replay, and manual evaluation, and are usually maintained by the app automatically.
+Actual files may also contain `runHistory`, `evaluationRubrics`, and `evaluations`. These fields are mainly used for debugging, replay, and manual evaluation, and are usually maintained by the app automatically. Rubric-backed evaluations store their own rubric snapshot so later definition changes do not alter historical results.
 
 # Supported Import Schemas
 

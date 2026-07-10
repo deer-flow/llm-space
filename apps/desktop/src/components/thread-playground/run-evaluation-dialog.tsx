@@ -5,6 +5,7 @@ import { format } from "timeago.js";
 
 import { cn } from "@/lib/utils";
 
+import { ConfirmDialog } from "../confirm-dialog";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -15,6 +16,16 @@ import {
 } from "../ui/dialog";
 import { Textarea } from "../ui/textarea";
 
+import { EvaluationRubricEditor } from "./evaluation-rubric-editor";
+import { RunEvaluationScorecard } from "./run-evaluation-scorecard";
+import {
+  completeRunScores,
+  initialRubricForEvaluation,
+  requiresScoreRemovalConfirmation,
+  scoreDraftFromEvaluation,
+  scoreDraftForRubricChange,
+  type EvaluationScoreDraft,
+} from "./run-evaluation-utils";
 import {
   runLastUserText,
   runMessageCountLabel,
@@ -23,7 +34,15 @@ import {
   summarizeRun,
 } from "./run-history-utils";
 import { RunTraceView } from "./run-trace-view";
-import type { EvaluationRecord, RunSnapshot } from "./stores";
+import {
+  snapshotEvaluationRubric,
+  type EvaluationRecord,
+  type EvaluationRubricInput,
+  type EvaluationRubricRecord,
+  type EvaluationRubricSnapshot,
+  type EvaluationRunScores,
+  type RunSnapshot,
+} from "./stores";
 
 const VERDICT_OPTIONS: {
   value: EvaluationRecord["verdict"];
@@ -41,40 +60,71 @@ export function RunEvaluationDialog({
   leftRun,
   rightRun,
   evaluation,
+  rubrics,
+  preferredRubricId,
   onOpenChange,
   onSave,
+  onSaveRubric,
+  onRemoveRubric,
 }: {
   open: boolean;
   leftRun: RunSnapshot | null;
   rightRun: RunSnapshot | null;
   evaluation: EvaluationRecord | null;
+  rubrics: EvaluationRubricRecord[];
+  preferredRubricId: string | null;
   onOpenChange: (open: boolean) => void;
   onSave: (input: {
     leftRunId: string;
     rightRunId: string;
     verdict: EvaluationRecord["verdict"];
     note?: string;
-  }) => void;
+    rubric?: EvaluationRubricSnapshot;
+    runScores?: EvaluationRunScores[];
+  }) => boolean;
+  onSaveRubric: (input: EvaluationRubricInput) => EvaluationRubricRecord | null;
+  onRemoveRubric: (id: string) => boolean;
 }) {
   const [verdict, setVerdict] = useState<EvaluationRecord["verdict"] | null>(
     null
   );
   const [note, setNote] = useState("");
   const [inspectingRun, setInspectingRun] = useState<RunSnapshot | null>(null);
+  const [rubricEditorOpen, setRubricEditorOpen] = useState(false);
+  const [editingRubric, setEditingRubric] =
+    useState<EvaluationRubricRecord | null>(null);
+  const [selectedRubric, setSelectedRubric] =
+    useState<EvaluationRubricSnapshot | null>(null);
+  const [scoreDraft, setScoreDraft] = useState<EvaluationScoreDraft>({});
+  const [removeScoresOpen, setRemoveScoresOpen] = useState(false);
 
   const [prevOpen, setPrevOpen] = useState(false);
-  const [prevEvaluation, setPrevEvaluation] = useState(evaluation);
+  const identity = `${leftRun?.id ?? ""}:${rightRun?.id ?? ""}:${evaluation?.id ?? ""}`;
+  const [prevIdentity, setPrevIdentity] = useState(identity);
 
-  // Reinitialize the dialog when it opens or the evaluation changes. Adjusting
+  // Reinitialize the dialog when it opens or the run/evaluation identity changes. Adjusting
   // during render (not via useEffect) avoids a stale frame between the two
   // commits. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  if (open !== prevOpen || evaluation !== prevEvaluation) {
+  if (open !== prevOpen || identity !== prevIdentity) {
     setPrevOpen(open);
-    setPrevEvaluation(evaluation);
+    setPrevIdentity(identity);
     setInspectingRun(null);
+    setRubricEditorOpen(false);
+    setEditingRubric(null);
+    setRemoveScoresOpen(false);
     if (open) {
+      const preferredRubric = preferredRubricId
+        ? rubrics.find((rubric) => rubric.id === preferredRubricId)
+        : undefined;
       setVerdict(evaluation?.verdict ?? null);
       setNote(evaluation?.note ?? "");
+      setSelectedRubric(
+        initialRubricForEvaluation(
+          evaluation,
+          preferredRubric ? snapshotEvaluationRubric(preferredRubric) : null
+        )
+      );
+      setScoreDraft(scoreDraftFromEvaluation(evaluation));
     }
   }
 
@@ -85,31 +135,85 @@ export function RunEvaluationDialog({
     return `${format(leftRun.timestamp)} vs ${format(rightRun.timestamp)}`;
   }, [leftRun, rightRun]);
 
-  const handleSave = () => {
+  const runScores = useMemo(() => {
+    if (!selectedRubric || !leftRun || !rightRun) {
+      return null;
+    }
+    return completeRunScores(selectedRubric, scoreDraft, [
+      leftRun.id,
+      rightRun.id,
+    ]);
+  }, [leftRun, rightRun, scoreDraft, selectedRubric]);
+  const canSave = Boolean(verdict && (!selectedRubric || runScores !== null));
+
+  const handleRubricChange = (rubric: EvaluationRubricSnapshot | null) => {
+    if (leftRun && rightRun) {
+      setScoreDraft((current) =>
+        scoreDraftForRubricChange(
+          current,
+          selectedRubric,
+          rubric,
+          [leftRun.id, rightRun.id],
+          evaluation
+        )
+      );
+    }
+    setSelectedRubric(rubric);
+  };
+
+  const persistEvaluation = () => {
     if (!leftRun || !rightRun || !verdict) {
       return;
     }
-    onSave({
+    if (selectedRubric && !runScores) {
+      return;
+    }
+    const saved = onSave({
       leftRunId: leftRun.id,
       rightRunId: rightRun.id,
       verdict,
       note,
+      ...(selectedRubric && runScores
+        ? { rubric: selectedRubric, runScores }
+        : {}),
     });
+    if (!saved) {
+      toast.error("Unable to save evaluation", {
+        description: "Check the selected runs and rubric scores.",
+      });
+      return;
+    }
     toast.success("Evaluation saved");
+    onOpenChange(false);
   };
+
+  const handleSave = () => {
+    if (requiresScoreRemovalConfirmation(evaluation, selectedRubric)) {
+      setRemoveScoresOpen(true);
+      return;
+    }
+    persistEvaluation();
+  };
+
+  const dialogTitle = inspectingRun
+    ? "Inspect Run"
+    : rubricEditorOpen
+      ? editingRubric
+        ? "Edit rubric"
+        : "Create rubric"
+      : "Evaluate Runs";
+  const dialogDescription = inspectingRun
+    ? "Saved run evidence from this comparison."
+    : rubricEditorOpen
+      ? "Create reusable criteria for manual run comparison in this thread."
+      : "Compare two durable runs and save a structured evaluation with this thread.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100vh-4rem)] w-[min(1040px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>
-            {inspectingRun ? "Inspect Run" : "Evaluate Runs"}
-          </DialogTitle>
-          <DialogDescription>
-            {inspectingRun
-              ? "Saved run evidence from this comparison."
-              : "Compare two durable runs and save a verdict with this thread."}
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         {inspectingRun ? (
           <>
@@ -121,6 +225,32 @@ export function RunEvaluationDialog({
               </Button>
             </div>
           </>
+        ) : rubricEditorOpen ? (
+          <EvaluationRubricEditor
+            key={editingRubric?.id ?? "new-rubric"}
+            rubric={editingRubric}
+            onBack={() => setRubricEditorOpen(false)}
+            onSave={onSaveRubric}
+            onRemove={(id) => {
+              const removed = onRemoveRubric(id);
+              const savedSnapshot = evaluation?.rubric;
+              if (
+                removed &&
+                selectedRubric?.id === id &&
+                (savedSnapshot?.id !== selectedRubric.id ||
+                  savedSnapshot?.revision !== selectedRubric.revision)
+              ) {
+                setSelectedRubric(null);
+              }
+              return removed;
+            }}
+            onSaved={(rubric) => {
+              const snapshot = snapshotEvaluationRubric(rubric);
+              handleRubricChange(snapshot);
+              setEditingRubric(rubric);
+              setRubricEditorOpen(false);
+            }}
+          />
         ) : leftRun && rightRun ? (
           <>
             <div className="min-h-0 overflow-y-auto px-4 py-4">
@@ -143,6 +273,32 @@ export function RunEvaluationDialog({
                 />
               </div>
               <div className="mt-4 flex flex-col gap-3">
+                <RunEvaluationScorecard
+                  rubrics={rubrics}
+                  savedRubric={evaluation?.rubric ?? null}
+                  rubric={selectedRubric}
+                  leftRunId={leftRun.id}
+                  rightRunId={rightRun.id}
+                  scoreDraft={scoreDraft}
+                  onRubricChange={handleRubricChange}
+                  onScoreChange={(runId, criterionId, score) =>
+                    setScoreDraft((current) => ({
+                      ...current,
+                      [runId]: {
+                        ...(current[runId] ?? {}),
+                        [criterionId]: score,
+                      },
+                    }))
+                  }
+                  onCreateRubric={() => {
+                    setEditingRubric(null);
+                    setRubricEditorOpen(true);
+                  }}
+                  onEditRubric={(rubric) => {
+                    setEditingRubric(rubric);
+                    setRubricEditorOpen(true);
+                  }}
+                />
                 <div>
                   <div className="text-xs font-medium">Verdict</div>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -178,7 +334,7 @@ export function RunEvaluationDialog({
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button disabled={!verdict} onClick={handleSave}>
+              <Button disabled={!canSave} onClick={handleSave}>
                 <SaveIcon className="size-3" />
                 Save Evaluation
               </Button>
@@ -190,6 +346,18 @@ export function RunEvaluationDialog({
           </div>
         )}
       </DialogContent>
+      <ConfirmDialog
+        open={removeScoresOpen}
+        onOpenChange={setRemoveScoresOpen}
+        title="Remove rubric scores?"
+        description="Saving without a rubric permanently removes the saved rubric snapshot and all criterion scores from this evaluation. This cannot be undone."
+        confirmLabel="Remove scores and save"
+        dimBackground={false}
+        onConfirm={() => {
+          setRemoveScoresOpen(false);
+          persistEvaluation();
+        }}
+      />
     </Dialog>
   );
 }

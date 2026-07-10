@@ -18,6 +18,14 @@ Thread 是 LLM Space 的基本工作单元。一个 Thread 通常包含：
 
 在界面里，新建、打开、复制、移动和删除 Thread，本质上是在管理工作区里的 Thread 文件。
 
+# 评测 Rubric
+
+Run History 支持选择两个持久化运行并比较它们保存的证据。你可以继续使用简单的总体结论和备注，也可以选择当前 Thread 中可复用的 Rubric。
+
+一个 Rubric 包含 2–6 个有序评测标准。每个标准包含名称和可选描述；两个运行分别获得 1（较差）到 5（优秀）的分数。LLM Space 会派生 Run A、Run B 的非加权平均分和 `B - A` 差值；总体结论仍由评测者独立决定。
+
+保存的 Evaluation 会包含不可变的 Rubric 快照，并通过稳定的 Run ID 关联分数。编辑或删除可复用 Rubric 定义不会改写历史 Evaluation。Rubric、快照、分数、结论和备注都保存在本地 Thread JSON 中，也不会触发额外的模型调用。
+
 # Model
 
 Model 是一次运行实际调用的语言模型，例如某个 OpenAI、Anthropic、Ark 或自定义兼容接口下的模型 ID。
@@ -260,7 +268,7 @@ Thread 文件保存在：
 }
 ```
 
-实际文件还可能包含 `runHistory` 和 `evaluations`。这些字段主要用于调试、回放和人工评估，通常由应用自动维护。
+实际文件还可能包含 `runHistory`、`evaluationRubrics` 和 `evaluations`。这些字段主要用于调试、回放和人工评估，通常由应用自动维护。使用 Rubric 的 Evaluation 会保存独立快照，因此后续修改定义不会改变历史结果。
 
 # 支持导入的 schema
 

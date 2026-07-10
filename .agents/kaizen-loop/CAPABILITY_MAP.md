@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-09
-- Map status: updated after Langfuse Trace Import V1, Langfuse Connected Source V1, Trace Workbench Header/Protocol Repair, System Prompt Variables V2 layout polish, and the Variables row relocation; first-thread editing is stable, MCP remains intentionally tools-only with remote diagnostics, manual paused tool-step continuation is first-class, provider-reported token/cost/cache usage is captured on assistant steps and saved-run traces, manual Langfuse trace import has a dedicated Trace Panel/debug workbench path, connected Langfuse projects can explicitly sync selected traces into the same trace-owned debug workbench with copyable trace identity, and system prompts now manage thread-owned variables from a dedicated Variables row below Tools and a dialog while preserving editable templates.
+- Last updated: 2026-07-10
+- Map status: refreshed after implementing and verifying Structured Evaluation Rubrics V1 in the real Electrobun CEF renderer. Evaluation now supports reusable thread-owned rubrics, immutable historical snapshots, per-run criterion scores, aggregates, and orientation-safe deltas while retaining the legacy verdict/note flow.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -265,18 +265,30 @@
 
 ## Evaluation Workspace
 
-- Status: shipped V1
+- Status: shipped V2 with Structured Evaluation Rubrics V1
 - Freshness: confirmed
-- Last checked: 2026-07-03
+- Last checked: 2026-07-10
 - Evidence:
+  - Current CEF screenshot `audits/2026-07-10-145713-evaluation-rubrics-discovery/01-current-run-history.png` shows two durable run cards, comparison selection, inspect/restore actions, and one saved evaluation in the 1280x800 desktop renderer.
+  - Current CEF screenshot `audits/2026-07-10-145713-evaluation-rubrics-discovery/02-current-evaluation-dialog.png` shows the comparison dialog with Run A/Run B evidence, five fixed overall verdicts, and one unstructured evaluation note; there is no criterion/rubric configuration or per-side structured score.
+  - Current CDP checks on 2026-07-10 found `documentElement.scrollWidth === innerWidth === 1280`, a 1040x728 evaluation dialog inside the 1280x800 viewport, and no relevant console errors.
   - Current screenshot `04-trace-fixture-run-history.png` shows a saved evaluation card for two runs.
   - Current screenshot `05-current-evaluation-dialog.png` shows the evaluation dialog comparing two run snapshots with model/message metadata, system prompt, last user message, result text, tool inputs, and tool outputs.
   - Implementation audit screenshots `04-evaluation-dialog-with-inspect.png` and `06-inspector-inside-evaluation.png` show each comparison side can open a read-only inspector inside the saved evaluation dialog without stacking a second modal.
-  - `packages/core/src/types/threads/thread.ts` includes optional `evaluations`.
-  - `apps/desktop/src/components/thread-playground/run-evaluation-dialog.tsx` renders the manual verdict/note comparison dialog.
-- Boundary: two durable run snapshots in one thread can be compared manually, inspected individually, labeled with a verdict, annotated, and persisted with the thread.
-- Explicit non-goals: dataset runner, automated judge, global evaluation database, reusable rubrics.
-- Visible gaps: no side-by-side trace diff, reusable rubric, dataset runner, or automated judge.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/05-six-criterion-editor.png` shows the same-dialog editor at the maximum six-criterion boundary.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/06-six-criterion-scorecard.png` shows complete 1-5 scores for both runs and the derived aggregate summary.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/07-reversed-six-criterion-scorecard.png` shows the same run-keyed scores with A/B orientation reversed and a correctly flipped directional verdict/delta.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/08-saved-snapshot-after-revision.png` shows the immutable saved v1 snapshot remaining selectable beside the edited v2 definition.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/09-delete-confirmation.png` documents the destructive-action guard and explains that historical snapshots survive definition deletion.
+  - Structured-rubric screenshot `audits/2026-07-10-154419-structured-evaluation-rubrics-v1/10-narrow-scorecard.png` plus CDP geometry checks confirm a 700x700 viewport has no document or dialog horizontal overflow.
+  - The isolated persisted Thread JSON retained one six-criterion rubric snapshot and twelve scores keyed by the two stable run IDs after save, reload, definition revision, and definition deletion.
+  - Real CDP keyboard smoke confirmed roving radio focus and ArrowRight/ArrowDown, ArrowLeft/ArrowUp, Home, End, Space, and Tab behavior; the final renderer console contained no errors.
+  - Twenty-four focused Bun tests cover schema bounds, malformed/duplicate normalization, rubric CRUD/revisions/caps, immutable snapshots, unordered run-pair orientation, score completeness/aggregation, cross-rubric isolation, and saved-snapshot score restoration.
+  - `packages/core/src/types/threads/thread.ts` models legacy and structured evaluations as a compatible union with bounded rubric/snapshot/score data.
+  - `apps/desktop/src/components/thread-playground/run-evaluation-dialog.tsx`, `run-evaluation-scorecard.tsx`, and `evaluation-rubric-editor.tsx` implement the comparison, scoring, and rubric-management surfaces.
+- Boundary: two durable runs in one thread can be compared and inspected, labeled with the existing overall verdict/note, or scored against a reusable thread-owned rubric with 2-6 ordered criteria and complete integer 1-5 scores. One evaluation per unordered pair persists immutable rubric evidence, per-run scores, unweighted averages, and B-minus-A delta; editing or deleting the reusable definition does not alter history, and legacy verdict-only evaluations remain valid.
+- Explicit non-goals: dataset/experiment runner, automated or model judge, weighted/formula criteria, thresholds, global rubric library, multiple evaluations per run pair, CI/export, cloud sync, evaluation telemetry, and raw side-by-side trace diff.
+- Visible gaps: rubric weights and mixed criterion types, reusable cross-thread libraries, aggregate experiment tables, evaluation cost comparison, dataset execution, automated judges, and side-by-side trace/timing diff remain unimplemented. The 80% rubric-backed completion target still needs a ten-comparison maintainer dogfood set after merge.
 
 ## Trace Inspection
 
