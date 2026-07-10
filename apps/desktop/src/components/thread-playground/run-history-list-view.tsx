@@ -30,6 +30,12 @@ import { Item, ItemContent, ItemDescription, ItemGroup } from "../ui/item";
 
 import { RunEvaluationDialog } from "./run-evaluation-dialog";
 import {
+  averageScoreForRun,
+  evaluationScoreDelta,
+  findEvaluationForPair,
+  preferredEvaluationRubricId,
+} from "./run-evaluation-utils";
+import {
   runMessageCountLabel,
   runModelLabel,
   summarizeRun,
@@ -50,8 +56,15 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const [containerRef] = useAutoAnimation();
   const runHistory = useThreadStore((s) => s.runHistory);
   const evaluations = useThreadStore((s) => s.evaluations);
-  const { restoreThread, removeRun, saveEvaluation, removeEvaluation } =
-    useThreadStoreActions();
+  const evaluationRubrics = useThreadStore((s) => s.evaluationRubrics);
+  const {
+    restoreThread,
+    removeRun,
+    saveEvaluation,
+    removeEvaluation,
+    saveEvaluationRubric,
+    removeEvaluationRubric,
+  } = useThreadStoreActions();
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   const [inspectingRunId, setInspectingRunId] = useState<string | null>(null);
@@ -85,12 +98,16 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
     if (!comparisonRuns) {
       return null;
     }
-    return _findEvaluation(
+    return findEvaluationForPair(
       evaluations,
       comparisonRuns[0].id,
       comparisonRuns[1].id
     );
   }, [comparisonRuns, evaluations]);
+  const preferredRubricId = useMemo(
+    () => preferredEvaluationRubricId(evaluations, evaluationRubrics),
+    [evaluationRubrics, evaluations]
+  );
 
   useEffect(() => {
     setSelectedRunIds((current) => current.filter((id) => runById.has(id)));
@@ -275,8 +292,12 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
         leftRun={comparisonRuns?.[0] ?? null}
         rightRun={comparisonRuns?.[1] ?? null}
         evaluation={selectedEvaluation}
+        rubrics={evaluationRubrics}
+        preferredRubricId={preferredRubricId}
         onOpenChange={setEvaluationOpen}
         onSave={saveEvaluation}
+        onSaveRubric={saveEvaluationRubric}
+        onRemoveRubric={removeEvaluationRubric}
       />
       <ConfirmDialog
         open={runPendingRemoval !== null}
@@ -525,6 +546,17 @@ function _EvaluationListItem({
   onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
   const verdictLabel = VERDICT_LABELS[evaluation.verdict];
+  const leftAverage = averageScoreForRun(
+    evaluation.rubric,
+    evaluation.runScores,
+    evaluation.leftRunId
+  );
+  const rightAverage = averageScoreForRun(
+    evaluation.rubric,
+    evaluation.runScores,
+    evaluation.rightRunId
+  );
+  const delta = evaluationScoreDelta(evaluation);
   const handleOpen = useCallback(() => {
     onOpenEvaluation(evaluation.leftRunId, evaluation.rightRunId);
   }, [evaluation.leftRunId, evaluation.rightRunId, onOpenEvaluation]);
@@ -582,6 +614,21 @@ function _EvaluationListItem({
         A: {summarizeRun(leftRun.thread)}
         {"\n"}B: {summarizeRun(rightRun.thread)}
       </div>
+      {evaluation.rubric &&
+        leftAverage !== null &&
+        rightAverage !== null &&
+        delta !== null && (
+          <div className="w-full text-[0.625rem]">
+            <div className="text-muted-foreground truncate">
+              {evaluation.rubric.name} · v{evaluation.rubric.revision}
+            </div>
+            <div className="font-mono tabular-nums">
+              A {leftAverage.toFixed(1)} · B {rightAverage.toFixed(1)} · Δ{" "}
+              {delta >= 0 ? "+" : ""}
+              {delta.toFixed(1)}
+            </div>
+          </div>
+        )}
       {evaluation.note && (
         <div className="text-foreground/70 line-clamp-2 w-full text-[0.625rem]">
           {evaluation.note}
@@ -592,55 +639,3 @@ function _EvaluationListItem({
 }
 
 const EvaluationListItem = memo(_EvaluationListItem);
-
-/** Find a saved evaluation for the currently selected left/right run pair. */
-function _findEvaluation(
-  evaluations: EvaluationRecord[],
-  leftRunId: string,
-  rightRunId: string
-): EvaluationRecord | null {
-  const evaluation = evaluations.find((evaluation) =>
-    _isSameRunPair(evaluation, leftRunId, rightRunId)
-  );
-  if (!evaluation) {
-    return null;
-  }
-  if (
-    evaluation.leftRunId === leftRunId &&
-    evaluation.rightRunId === rightRunId
-  ) {
-    return evaluation;
-  }
-  return {
-    ...evaluation,
-    leftRunId,
-    rightRunId,
-    verdict: _flipEvaluationVerdict(evaluation.verdict),
-  };
-}
-
-/** Treat a comparison as the same pair even when the current A/B order flips. */
-function _isSameRunPair(
-  evaluation: EvaluationRecord,
-  leftRunId: string,
-  rightRunId: string
-): boolean {
-  return (
-    (evaluation.leftRunId === leftRunId &&
-      evaluation.rightRunId === rightRunId) ||
-    (evaluation.leftRunId === rightRunId && evaluation.rightRunId === leftRunId)
-  );
-}
-
-/** Convert a stored verdict into the currently displayed A/B orientation. */
-function _flipEvaluationVerdict(
-  verdict: EvaluationRecord["verdict"]
-): EvaluationRecord["verdict"] {
-  if (verdict === "leftBetter") {
-    return "rightBetter";
-  }
-  if (verdict === "rightBetter") {
-    return "leftBetter";
-  }
-  return verdict;
-}

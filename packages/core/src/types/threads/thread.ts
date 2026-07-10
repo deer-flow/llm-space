@@ -127,8 +127,9 @@ const THREAD_FIELDS = {
 };
 
 /**
- * A completed-run snapshot of a thread. It intentionally excludes `runHistory`
- * so persisted run history cannot recursively contain itself.
+ * A completed-run snapshot of a thread. It intentionally excludes run and
+ * evaluation metadata so persisted run history cannot recursively contain
+ * itself or pin mutable evaluation definitions.
  */
 export const ThreadSnapshot = Type.Object(THREAD_FIELDS);
 export type ThreadSnapshot = Static<typeof ThreadSnapshot>;
@@ -163,6 +164,65 @@ export const ThreadRunSnapshot = Type.Object({
 });
 export type ThreadRunSnapshot = Static<typeof ThreadRunSnapshot>;
 
+/** One ordered dimension in a reusable manual evaluation rubric. */
+export const ThreadEvaluationCriterion = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  description: Type.Optional(Type.String()),
+});
+export type ThreadEvaluationCriterion = Static<
+  typeof ThreadEvaluationCriterion
+>;
+
+/** A reusable, thread-owned manual evaluation rubric definition. */
+export const ThreadEvaluationRubric = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  criteria: Type.Array(ThreadEvaluationCriterion, {
+    minItems: 2,
+    maxItems: 6,
+  }),
+  revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  createdAt: Type.Number(),
+  updatedAt: Type.Number(),
+});
+export type ThreadEvaluationRubric = Static<typeof ThreadEvaluationRubric>;
+
+/** Immutable rubric structure copied into a saved evaluation. */
+export const ThreadEvaluationRubricSnapshot = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  criteria: Type.Array(ThreadEvaluationCriterion, {
+    minItems: 2,
+    maxItems: 6,
+  }),
+  revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+});
+export type ThreadEvaluationRubricSnapshot = Static<
+  typeof ThreadEvaluationRubricSnapshot
+>;
+
+/** A single criterion score for one run. Higher is better. */
+export const ThreadEvaluationCriterionScore = Type.Object({
+  criterionId: Type.String(),
+  score: Type.Integer({ minimum: 1, maximum: 5 }),
+});
+export type ThreadEvaluationCriterionScore = Static<
+  typeof ThreadEvaluationCriterionScore
+>;
+
+/** All criterion scores assigned to one stable run ID. */
+export const ThreadEvaluationRunScores = Type.Object({
+  runId: Type.String(),
+  scores: Type.Array(ThreadEvaluationCriterionScore, {
+    minItems: 2,
+    maxItems: 6,
+  }),
+});
+export type ThreadEvaluationRunScores = Static<
+  typeof ThreadEvaluationRunScores
+>;
+
 export const ThreadEvaluationVerdict = Type.Union([
   Type.Literal("leftBetter"),
   Type.Literal("rightBetter"),
@@ -175,7 +235,7 @@ export type ThreadEvaluationVerdict = Static<typeof ThreadEvaluationVerdict>;
 /**
  * A manual evaluation verdict comparing two durable run snapshots.
  */
-export const ThreadEvaluation = Type.Object({
+const THREAD_EVALUATION_FIELDS = {
   /**
    * Stable ID for updating this evaluation record.
    */
@@ -210,7 +270,32 @@ export const ThreadEvaluation = Type.Object({
    * Epoch milliseconds when the evaluation was last updated.
    */
   updatedAt: Type.Number(),
+};
+
+const ThreadLegacyEvaluation = Type.Object({
+  ...THREAD_EVALUATION_FIELDS,
+  rubric: Type.Optional(Type.Never()),
+  runScores: Type.Optional(Type.Never()),
 });
+
+const ThreadStructuredEvaluation = Type.Object({
+  ...THREAD_EVALUATION_FIELDS,
+
+  /** Immutable rubric structure used by this evaluation. */
+  rubric: ThreadEvaluationRubricSnapshot,
+
+  /** Complete per-run criterion scores for `rubric`, keyed by stable run ID. */
+  runScores: Type.Array(ThreadEvaluationRunScores, {
+    minItems: 2,
+    maxItems: 2,
+  }),
+});
+
+/** A legacy overall verdict or a complete structured manual evaluation. */
+export const ThreadEvaluation = Type.Union([
+  ThreadLegacyEvaluation,
+  ThreadStructuredEvaluation,
+]);
 export type ThreadEvaluation = Static<typeof ThreadEvaluation>;
 
 /**
@@ -229,6 +314,9 @@ export const Thread = Type.Object({
    * Manual evaluations created by comparing durable run snapshots.
    */
   evaluations: Type.Optional(Type.Array(ThreadEvaluation)),
+
+  /** Reusable manual evaluation rubrics owned by this thread. */
+  evaluationRubrics: Type.Optional(Type.Array(ThreadEvaluationRubric)),
 });
 export type Thread = Static<typeof Thread>;
 

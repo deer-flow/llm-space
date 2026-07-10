@@ -112,7 +112,7 @@ The core value of LLM Space is not just "getting one conversation to run". It le
 - Change the System Prompt to iterate Agent behavior quickly.
 - Change User Messages and Assistant Messages to reproduce experiment conditions.
 - Change Tool Call arguments or responses to validate errors, edge cases, and different tool outputs.
-- Compare run history and evaluation results to decide which version is better.
+- Compare run history with reusable evaluation rubrics, per-criterion scores, and an explicit score delta to decide which version is better.
 
 This is Agent debugging in LLM Space: turn an Agent run into observable, editable, replayable context.
 
