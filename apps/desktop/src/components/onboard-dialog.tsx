@@ -191,7 +191,7 @@ export function OnboardDialog({
                   </DialogClose>
                 )}
                 <Button
-                  className="h-11 rounded-2xl border border-white/20 bg-white/10! px-8 backdrop-blur-xs"
+                  className="h-11 rounded-2xl border border-white/20 bg-white/10! px-8 text-white backdrop-blur-xs"
                   variant="outline"
                   size="lg"
                   onClick={handleLearnMore}
