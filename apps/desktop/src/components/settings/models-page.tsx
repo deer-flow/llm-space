@@ -615,7 +615,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           {!isBuiltin && (
             <>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">Name</label>
+                <span className="text-sm font-medium">Name</span>
                 <Input
                   defaultValue={provider.name}
                   placeholder="Custom provider"
@@ -625,7 +625,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">API type</label>
+                <span className="text-sm font-medium">API type</span>
                 <Select
                   value={apiValue}
                   onValueChange={(value) =>
@@ -652,7 +652,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
 
           {!isBuiltin && (
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Icon</label>
+              <span className="text-sm font-medium">Icon</span>
               <div className="flex items-center gap-2">
                 <ProviderAvatar
                   id={provider.id}
@@ -707,7 +707,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           {isBuiltin ? (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Custom base URL</label>
+                <span className="text-sm font-medium">Custom base URL</span>
                 <Switch
                   aria-label={
                     baseUrlEnabled
@@ -735,7 +735,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Base URL</label>
+              <span className="text-sm font-medium">Base URL</span>
               <Input
                 required
                 defaultValue={provider.baseUrl ?? ""}
@@ -906,7 +906,7 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium">Custom headers</label>
+      <span className="text-sm font-medium">Custom headers</span>
       {rows.map((row, index) => (
         <div key={index} className="flex items-center gap-2">
           <Input
