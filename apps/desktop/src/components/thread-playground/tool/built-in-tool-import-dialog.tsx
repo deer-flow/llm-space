@@ -52,7 +52,11 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
   "present_files",
 ]);
 
-const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search"]);
+const WEB_TOOL_NAMES = new Set([
+  "web_fetch",
+  "web_search",
+  "weather_report",
+]);
 
 function _BuiltInToolImportDialog({
   existingToolNames,
