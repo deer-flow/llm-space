@@ -33,7 +33,7 @@ import {
 } from "./custom-provider-api";
 
 const DEFAULT_CONTEXT_WINDOW = 262144;
-const DEFAULT_MAX_TOKENS = 262144;
+const DEFAULT_MAX_TOKENS = 131072;
 
 interface FormState {
   id: string;
