@@ -12,7 +12,7 @@ export const ARK_CODING_PLAN_MODELS = {
     reasoning: true,
     input: ["text", "image"],
     contextWindow: 262144,
-    maxTokens: 262144,
+    maxTokens: 131072,
     compat: {
       supportsDeveloperRole: false,
       thinkingFormat: "deepseek",
@@ -33,7 +33,7 @@ export const ARK_CODING_PLAN_MODELS = {
     reasoning: true,
     input: ["text", "image"],
     contextWindow: 262144,
-    maxTokens: 262144,
+    maxTokens: 131072,
     compat: {
       supportsDeveloperRole: false,
       thinkingFormat: "deepseek",
@@ -130,7 +130,7 @@ export const ARK_CODING_PLAN_MODELS = {
     reasoning: true,
     input: ["text", "image"],
     contextWindow: 262144,
-    maxTokens: 262144,
+    maxTokens: 131072,
     compat: {
       supportsDeveloperRole: false,
       thinkingFormat: "deepseek",
