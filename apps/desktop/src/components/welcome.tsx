@@ -74,7 +74,7 @@ export function Welcome({
         <EmptyContent className="flex-row justify-center gap-2">
           <Button onClick={onNewStarter}>
             <SparklesIcon />
-            Start from Example
+            Start from examples
           </Button>
           <Button variant="outline" onClick={onNewFile}>
             <PlusIcon />
