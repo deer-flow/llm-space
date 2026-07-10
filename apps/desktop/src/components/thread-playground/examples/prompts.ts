@@ -142,15 +142,15 @@ const HELLO_WORLD_BUILT_IN_TOOLS: Tool[] = [
     type: "builtin",
     name: "weather_report",
     icon: "cloud-sun",
-    description: "Get today's weather report for a city.",
+    description: "Get today's weather report for a location.",
     strict: true,
     parameters: {
       type: "object",
-      required: ["city"],
+      required: ["location"],
       properties: {
-        city: {
+        location: {
           type: "string",
-          description: "The city to get today's weather report for.",
+          description: "The location to get today's weather report for.",
         },
       },
       additionalProperties: false,

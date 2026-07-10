@@ -342,15 +342,15 @@ export const weatherReportTool: BuiltinTool = {
   type: "builtin",
   name: "weather_report",
   icon: "cloud-sun",
-  description: "Get today's weather report for a city.",
+  description: "Get today's weather report for a location.",
   strict: true,
   parameters: {
     type: "object",
-    required: ["city"],
+    required: ["location"],
     properties: {
-      city: {
+      location: {
         type: "string",
-        description: "The city to get today's weather report for.",
+        description: "The location to get today's weather report for.",
       },
     },
     additionalProperties: false,
@@ -378,14 +378,14 @@ function _getWeatherDescription(data: WttrResponse): string {
   return "Unknown";
 }
 
-export async function weather_report(city: string): Promise<WeatherReport> {
-  const normalizedCity = city.trim();
-  if (!normalizedCity) {
-    throw new Error("city is required.");
+export async function weather_report(location: string): Promise<WeatherReport> {
+  const normalizedLocation = location.trim();
+  if (!normalizedLocation) {
+    throw new Error("location is required.");
   }
-  const location = _encodeWttrCity(normalizedCity);
+  const encodedLocation = _encodeWttrCity(normalizedLocation);
 
-  const res = await fetch(`https://wttr.in/${location}?format=j1&lang=en`, {
+  const res = await fetch(`https://wttr.in/${encodedLocation}?format=j1&lang=en`, {
     headers: {
       Accept: "application/json",
       "Accept-Language": "en",
@@ -405,7 +405,7 @@ export async function weather_report(city: string): Promise<WeatherReport> {
   }
 
   return {
-    city: normalizedCity,
+    city: normalizedLocation,
     date: today.date,
     weather: _getWeatherDescription(data),
     temperature: {
@@ -436,7 +436,7 @@ export const webBuiltInTools = [
   {
     tool: weatherReportTool,
     async execute(args: Record<string, unknown>) {
-      return weather_report(_requireString(args, "city"));
+      return weather_report(_requireString(args, "location"));
     },
   },
 ];
