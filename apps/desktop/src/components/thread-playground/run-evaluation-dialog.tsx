@@ -5,6 +5,7 @@ import { format } from "timeago.js";
 
 import { cn } from "@/lib/utils";
 
+import { ConfirmDialog } from "../confirm-dialog";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -20,6 +21,7 @@ import { RunEvaluationScorecard } from "./run-evaluation-scorecard";
 import {
   completeRunScores,
   initialRubricForEvaluation,
+  requiresScoreRemovalConfirmation,
   scoreDraftFromEvaluation,
   scoreDraftForRubricChange,
   type EvaluationScoreDraft,
@@ -94,6 +96,7 @@ export function RunEvaluationDialog({
   const [selectedRubric, setSelectedRubric] =
     useState<EvaluationRubricSnapshot | null>(null);
   const [scoreDraft, setScoreDraft] = useState<EvaluationScoreDraft>({});
+  const [removeScoresOpen, setRemoveScoresOpen] = useState(false);
 
   const [prevOpen, setPrevOpen] = useState(false);
   const identity = `${leftRun?.id ?? ""}:${rightRun?.id ?? ""}:${evaluation?.id ?? ""}`;
@@ -108,6 +111,7 @@ export function RunEvaluationDialog({
     setInspectingRun(null);
     setRubricEditorOpen(false);
     setEditingRubric(null);
+    setRemoveScoresOpen(false);
     if (open) {
       const preferredRubric = preferredRubricId
         ? rubrics.find((rubric) => rubric.id === preferredRubricId)
@@ -157,7 +161,7 @@ export function RunEvaluationDialog({
     setSelectedRubric(rubric);
   };
 
-  const handleSave = () => {
+  const persistEvaluation = () => {
     if (!leftRun || !rightRun || !verdict) {
       return;
     }
@@ -181,6 +185,14 @@ export function RunEvaluationDialog({
     }
     toast.success("Evaluation saved");
     onOpenChange(false);
+  };
+
+  const handleSave = () => {
+    if (requiresScoreRemovalConfirmation(evaluation, selectedRubric)) {
+      setRemoveScoresOpen(true);
+      return;
+    }
+    persistEvaluation();
   };
 
   const dialogTitle = inspectingRun
@@ -334,6 +346,18 @@ export function RunEvaluationDialog({
           </div>
         )}
       </DialogContent>
+      <ConfirmDialog
+        open={removeScoresOpen}
+        onOpenChange={setRemoveScoresOpen}
+        title="Remove rubric scores?"
+        description="Saving without a rubric permanently removes the saved rubric snapshot and all criterion scores from this evaluation. This cannot be undone."
+        confirmLabel="Remove scores and save"
+        dimBackground={false}
+        onConfirm={() => {
+          setRemoveScoresOpen(false);
+          persistEvaluation();
+        }}
+      />
     </Dialog>
   );
 }

@@ -15,6 +15,14 @@ export function initialRubricForEvaluation(
   return evaluation ? (evaluation.rubric ?? null) : preferredRubric;
 }
 
+/** Confirm before replacing persisted structured evidence with a legacy record. */
+export function requiresScoreRemovalConfirmation(
+  evaluation: EvaluationRecord | null,
+  nextRubric: EvaluationRubricSnapshot | null
+): boolean {
+  return Boolean(evaluation?.rubric && !nextRubric);
+}
+
 /** Most recently used available rubric, falling back to the newest definition. */
 export function preferredEvaluationRubricId(
   evaluations: EvaluationRecord[],
@@ -134,6 +142,13 @@ export function scoreDraftForRubricChange(
   runIds: string[],
   savedEvaluation?: EvaluationRecord | null
 ): EvaluationScoreDraft {
+  if (
+    nextRubric &&
+    previousRubric?.id === nextRubric.id &&
+    previousRubric.revision === nextRubric.revision
+  ) {
+    return reconcileScoreDraft(draft, nextRubric, runIds);
+  }
   if (
     nextRubric &&
     savedEvaluation?.rubric?.id === nextRubric.id &&

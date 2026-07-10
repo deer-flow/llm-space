@@ -7,6 +7,7 @@ import {
   findEvaluationForPair,
   initialRubricForEvaluation,
   preferredEvaluationRubricId,
+  requiresScoreRemovalConfirmation,
   scoreDraftForRubricChange,
 } from "./run-evaluation-utils";
 import type {
@@ -115,6 +116,12 @@ describe("evaluation rubric selection", () => {
       )
     ).toBe(RUBRIC.id);
   });
+
+  test("confirms only when removing scores from a structured evaluation", () => {
+    expect(requiresScoreRemovalConfirmation(EVALUATION, null)).toBe(true);
+    expect(requiresScoreRemovalConfirmation(EVALUATION, RUBRIC)).toBe(false);
+    expect(requiresScoreRemovalConfirmation(null, null)).toBe(false);
+  });
 });
 
 describe("evaluation score derivation", () => {
@@ -196,6 +203,24 @@ describe("evaluation score derivation", () => {
       )
     ).toEqual({
       "run-a": { correctness: 5, clarity: 3 },
+      "run-b": { correctness: 3, clarity: 3 },
+    });
+  });
+
+  test("preserves draft scores when the rubric revision is unchanged", () => {
+    expect(
+      scoreDraftForRubricChange(
+        {
+          "run-a": { correctness: 4, clarity: 3 },
+          "run-b": { correctness: 3, clarity: 3 },
+        },
+        RUBRIC,
+        RUBRIC,
+        ["run-a", "run-b"],
+        EVALUATION
+      )
+    ).toEqual({
+      "run-a": { correctness: 4, clarity: 3 },
       "run-b": { correctness: 3, clarity: 3 },
     });
   });
