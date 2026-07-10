@@ -113,7 +113,7 @@ Before proceeding to content generation, verify:
 "[topic] statistics"
 "[topic] expert interview"
 
-# Use temporal qualifiers — always use the ACTUAL current year from <current_date>
+# Use temporal qualifiers — always use the ACTUAL current year from <current-date>
 "[topic] 2026"   # ← replace with real current year, never hardcode a past year
 "[topic] latest"
 "[topic] recent developments"
@@ -121,9 +121,9 @@ Before proceeding to content generation, verify:
 
 ### Temporal Awareness
 
-**Always check `<current_date>` in your context before forming ANY search query.**
+**Always check `<current-date>` in your context before forming ANY search query.**
 
-`<current_date>` gives you the full date: year, month, day, and weekday (e.g. `2026-02-28, Saturday`). Use the right level of precision depending on what the user is asking:
+`<current-date>` gives you the full date: year, month, day, and weekday (e.g. `2026-02-28, Saturday`). Use the right level of precision depending on what the user is asking:
 
 | User intent | Temporal precision needed | Example query |
 |---|---|---|
