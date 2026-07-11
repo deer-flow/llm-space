@@ -35,6 +35,9 @@ import { createStore, useStore, type StoreApi } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/shallow";
 
+import { createFrameThrottle } from "@/lib/frame-throttle";
+
+import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
 import { aggregateMessageUsage } from "../token-usage";
 import {
   createMessagePromptVariablePlaceKey,
@@ -941,38 +944,18 @@ export function createThreadStore(
           // A failed run is never recorded in the run history.
           let failed = false;
 
-          // Coalesce live-preview updates to at most one per animation frame.
-          // A fast stream delivers a burst of events that the transport drains
-          // synchronously; calling set() on every one fires a synchronous
-          // useSyncExternalStore re-render per event within a single microtask
-          // chain, which never crosses the task boundary React uses to reset
-          // its nested-update counter — tripping "Maximum update depth
-          // exceeded". Batching by frame also lets the UI paint between chunks.
-          const canRaf = typeof requestAnimationFrame === "function";
-          let previewFrame: number | null = null;
-          const flushPreview = () => {
-            previewFrame = null;
-            if (!isActiveRun()) {
-              return;
-            }
-            set({ streamingMessage });
-          };
-          const schedulePreview = () => {
-            if (!isActiveRun()) {
-              return;
-            }
-            if (!canRaf) {
+          // Throttle live-preview updates (frame-aligned, at most one per
+          // PREVIEW_THROTTLE_MS) — see createFrameThrottle for why per-event
+          // set() calls are unsafe and re-rendering the growing document per
+          // frame is too expensive.
+          const {
+            schedule: schedulePreview,
+            cancel: cancelPreview,
+          } = createFrameThrottle(() => {
+            if (isActiveRun()) {
               set({ streamingMessage });
-              return;
             }
-            previewFrame ??= requestAnimationFrame(flushPreview);
-          };
-          const cancelPreview = () => {
-            if (previewFrame !== null) {
-              cancelAnimationFrame(previewFrame);
-              previewFrame = null;
-            }
-          };
+          }, PREVIEW_THROTTLE_MS);
 
           const finalizeActiveRun = () => {
             if (!isActiveRun()) {

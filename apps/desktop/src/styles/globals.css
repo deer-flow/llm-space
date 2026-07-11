@@ -5,12 +5,17 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Compositor-only (`transform`): scaling beats animating `width`, which
+     relayouts the skeleton line every frame. The origin lives in the
+     keyframes so consumers can't forget it. */
   @keyframes skeleton-extending {
     0% {
-      width: 0%;
+      transform: scaleX(0);
+      transform-origin: left;
     }
     100% {
-      width: 90%;
+      transform: scaleX(1);
+      transform-origin: left;
     }
   }
   --animate-skeleton-extending: skeleton-extending 2s ease-in-out infinite;

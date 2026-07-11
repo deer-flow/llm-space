@@ -1,5 +1,6 @@
 import { type Extension } from "@codemirror/state";
 import CodeMirror, {
+  ExternalChange,
   type BasicSetupOptions,
   type ReactCodeMirrorRef,
 } from "@uiw/react-codemirror";
@@ -56,6 +57,12 @@ export interface CodeEditorProps {
    */
   plain?: boolean;
   language?: "markdown" | "json";
+  /**
+   * The value is a live streaming preview: syntax highlighting is skipped
+   * (restored by whatever renders the settled value — the streamed message
+   * commits into a fresh editor) and content sniffing is pinned so mid-stream
+   * chunks can't reconfigure the editor.
+   */
   streaming?: boolean;
   value: string;
   readonly?: boolean;
@@ -102,6 +109,9 @@ function _CodeEditor(
 
   const detectLanguage = useCallback(
     (text: string): "markdown" | "json" => {
+      // While streaming, the extensions memo overrides the language to "none";
+      // this branch only pins the detection *state* so a JSON-looking chunk
+      // can't flip `detectedLanguage` (and reconfigure the editor) mid-stream.
       if (streaming) {
         return "markdown";
       }
@@ -140,10 +150,31 @@ function _CodeEditor(
   );
 
   useEffect(() => {
-    if (!isFocusedRef.current || readonly) {
-      setDraftValue(value, true);
-      committedRef.current = value;
+    if (isFocusedRef.current && !readonly) {
+      return;
     }
+    // Once the view exists, dispatch external values directly instead of via
+    // the `value` prop — react-codemirror applies prop updates as a full-
+    // document replace (reparse + native selection resync), which saturates
+    // the main thread on streamed replies growing every frame. `ExternalChange`
+    // stops react-codemirror from echoing the change back through `onChange`,
+    // and the untouched `syncedValue` now only seeds the initial document.
+    const view = cmRef.current?.view;
+    if (!view) {
+      setDraftValue(value, true);
+    } else if (value !== draftRef.current) {
+      const previous = draftRef.current;
+      const docLength = view.state.doc.length;
+      view.dispatch({
+        changes:
+          docLength === previous.length && value.startsWith(previous)
+            ? { from: docLength, insert: value.slice(previous.length) }
+            : { from: 0, to: docLength, insert: value },
+        annotations: ExternalChange.of(true),
+      });
+      setDraftValue(value);
+    }
+    committedRef.current = value;
   }, [value, readonly, setDraftValue]);
 
   const commit = useCallback(() => {
@@ -231,9 +262,17 @@ function _CodeEditor(
     [commit, onKeyDown]
   );
 
+  // While streaming, skip the language extension entirely: highlighting a
+  // growing document re-parses the trailing block on every appended chunk
+  // (O(paragraph) per frame — a major source of long frames), for colors the
+  // reader barely sees mid-stream. Same editor, same layout; the committed
+  // message (or the first post-stream update) brings the highlighting back.
   const extensions = useMemo(
-    () => [...createExtensions(detectedLanguage), ...(extraExtensions ?? [])],
-    [detectedLanguage, extraExtensions]
+    () => [
+      ...createExtensions(streaming ? "none" : detectedLanguage),
+      ...(extraExtensions ?? []),
+    ],
+    [detectedLanguage, extraExtensions, streaming]
   );
   return (
     <div
