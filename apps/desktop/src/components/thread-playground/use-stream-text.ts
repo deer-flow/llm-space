@@ -11,8 +11,11 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createRpcTransport } from "@/client/rpc-transport";
+import { createFrameThrottle } from "@/lib/frame-throttle";
 
 import { useDefaultTextGenerationModel } from "../model-provider";
+
+import { PREVIEW_THROTTLE_MS } from "./streaming-preview";
 
 // One transport for the app: stream agent runs over Electrobun RPC to the bun
 // process. It multiplexes concurrent runs by internal `streamId`, so a single
@@ -109,32 +112,20 @@ export function useStreamText({
     setError(null);
     setStreaming(true);
 
-    // Coalesce text updates to at most one per animation frame: the transport
-    // drains a burst of events synchronously, and calling set() per event trips
-    // React's "Maximum update depth exceeded" (see thread-store.ts run()).
-    const canRaf = typeof requestAnimationFrame === "function";
-    let previewFrame: number | null = null;
-    let pendingText = "";
-    const flushPreview = () => {
-      previewFrame = null;
+    let streamingMessage: AssistantMessage | null = null;
+    let content: ReducedMessageContent[] = [];
+    const lastText = () => {
+      const parts = streamingMessage?.content;
+      return parts?.[parts.length - 1]?.text ?? "";
+    };
+
+    // Throttle text updates (frame-aligned, at most one per
+    // PREVIEW_THROTTLE_MS) — see createFrameThrottle.
+    const preview = createFrameThrottle(() => {
       if (controllerRef.current === controller) {
-        setText(pendingText);
+        setText(lastText());
       }
-    };
-    const schedulePreview = (next: string) => {
-      pendingText = next;
-      if (!canRaf) {
-        flushPreview();
-        return;
-      }
-      previewFrame ??= requestAnimationFrame(flushPreview);
-    };
-    const cancelPreview = () => {
-      if (previewFrame !== null && canRaf) {
-        cancelAnimationFrame(previewFrame);
-        previewFrame = null;
-      }
-    };
+    }, PREVIEW_THROTTLE_MS);
 
     const context = {
       systemPrompt,
@@ -160,8 +151,6 @@ export function useStreamText({
       },
     };
 
-    let streamingMessage: AssistantMessage | null = null;
-    let content: ReducedMessageContent[] = [];
     try {
       const response = streamThread(
         { context, model: runModel },
@@ -174,24 +163,20 @@ export function useStreamText({
         }
         streamingMessage = reduced.message;
         content = reduced.content;
-        schedulePreview(
-          streamingMessage.content[streamingMessage.content.length - 1]
-            ?.text ?? ""
-        );
+        preview.schedule();
       }
     } catch (e) {
       if (!controller.signal.aborted) {
-        cancelPreview();
+        preview.cancel();
         if (controllerRef.current === controller) {
           setError(e instanceof Error ? e.message : String(e));
         }
       }
     } finally {
-      cancelPreview();
+      preview.cancel();
       if (controllerRef.current === controller) {
         // Emit the final text directly so a dropped frame can't leave it stale.
-        const finalContent = streamingMessage?.content;
-        setText(finalContent?.[finalContent.length - 1]?.text ?? "");
+        setText(lastText());
         setStreaming(false);
         controllerRef.current = null;
       }
