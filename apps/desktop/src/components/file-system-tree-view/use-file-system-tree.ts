@@ -149,6 +149,14 @@ function _createThreadFromPromptExample(
   };
 }
 
+/** A name collision surfaced by {@link FileSystemTree.move}. */
+export interface MoveConflict {
+  /** The colliding base name in the destination directory. */
+  name: string;
+  /** Whether the existing entry being overwritten is a directory. */
+  isDir: boolean;
+}
+
 export interface FileSystemTree {
   /** Cached listing for each loaded directory path. */
   nodesByPath: Map<string, FileNode[]>;
@@ -183,8 +191,18 @@ export interface FileSystemTree {
   duplicate: (path: string) => Promise<string | null>;
   /** Reveal a file/directory in the OS file manager (Finder/Explorer). */
   reveal: (path: string) => Promise<void>;
-  /** Move into `destDir`; resolves to the new path, or null on no-op/error. */
-  move: (src: string, destDir: string) => Promise<string | null>;
+  /**
+   * Move into `destDir`; resolves to the new path, or null on no-op/error/cancel.
+   * When an entry of the same name already exists in `destDir`, `confirmOverwrite`
+   * is consulted — resolving `false` cancels the move, `true` replaces the
+   * existing entry (moved to the trash first). Without a callback, a collision
+   * cancels.
+   */
+  move: (
+    src: string,
+    destDir: string,
+    opts?: { confirmOverwrite?: (info: MoveConflict) => Promise<boolean> }
+  ) => Promise<string | null>;
   /** Rename within the same directory; resolves to the new path, or null. */
   rename: (path: string, newBase: string) => Promise<string | null>;
 }
@@ -413,7 +431,11 @@ export function useFileSystemTree(): FileSystemTree {
   }, []);
 
   const move = useCallback(
-    async (src: string, destDir: string): Promise<string | null> => {
+    async (
+      src: string,
+      destDir: string,
+      opts?: { confirmOverwrite?: (info: MoveConflict) => Promise<boolean> }
+    ): Promise<string | null> => {
       if (!src) return null;
       if (isSelfOrDescendant(src, destDir)) {
         toast.error("Cannot move a folder into itself.");
@@ -427,6 +449,26 @@ export function useFileSystemTree(): FileSystemTree {
       const srcKey = fsKeys.ls(srcParent);
       const destKey = fsKeys.ls(destDir);
 
+      // Detect a name collision up front (from a fresh listing, not the possibly
+      // stale cache) and confirm the overwrite before touching anything — an
+      // unconfirmed clash would otherwise silently replace the existing entry.
+      let overwrite = false;
+      try {
+        const destNodes = await localFs.ls(destDir);
+        const clash = destNodes.find((n) => n.name === name);
+        if (clash) {
+          const confirmed = await opts?.confirmOverwrite?.({
+            name,
+            isDir: clash.type === "directory",
+          });
+          if (!confirmed) return null;
+          overwrite = true;
+        }
+      } catch (err) {
+        toast.error((err as Error).message);
+        return null;
+      }
+
       await Promise.all([
         qc.cancelQueries({ queryKey: srcKey }),
         qc.cancelQueries({ queryKey: destKey }),
@@ -435,7 +477,8 @@ export function useFileSystemTree(): FileSystemTree {
       const prevDest = qc.getQueryData<FileNode[]>(destKey);
       const moved = prevSrc?.find((n) => n.path === src);
 
-      // Optimistically remove from the source and add to the destination.
+      // Optimistically remove from the source and add to the destination,
+      // dropping any same-named entry there (the one being overwritten).
       if (prevSrc) {
         qc.setQueryData<FileNode[]>(
           srcKey,
@@ -445,12 +488,20 @@ export function useFileSystemTree(): FileSystemTree {
       if (moved && prevDest) {
         qc.setQueryData<FileNode[]>(
           destKey,
-          sortNodes([...prevDest, { ...moved, path: dest, name }])
+          sortNodes([
+            ...prevDest.filter((n) => n.name !== name),
+            { ...moved, path: dest, name },
+          ])
         );
       }
 
       let ok = true;
       try {
+        // Replacing an existing entry: send it to the trash first, so the move
+        // succeeds for directories too (rename onto a non-empty dir fails).
+        if (overwrite) {
+          await localFs.rm(dest);
+        }
         await localFs.mv(src, dest);
       } catch (err) {
         // Roll back.

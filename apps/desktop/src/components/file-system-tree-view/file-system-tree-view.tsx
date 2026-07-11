@@ -40,7 +40,7 @@ import { useFullScreen } from "@/lib/use-full-screen";
 import { cn } from "@/lib/utils";
 
 import { NodeActions, RootActions } from "./node-actions";
-import { useFileSystemTree } from "./use-file-system-tree";
+import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
 
 /** What the OS calls its trash, for the delete-confirmation copy. */
 const TRASH_NAME =
@@ -85,6 +85,11 @@ function _FileSystemTreeView({
 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // A pending drag-drop name collision awaiting the user's overwrite decision.
+  // `resolve` is the promise gate handed to `move`'s `confirmOverwrite`.
+  const [overwriteConflict, setOverwriteConflict] = useState<
+    (MoveConflict & { resolve: (overwrite: boolean) => void }) | null
+  >(null);
   // Path of a just-created node we want to expand-to, scroll to, and rename
   // once its parent's listing has loaded.
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
@@ -316,8 +321,14 @@ function _FileSystemTreeView({
 
   function onDocumentDrag(source: TreeDataItem, target: TreeDataItem) {
     // Only directories and the root drop-zone are droppable, so the target is
-    // always a directory ("" = root).
-    void move(source.id, target.id).then((to) => {
+    // always a directory ("" = root). On a name collision, `move` pauses on
+    // `confirmOverwrite` while we surface the overwrite dialog.
+    void move(source.id, target.id, {
+      confirmOverwrite: (info) =>
+        new Promise<boolean>((resolve) => {
+          setOverwriteConflict({ ...info, resolve });
+        }),
+    }).then((to) => {
       if (to) onMove?.(source.id, to);
     });
   }
@@ -446,6 +457,40 @@ function _FileSystemTreeView({
               if (ok) onRemove?.(path);
             });
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!overwriteConflict}
+        onOpenChange={(open) => {
+          // Any dismissal (cancel, Esc, outside click) declines the overwrite.
+          if (!open && overwriteConflict) {
+            overwriteConflict.resolve(false);
+            setOverwriteConflict(null);
+          }
+        }}
+        title={
+          <>
+            Replace &ldquo;
+            {overwriteConflict
+              ? overwriteConflict.isDir
+                ? overwriteConflict.name
+                : overwriteConflict.name.replace(/\.json$/, "")
+              : ""}
+            &rdquo;?
+          </>
+        }
+        description={
+          overwriteConflict
+            ? `${overwriteConflict.isDir ? "A folder" : "A thread"} with this name already exists here. Replacing it moves the existing ${
+                overwriteConflict.isDir ? "folder" : "thread"
+              } to the ${TRASH_NAME}.`
+            : undefined
+        }
+        confirmLabel="Replace"
+        onConfirm={() => {
+          overwriteConflict?.resolve(true);
+          setOverwriteConflict(null);
         }}
       />
     </div>
