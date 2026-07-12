@@ -43,7 +43,17 @@ Set-Content -Path $userDataSentinel -Value "must survive uninstall"
 
 Write-Host "== silent install: $installer =="
 $install = Start-Process -FilePath (Resolve-Path $installer) -ArgumentList "/S" -Wait -PassThru
-Assert-True ($install.ExitCode -eq 0) "silent install exit code 0 (got $($install.ExitCode))"
+if ($install.ExitCode -ne 0) {
+  # The installer persists the extractor's output here when extraction fails.
+  $failLog = Join-Path $env:TEMP "llm-space-install-fail.log"
+  if (Test-Path $failLog) {
+    Write-Host "---- extractor log ----"
+    Get-Content $failLog | Write-Host
+    Write-Host "---- end extractor log ----"
+  }
+  throw "silent install exited with $($install.ExitCode)"
+}
+Write-Host "ok: silent install exit code 0"
 
 # Updater path contract: the in-app updater hardcodes this layout and restarts
 # bin\launcher.exe from it — any deviation silently breaks self-update.

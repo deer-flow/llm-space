@@ -122,11 +122,13 @@ Section "Install"
   SetOutPath "$PLUGINSDIR\payload"
   File "/oname=${PAYLOAD_STEM}.exe" "${PAYLOAD_SETUP_EXE}"
 
-  # Run the extractor hidden (nsExec captures the console) as the install
+  # Run the extractor hidden (nsExec runs cmd with no window) as the install
   # engine — it owns the updater-contract layout, including
-  # self-extraction\<hash>.tar for future delta updates.
+  # self-extraction\<hash>.tar for future delta updates. Its output goes to a
+  # log file: nsExec's log window is invisible in silent installs, and the
+  # extractor's diagnostics are the only clue when it fails.
   DetailPrint "Extracting ${APP_NAME} ${VERSION}..."
-  nsExec::ExecToLog '"$PLUGINSDIR\payload\${PAYLOAD_STEM}.exe"'
+  nsExec::ExecToLog '"$SYSDIR\cmd.exe" /C ""$PLUGINSDIR\payload\${PAYLOAD_STEM}.exe" > "$PLUGINSDIR\extractor.log" 2>&1"'
   Pop $0
   DetailPrint "Extractor finished (exit code $0)"
 
@@ -134,9 +136,12 @@ Section "Install"
   # code alone is not trustworthy — verify the contract path materialized.
   IfFileExists "${LAUNCHER}" extraction_ok
     SetDetailsPrint both
-    DetailPrint "ERROR: ${LAUNCHER} was not created."
+    DetailPrint "ERROR: ${LAUNCHER} was not created (extractor exit code $0)."
+    # $PLUGINSDIR is wiped on exit — persist the extractor log where a human
+    # (or the CI smoke test) can find it.
+    CopyFiles /SILENT "$PLUGINSDIR\extractor.log" "$TEMP\llm-space-install-fail.log"
     SetErrorLevel 2
-    MessageBox MB_ICONSTOP "Installation failed: the application files could not be extracted.$\r$\n$\r$\nExpected launcher at:$\r$\n${LAUNCHER}" /SD IDOK
+    MessageBox MB_ICONSTOP "Installation failed: the application files could not be extracted.$\r$\n$\r$\nExpected launcher at:$\r$\n${LAUNCHER}$\r$\n$\r$\nA log was saved to:$\r$\n$TEMP\llm-space-install-fail.log" /SD IDOK
     Abort "Extraction failed — launcher.exe missing."
   extraction_ok:
 
