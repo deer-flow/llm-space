@@ -220,11 +220,15 @@ jobs:
         if: matrix.os == 'win'
         shell: pwsh
         run: |
-          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            makensis /VERSION
+          } else {
             choco install nsis -y --no-progress
+            # PATH additions only reach later steps; verify via the absolute
+            # path here (build-win-installer.ts also falls back to it).
             Add-Content $env:GITHUB_PATH "C:\Program Files (x86)\NSIS"
+            & "C:\Program Files (x86)\NSIS\makensis.exe" /VERSION
           }
-          makensis /VERSION
 
       # Wrap the electrobun console self-extractor in the GUI installer
       # (shortcuts, Add/Remove Programs entry, uninstaller); see
