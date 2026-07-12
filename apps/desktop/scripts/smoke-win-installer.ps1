@@ -96,8 +96,38 @@ foreach ($exe in "bspatch.exe", "zig-zstd.exe") {
 $bunExe = Join-Path $binDir "bun.exe"
 # DPI manifest: deliberately SYSTEM-aware, not PerMonitorV2 — electrobun's
 # win32 layer cannot rescale webviews mid-flight (VM round-2 regression).
-Assert-True ([bool](Select-String -Path $bunExe -Pattern "dpiAware" -Quiet)) "bun.exe embeds a DPI-aware manifest"
-Assert-True (-not (Select-String -Path $bunExe -Pattern "PerMonitorV2" -Quiet)) "bun.exe manifest is NOT PerMonitorV2 (framework can't rescale webviews)"
+# Extract the actual RT_MANIFEST resource: a whole-binary string grep is
+# unreliable (the bun runtime itself contains "PerMonitorV2" somewhere).
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ManifestReader {
+  [DllImport("kernel32", SetLastError=true, CharSet=CharSet.Unicode)]
+  static extern IntPtr LoadLibraryEx(string path, IntPtr file, uint flags);
+  [DllImport("kernel32")] static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
+  [DllImport("kernel32")] static extern IntPtr LoadResource(IntPtr module, IntPtr res);
+  [DllImport("kernel32")] static extern IntPtr LockResource(IntPtr res);
+  [DllImport("kernel32")] static extern uint SizeofResource(IntPtr module, IntPtr res);
+  [DllImport("kernel32")] static extern bool FreeLibrary(IntPtr module);
+  public static string Read(string path) {
+    IntPtr module = LoadLibraryEx(path, IntPtr.Zero, 0x2); // LOAD_LIBRARY_AS_DATAFILE
+    if (module == IntPtr.Zero) return null;
+    try {
+      IntPtr res = FindResource(module, (IntPtr)1, (IntPtr)24); // id 1, RT_MANIFEST
+      if (res == IntPtr.Zero) return null;
+      uint size = SizeofResource(module, res);
+      byte[] bytes = new byte[size];
+      Marshal.Copy(LockResource(LoadResource(module, res)), bytes, 0, (int)size);
+      return System.Text.Encoding.UTF8.GetString(bytes);
+    } finally { FreeLibrary(module); }
+  }
+}
+"@
+$bunManifest = [ManifestReader]::Read($bunExe)
+Assert-True ($null -ne $bunManifest) "bun.exe embeds an RT_MANIFEST resource"
+Assert-True ($bunManifest -match "<dpiAware[^>]*>\s*true\s*</dpiAware>") "bun.exe manifest declares system DPI awareness"
+Assert-True ($bunManifest -notmatch "PerMonitorV2") "bun.exe manifest is NOT PerMonitorV2 (framework can't rescale webviews)"
+Assert-True ($bunManifest -match "longPathAware") "bun.exe manifest keeps longPathAware (stock bun setting)"
 
 # Icon resources: the taskbar falls back to the window-owning exe's icon.
 # ExtractAssociatedIcon returns Windows' generic exe icon for a resource-less
