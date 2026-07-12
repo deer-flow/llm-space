@@ -7,6 +7,7 @@ import {
   type ThreadContext,
   type ToolCall,
 } from "@llm-space/core";
+import { createMessagePromptVariablePlaceKey } from "@llm-space/core/thread";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,7 +24,6 @@ import { Marker, MarkerContent } from "../../ui/marker";
 import { ShineBorder } from "../../ui/shine-border";
 import { Skeleton } from "../../ui/skeleton";
 import { useThreadStore, useThreadStoreActions } from "../stores";
-import { createMessagePromptVariablePlaceKey } from "../variable/prompt-variables";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ImageContentList } from "./image-content-view";

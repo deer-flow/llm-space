@@ -3,7 +3,7 @@ import type {
   EvaluationRubricRecord,
   EvaluationRubricSnapshot,
   EvaluationRunScores,
-} from "./stores";
+} from "@llm-space/core/thread";
 
 export type EvaluationScoreDraft = Record<string, Record<string, number>>;
 

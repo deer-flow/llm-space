@@ -1,10 +1,13 @@
-import type { Thread } from "@llm-space/core";
 import { describe, expect, test } from "bun:test";
 
+import type { Thread } from "../types";
+
 import {
+  MAX_RUN_HISTORY,
   normalizeEvaluationRubrics,
   normalizeEvaluations,
   normalizeRunHistory,
+  recordRun,
   snapshotEvaluationRubric,
   upsertEvaluation,
   upsertEvaluationRubric,
@@ -12,7 +15,7 @@ import {
   type EvaluationRecord,
   type EvaluationRubricRecord,
   type RunSnapshot,
-} from "./thread-history";
+} from "./history";
 
 const RUNS: RunSnapshot[] = [
   { id: "run-a", thread: {}, timestamp: 1 },
@@ -158,6 +161,49 @@ describe("evaluation rubrics", () => {
       })
     ).toBeNull();
   });
+
+  test("rejects an injected id already owned by another rubric", () => {
+    const existing = { ..._createRubric(), id: "rubric-existing" };
+    expect(
+      upsertEvaluationRubric(
+        [existing],
+        { name: "New rubric", criteria: CRITERIA },
+        20,
+        { id: existing.id }
+      )
+    ).toBeNull();
+  });
+});
+
+describe("run history persistence", () => {
+  test("backfills stable ids and retains only the newest runs", () => {
+    const raw = Array.from({ length: MAX_RUN_HISTORY + 2 }, (_, index) => ({
+      thread: { title: `Run ${index}` },
+      timestamp: index + 0.9,
+    }));
+    const normalized = normalizeRunHistory(raw);
+
+    expect(normalized).toHaveLength(MAX_RUN_HISTORY);
+    expect(normalized[0]?.id).toBe("run-2-2");
+    expect(normalized.at(-1)?.id).toBe(
+      `run-${MAX_RUN_HISTORY + 1}-${MAX_RUN_HISTORY + 1}`
+    );
+  });
+
+  test("does not append beyond the run cap", () => {
+    const runs = Array.from({ length: MAX_RUN_HISTORY }, (_, index) => ({
+      id: `run-${index}`,
+      thread: {},
+      timestamp: index,
+    }));
+    const next = recordRun(runs, { title: "Latest" }, 100, {
+      id: "run-latest",
+    });
+
+    expect(next).toHaveLength(MAX_RUN_HISTORY);
+    expect(next[0]?.id).toBe("run-1");
+    expect(next.at(-1)?.id).toBe("run-latest");
+  });
 });
 
 describe("structured evaluation persistence", () => {
@@ -243,6 +289,24 @@ describe("structured evaluation persistence", () => {
       createdAt: original.createdAt,
       updatedAt: 30,
     });
+  });
+
+  test("rejects an injected id already owned by another evaluation", () => {
+    const existing = _legacyEvaluation();
+    const runs = [...RUNS, { id: "run-c", thread: {}, timestamp: 3 }];
+    expect(
+      upsertEvaluation(
+        [existing],
+        runs,
+        {
+          id: existing.id,
+          leftRunId: "run-a",
+          rightRunId: "run-c",
+          verdict: "tie",
+        },
+        40
+      )
+    ).toBeNull();
   });
 
   test("keeps the last valid duplicate run ID and unordered evaluation pair", () => {

@@ -1,3 +1,8 @@
+import type {
+  EvaluationRecord,
+  EvaluationRubricRecord,
+  EvaluationRubricSnapshot,
+} from "@llm-space/core/thread";
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -10,12 +15,6 @@ import {
   requiresScoreRemovalConfirmation,
   scoreDraftForRubricChange,
 } from "./run-evaluation-utils";
-import type {
-  EvaluationRecord,
-  EvaluationRubricRecord,
-  EvaluationRubricSnapshot,
-} from "./stores";
-
 const RUBRIC: EvaluationRubricSnapshot = {
   id: "rubric-1",
   name: "Answer quality",

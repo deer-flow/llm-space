@@ -7,12 +7,12 @@ import type { SkillInfo } from "@/shared/skills";
 
 import { ThreadStoreContext, type ThreadStore } from "../stores";
 
-import { createPromptVariableExtension } from "./prompt-variable-extension";
 import {
-  listEnabledPromptVariableSkills,
   listPromptVariableCompletions,
   resolvePromptVariableValueForPlace,
-} from "./prompt-variables";
+} from "./prompt-variable-display";
+import { createPromptVariableExtension } from "./prompt-variable-extension";
+import { listEnabledPromptVariableSkills } from "./prompt-variable-skills";
 
 // Skills settings are global (not per-thread), so the resolved list is cached
 // module-wide with a short TTL and in-flight de-dupe. Repeated hovers over a

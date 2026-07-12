@@ -1,4 +1,5 @@
 import { uuid, type Message } from "@llm-space/core";
+import { SYSTEM_PROMPT_PLACE_KEY } from "@llm-space/core/thread";
 import { memo, useCallback, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
@@ -10,7 +11,6 @@ import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
-import { SYSTEM_PROMPT_PLACE_KEY } from "../variable/prompt-variables";
 import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
 
 interface SystemPromptEditorProps {

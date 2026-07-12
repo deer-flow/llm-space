@@ -28,6 +28,33 @@ import {
   type ToolCall,
   type UserMessage,
 } from "@llm-space/core";
+import {
+  aggregateMessageUsage,
+  createMessagePromptVariablePlaceKey,
+  createToolResultPromptVariablePlaceKey,
+  DEFAULT_VARIABLE_VARIANT_NAME,
+  ensureThreadVariableState,
+  normalizeEvaluationRubrics,
+  normalizeEvaluations,
+  normalizePromptVariableState,
+  normalizeRunHistory,
+  PromptVariableError,
+  recordRun,
+  removePromptVariableSnapshotPlaces,
+  renderThreadPromptVariables,
+  replaceThreadPromptVariableReferences,
+  SYSTEM_PROMPT_PLACE_KEY,
+  upsertEvaluation,
+  upsertEvaluationRubric,
+  withPromptVariableSnapshot,
+  withRunMetadata,
+  type EvaluationRecord,
+  type EvaluationRubricInput,
+  type EvaluationRubricRecord,
+  type EvaluationRubricSnapshot,
+  type EvaluationRunScores,
+  type RunSnapshot,
+} from "@llm-space/core/thread";
 import { createContext, useContext } from "react";
 import { toast } from "sonner";
 import { Compile } from "typebox/compile";
@@ -38,39 +65,14 @@ import { useShallow } from "zustand/shallow";
 import { createFrameThrottle } from "@/lib/frame-throttle";
 
 import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
-import { aggregateMessageUsage } from "../token-usage";
-import {
-  createMessagePromptVariablePlaceKey,
-  createToolResultPromptVariablePlaceKey,
-  DEFAULT_VARIABLE_VARIANT_NAME,
-  ensureThreadVariableState,
-  normalizePromptVariableState,
-  PromptVariableError,
-  removePromptVariableSnapshotPlaces,
-  replaceThreadPromptVariableReferences,
-  renderThreadPromptVariables,
-  SYSTEM_PROMPT_PLACE_KEY,
-} from "../variable/prompt-variables";
+import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
 import {
   createInitialHistory,
-  normalizeEvaluationRubrics,
-  normalizeEvaluations,
-  normalizeRunHistory,
-  recordRun,
   recordSnapshot,
   redo as redoHistory,
   undo as undoHistory,
-  upsertEvaluation,
-  upsertEvaluationRubric,
-  withRunMetadata,
   type ChangeHistory,
-  type EvaluationRecord,
-  type EvaluationRubricInput,
-  type EvaluationRubricRecord,
-  type EvaluationRubricSnapshot,
-  type EvaluationRunScores,
-  type RunSnapshot,
 } from "./thread-history";
 
 const toolValidator = Compile(ToolSchema);
@@ -233,19 +235,6 @@ export function createThreadStore(
 
       const patchContext = (partial: Partial<Thread["context"]>) => {
         patchThread({ context: { ...get().thread.context, ...partial } });
-      };
-
-      const threadWithPromptSnapshot = (
-        thread: Thread,
-        snapshot: ThreadContext["snapshot"]
-      ): Thread => {
-        const context: ThreadContext = { ...(thread.context ?? {}) };
-        if (snapshot === undefined) {
-          delete context.snapshot;
-        } else {
-          context.snapshot = snapshot;
-        }
-        return { ...thread, context };
       };
 
       const getVariableState = () =>
@@ -891,6 +880,7 @@ export function createThreadStore(
           try {
             const rendered = await renderThreadPromptVariables({
               context: { ...get().thread.context, messages },
+              loadSkills: listEnabledPromptVariableSkills,
             });
             preparedContext = rendered.context;
             promptSnapshot = rendered.snapshot;
@@ -977,7 +967,7 @@ export function createThreadStore(
             // thread is unchanged.
             const finalThread = get().thread;
             if (sawEvent && !failed) {
-              const threadWithSnapshot = threadWithPromptSnapshot(
+              const threadWithSnapshot = withPromptVariableSnapshot(
                 finalThread,
                 promptSnapshot
               );
@@ -1048,6 +1038,7 @@ export function createThreadStore(
                         messages,
                         snapshot: promptSnapshot,
                       },
+                      loadSkills: listEnabledPromptVariableSkills,
                     })
                   ).context;
               preparedContext = null;

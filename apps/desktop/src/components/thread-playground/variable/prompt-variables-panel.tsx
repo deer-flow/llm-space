@@ -6,6 +6,13 @@ import type {
   ThreadVariable,
 } from "@llm-space/core";
 import {
+  DEFAULT_VARIABLE_VARIANT_NAME,
+  formatCurrentDateVariable,
+  formatSkillsVariable,
+  normalizePromptVariableState,
+  VARIABLE_NAME_RE,
+} from "@llm-space/core/thread";
+import {
   BracesIcon,
   CalendarDaysIcon,
   ListFilterIcon,
@@ -42,16 +49,11 @@ import { Textarea } from "../../ui/textarea";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import {
-  DEFAULT_VARIABLE_VARIANT_NAME,
-  formatCurrentDateVariable,
-  formatSkillsVariable,
-  listEnabledPromptVariableSkills,
-  normalizePromptVariableState,
   PROMPT_DATE_FORMATS,
   PROMPT_SKILLS_FORMATS,
   PROMPT_SKILLS_INDENTS,
-  VARIABLE_NAME_RE,
-} from "./prompt-variables";
+} from "./prompt-variable-options";
+import { listEnabledPromptVariableSkills } from "./prompt-variable-skills";
 import { SkillSelectionDialog } from "./skill-selection-dialog";
 
 interface PromptVariablesPanelProps {

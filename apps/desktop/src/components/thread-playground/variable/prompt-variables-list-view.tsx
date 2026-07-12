@@ -5,6 +5,10 @@ import type {
   ThreadVariable,
 } from "@llm-space/core";
 import {
+  DEFAULT_VARIABLE_VARIANT_NAME,
+  normalizePromptVariableState,
+} from "@llm-space/core/thread";
+import {
   BracesIcon,
   CalendarDaysIcon,
   CopyIcon,
@@ -22,11 +26,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "../../ui/button";
 import { useThreadStore } from "../stores";
 
-import {
-  DEFAULT_VARIABLE_VARIANT_NAME,
-  normalizePromptVariableState,
-  PROMPT_DATE_FORMATS,
-} from "./prompt-variables";
+import { PROMPT_DATE_FORMATS } from "./prompt-variable-options";
 import { PromptVariablesDialog } from "./prompt-variables-dialog";
 import type { PromptVariableSelection } from "./prompt-variables-panel";
 

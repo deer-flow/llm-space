@@ -4,6 +4,7 @@ import {
   type ToolCall,
   type ToolCallInput,
 } from "@llm-space/core";
+import { createToolResultPromptVariablePlaceKey } from "@llm-space/core/thread";
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -26,7 +27,6 @@ import { CodeEditor, type CodeEditorProps } from "../../code-editor";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { useThreadStoreActions } from "../stores";
-import { createToolResultPromptVariablePlaceKey } from "../variable/prompt-variables";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ToolCallInputView } from "./tool-call-input-view";

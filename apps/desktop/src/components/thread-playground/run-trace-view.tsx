@@ -1,3 +1,4 @@
+import { usageForRun, type RunSnapshot } from "@llm-space/core/thread";
 import { memo } from "react";
 import { format } from "timeago.js";
 
@@ -10,8 +11,6 @@ import {
   runModelLabel,
   summarizeRun,
 } from "./run-history-utils";
-import type { RunSnapshot } from "./stores";
-import { usageForRun } from "./token-usage";
 
 function _RunTraceView({
   className,

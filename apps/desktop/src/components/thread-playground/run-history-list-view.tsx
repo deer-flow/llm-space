@@ -1,4 +1,8 @@
 import {
+  type EvaluationRecord,
+  type RunSnapshot,
+} from "@llm-space/core/thread";
+import {
   ArrowLeftIcon,
   CheckIcon,
   ChevronLeftIcon,
@@ -42,7 +46,6 @@ import {
 } from "./run-history-utils";
 import { RunTraceView } from "./run-trace-view";
 import { useThreadStore, useThreadStoreActions } from "./stores";
-import type { EvaluationRecord, RunSnapshot } from "./stores";
 
 const VERDICT_LABELS: Record<EvaluationRecord["verdict"], string> = {
   leftBetter: "Run A Better",
