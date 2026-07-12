@@ -41,33 +41,41 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP/rg/$zip/rg.exe" resources/win/rg.exe
           & resources/win/rg.exe --version
 
-      # electrobun's createTar shells out to `tar -cf` with no format flag, and
-      # the runner's bsdtar defaults to "restricted pax": any path >100 chars
-      # (e.g. hashed font assets) gets a pax extended header, which electrobun's
-      # zig self-extractor cannot parse (TarUnsupportedFileType — install dies
-      # mid-extraction). Force ustar, whose prefix field covers those paths and
-      # which the extractor fully supports; build-win-installer.ts validates
-      # the payload tar so any regression fails loudly at packaging time.
-      - name: Force ustar tar creation (extractor compat)
-        shell: pwsh
-        run: |
-          $shimDir = Join-Path $env:RUNNER_TEMP "tar-ustar-shim"
-          New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-          $lines = @(
-            '@echo off',
-            'if "%~1"=="-cf" (',
-            '  C:\Windows\System32\tar.exe --format=ustar %*',
-            ') else (',
-            '  C:\Windows\System32\tar.exe %*',
-            ')'
-          )
-          Set-Content -Path (Join-Path $shimDir "tar.cmd") -Value $lines -Encoding ascii
-          Add-Content $env:GITHUB_PATH $shimDir
-
+      # The tar shim below: electrobun's createTar shells out to `tar -cf`
+      # with no format flag, and under a bash step Git's GNU tar wins the
+      # inherited PATH — any path >100 chars (e.g. hashed font assets) then
+      # gets a GNU/pax long-name entry, which electrobun's zig self-extractor
+      # cannot parse (TarUnsupportedFileType — install dies mid-extraction).
+      # Force ustar via bsdtar: its prefix field covers those paths and the
+      # extractor fully supports it. The shim is prepended in-step because
+      # mise-action exports a full `Path` env that clobbers GITHUB_PATH
+      # additions; it ships both an extensionless sh script (sh/bash
+      # resolution) and a .cmd (cmd/PATHEXT resolution) so it wins regardless
+      # of which shell bun's execSync uses. build-win-installer.ts validates
+      # the payload tar, so any regression fails at packaging time.
       - name: Build (unsigned canary)
         working-directory: apps/desktop
         shell: bash
-        run: bun run build:canary
+        run: |
+          SHIM="$(cygpath -u "$RUNNER_TEMP")/tar-ustar-shim"
+          mkdir -p "$SHIM"
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'case "$1" in' \
+            '  -cf) exec /c/Windows/System32/tar.exe --format=ustar "$@" ;;' \
+            '  *) exec /c/Windows/System32/tar.exe "$@" ;;' \
+            'esac' > "$SHIM/tar"
+          chmod +x "$SHIM/tar"
+          printf '%s\r\n' \
+            '@echo off' \
+            'if "%~1"=="-cf" (' \
+            '  C:\Windows\System32\tar.exe --format=ustar %*' \
+            ') else (' \
+            '  C:\Windows\System32\tar.exe %*' \
+            ')' > "$SHIM/tar.cmd"
+          export PATH="$SHIM:$PATH"
+          tar --version
+          bun run build:canary
 
       - name: Validate artifacts
         shell: pwsh

@@ -155,33 +155,22 @@ jobs:
           printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
           echo "ELECTROBUN_APPLEAPIKEYPATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      # electrobun's createTar shells out to `tar -cf` with no format flag, and
-      # the runner's bsdtar defaults to "restricted pax": any path >100 chars
-      # (e.g. hashed font assets) gets a pax extended header, which electrobun's
-      # zig self-extractor cannot parse (TarUnsupportedFileType — install dies
-      # mid-extraction). Force ustar, whose prefix field covers those paths and
-      # which the extractor fully supports; build-win-installer.ts validates
-      # the payload tar so any regression fails loudly at packaging time.
-      - name: Force ustar tar creation (Windows extractor compat)
-        if: matrix.os == 'win'
-        shell: pwsh
-        run: |
-          $shimDir = Join-Path $env:RUNNER_TEMP "tar-ustar-shim"
-          New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-          $lines = @(
-            '@echo off',
-            'if "%~1"=="-cf" (',
-            '  C:\Windows\System32\tar.exe --format=ustar %*',
-            ') else (',
-            '  C:\Windows\System32\tar.exe %*',
-            ')'
-          )
-          Set-Content -Path (Join-Path $shimDir "tar.cmd") -Value $lines -Encoding ascii
-          Add-Content $env:GITHUB_PATH $shimDir
-
       # Windows ships unsigned for now (SmartScreen shows "More info → Run
       # anyway" on first install; auto-updates never re-prompt). SignPath
       # Foundation OSS signing lands with the first stable Windows release.
+      #
+      # The Windows tar shim: electrobun's createTar shells out to `tar -cf`
+      # with no format flag, and under a bash step Git's GNU tar wins the
+      # inherited PATH — any path >100 chars (e.g. hashed font assets) then
+      # gets a GNU/pax long-name entry, which electrobun's zig self-extractor
+      # cannot parse (TarUnsupportedFileType — install dies mid-extraction).
+      # Force ustar via bsdtar: its prefix field covers those paths and the
+      # extractor fully supports it. The shim is prepended in-step because
+      # mise-action exports a full `Path` env that clobbers GITHUB_PATH
+      # additions; it ships both an extensionless sh script (sh/bash
+      # resolution) and a .cmd (cmd/PATHEXT resolution) so it wins regardless
+      # of which shell bun's execSync uses. build-win-installer.ts validates
+      # the payload tar, so any regression fails at packaging time.
       - name: Build, sign and notarize
         working-directory: apps/desktop
         shell: bash
@@ -189,7 +178,28 @@ jobs:
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.ASC_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
-        run: bun run "build:$CHANNEL"
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            SHIM="$(cygpath -u "$RUNNER_TEMP")/tar-ustar-shim"
+            mkdir -p "$SHIM"
+            printf '%s\n' \
+              '#!/bin/sh' \
+              'case "$1" in' \
+              '  -cf) exec /c/Windows/System32/tar.exe --format=ustar "$@" ;;' \
+              '  *) exec /c/Windows/System32/tar.exe "$@" ;;' \
+              'esac' > "$SHIM/tar"
+            chmod +x "$SHIM/tar"
+            printf '%s\r\n' \
+              '@echo off' \
+              'if "%~1"=="-cf" (' \
+              '  C:\Windows\System32\tar.exe --format=ustar %*' \
+              ') else (' \
+              '  C:\Windows\System32\tar.exe %*' \
+              ')' > "$SHIM/tar.cmd"
+            export PATH="$SHIM:$PATH"
+            tar --version
+          fi
+          bun run "build:$CHANNEL"
 
       - name: Smoke test the signed app
         if: matrix.os == 'macos'
