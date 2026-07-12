@@ -15,7 +15,9 @@
  *   (installer/win-app.manifest; system-aware — see its header for why not
  *   PerMonitorV2).
  * - launcher.exe (shortcut target, Explorer/file-properties surface) ships
- *   with no resources at all — same icon/VERSIONINFO/manifest treatment.
+ *   with no resources at all — same icon/VERSIONINFO/manifest treatment, with
+ *   the version resource injected from scratch (see win-version-info.ts;
+ *   rcedit cannot add version strings to a resource-less PE).
  * - bspatch.exe / zig-zstd.exe appear in Task Manager during self-updates —
  *   VERSIONINFO so they read as LLM Space helpers, not anonymous tools.
  *
@@ -27,14 +29,16 @@
  * writes; both-or-neither, else taskbar matching regresses); WebView2's
  * msedgewebview2.exe children (Microsoft's runtime, expected).
  *
- * Invoked by scripts/post-build.ts with electrobun's hook env; a bun.exe
- * branding failure fails the build; the smoke test asserts every statically
- * checkable surface.
+ * Invoked by scripts/post-build.ts with electrobun's hook env; any branding
+ * failure fails the build (the smoke test hard-asserts every statically
+ * checkable surface, so failing here is just earlier and clearer).
  */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { rcedit } from "rcedit";
+
+import { buildVersionResource, writeVersionResource } from "./win-version-info";
 
 const APP_DISPLAY_NAME = "LLM Space";
 const PUBLISHER = "DeerFlow";
@@ -74,9 +78,15 @@ const brandedStrings = {
   CompanyName: PUBLISHER,
 };
 
-// The window-owning, socket-listening process: branding it is the point.
-// Its icon is what the taskbar and alt-tab show (no window-class icon is set
-// by the native layer, so Windows falls back to the exe resource).
+function fail(name: string, error: unknown): never {
+  console.error(`brand-win-binaries: ${name} branding failed: ${String(error)}`);
+  process.exit(1);
+}
+
+// bun.exe — the window-owning, socket-listening process: branding it is the
+// point. Its icon is what the taskbar and alt-tab show (no window-class icon
+// is set by the native layer, so Windows falls back to the exe resource). It
+// ships WITH a version resource, so rcedit's string edits work here.
 try {
   await rcedit(join(binDir, "bun.exe"), {
     "version-string": brandedStrings,
@@ -86,44 +96,40 @@ try {
   });
   console.info("brand-win-binaries: bun.exe — branded (icon + VERSIONINFO + DPI manifest)");
 } catch (error) {
-  console.error(`brand-win-binaries: bun.exe branding failed: ${String(error)}`);
-  process.exit(1);
+  fail("bun.exe", error);
 }
 
-// The remaining exes are cosmetic surfaces (Explorer, file properties, Task
-// Manager during updates) — best-effort, never fail the build over them.
-const cosmetic: [string, Parameters<typeof rcedit>[1]][] = [
-  [
-    "launcher.exe",
-    {
-      "version-string": brandedStrings,
-      "product-version": productVersion,
-      icon,
-      "application-manifest": manifest,
-    },
-  ],
-  [
-    "bspatch.exe",
-    {
-      "version-string": { ...brandedStrings, FileDescription: `${APP_DISPLAY_NAME} update helper` },
-      "product-version": productVersion,
-    },
-  ],
-  [
-    "zig-zstd.exe",
-    {
-      "version-string": { ...brandedStrings, FileDescription: `${APP_DISPLAY_NAME} update helper` },
-      "product-version": productVersion,
-    },
-  ],
+// launcher.exe / bspatch.exe / zig-zstd.exe ship with NO resources at all,
+// and rcedit cannot ADD version strings to a resource-less PE (silent no-op
+// — see win-version-info.ts). Inject a complete VS_VERSIONINFO first; then
+// rcedit (which re-serializes the strings it loaded) adds icon + manifest.
+const helperStrings = {
+  ...brandedStrings,
+  FileDescription: `${APP_DISPLAY_NAME} update helper`,
+};
+const resourceless: [string, Record<string, string>, boolean][] = [
+  ["launcher.exe", brandedStrings, true],
+  ["bspatch.exe", helperStrings, false],
+  ["zig-zstd.exe", helperStrings, false],
 ];
-for (const [name, options] of cosmetic) {
+for (const [name, strings, wantsIconAndManifest] of resourceless) {
+  const exePath = join(binDir, name);
   try {
-    await rcedit(join(binDir, name), options);
+    writeVersionResource(
+      exePath,
+      buildVersionResource(productVersion, {
+        ...strings,
+        FileVersion: productVersion,
+        ProductVersion: version,
+        OriginalFilename: name,
+        InternalName: name.replace(/\.exe$/, ""),
+      })
+    );
+    if (wantsIconAndManifest) {
+      await rcedit(exePath, { icon, "application-manifest": manifest });
+    }
     console.info(`brand-win-binaries: ${name} — branded`);
   } catch (error) {
-    console.warn(
-      `brand-win-binaries: ${name} branding skipped (non-fatal): ${String(error)}`
-    );
+    fail(name, error);
   }
 }
