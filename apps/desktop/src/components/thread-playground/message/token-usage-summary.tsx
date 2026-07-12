@@ -1,4 +1,5 @@
 import type { ModelUsage } from "@llm-space/core";
+import { hasModelUsage } from "@llm-space/core/thread";
 import { GaugeIcon } from "lucide-react";
 import { memo, useMemo } from "react";
 
@@ -8,7 +9,6 @@ import { Tooltip } from "../../tooltip";
 import {
   formatCompactUsage,
   formatUsageSummary,
-  hasModelUsage,
   usageBreakdownRows,
 } from "../token-usage";
 

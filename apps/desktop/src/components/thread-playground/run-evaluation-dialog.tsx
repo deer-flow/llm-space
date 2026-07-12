@@ -1,3 +1,12 @@
+import {
+  snapshotEvaluationRubric,
+  type EvaluationRecord,
+  type EvaluationRubricInput,
+  type EvaluationRubricRecord,
+  type EvaluationRubricSnapshot,
+  type EvaluationRunScores,
+  type RunSnapshot,
+} from "@llm-space/core/thread";
 import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -34,15 +43,6 @@ import {
   summarizeRun,
 } from "./run-history-utils";
 import { RunTraceView } from "./run-trace-view";
-import {
-  snapshotEvaluationRubric,
-  type EvaluationRecord,
-  type EvaluationRubricInput,
-  type EvaluationRubricRecord,
-  type EvaluationRubricSnapshot,
-  type EvaluationRunScores,
-  type RunSnapshot,
-} from "./stores";
 
 const VERDICT_OPTIONS: {
   value: EvaluationRecord["verdict"];

@@ -1,5 +1,15 @@
 import { uuid } from "@llm-space/core";
 import {
+  MAX_CRITERION_DESCRIPTION_LENGTH,
+  MAX_CRITERION_NAME_LENGTH,
+  MAX_RUBRIC_CRITERIA,
+  MAX_RUBRIC_NAME_LENGTH,
+  MIN_RUBRIC_CRITERIA,
+  type EvaluationCriterion,
+  type EvaluationRubricInput,
+  type EvaluationRubricRecord,
+} from "@llm-space/core/thread";
+import {
   ArrowDownIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
@@ -14,17 +24,6 @@ import { Tooltip } from "../tooltip";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-
-import {
-  MAX_CRITERION_DESCRIPTION_LENGTH,
-  MAX_CRITERION_NAME_LENGTH,
-  MAX_RUBRIC_CRITERIA,
-  MAX_RUBRIC_NAME_LENGTH,
-  MIN_RUBRIC_CRITERIA,
-  type EvaluationCriterion,
-  type EvaluationRubricInput,
-  type EvaluationRubricRecord,
-} from "./stores";
 
 function _emptyCriterion(): EvaluationCriterion {
   return { id: uuid(), name: "" };

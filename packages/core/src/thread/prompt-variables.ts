@@ -13,18 +13,21 @@ import type {
   ThreadVariable,
   ThreadVariableVariants,
   ThreadVariables,
-} from "@llm-space/core";
+} from "../types";
 
-import { getSkillsSettings, listSkills } from "@/client/skills";
-import type { SkillInfo } from "@/shared/skills";
+export interface PromptSkill {
+  name: string;
+  description: string;
+  path: string;
+}
+
+export interface PromptVariableRenderOptions {
+  loadSkills?: () => Promise<PromptSkill[]>;
+  now?: () => Date;
+}
 
 export type PromptDateVariableFormat = ThreadCurrentDateVariableFormat;
 export type PromptSkillsVariableFormat = ThreadSkillsVariableFormat;
-
-export interface PromptVariableFormatOption<T extends string> {
-  value: T;
-  label: string;
-}
 
 export interface PromptVariableState {
   variables: ThreadVariables;
@@ -49,20 +52,6 @@ export interface RenderedThreadPromptVariables {
   variables: RenderedPromptVariable[];
 }
 
-/** A selectable variable for `{{`-triggered autocompletion. */
-export interface PromptVariableCompletion {
-  name: string;
-  /** One-line value preview for the dropdown (skills show a short summary). */
-  hint: string;
-}
-
-/** Outcome of resolving a single `{{name}}` placeholder for hover display. */
-export type VariableResolution =
-  | { status: "ok"; value: string }
-  | { status: "empty"; name: string } // defined but blank/whitespace value
-  | { status: "unknown"; name: string } // neither built-in nor a custom key
-  | { status: "invalid"; name: string }; // name fails VARIABLE_NAME_RE
-
 export class PromptVariableError extends Error {
   constructor(message: string) {
     super(message);
@@ -72,21 +61,6 @@ export class PromptVariableError extends Error {
 
 export const VARIABLE_NAME_PATTERN = "[A-Za-z_][A-Za-z0-9_]*";
 export const VARIABLE_NAME_RE = new RegExp(`^${VARIABLE_NAME_PATTERN}$`);
-
-export const PROMPT_DATE_FORMATS: readonly PromptVariableFormatOption<PromptDateVariableFormat>[] =
-  [
-    { value: "readable-date", label: "Readable date" },
-    { value: "iso-date", label: "ISO date" },
-    { value: "local-date-time", label: "Local date and time" },
-  ];
-
-export const PROMPT_SKILLS_FORMATS: readonly PromptVariableFormatOption<PromptSkillsVariableFormat>[] =
-  [
-    { value: "xml", label: "XML" },
-    { value: "markdown-list", label: "Markdown list" },
-  ];
-
-export const PROMPT_SKILLS_INDENTS = [0, 2, 4] as const;
 
 const DEFAULT_CURRENT_DATE_NAME = "current_date";
 const DEFAULT_SKILLS_NAME = "available_skills";
@@ -190,6 +164,20 @@ export function removePromptVariableSnapshotPlaces(
   return changed ? _buildSnapshot(snapshot, variables) : snapshot;
 }
 
+/** Attach frozen runtime values while preserving the editable thread templates. */
+export function withPromptVariableSnapshot(
+  thread: Thread,
+  snapshot: ThreadContextSnapshot | undefined
+): Thread {
+  const context: ThreadContext = { ...(thread.context ?? {}) };
+  if (snapshot === undefined) {
+    delete context.snapshot;
+  } else {
+    context.snapshot = snapshot;
+  }
+  return { ...thread, context };
+}
+
 /** Return the default built-in variable definitions for a thread. */
 export function createDefaultThreadVariables(): ThreadVariables {
   return {
@@ -266,7 +254,7 @@ export function formatCurrentDateVariable(
 
 /** Format a group of selected skills without inlining their full instructions. */
 export function formatSkillsVariable(
-  skills: SkillInfo[],
+  skills: PromptSkill[],
   variable: ThreadSkillsVariable
 ): string {
   const value =
@@ -277,41 +265,25 @@ export function formatSkillsVariable(
 }
 
 /**
- * List enabled skills across all configured discovery folders, de-duped by
- * name. Reuses the Settings skill model so prompt variables cannot see hidden
- * skills the runtime `skill()` tool would reject.
- */
-export async function listEnabledPromptVariableSkills(): Promise<SkillInfo[]> {
-  const { discoveryPaths } = await getSkillsSettings();
-  const perPath = await Promise.all(
-    discoveryPaths.map((entry) =>
-      listSkills(entry.path).catch((): SkillInfo[] => [])
-    )
-  );
-  const byName = new Map<string, SkillInfo>();
-  for (const skill of perPath.flat()) {
-    if (skill.enabled && !byName.has(skill.name)) {
-      byName.set(skill.name, skill);
-    }
-  }
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
  * Resolve supported prompt variables into the concrete system prompt sent to
  * the model. The caller keeps the stored thread template untouched.
  */
 export async function renderSystemPromptVariables({
   systemPrompt,
   context,
+  loadSkills,
+  now,
 }: {
   systemPrompt: string;
   context?: ThreadContext;
-}): Promise<RenderedSystemPrompt> {
+} & PromptVariableRenderOptions): Promise<RenderedSystemPrompt> {
   const state = normalizePromptVariableState(context);
   _assertValidVariableState(state);
 
-  const renderState = _createPromptVariableRenderState(state);
+  const renderState = _createPromptVariableRenderState(state, {
+    loadSkills,
+    now,
+  });
   const rendered: RenderedPromptVariable[] = [];
   const snapshotVariables: SnapshotVariables = {};
   const output = await _renderTextPromptVariables({
@@ -332,13 +304,18 @@ export async function renderSystemPromptVariables({
  */
 export async function renderThreadPromptVariables({
   context,
+  loadSkills,
+  now,
 }: {
   context: ThreadContext;
-}): Promise<RenderedThreadPromptVariables> {
+} & PromptVariableRenderOptions): Promise<RenderedThreadPromptVariables> {
   const state = normalizePromptVariableState(context);
   _assertValidVariableState(state);
 
-  const renderState = _createPromptVariableRenderState(state);
+  const renderState = _createPromptVariableRenderState(state, {
+    loadSkills,
+    now,
+  });
   const rendered: RenderedPromptVariable[] = [];
   const snapshotVariables = _normalizeSnapshotVariables(
     context.snapshot?.variables
@@ -380,129 +357,13 @@ export async function renderThreadPromptVariables({
   };
 }
 
-/**
- * Resolve one variable by name WITHOUT any async work. Handles currentDate and
- * custom-string variables directly; returns `needsSkills` when the name is a
- * skills built-in so the caller can await the async path only when required.
- * Keeps the common hover (date / custom) fully synchronous.
- */
-export function resolvePromptVariableValueSync(
-  name: string,
-  context: ThreadContext | undefined
-):
-  | VariableResolution
-  | { status: "needsSkills"; variable: ThreadSkillsVariable } {
-  if (!VARIABLE_NAME_RE.test(name)) {
-    return { status: "invalid", name };
-  }
-  const state = normalizePromptVariableState(context);
-  const builtIn = state.variables[name];
-  if (builtIn?.type === "currentDate") {
-    return { status: "ok", value: formatCurrentDateVariable(builtIn.format) };
-  }
-  if (builtIn?.type === "skills") {
-    return { status: "needsSkills", variable: builtIn };
-  }
-  const customValues =
-    state.variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
-  if (!(name in customValues)) {
-    return { status: "unknown", name };
-  }
-  const raw = customValues[name];
-  return raw?.trim() ? { status: "ok", value: raw } : { status: "empty", name };
-}
-
-/**
- * Resolve one variable by name for hover display. Never throws. Mirrors the
- * three branches of the runtime resolver but is lenient (drops missing skills,
- * degrades load failures to `unknown`) since this is display-only. `loadSkills`
- * is injected so callers can share a cached skills list across many hovers.
- */
-export async function resolvePromptVariableValue(
-  name: string,
-  context: ThreadContext | undefined,
-  loadSkills: () => Promise<SkillInfo[]> = listEnabledPromptVariableSkills
-): Promise<VariableResolution> {
-  const fast = resolvePromptVariableValueSync(name, context);
-  if (fast.status !== "needsSkills") {
-    return fast;
-  }
-  try {
-    const all = await loadSkills();
-    const byName = new Map(all.map((skill) => [skill.name, skill]));
-    // An empty selection means "all enabled skills".
-    const selected =
-      fast.variable.skillNames.length === 0
-        ? all
-        : fast.variable.skillNames.flatMap((skillName) => {
-            const skill = byName.get(skillName);
-            return skill ? [skill] : [];
-          });
-    const value = formatSkillsVariable(selected, fast.variable);
-    return value.trim() ? { status: "ok", value } : { status: "empty", name };
-  } catch {
-    return { status: "unknown", name };
-  }
-}
-
-/**
- * Resolve a variable for display at a specific prompt place. Frozen snapshot
- * values take precedence; missing values fall back to the live variable config.
- */
-export async function resolvePromptVariableValueForPlace(
-  name: string,
-  context: ThreadContext | undefined,
-  placeKey: string | undefined,
-  loadSkills: () => Promise<SkillInfo[]> = listEnabledPromptVariableSkills
-): Promise<VariableResolution> {
-  if (!VARIABLE_NAME_RE.test(name)) {
-    return { status: "invalid", name };
-  }
-  const frozen =
-    placeKey === undefined
-      ? undefined
-      : context?.snapshot?.variables?.[placeKey]?.[name];
-  if (frozen !== undefined) {
-    return { status: "ok", value: frozen };
-  }
-  return resolvePromptVariableValue(name, context, loadSkills);
-}
-
-/**
- * List every variable available for `{{`-triggered autocompletion (built-ins +
- * custom), each with a one-line, synchronous value preview. Skills show a short
- * summary rather than their full resolved list (which would require async IO).
- */
-export function listPromptVariableCompletions(
-  context: ThreadContext | undefined
-): PromptVariableCompletion[] {
-  const state = normalizePromptVariableState(context);
-  const items: PromptVariableCompletion[] = [];
-  for (const [name, variable] of Object.entries(state.variables)) {
-    const hint =
-      variable.type === "currentDate"
-        ? formatCurrentDateVariable(variable.format)
-        : variable.skillNames.length === 0
-          ? "All enabled skills"
-          : `${variable.skillNames.length} selected skill${
-              variable.skillNames.length === 1 ? "" : "s"
-            }`;
-    items.push({ name, hint });
-  }
-  const customValues =
-    state.variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
-  for (const [name, value] of Object.entries(customValues)) {
-    items.push({ name, hint: value.trim() ? _singleLine(value) : "(empty)" });
-  }
-  return items.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 type SnapshotVariables = Record<string, Record<string, string>>;
 
 interface PromptVariableRenderState {
   state: PromptVariableState;
-  skills: Map<string, SkillInfo>;
+  skills: Map<string, PromptSkill>;
   loadSkills: () => Promise<void>;
+  now: () => Date;
 }
 
 interface RenderTextPromptVariablesInput {
@@ -634,19 +495,22 @@ function _renamePromptVariableSnapshotReference(
 }
 
 function _createPromptVariableRenderState(
-  state: PromptVariableState
+  state: PromptVariableState,
+  options: PromptVariableRenderOptions
 ): PromptVariableRenderState {
-  const skills = new Map<string, SkillInfo>();
+  const skills = new Map<string, PromptSkill>();
   let loadedSkills: Promise<void> | null = null;
   const loadSkills = async () => {
-    loadedSkills ??= listEnabledPromptVariableSkills().then((items) => {
-      for (const item of items) {
-        skills.set(item.name, item);
+    loadedSkills ??= (options.loadSkills?.() ?? Promise.resolve([])).then(
+      (items) => {
+        for (const item of items) {
+          skills.set(item.name, item);
+        }
       }
-    });
+    );
     await loadedSkills;
   };
-  return { state, skills, loadSkills };
+  return { state, skills, loadSkills, now: options.now ?? (() => new Date()) };
 }
 
 async function _renderMessagesPromptVariables({
@@ -780,17 +644,22 @@ async function _renderTextPromptVariables({
       continue;
     }
     const placeholder = match[0];
-    const name = match[1].trim();
+    const name = match[1]?.trim();
+    if (!name) {
+      continue;
+    }
     // Arbitrary "{{...}}" text can appear in message and tool-result content
     // (e.g. a web-search response). Leave any placeholder whose name isn't a
     // valid variable reference untouched rather than failing the whole run.
     if (!VARIABLE_NAME_RE.test(name)) {
       continue;
     }
-    let value: string | undefined = placeValues[name] ?? frozenPlaceValues[name];
+    let value: string | undefined =
+      placeValues[name] ?? frozenPlaceValues[name];
     if (value === undefined) {
       value = await _renderVariableValue(name, renderState.state, {
         loadSkills: renderState.loadSkills,
+        now: renderState.now,
         skills: renderState.skills,
       });
       // Unknown variable name — keep the original placeholder text as-is.
@@ -972,16 +841,18 @@ async function _renderVariableValue(
   state: PromptVariableState,
   {
     loadSkills,
+    now,
     skills,
   }: {
     loadSkills: () => Promise<void>;
-    skills: Map<string, SkillInfo>;
+    now: () => Date;
+    skills: Map<string, PromptSkill>;
   }
 ): Promise<string | undefined> {
   const builtIn = state.variables[name];
   if (builtIn) {
     if (builtIn.type === "currentDate") {
-      return formatCurrentDateVariable(builtIn.format);
+      return formatCurrentDateVariable(builtIn.format, now());
     }
     await loadSkills();
     // An empty selection means "all enabled skills" — the default that keeps
@@ -1020,7 +891,7 @@ function _assertVariableName(name: string, message: string): void {
   }
 }
 
-function _formatSkillsXml(skills: SkillInfo[]): string {
+function _formatSkillsXml(skills: PromptSkill[]): string {
   return [
     "<available-skills>",
     ...skills.flatMap((skill) => [
@@ -1032,7 +903,7 @@ function _formatSkillsXml(skills: SkillInfo[]): string {
   ].join("\n");
 }
 
-function _formatSkillsMarkdownList(skills: SkillInfo[]): string {
+function _formatSkillsMarkdownList(skills: PromptSkill[]): string {
   return skills
     .map(
       (skill) =>

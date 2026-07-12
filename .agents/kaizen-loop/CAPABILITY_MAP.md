@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-11
-- Map status: refreshed after DI/plugin-readiness V1. The Bun process now has one explicit composition root, deterministic bundled-module lifecycle, and one frozen built-in-tool contribution seam; public or dynamically loaded plugins remain absent.
+- Last updated: 2026-07-12
+- Map status: refreshed after Headless Thread Semantics V1. A dedicated browser-safe `@llm-space/core/thread` entrypoint now owns prompt materialization, usage arithmetic, and persisted run/evaluation lifecycle rules; desktop retains UI/session and host-specific adapters. Public or dynamically loaded plugins remain absent.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -47,7 +47,7 @@
   - Variable Panel V2 screenshot `audits/2026-07-08-191806-variable-panel-v2/06-v2-custom-scenario.png` shows custom variable `customer_profile` under active scenario `scenario_2` with a multiline value.
   - Isolated runtime file `workspace/untitled-3.json` persisted `context.variables.available_skills` with `skillNames`, `format`, and `indent`, plus `context.variableVariants` with `baseline` and `scenario_2` value sets.
   - Live CEF resolver checks rendered `{{available_skills}}`, `{{customer_profile}}`, and `{{system_date}}`, and rejected legacy `{{llm_space.current_date format="default"}}`, empty skill selections, and empty custom values with actionable errors.
-  - `apps/desktop/src/components/thread-playground/prompt-variables.ts` formats date and skill variables, loads enabled skills through existing skill settings, and resolves placeholders.
+  - `packages/core/src/thread/prompt-variables.ts` owns date/skill formatting and placeholder semantics; desktop injects enabled local skills through `variable/prompt-variable-skills.ts`.
   - `apps/desktop/src/components/thread-playground/stores/thread-store.ts` now renders variables before `streamThread()` while run snapshots keep the rendered prompt and the live editor keeps the template.
   - Current screenshot `02-starter-thread-current.png` shows `Start from Example` now opens a prompt-example chooser rather than directly creating a single starter thread.
   - Current screenshot `03-example-thread-opened.png` shows a `general-agent` prompt example opened with a populated system prompt, fallback model, and an empty user message.
@@ -127,6 +127,24 @@
 - Boundary: one thread can run against its selected or fallback model, stream assistant/tool output, abort, and persist completed state.
 - Explicit non-goals: batch runs, scheduled runs, provider health validation.
 - Visible gaps: live-provider continuation after a real paid/provider tool-call turn still needs a bounded smoke check; the global run control remains generic while the message-level continuation flow is specialized.
+
+## Headless Thread Execution And Evaluation
+
+- Status: shipped V1
+- Freshness: confirmed
+- Last checked: 2026-07-12
+- Evidence:
+  - `packages/core/src/types/threads/thread.ts` owns the durable schemas for prompt variables, variable snapshots, run snapshots, evaluation rubrics, scores, and evaluations.
+  - `packages/core/src/client/` owns transport-independent streaming, event reduction, conversion, and run eligibility; `packages/core/src/parsers/` owns native/foreign thread parsing and normalization.
+  - `packages/core/src/thread/` now owns prompt-variable rendering/snapshot semantics, usage validation/arithmetic/fallback, run-history normalization/recording, and rubric/evaluation persistence rules behind `@llm-space/core/thread`.
+  - Desktop imports durable variable behavior directly from core. `variable/prompt-variable-skills.ts` owns enabled local skill discovery, `prompt-variable-options.ts` owns UI labels, and `prompt-variable-display.ts` owns CodeMirror completion/hover presentation; the former mirror façade was deleted. Desktop undo/redo and image-memory policy remain in `stores/thread-history.ts`.
+  - `apps/desktop/src/bun/traces/trace-manager.ts` now uses the core usage aggregators instead of a private duplicate implementation.
+  - The public-entrypoint headless workflow test materializes prompt variables, records two runs with usage, and persists a structured evaluation without desktop imports; frozen prompt bytes and the missing-skill error contract have focused coverage.
+  - All 54 Bun tests, core TypeScript, lint with its one pre-existing warning, and the Vite production build passed on 2026-07-12. Focused tests cover usage compatibility, run caps/fallback IDs, injected-ID collisions, variable normalization, multi-place snapshots, and template-preserving snapshot application. Desktop TypeScript retains the same pre-existing unused `HELLO_WORLD_BUILT_IN_TOOLS` diagnostic.
+  - Real Electrobun CEF loaded the existing configured `GPT-5.3 Codex Spark`, materialized a current-date/skills template, and entered the real run path without prompt/RPC/render errors. The provider then failed with `Unable to connect`, so no completed run was available for live persistence inspection; the temporary test thread was removed.
+- Boundary: a core-only consumer can materialize a variableized Thread with injected skills/time, apply canonical usage semantics, record and normalize bounded runs, and create/update valid rubrics and evaluations. Desktop supplies local skill discovery and owns UI/session behavior.
+- Explicit non-goals: React/Zustand state, CodeMirror completion UI, Electrobun RPC and commands, native menus/windows/updates, desktop analytics, and dynamic third-party plugins do not belong to this capability.
+- Visible gaps: core still contains desktop-specific window-state persistence; the new public entrypoint has no real second product consumer beyond desktop and its headless integration test; a successful live-provider run/reload smoke remains pending because the configured provider was unreachable in this loop.
 
 ## Token Usage Visibility
 

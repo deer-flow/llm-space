@@ -20,7 +20,7 @@ import {
 import type {
   PromptVariableCompletion,
   VariableResolution,
-} from "./prompt-variables";
+} from "./prompt-variable-display";
 
 /**
  * Resolves a `{{name}}` to its display value. May return synchronously (date /
