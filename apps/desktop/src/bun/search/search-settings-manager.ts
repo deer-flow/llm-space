@@ -16,7 +16,7 @@ const VALID_PROVIDERS: readonly SearchProviderId[] = ["firecrawl", "tavily"];
  * web tools' search provider and API keys. Mirrors `ModelManager`'s eager,
  * synchronous load-and-seed pattern.
  */
-class SearchSettingsManager {
+export class SearchSettingsManager {
   private _settings: SearchSettings;
 
   constructor() {
@@ -89,6 +89,3 @@ class SearchSettingsManager {
     };
   }
 }
-
-/** Process-wide singleton owning the search settings config. */
-export const searchSettings = new SearchSettingsManager();

@@ -7,7 +7,8 @@ import {
 } from "@llm-space/core/server";
 import { BrowserWindow, Updater } from "electrobun/bun";
 
-import { mainWindowRPC } from "../rpc";
+import type { Command } from "../../shared/commands";
+import type { MainWindowRPC } from "../rpc";
 
 import { registerMenuActions } from "./menu";
 import { attachWindowStates } from "./window-state";
@@ -32,28 +33,37 @@ async function getMainViewUrl(): Promise<string> {
   return "views://mainview/index.html";
 }
 
-const url = await getMainViewUrl();
-const windowState = await loadWindowState();
-const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
-const savedZoom = getWindowZoom(windowState) ?? 1;
+export async function createMainWindow({
+  rpc,
+  executeCommand,
+}: {
+  rpc: MainWindowRPC;
+  executeCommand: (command: Command, window: BrowserWindow) => void;
+}): Promise<BrowserWindow> {
+  const url = await getMainViewUrl();
+  const windowState = await loadWindowState();
+  const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
+  const savedZoom = getWindowZoom(windowState) ?? 1;
 
-export const mainWindow = new BrowserWindow({
-  title: "LLM Space",
-  url,
-  titleBarStyle: "hiddenInset",
-  rpc: mainWindowRPC,
-  trafficLightOffset: {
-    x: 2,
-    y: 16,
-  },
-  frame: savedFrame,
-});
+  const window = new BrowserWindow({
+    title: "LLM Space",
+    url,
+    titleBarStyle: "hiddenInset",
+    rpc,
+    trafficLightOffset: {
+      x: 2,
+      y: 16,
+    },
+    frame: savedFrame,
+  });
 
-attachWindowStates(mainWindow, {
-  isMaximized: getWindowMaximized(windowState),
-  zoom: savedZoom,
-  onFullScreenChange: (fullScreen) => {
-    mainWindowRPC.send.fullScreenChanged({ fullScreen });
-  },
-});
-registerMenuActions(mainWindow);
+  attachWindowStates(window, {
+    isMaximized: getWindowMaximized(windowState),
+    zoom: savedZoom,
+    onFullScreenChange: (fullScreen) => {
+      rpc.send.fullScreenChanged({ fullScreen });
+    },
+  });
+  registerMenuActions(window, executeCommand);
+  return window;
+}

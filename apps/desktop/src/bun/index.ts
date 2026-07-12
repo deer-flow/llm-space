@@ -6,19 +6,9 @@ import "./env/hydrate";
 import "./workspace/seed";
 // Seed the managed skills folder (before `./app` pulls in the SkillsManager).
 import "./skills/seed";
-import "./app";
-import { app } from "electrobun/bun";
-import { analytics } from "./analytics";
 /* eslint-enable import-x/order */
 
-// Anonymous launch signal. See `shared/analytics.ts` for the privacy contract.
-analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
-
-// Best-effort flush on the real quit path: GUI quits (Cmd+Q, window close) run
-// through Electrobun's `quit()`, which emits `before-quit` - and Electrobun's
-// own SIGINT/SIGTERM handlers call `quit()` too, so this hook covers them all.
-// (Node-style `beforeExit` would never fire here: the PostHog flush-interval
-// timer keeps the event loop alive.)
-app.on("before-quit", () => {
-  void analytics.shutdown();
-});
+// Dynamic import is intentional: environment hydration and seeding must finish
+// before the composition root evaluates manager modules and reads configuration.
+const { startDesktopApp } = await import("./app");
+await startDesktopApp();

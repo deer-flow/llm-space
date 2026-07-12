@@ -2,7 +2,6 @@ import { Updater } from "electrobun/bun";
 
 import type { UpdateMode, UpdateStatus } from "../../shared/updates";
 import { setUpdateReadyInMenu } from "../app/menu";
-import { mainWindowRPC } from "../rpc";
 
 import {
   getLastSeenHash,
@@ -13,157 +12,131 @@ import {
 
 const INITIAL_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60_000;
-// electrobun's applyUpdate quits the process on success, so still being alive
-// after this grace period means the update did not install.
 const APPLY_GRACE_MS = 5_000;
 
-let isCheckInFlight = false;
-// Whether the in-flight pass reports full progress (menu-triggered) or only
-// the final "ready" prompt (background timer).
-let isPassManual = false;
-let lastStatus: UpdateStatus | null = null;
-// The version we launched into after an applyUpdate relaunch, if any — pulled
-// once by the renderer (race-free) to show the "Updated to …" toast.
-let installedVersion: string | null = null;
-let backgroundTimer: ReturnType<typeof setTimeout> | null = null;
-let backgroundInterval: ReturnType<typeof setInterval> | null = null;
-
-function _sendStatus(status: UpdateStatus) {
-  lastStatus = status;
-  mainWindowRPC.send.updateStatusChanged({ status, manual: isPassManual });
+export interface UpdateStatusMessage {
+  status: UpdateStatus;
+  manual: boolean;
 }
 
-/**
- * One check→download pass. Passes are serialized; a manual trigger landing
- * while a background pass is in flight upgrades that pass to manual and
- * replays its latest state, so the menu click gets immediate feedback instead
- * of being silently dropped.
- *
- * Every pass with an update available re-runs `downloadUpdate` — it is cheap
- * when the latest bundle is already on disk, it fetches the newer build when
- * the feed has moved on since a previous download, and it re-arms electrobun's
- * internal `updateReady` flag (which any `checkForUpdate` call resets, and
- * which `applyUpdate` requires). "ready" is therefore only ever reported
- * immediately after a download pass, when a restart is actually possible.
- */
-export async function checkForUpdates(manual: boolean) {
-  if (isCheckInFlight) {
-    if (manual && !isPassManual) {
-      isPassManual = true;
-      if (lastStatus) _sendStatus(lastStatus);
-    }
-    return;
-  }
-  isCheckInFlight = true;
-  isPassManual = manual;
-  try {
-    _sendStatus({ state: "checking" });
-    const info = await Updater.checkForUpdate();
-    if (info.error) {
-      _sendStatus({ state: "error", message: info.error });
+/** Process-scoped updater state and scheduling. */
+export class UpdaterService {
+  private _isCheckInFlight = false;
+  private _isPassManual = false;
+  private _lastStatus: UpdateStatus | null = null;
+  private _installedVersion: string | null = null;
+  private _backgroundTimer: ReturnType<typeof setTimeout> | null = null;
+  private _backgroundInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    private readonly _sendUpdateStatus: (message: UpdateStatusMessage) => void
+  ) {}
+
+  async checkForUpdates(manual: boolean): Promise<void> {
+    if (this._isCheckInFlight) {
+      if (manual && !this._isPassManual) {
+        this._isPassManual = true;
+        if (this._lastStatus) this._sendStatus(this._lastStatus);
+      }
       return;
     }
-    if (!info.updateAvailable) {
-      // Revert a stale "Restart to Update" menu item — the ready build the
-      // renderer's badge tracked may have been rolled back on the feed.
-      setUpdateReadyInMenu(null);
-      const { version } = await Updater.getLocalInfo();
-      _sendStatus({ state: "up-to-date", version });
+    this._isCheckInFlight = true;
+    this._isPassManual = manual;
+    try {
+      this._sendStatus({ state: "checking" });
+      const info = await Updater.checkForUpdate();
+      if (info.error) {
+        this._sendStatus({ state: "error", message: info.error });
+        return;
+      }
+      if (!info.updateAvailable) {
+        setUpdateReadyInMenu(null);
+        const { version } = await Updater.getLocalInfo();
+        this._sendStatus({ state: "up-to-date", version });
+        return;
+      }
+      this._sendStatus({ state: "downloading", version: info.version });
+      await Updater.downloadUpdate();
+      if (!Updater.updateInfo()?.updateReady) {
+        const message =
+          Updater.updateInfo()?.error || "download did not complete";
+        this._sendStatus({ state: "error", message });
+        return;
+      }
+      setUpdateReadyInMenu(info.version);
+      this._sendStatus({ state: "ready", version: info.version });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this._sendStatus({ state: "error", message });
+    } finally {
+      this._isCheckInFlight = false;
+    }
+  }
+
+  async applyUpdateAndRestart(): Promise<void> {
+    try {
+      await Updater.applyUpdate();
+    } catch (error) {
+      this._isPassManual = true;
+      const message = error instanceof Error ? error.message : String(error);
+      this._sendStatus({ state: "error", message });
       return;
     }
-    _sendStatus({ state: "downloading", version: info.version });
-    await Updater.downloadUpdate();
-    if (!Updater.updateInfo()?.updateReady) {
-      const message =
-        Updater.updateInfo()?.error || "download did not complete";
-      _sendStatus({ state: "error", message });
-      return;
-    }
-    setUpdateReadyInMenu(info.version);
-    _sendStatus({ state: "ready", version: info.version });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    _sendStatus({ state: "error", message });
-  } finally {
-    isCheckInFlight = false;
+    setTimeout(() => void this.checkForUpdates(true), APPLY_GRACE_MS);
   }
-}
 
-/**
- * Quit, swap in the downloaded bundle and relaunch. electrobun's applyUpdate
- * quits the process on success, so resolving (or throwing) means the install
- * did not happen — e.g. the machine is offline, or the update feed moved on
- * while the "ready" prompt sat open. Fall back to a fresh manual pass so the
- * state re-converges (re-download → new "ready", or a visible error).
- */
-export async function applyUpdateAndRestart() {
-  try {
-    await Updater.applyUpdate();
-  } catch (error) {
-    isPassManual = true;
-    const message = error instanceof Error ? error.message : String(error);
-    _sendStatus({ state: "error", message });
-    return;
+  getInstalledVersion(): string | null {
+    const version = this._installedVersion;
+    this._installedVersion = null;
+    return version;
   }
-  setTimeout(() => void checkForUpdates(true), APPLY_GRACE_MS);
-}
 
-/**
- * The version we just updated into this launch (null if unchanged). Consumed
- * once: a webview reload re-mounts the renderer and re-pulls, so clearing here
- * keeps the "Updated to …" toast to a single show per process (also guards the
- * dev StrictMode double-mount).
- */
-export function getInstalledVersion(): string | null {
-  const version = installedVersion;
-  installedVersion = null;
-  return version;
-}
+  async getUpdateModeSetting(): Promise<UpdateMode> {
+    return getUpdateMode();
+  }
 
-export async function getUpdateModeSetting(): Promise<UpdateMode> {
-  return getUpdateMode();
-}
+  async setUpdateModeSetting(mode: UpdateMode): Promise<void> {
+    await persistUpdateMode(mode);
+    this._applySchedule(mode);
+  }
 
-/** Persist the update mode and re-arm/tear-down the background timers live. */
-export async function setUpdateModeSetting(mode: UpdateMode) {
-  await persistUpdateMode(mode);
-  _applySchedule(mode);
-}
+  async start(): Promise<void> {
+    const { channel, hash, version } = await Updater.getLocalInfo();
+    if (channel === "dev") return;
 
-function _clearSchedule() {
-  if (backgroundTimer) clearTimeout(backgroundTimer);
-  if (backgroundInterval) clearInterval(backgroundInterval);
-  backgroundTimer = null;
-  backgroundInterval = null;
-}
+    const lastSeen = await getLastSeenHash();
+    if (lastSeen && lastSeen !== hash) this._installedVersion = version;
+    if (lastSeen !== hash) await setLastSeenHash(hash);
 
-function _applySchedule(mode: UpdateMode) {
-  _clearSchedule();
-  // Only `automatic` polls; `manual`/`off` rely on the menu item.
-  if (mode !== "automatic") return;
-  backgroundTimer = setTimeout(
-    () => void checkForUpdates(false),
-    INITIAL_CHECK_DELAY_MS
-  );
-  backgroundInterval = setInterval(
-    () => void checkForUpdates(false),
-    CHECK_INTERVAL_MS
-  );
-}
+    this._applySchedule(await getUpdateMode());
+  }
 
-/**
- * Start the updater: detect whether this launch is a just-applied update
- * (bundle hash changed since last launch) and, unless the dev channel or an
- * `off`/`manual` mode says otherwise, begin background polling. The dev
- * channel disables updates entirely (electrobun does too).
- */
-export async function startUpdaterService() {
-  const { channel, hash, version } = await Updater.getLocalInfo();
-  if (channel === "dev") return;
+  stop(): void {
+    this._clearSchedule();
+  }
 
-  const lastSeen = await getLastSeenHash();
-  if (lastSeen && lastSeen !== hash) installedVersion = version;
-  if (lastSeen !== hash) await setLastSeenHash(hash);
+  private _sendStatus(status: UpdateStatus): void {
+    this._lastStatus = status;
+    this._sendUpdateStatus({ status, manual: this._isPassManual });
+  }
 
-  _applySchedule(await getUpdateMode());
+  private _clearSchedule(): void {
+    if (this._backgroundTimer) clearTimeout(this._backgroundTimer);
+    if (this._backgroundInterval) clearInterval(this._backgroundInterval);
+    this._backgroundTimer = null;
+    this._backgroundInterval = null;
+  }
+
+  private _applySchedule(mode: UpdateMode): void {
+    this._clearSchedule();
+    if (mode !== "automatic") return;
+    this._backgroundTimer = setTimeout(
+      () => void this.checkForUpdates(false),
+      INITIAL_CHECK_DELAY_MS
+    );
+    this._backgroundInterval = setInterval(
+      () => void this.checkForUpdates(false),
+      CHECK_INTERVAL_MS
+    );
+  }
 }

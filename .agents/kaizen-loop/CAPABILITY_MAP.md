@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-10
-- Map status: refreshed after implementing and verifying Structured Evaluation Rubrics V1 in the real Electrobun CEF renderer. Evaluation now supports reusable thread-owned rubrics, immutable historical snapshots, per-run criterion scores, aggregates, and orientation-safe deltas while retaining the legacy verdict/note flow.
+- Last updated: 2026-07-11
+- Map status: refreshed after DI/plugin-readiness V1. The Bun process now has one explicit composition root, deterministic bundled-module lifecycle, and one frozen built-in-tool contribution seam; public or dynamically loaded plugins remain absent.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -248,6 +248,23 @@
 - Boundary: source evidence indicates users can configure local skill discovery folders, enable or hide discovered skills, seed a bundled Deep Research skill, expose enabled skills in the General Agent starter context, and load skill instructions at runtime through `skill(name)`.
 - Explicit non-goals: no skill creation/editing UI, no runtime skill preview/test call from Settings, no skill provenance panel inside threads, no conflict resolution for duplicate names beyond first-folder-wins, no packaged skill registry/marketplace.
 - Visible gaps: rendered flow is unconfirmed in this loop; users likely cannot test from Settings that a skill can be loaded by a thread, see which skills a particular thread captured, or diagnose duplicate/invalid skills without source-level knowledge.
+
+## Bundled Extension Authoring
+
+- Status: shipped internal V1 for trusted bundled tool modules
+- Freshness: confirmed
+- Last checked: 2026-07-11
+- Evidence:
+  - `apps/desktop/src/bun/app/start-desktop-app.ts` is the production composition root and constructs process-scoped model, MCP, search, skills, trace, analytics, storage, streaming, updater, RPC, and window dependencies explicitly.
+  - `apps/desktop/src/bun/host/desktop-host.ts` registers bundled modules before RPC/window creation, freezes contributions, reports module-context startup failures, and performs reverse-order best-effort cleanup.
+  - `apps/desktop/src/bun/tools/tool-registry.ts` snapshots and freezes `ToolContribution` definitions, rejects duplicate ids/names, lists tools, and dispatches calls through the unchanged RPC contract.
+  - `apps/desktop/src/bun/tools/built-in/built-in-tools-module.ts` is the reference bundled module. Filesystem and web tool factories receive only declared workspace, skill, search, and environment dependencies.
+  - `apps/desktop/src/bun/app/shutdown-coordinator.ts` synchronously cancels the first Electrobun quit, awaits idempotent runtime cleanup, and permits the second quit.
+  - Final verification on 2026-07-11: `bun test` passed 42/42; core TypeScript and Vite production build passed; lint had only the existing `HELLO_WORLD_BUILT_IN_TOOLS` warning; desktop TypeScript had only the matching existing unused-variable diagnostic.
+  - Real CEF verification on port 9341 returned all 16 original tool names in order, called `todo_write` with `{ contentText: "OK" }`, reported zero horizontal overflow, and showed no relevant console errors.
+- Boundary: a core-team author can add a trusted, compile-time bundled Bun module that contributes built-in tools, receives explicit narrow dependencies, fails startup with module context, and participates in deterministic lifecycle. The registry is permanently frozen before RPC/window creation; existing renderer, RPC, persistence, and tool behavior stay unchanged.
+- Explicit non-goals: no public plugin SDK, third-party or runtime package loading, manifests, marketplace, dynamic enable/disable, hot reload, sandboxing, permissions, compatibility negotiation, renderer/UI contribution points, or contribution types beyond built-in tools.
+- Visible gaps: no plugin discovery or user management surface; no isolation or trust model; no compatibility/version contract; additional contribution seams should be added only after a concrete product use case proves them necessary.
 
 ## Debug Timeline
 

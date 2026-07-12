@@ -1,7 +1,5 @@
 import { mkdirSync } from "node:fs";
-import path from "node:path";
 
-import { getLlmSpaceHomePath } from "@llm-space/core/server";
 import { writeClipboardFilePaths } from "clip-filepaths";
 import { Utils, type BrowserWindow } from "electrobun/bun";
 
@@ -13,8 +11,7 @@ import {
   importFilesWithNativePicker,
   importTextFromClipboard,
 } from "./import-files";
-import { mainWindowRPC } from "./rpc";
-import { applyUpdateAndRestart, checkForUpdates } from "./updates";
+import type { UpdaterService } from "./updates";
 
 /** The documentation website opened by the `openDocument` command. */
 const DOCS_URL =
@@ -32,23 +29,36 @@ const ZOOM_MAX = 3.0;
 const clampZoom = (zoom: number) =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 
+export interface BunCommandDependencies {
+  sendToWebview: (command: Command) => void;
+  updater: Pick<UpdaterService, "applyUpdateAndRestart" | "checkForUpdates">;
+  workspacePath: string;
+}
+
 /**
  * Run a {@link Command} from the main process. `webview`-target commands are
  * forwarded to the renderer over RPC; `bun`-target commands (window zoom /
  * reload) run here against `window`.
  */
-export function executeCommandInBun(command: Command, window: BrowserWindow) {
+export function executeCommandInBun(
+  command: Command,
+  window: BrowserWindow,
+  dependencies: BunCommandDependencies
+) {
   if (command.type === "importFiles") {
-    void importFilesWithNativePicker(command.args.parent);
+    void importFilesWithNativePicker(
+      dependencies.sendToWebview,
+      command.args.parent
+    );
     return;
   }
   if (command.type === "importFromClipboard") {
-    importTextFromClipboard(command.args.parent);
+    importTextFromClipboard(dependencies.sendToWebview, command.args.parent);
     return;
   }
 
   if (COMMAND_META[command.type].target === "webview") {
-    mainWindowRPC.send.executeCommand(command);
+    dependencies.sendToWebview(command);
     return;
   }
   switch (command.type) {
@@ -98,17 +108,16 @@ export function executeCommandInBun(command: Command, window: BrowserWindow) {
       return;
     }
     case "openWorkspaceFolder": {
-      const workspacePath = path.join(getLlmSpaceHomePath(), "workspace");
-      mkdirSync(workspacePath, { recursive: true });
-      Utils.openPath(workspacePath);
+      mkdirSync(dependencies.workspacePath, { recursive: true });
+      Utils.openPath(dependencies.workspacePath);
       return;
     }
     case "checkForUpdates": {
-      void checkForUpdates(true);
+      void dependencies.updater.checkForUpdates(true);
       return;
     }
     case "applyUpdateAndRestart": {
-      void applyUpdateAndRestart();
+      void dependencies.updater.applyUpdateAndRestart();
       return;
     }
     default:

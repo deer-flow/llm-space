@@ -4,14 +4,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { BuiltinTool } from "@llm-space/core";
-import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
+import type { SkillContent } from "../../../shared/skills";
 import { openPath, revealInFileManager } from "../../fs";
-import { skillsManager } from "../../skills";
+import type { ToolEntry } from "../tool-registry";
 
-/** Workspace root that path-less tools (e.g. `glob`) default to. */
-function _workspaceRoot(): string {
-  return path.join(getLlmSpaceHomePath(), "workspace");
+export interface FsBuiltInToolsDependencies {
+  workspaceRoot: string;
+  findSkill: (name: string) => SkillContent | null;
 }
 
 /**
@@ -352,7 +352,10 @@ export const treeTool: BuiltinTool = {
   },
 };
 
-export async function tree(dirPath: string, maxDepth?: number): Promise<string> {
+export async function tree(
+  dirPath: string,
+  maxDepth?: number
+): Promise<string> {
   const stat = await fs.stat(dirPath);
   if (!stat.isDirectory()) {
     throw new Error(`${dirPath} is not a directory.`);
@@ -403,7 +406,9 @@ async function _buildTree(
     const entry = visible[i];
     const last = i === visible.length - 1;
     const isDir = entry.isDirectory();
-    lines.push(`${prefix}${last ? "└── " : "├── "}${entry.name}${isDir ? "/" : ""}`);
+    lines.push(
+      `${prefix}${last ? "└── " : "├── "}${entry.name}${isDir ? "/" : ""}`
+    );
     if (isDir) {
       await _buildTree(
         path.join(dir, entry.name),
@@ -528,9 +533,10 @@ export const globTool: BuiltinTool = {
 
 export async function glob(
   globPattern: string,
-  targetDirectory?: string
+  targetDirectory: string | undefined,
+  workspaceRoot: string
 ): Promise<string> {
-  const root = targetDirectory ?? _workspaceRoot();
+  const root = targetDirectory ?? workspaceRoot;
   const scanner = new Bun.Glob(globPattern);
   const matches: { path: string; mtimeMs: number }[] = [];
   for await (const relative of scanner.scan({ cwd: root, dot: true })) {
@@ -601,7 +607,11 @@ export async function bash(
     timeout ?? BASH_DEFAULT_TIMEOUT_MS,
     BASH_MAX_TIMEOUT_MS
   );
-  const { stdout, stderr, code } = await _run("bash", ["-c", command], timeoutMs);
+  const { stdout, stderr, code } = await _run(
+    "bash",
+    ["-c", command],
+    timeoutMs
+  );
   return { stdout, stderr, exitCode: code };
 }
 
@@ -627,8 +637,11 @@ export const skillTool: BuiltinTool = {
   },
 };
 
-export function skill(name: string): string {
-  const found = skillsManager.findSkill(name);
+export function skill(
+  name: string,
+  findSkill: FsBuiltInToolsDependencies["findSkill"]
+): string {
+  const found = findSkill(name);
   if (!found) {
     throw new Error(`Skill "${name}" not found.`);
   }
@@ -692,92 +705,101 @@ function _isHtmlFile(filePath: string): boolean {
 
 // -- registry -----------------------------------------------------------------
 
-export const fsBuiltInTools = [
-  {
-    tool: readTool,
-    async execute(args: Record<string, unknown>) {
-      return read(
-        _requireString(args, "path"),
-        _optionalNumber(args, "offset"),
-        _optionalNumber(args, "limit")
-      );
+export function createFsBuiltInTools({
+  workspaceRoot,
+  findSkill,
+}: FsBuiltInToolsDependencies): ToolEntry[] {
+  return [
+    {
+      tool: readTool,
+      async execute(args: Record<string, unknown>) {
+        return read(
+          _requireString(args, "path"),
+          _optionalNumber(args, "offset"),
+          _optionalNumber(args, "limit")
+        );
+      },
     },
-  },
-  {
-    tool: writeTool,
-    async execute(args: Record<string, unknown>) {
-      return write(
-        _requireString(args, "path"),
-        _requireString(args, "contents")
-      );
+    {
+      tool: writeTool,
+      async execute(args: Record<string, unknown>) {
+        return write(
+          _requireString(args, "path"),
+          _requireString(args, "contents")
+        );
+      },
     },
-  },
-  {
-    tool: skillTool,
-    execute(args: Record<string, unknown>) {
-      return Promise.resolve(skill(_requireString(args, "name")));
+    {
+      tool: skillTool,
+      execute(args: Record<string, unknown>) {
+        return Promise.resolve(skill(_requireString(args, "name"), findSkill));
+      },
     },
-  },
-  {
-    tool: editTool,
-    async execute(args: Record<string, unknown>) {
-      return edit(
-        _requireString(args, "path"),
-        _requireString(args, "old_string"),
-        _requireStringAllowEmpty(args, "new_string"),
-        _optionalBoolean(args, "replace_all") ?? false
-      );
+    {
+      tool: editTool,
+      async execute(args: Record<string, unknown>) {
+        return edit(
+          _requireString(args, "path"),
+          _requireString(args, "old_string"),
+          _requireStringAllowEmpty(args, "new_string"),
+          _optionalBoolean(args, "replace_all") ?? false
+        );
+      },
     },
-  },
-  {
-    tool: lsTool,
-    async execute(args: Record<string, unknown>) {
-      return ls(_requireString(args, "path"));
+    {
+      tool: lsTool,
+      async execute(args: Record<string, unknown>) {
+        return ls(_requireString(args, "path"));
+      },
     },
-  },
-  {
-    tool: treeTool,
-    async execute(args: Record<string, unknown>) {
-      return tree(_requireString(args, "path"), _optionalNumber(args, "max_depth"));
+    {
+      tool: treeTool,
+      async execute(args: Record<string, unknown>) {
+        return tree(
+          _requireString(args, "path"),
+          _optionalNumber(args, "max_depth")
+        );
+      },
     },
-  },
-  {
-    tool: grepTool,
-    async execute(args: Record<string, unknown>) {
-      return grep(
-        _requireString(args, "pattern"),
-        _requireString(args, "path"),
-        _optionalString(args, "glob"),
-        _optionalBoolean(args, "case_insensitive") ?? false,
-        _optionalNumber(args, "context_lines")
-      );
+    {
+      tool: grepTool,
+      async execute(args: Record<string, unknown>) {
+        return grep(
+          _requireString(args, "pattern"),
+          _requireString(args, "path"),
+          _optionalString(args, "glob"),
+          _optionalBoolean(args, "case_insensitive") ?? false,
+          _optionalNumber(args, "context_lines")
+        );
+      },
     },
-  },
-  {
-    tool: globTool,
-    async execute(args: Record<string, unknown>) {
-      return glob(
-        _requireString(args, "glob_pattern"),
-        _optionalString(args, "target_directory")
-      );
+    {
+      tool: globTool,
+      async execute(args: Record<string, unknown>) {
+        return glob(
+          _requireString(args, "glob_pattern"),
+          _optionalString(args, "target_directory"),
+          workspaceRoot
+        );
+      },
     },
-  },
-  {
-    tool: bashTool,
-    async execute(args: Record<string, unknown>) {
-      return bash(
-        _requireString(args, "command"),
-        _optionalNumber(args, "timeout")
-      );
+    {
+      tool: bashTool,
+      async execute(args: Record<string, unknown>) {
+        return bash(
+          _requireString(args, "command"),
+          _optionalNumber(args, "timeout")
+        );
+      },
     },
-  },
-  {
-    tool: presentFilesTool,
-    async execute(args: Record<string, unknown>) {
-      return present_files(_requireStringArray(args, "paths"));
+    {
+      tool: presentFilesTool,
+      async execute(args: Record<string, unknown>) {
+        return present_files(_requireStringArray(args, "paths"));
+      },
     },
-  },
-];
+  ];
+}
 
 // -- helpers ------------------------------------------------------------------
 

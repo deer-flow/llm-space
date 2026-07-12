@@ -1,9 +1,4 @@
-import {
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -31,7 +26,7 @@ import { getManagedSkillsDir } from "./seed";
  * reads (`readSkill`) parse `SKILL.md` frontmatter with gray-matter and validate
  * it against the Agent Skills spec via `skills-handler`.
  */
-class SkillsManager {
+export class SkillsManager {
   private _settings: SkillsSettings;
 
   constructor() {
@@ -300,6 +295,3 @@ class SkillsManager {
     return { discoveryPaths };
   }
 }
-
-/** Process-wide singleton owning the skills config. */
-export const skillsManager = new SkillsManager();

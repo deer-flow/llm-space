@@ -1,7 +1,2 @@
-import { startUpdaterService } from "../updates";
-
-import "./menu";
-
-export * from "./window";
-
-void startUpdaterService();
+export { createMainWindow } from "./window";
+export { startDesktopApp } from "./start-desktop-app";

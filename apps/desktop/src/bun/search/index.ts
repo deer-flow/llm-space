@@ -1,1 +1,1 @@
-export { searchSettings } from "./search-settings-manager";
+export { SearchSettingsManager } from "./search-settings-manager";

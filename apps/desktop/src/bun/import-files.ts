@@ -2,9 +2,9 @@ import { basename } from "node:path";
 
 import { Utils } from "electrobun/bun";
 
-import type { ImportFilePayload } from "../shared/commands";
+import type { Command, ImportFilePayload } from "../shared/commands";
 
-import { mainWindowRPC } from "./rpc";
+type SendCommand = (command: Command) => void;
 
 function _normalizeSelectedPaths(paths: string[]): string[] {
   return paths.map((path) => path.trim()).filter(Boolean);
@@ -21,7 +21,10 @@ async function _readImportFile(path: string): Promise<ImportFilePayload> {
  * Native import entrypoint for the application menu. The renderer still owns
  * parsing/writing so imports use the same model normalization as drag/drop.
  */
-export async function importFilesWithNativePicker(parent = "") {
+export async function importFilesWithNativePicker(
+  sendCommand: SendCommand,
+  parent = ""
+) {
   const paths = _normalizeSelectedPaths(
     await Utils.openFileDialog({
       startingFolder: Utils.paths.documents,
@@ -34,7 +37,7 @@ export async function importFilesWithNativePicker(parent = "") {
   if (paths.length === 0) return;
 
   const files = await Promise.all(paths.map((path) => _readImportFile(path)));
-  mainWindowRPC.send.executeCommand({
+  sendCommand({
     type: "importFiles",
     args: { parent, files },
   });
@@ -44,9 +47,9 @@ export async function importFilesWithNativePicker(parent = "") {
  * Native clipboard import entrypoint. Clipboard access belongs to the bun side;
  * the renderer still owns parsing/writing through the regular file-import path.
  */
-export function importTextFromClipboard(parent = "") {
+export function importTextFromClipboard(sendCommand: SendCommand, parent = "") {
   const text = Utils.clipboardReadText();
-  mainWindowRPC.send.executeCommand({
+  sendCommand({
     type: "importFiles",
     args: {
       parent,

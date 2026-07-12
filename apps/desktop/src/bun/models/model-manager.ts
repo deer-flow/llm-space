@@ -69,10 +69,7 @@ export class ModelManager {
    * candidate is resolved through the same path as saved custom models so it
    * reuses the provider's api/baseUrl. Never touches the cached registry.
    */
-  buildModelsWithCandidate(
-    providerId: string,
-    candidate: CustomModel
-  ): Models {
+  buildModelsWithCandidate(providerId: string, candidate: CustomModel): Models {
     const entry = this._config.providers.find(
       (provider) => provider.id === providerId
     );
@@ -685,6 +682,3 @@ export class ModelManager {
     }
   }
 }
-
-/** Process-wide singleton owning the models config. */
-export const modelManager = new ModelManager();

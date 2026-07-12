@@ -47,7 +47,7 @@ interface PersistedAnalytics extends AnalyticsSettings {
  * `capture` is a silent no-op. Capture is fire-and-forget and defensively
  * wrapped so telemetry can never crash the app.
  */
-class Analytics {
+export class Analytics {
   /** True when this launch minted the install id (first run, or an id reset). */
   readonly isFirstRun: boolean;
   private readonly _anonymousId: string;
@@ -191,5 +191,3 @@ class Analytics {
     return { persisted: seeded, isFirstRun: true };
   }
 }
-
-export const analytics = new Analytics();

@@ -233,6 +233,18 @@ export class McpManager {
     return this.listServers();
   }
 
+  /** Close every live or connecting client during application shutdown. */
+  async shutdown(): Promise<void> {
+    const serverIds = new Set([
+      ...this._clients.keys(),
+      ...this._connecting.keys(),
+    ]);
+    await Promise.all(
+      [...serverIds].map((serverId) => this._closeServer(serverId))
+    );
+    this._status.clear();
+  }
+
   async listTools(serverId: string): Promise<McpServerToolsResponse> {
     const server = this._getServer(serverId);
     const diagnostic = _isRemoteTransport(server.transport)
@@ -247,11 +259,7 @@ export class McpManager {
         );
       }
       const entry = await this._connect(server, diagnostic);
-      const tools = await this._fetchAllTools(
-        entry.client,
-        server,
-        diagnostic
-      );
+      const tools = await this._fetchAllTools(entry.client, server, diagnostic);
       entry.tools = tools;
       const toolViews = this._toToolViews(server, tools);
       const result = diagnostic
@@ -339,9 +347,21 @@ export class McpManager {
     const cached = this._clients.get(server.id);
     if (cached) {
       if (diagnostic) {
-        _passDiagnosticStep(diagnostic, "secrets", "Using existing connection.");
-        _passDiagnosticStep(diagnostic, "transport", "Connection is already open.");
-        _passDiagnosticStep(diagnostic, "initialize", "MCP session is already initialized.");
+        _passDiagnosticStep(
+          diagnostic,
+          "secrets",
+          "Using existing connection."
+        );
+        _passDiagnosticStep(
+          diagnostic,
+          "transport",
+          "Connection is already open."
+        );
+        _passDiagnosticStep(
+          diagnostic,
+          "initialize",
+          "MCP session is already initialized."
+        );
       }
       return cached;
     }
@@ -349,9 +369,17 @@ export class McpManager {
     if (connecting) {
       const entry = await connecting;
       if (diagnostic) {
-        _passDiagnosticStep(diagnostic, "secrets", "Using in-flight connection.");
+        _passDiagnosticStep(
+          diagnostic,
+          "secrets",
+          "Using in-flight connection."
+        );
         _passDiagnosticStep(diagnostic, "transport", "Connection opened.");
-        _passDiagnosticStep(diagnostic, "initialize", "MCP session initialized.");
+        _passDiagnosticStep(
+          diagnostic,
+          "initialize",
+          "MCP session initialized."
+        );
       }
       return entry;
     }
@@ -377,7 +405,11 @@ export class McpManager {
       await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS });
       if (diagnostic) {
         _passDiagnosticStep(diagnostic, "transport", "Connection opened.");
-        _passDiagnosticStep(diagnostic, "initialize", "MCP session initialized.");
+        _passDiagnosticStep(
+          diagnostic,
+          "initialize",
+          "MCP session initialized."
+        );
       }
     } catch (error) {
       if (diagnostic) {
@@ -722,12 +754,10 @@ export class McpManager {
         })),
       };
     } catch (error) {
-      if (
-        !(
-          error instanceof z.ZodError ||
-          (error as NodeJS.ErrnoException).code === "ENOENT"
-        )
-      ) {
+      if (!(
+        error instanceof z.ZodError ||
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+      )) {
         throw error;
       }
       const empty: McpServersConfig = { servers: [] };
@@ -759,9 +789,7 @@ const DIAGNOSTIC_STEP_LABELS: Record<string, string> = {
  * helper must only be called for Streamable HTTP/SSE servers because stdio
  * diagnostics are outside the V1 scope.
  */
-function _createDiagnosticDraft(
-  server: McpServerConfig
-): McpDiagnosticDraft {
+function _createDiagnosticDraft(server: McpServerConfig): McpDiagnosticDraft {
   if (!_isRemoteTransport(server.transport)) {
     throw new Error("MCP diagnostics are only available for remote servers.");
   }
@@ -869,7 +897,11 @@ function _markSecretFailure(
     detail: message,
   });
   _skipDiagnosticStep(diagnostic, "transport", "Skipped after secret failure.");
-  _skipDiagnosticStep(diagnostic, "initialize", "Skipped after secret failure.");
+  _skipDiagnosticStep(
+    diagnostic,
+    "initialize",
+    "Skipped after secret failure."
+  );
   _skipDiagnosticStep(diagnostic, "listTools", "Skipped after secret failure.");
 }
 
@@ -933,9 +965,14 @@ function _markConnectFailure(
       { detail }
     );
   } else {
-    _failDiagnosticStep(diagnostic, "transport", "Transport connection failed.", {
-      detail,
-    });
+    _failDiagnosticStep(
+      diagnostic,
+      "transport",
+      "Transport connection failed.",
+      {
+        detail,
+      }
+    );
     _skipDiagnosticStep(
       diagnostic,
       "initialize",
@@ -1170,11 +1207,7 @@ function _errorText(error: unknown): string {
   let current: unknown = error;
   for (let depth = 0; depth < 4 && current; depth++) {
     parts.push(_errorMessage(current));
-    if (
-      typeof current === "object" &&
-      current !== null &&
-      "cause" in current
-    ) {
+    if (typeof current === "object" && current !== null && "cause" in current) {
       current = (current as { cause?: unknown }).cause;
     } else {
       break;
@@ -1450,5 +1483,3 @@ function _flattenToolResult(result: CallToolResult): McpCallToolResponse {
     isError: result.isError,
   };
 }
-
-export const mcpManager = new McpManager();

@@ -1,1 +1,1 @@
-export { skillsManager } from "./skills-manager";
+export { SkillsManager } from "./skills-manager";

@@ -6,20 +6,20 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 
 Use **bun** for everything (fuzzy-pinned in `mise.toml`, exact version + checksums locked in `mise.lock` — regenerate with `mise lock` when bumping). Do not use npm/pnpm/yarn.
 
-| Task | Command | Notes |
-|---|---|---|
-| Set up a fresh clone | `mise setup` | installs the locked toolchain (`mise install`) + JS deps (`bun install`) |
-| Install deps | `bun install` | from repo root |
-| Run desktop app | `bun dev` | root script → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `electrobun dev --watch`) |
-| Run desktop app with CEF/CDP debugging | `bun run dev:cef` | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default |
-| Build (canary) | `bun run build:canary` | in `apps/desktop` → `vite build && electrobun build --env=canary` |
-| Build (stable) | `bun run build:stable` | in `apps/desktop` → `vite build && electrobun build --env=stable` |
-| Local packaging / update test | `mise run pack` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
-| Cut a release | `bun run release` / `bun run release:canary` | root script → `bun scripts/release.ts`; see "Releases & auto-update" |
-| Lint | `bun lint` / `bun run lint:check` | `lint` = `eslint --fix`, `lint:check` / `check` = `eslint .`; flat config at repo root |
-| Add a dependency | `bun add <pkg>` | run inside the target package (`apps/desktop` or `packages/core`) |
-| Add a shadcn/ui component | `bunx --bun shadcn@latest add <component>` | run inside `apps/desktop` |
-| Run a script from root | `bun --filter <pkg> <script>` | e.g. `bun --filter @llm-space/desktop start` |
+| Task                                   | Command                                                                     | Notes                                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Set up a fresh clone                   | `mise setup`                                                                | installs the locked toolchain (`mise install`) + JS deps (`bun install`)                                               |
+| Install deps                           | `bun install`                                                               | from repo root                                                                                                         |
+| Run desktop app                        | `bun dev`                                                                   | root script → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `electrobun dev --watch`)                      |
+| Run desktop app with CEF/CDP debugging | `bun run dev:cef`                                                           | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default                         |
+| Build (canary)                         | `bun run build:canary`                                                      | in `apps/desktop` → `vite build && electrobun build --env=canary`                                                      |
+| Build (stable)                         | `bun run build:stable`                                                      | in `apps/desktop` → `vite build && electrobun build --env=stable`                                                      |
+| Local packaging / update test          | `mise run pack` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
+| Cut a release                          | `bun run release` / `bun run release:canary`                                | root script → `bun scripts/release.ts`; see "Releases & auto-update"                                                   |
+| Lint                                   | `bun lint` / `bun run lint:check`                                           | `lint` = `eslint --fix`, `lint:check` / `check` = `eslint .`; flat config at repo root                                 |
+| Add a dependency                       | `bun add <pkg>`                                                             | run inside the target package (`apps/desktop` or `packages/core`)                                                      |
+| Add a shadcn/ui component              | `bunx --bun shadcn@latest add <component>`                                  | run inside `apps/desktop`                                                                                              |
+| Run a script from root                 | `bun --filter <pkg> <script>`                                               | e.g. `bun --filter @llm-space/desktop start`                                                                           |
 
 There is **no test framework** and **no root typecheck script**; each package uses `tsc` via `tsconfig.json`.
 
@@ -63,28 +63,54 @@ Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*`.
 
 ### The RPC bridge
 
-The typed contract lives in `src/shared/rpc.ts` (`DesktopRPCType`). The bun side defines handlers in `src/bun/rpc/index.ts` (`mainWindowRPC`); the renderer holds the client in `src/lib/electrobun.ts` (`electrobun.rpc`). Two directions:
+The typed contract lives in `src/shared/rpc.ts` (`DesktopRPCType`). The bun side creates handlers in `src/bun/rpc/index.ts` (`createMainWindowRPC()`); the renderer holds the client in `src/lib/electrobun.ts` (`electrobun.rpc`). Two directions:
+
 - **requests** (webview → bun, request/response): `availableModels`, `addProvider`/`updateProvider`/`removeProvider`/`setModelEnabled`/…, and the filesystem ops `fsLs`/`fsRead`/`fsWrite`/`fsMkdir`/`fsCp`/`fsMv`/`fsRm`/`fsReveal` (mirroring what were HTTP routes).
 - **messages** (fire-and-forget, both ways): agent streaming (`sendStreamThreadRequest` / `receiveStreamThreadResponse` / `abortStreamThread`), fullscreen sync, update status (`updateStatusChanged`), and `executeCommand` (see the command layer).
 
 Electrobun RPC has no native streaming, so agent runs **simulate a stream over fire-and-forget messages**, correlated by a per-run `streamId` (uuid):
+
 1. Renderer `createRpcTransport()` (`src/client/rpc-transport.ts`) sends `sendStreamThreadRequest { streamId, request }`.
-2. Bun `runStreamThread` (`bun/streaming/stream-thread.ts`) iterates `streamAgent()` and sends back `receiveStreamThreadResponse` messages keyed by `streamId`: one `{ type: "event" }` per event, then a terminal `{ type: "done" }` or `{ type: "error", message }`.
-3. The transport keeps a per-`streamId` listener that buffers events and drives an async iterator via a wake/notify promise — turning the message stream back into `for await`. `done` ends it, `error` throws, and abort (signal or early break) sends `abortStreamThread`, which aborts the bun-side `AbortController`.
+2. Bun `StreamThreadController.run()` (`bun/streaming/stream-thread.ts`) iterates `streamAgent()` and sends back `receiveStreamThreadResponse` messages keyed by `streamId`: one `{ type: "event" }` per event, then a terminal `{ type: "done" }` or `{ type: "error", message }`.
+3. The transport keeps a per-`streamId` listener that buffers events and drives an async iterator via a wake/notify promise — turning the message stream back into `for await`. `done` ends it, `error` throws, and abort (signal or early break) sends `abortStreamThread`, which calls `StreamThreadController.abort()` for the bun-side `AbortController`.
 
 Downstream, `reduceMessages()` folds the events into messages.
 
+### Bun composition and bundled modules
+
+The Bun process object graph is assembled in one production composition root,
+`src/bun/app/start-desktop-app.ts`. Process-scoped managers are constructed
+there and passed explicitly to RPC, streaming, commands, updates, and tool
+factories; Bun feature modules must not export import-time manager instances or
+reach through a service locator.
+
+`DesktopHost` (`src/bun/host/desktop-host.ts`) is the lifecycle boundary for
+trusted, bundled modules. Modules register synchronously before RPC/window
+creation, the contribution registry then freezes for the process lifetime, and
+cleanup runs in reverse order on a best-effort basis. Startup errors include
+the module id. Electrobun quit uses a two-phase handshake so asynchronous host,
+MCP, and analytics cleanup finishes before the process exits.
+
+V1 exposes one internal extension seam: `ToolContribution` through
+`ToolRegistry` (`src/bun/tools/tool-registry.ts`). Contributions have stable
+unique ids and tool names; registration snapshots and freezes tool definitions.
+The bundled built-in-tools module is the reference implementation. This is not
+a public plugin SDK: dynamic loading, manifests, permissions, runtime
+enable/disable, renderer contributions, and third-party compatibility remain
+out of scope.
+
 ### Data flow (the core loop)
 
-UI action → Zustand `run()` (`components/thread-playground/stores/thread-store.ts`) → `streamThread()` (core) with an injected `AgentTransport`. The desktop transport is `createRpcTransport()`, wired in once at `components/thread-tabs/thread-tab-pane.tsx`; it runs the RPC streaming dance above. On the bun side `runStreamThread` calls `streamAgent()` (`@llm-space/core/server`), which drives `agentLoopContinue()` from `@earendil-works/pi-agent-core`. The resulting event iterator → `reduceMessages()` → Zustand → UI re-renders.
+UI action → Zustand `run()` (`components/thread-playground/stores/thread-store.ts`) → `streamThread()` (core) with an injected `AgentTransport`. The desktop transport is `createRpcTransport()`, wired in once at `components/thread-tabs/thread-tab-pane.tsx`; it runs the RPC streaming dance above. On the bun side `StreamThreadController.run()` calls `streamAgent()` (`@llm-space/core/server`), which drives `agentLoopContinue()` from `@earendil-works/pi-agent-core`. The resulting event iterator → `reduceMessages()` → Zustand → UI re-renders.
 
 ### Thread store
 
-Each open thread owns its own Zustand store (`stores/thread-store.ts`), created per-tab via `createThreadStore()` and supplied through `ThreadStoreContext` — there is **no global store**. Read it with `useThreadStore(selector)` and `useThreadStoreActions()`. State holds the `thread`, `streamingMessage`, `status`, `runHistory`, and `changeHistory`; `run()` drives a streaming turn. Undo/redo lives in `stores/thread-history.ts`: snapshots are thread *references* (copy-on-write shares unchanged substructure, so undo is an O(1) pointer move), capped by count and a retained-image-bytes budget.
+Each open thread owns its own Zustand store (`stores/thread-store.ts`), created per-tab via `createThreadStore()` and supplied through `ThreadStoreContext` — there is **no global store**. Read it with `useThreadStore(selector)` and `useThreadStoreActions()`. State holds the `thread`, `streamingMessage`, `status`, `runHistory`, and `changeHistory`; `run()` drives a streaming turn. Undo/redo lives in `stores/thread-history.ts`: snapshots are thread _references_ (copy-on-write shares unchanged substructure, so undo is an O(1) pointer move), capped by count and a retained-image-bytes budget.
 
 ### Persistence
 
 State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_HOME`):
+
 - `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`) and `window.json` (frame/zoom/maximized).
 
@@ -111,6 +137,7 @@ Every cross-boundary user action (menus, context menus, toolbar buttons, shortcu
 ### Static assets (images, etc.)
 
 There are two kinds of assets, and they land in different places:
+
 - **Imported assets** — `import logo from "./logo.svg"`. Vite hashes these into `dist/assets`, which `electrobun.config.ts` already copies to `views/mainview/assets`. No config change needed.
 - **Public assets referenced by absolute path** — e.g. `<img src="/images/onboard.png">`. These live under **`src/mainview/public/`** (Vite's `root` is `src/mainview`, so `public/images/onboard.png` is served at `/images/onboard.png`). Vite copies `public/` verbatim into `dist/`, but a **packaged build only copies what `electrobun.config.ts` `build.copy` lists** — so any new top-level public folder must be added there, or it 404s in the built app. Today `build.copy` maps `dist/images` → `views/mainview/images`; if you add, say, `public/fonts/`, add a `"dist/fonts": "views/mainview/fonts"` entry too.
 
@@ -126,7 +153,7 @@ Prefer dropping new images into the existing `src/mainview/public/images/` folde
 - **File names** are **kebab-case** for every `.ts`/`.tsx` file, including component files (e.g. `tool-call-list-item.tsx`, `model-provider.tsx`). No PascalCase or camelCase filenames. One primary component/export per file, named after the file.
 - **Identifiers**:
   - React components, classes, types, and interfaces are **PascalCase** (`ThreadPlayground`, `ModelManager`, `Command`, `FileNode`).
-  - Functions, variables, hooks, and command `type` discriminants are **camelCase** (`runStreamThread`, `useThreadTabs`, `newFile`, `closeTab`).
+  - Functions, variables, hooks, and command `type` discriminants are **camelCase** (`createMainWindowRPC`, `useThreadTabs`, `newFile`, `closeTab`).
   - Module-level constants are **UPPER_SNAKE_CASE** (`DOCS_URL`, `ZOOM_STEP`, `COMMAND_META`, `BUILTIN_PROVIDERS`).
 - **Leading underscore for what's private**:
   - Module-private (non-exported) functions: `_foo()`.
@@ -144,6 +171,7 @@ Prefer dropping new images into the existing `src/mainview/public/images/` folde
 ### Performance
 
 **Weigh render performance on every change.** This UI streams events and re-renders hot lists (messages, tool calls), so:
+
 - Wrap components that re-render often or sit in a list in `memo()`. The house pattern is `export const Foo = memo(_Foo)` — the underscore-prefixed inner holds the implementation (see `MessageListItem`, `ThinkingView`, `CodeEditor`).
 - Keep memo effective: stabilize props with `useMemo`/`useCallback` and read the store through narrow `useThreadStore(selector)` slices so a component only re-renders on the state it uses.
 - Don't reach for `memo()` reflexively on cheap, rarely-rendered components — add it where a profile or the render path shows it pays off.

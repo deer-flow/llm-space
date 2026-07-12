@@ -1,1 +1,1 @@
-export { McpManager, mcpManager } from "./mcp-manager";
+export { McpManager } from "./mcp-manager";

@@ -1,6 +1,12 @@
 import type { BuiltinTool } from "@llm-space/core";
 
-import { searchSettings } from "../../search";
+import type { SearchSettings } from "../../../shared/search";
+import type { ToolEntry } from "../tool-registry";
+
+export interface WebBuiltInToolsDependencies {
+  env: Readonly<Record<string, string | undefined>>;
+  getSearchSettings: () => SearchSettings;
+}
 
 const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
@@ -85,9 +91,12 @@ function _truncateText(text: string, maxChars: number): string {
 }
 
 /** Resolve a `$VAR` reference from the environment; pass literals through. */
-function _resolveApiKey(value: string): string {
+function _resolveApiKey(
+  value: string,
+  env: WebBuiltInToolsDependencies["env"]
+): string {
   if (value.startsWith("$")) {
-    return process.env[value.slice(1)] ?? "";
+    return env[value.slice(1)] ?? "";
   }
   return value;
 }
@@ -253,12 +262,17 @@ class TavilySearchProvider implements SearchProvider {
 }
 
 /** Build the provider selected in `settings/search.json` with its resolved key. */
-function _getSearchProvider(): SearchProvider {
-  const settings = searchSettings.get();
+function _getSearchProvider({
+  env,
+  getSearchSettings,
+}: WebBuiltInToolsDependencies): SearchProvider {
+  const settings = getSearchSettings();
   if (settings.provider === "tavily") {
-    return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey));
+    return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
   }
-  return new FirecrawlSearchProvider(_resolveApiKey(settings.firecrawlApiKey));
+  return new FirecrawlSearchProvider(
+    _resolveApiKey(settings.firecrawlApiKey, env)
+  );
 }
 
 export const webFetchTool: BuiltinTool = {
@@ -298,7 +312,8 @@ export const webSearchTool: BuiltinTool = {
       },
       limit: {
         type: "number",
-        description: "Maximum number of search results to return. Defaults to 5.",
+        description:
+          "Maximum number of search results to return. Defaults to 5.",
       },
       includeContent: {
         type: "boolean",
@@ -385,13 +400,16 @@ export async function weather_report(location: string): Promise<WeatherReport> {
   }
   const encodedLocation = _encodeWttrCity(normalizedLocation);
 
-  const res = await fetch(`https://wttr.in/${encodedLocation}?format=j1&lang=en`, {
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": "en",
-      "User-Agent": "llm-space-weather-tool/1.0",
-    },
-  });
+  const res = await fetch(
+    `https://wttr.in/${encodedLocation}?format=j1&lang=en`,
+    {
+      headers: {
+        Accept: "application/json",
+        "Accept-Language": "en",
+        "User-Agent": "llm-space-weather-tool/1.0",
+      },
+    }
+  );
 
   if (!res.ok) {
     throw new Error(`weather_report failed: ${res.status}`);
@@ -416,30 +434,36 @@ export async function weather_report(location: string): Promise<WeatherReport> {
   };
 }
 
-export const webBuiltInTools = [
-  {
-    tool: webFetchTool,
-    async execute(args: Record<string, unknown>) {
-      return _getSearchProvider().fetch(_requireString(args, "url"));
+export function createWebBuiltInTools(
+  dependencies: WebBuiltInToolsDependencies
+): ToolEntry[] {
+  return [
+    {
+      tool: webFetchTool,
+      async execute(args: Record<string, unknown>) {
+        return _getSearchProvider(dependencies).fetch(
+          _requireString(args, "url")
+        );
+      },
     },
-  },
-  {
-    tool: webSearchTool,
-    async execute(args: Record<string, unknown>) {
-      return _getSearchProvider().search(
-        _requireString(args, "query"),
-        _optionalNumber(args, "limit") ?? 5,
-        _optionalBoolean(args, "includeContent") ?? false
-      );
+    {
+      tool: webSearchTool,
+      async execute(args: Record<string, unknown>) {
+        return _getSearchProvider(dependencies).search(
+          _requireString(args, "query"),
+          _optionalNumber(args, "limit") ?? 5,
+          _optionalBoolean(args, "includeContent") ?? false
+        );
+      },
     },
-  },
-  {
-    tool: weatherReportTool,
-    async execute(args: Record<string, unknown>) {
-      return weather_report(_requireString(args, "location"));
+    {
+      tool: weatherReportTool,
+      async execute(args: Record<string, unknown>) {
+        return weather_report(_requireString(args, "location"));
+      },
     },
-  },
-];
+  ];
+}
 
 function _requireString(args: Record<string, unknown>, key: string): string {
   const value = args[key];

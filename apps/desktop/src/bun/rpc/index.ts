@@ -3,31 +3,23 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
-import { getLlmSpaceHomePath } from "@llm-space/core/server";
-import { BrowserView, Utils } from "electrobun/bun";
+import type { LocalFileSystem } from "@llm-space/core/server";
+import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
+import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
-import { analytics } from "../analytics";
+import type { Analytics } from "../analytics";
 import { moveToTrash, revealInFileManager } from "../fs";
-import { mcpManager } from "../mcp";
-import { modelManager } from "../models";
-import { searchSettings } from "../search";
-import { skillsManager } from "../skills";
-import { localFs } from "../storage";
-import {
-  abortStreamThread,
-  runStreamThread,
-  testModelConnection,
-} from "../streaming";
-import { callBuiltInTool, listBuiltInTools } from "../tools/built-in";
-import { traceManager } from "../traces";
-import {
-  getInstalledVersion,
-  getUpdateModeSetting,
-  setUpdateModeSetting,
-} from "../updates";
+import type { McpManager } from "../mcp";
+import type { ModelManager } from "../models";
+import type { SearchSettingsManager } from "../search";
+import type { SkillsManager } from "../skills";
+import type { StreamThreadController } from "../streaming";
+import type { ToolRegistry } from "../tools/tool-registry";
+import type { TraceManager } from "../traces";
+import type { UpdaterService } from "../updates";
 
-async function getModelProviderGroups() {
+async function _getModelProviderGroups(modelManager: ModelManager) {
   const models = await modelManager.getAvailableModels();
   return Promise.all(
     models.getProviders().map(async (provider) => ({
@@ -48,16 +40,49 @@ async function getModelProviderGroups() {
 }
 
 /**
- * The handler for `sendStreamThreadRequest` references `mainWindowRPC` inside
- * its own initializer, so an explicit annotation is required — otherwise TS
- * infers `mainWindowRPC` (and everything built from it) as `any`.
+ * The stream handler references its RPC instance inside the initializer, so an
+ * explicit annotation keeps TypeScript from inferring the recursive value as
+ * `any`.
  */
-type MainWindowRPC = ReturnType<typeof BrowserView.defineRPC<DesktopRPCType>>;
+export type MainWindowRPC = ReturnType<
+  typeof BrowserView.defineRPC<DesktopRPCType>
+>;
+
+export interface MainWindowRPCDependencies {
+  analytics: Analytics;
+  executeCommand: (command: Command) => void;
+  getMainWindow: () => BrowserWindow;
+  homePath: string;
+  localFs: LocalFileSystem;
+  mcpManager: McpManager;
+  modelManager: ModelManager;
+  searchSettings: SearchSettingsManager;
+  skillsManager: SkillsManager;
+  streaming: StreamThreadController;
+  tools: ToolRegistry;
+  traceManager: TraceManager;
+  updater: UpdaterService;
+}
 
 const MAX_REQUEST_TIME_MS = 5 * 60_000 + 10_000;
 
-export const mainWindowRPC: MainWindowRPC =
-  BrowserView.defineRPC<DesktopRPCType>({
+export function createMainWindowRPC({
+  analytics,
+  executeCommand,
+  getMainWindow,
+  homePath,
+  localFs,
+  mcpManager,
+  modelManager,
+  searchSettings,
+  skillsManager,
+  streaming,
+  tools,
+  traceManager,
+  updater,
+}: MainWindowRPCDependencies): MainWindowRPC {
+  const getModelProviderGroups = () => _getModelProviderGroups(modelManager);
+  const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
       requests: {
@@ -75,7 +100,10 @@ export const mainWindowRPC: MainWindowRPC =
         addCustomProvider: async ({ id, name, baseUrl, api }) => {
           modelManager.addCustomProvider({ id, name, baseUrl, api });
           // Only the provider id is recorded — never the base URL or name.
-          analytics.capture("provider_added", { providerId: id, kind: "custom" });
+          analytics.capture("provider_added", {
+            providerId: id,
+            kind: "custom",
+          });
           return getModelProviderGroups();
         },
         updateProvider: async ({
@@ -111,7 +139,11 @@ export const mainWindowRPC: MainWindowRPC =
           return Promise.resolve(modelManager.getDefaultModel());
         },
         testModelConnection: async ({ providerId, modelId, candidate }) => {
-          await testModelConnection({ providerId, modelId, candidate });
+          await streaming.testModelConnection({
+            providerId,
+            modelId,
+            candidate,
+          });
           return null;
         },
         removeCustomModel: async ({ providerId, modelId }) => {
@@ -122,8 +154,8 @@ export const mainWindowRPC: MainWindowRPC =
           modelManager.upsertCustomModel(providerId, model, originalId);
           return getModelProviderGroups();
         },
-        toggleMaximized: async () => {
-          const { mainWindow } = await import("../app/window");
+        toggleMaximized: () => {
+          const mainWindow = getMainWindow();
           if (mainWindow.isMaximized()) {
             mainWindow.unmaximize();
           } else {
@@ -131,12 +163,12 @@ export const mainWindowRPC: MainWindowRPC =
           }
           return { maximized: mainWindow.isMaximized() };
         },
-        isFullScreen: async () => {
-          const { mainWindow } = await import("../app/window");
+        isFullScreen: () => {
+          const mainWindow = getMainWindow();
           return { fullScreen: mainWindow.isFullScreen() };
         },
         ensureRootDir: ({ relativePath }) => {
-          const dir = path.join(getLlmSpaceHomePath(), relativePath);
+          const dir = path.join(homePath, relativePath);
           mkdirSync(dir, { recursive: true });
           return Promise.resolve({ path: dir });
         },
@@ -211,9 +243,9 @@ export const mainWindowRPC: MainWindowRPC =
         mcpListTools: async ({ serverId }) => mcpManager.listTools(serverId),
         mcpCallTool: async ({ serverId, toolName, arguments: args }) =>
           mcpManager.callTool({ serverId, toolName, arguments: args }),
-        builtInListTools: () => listBuiltInTools(),
+        builtInListTools: () => tools.listTools(),
         builtInCallTool: ({ name, arguments: args }) =>
-          callBuiltInTool({ name, arguments: args }),
+          tools.call({ name, arguments: args }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>
           Promise.resolve(analytics.setEnabled(enabled)),
@@ -230,11 +262,14 @@ export const mainWindowRPC: MainWindowRPC =
           const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
           return { path };
         },
-        skillsAddPath: ({ path }) => Promise.resolve(skillsManager.addPath(path)),
+        skillsAddPath: ({ path }) =>
+          Promise.resolve(skillsManager.addPath(path)),
         skillsRemovePath: ({ path }) =>
           Promise.resolve(skillsManager.removePath(path)),
         skillsSetSkillHidden: ({ path, skillName, hidden }) =>
-          Promise.resolve(skillsManager.setSkillHidden(path, skillName, hidden)),
+          Promise.resolve(
+            skillsManager.setSkillHidden(path, skillName, hidden)
+          ),
         skillsSetAllSkillsHidden: ({ path, hidden }) =>
           Promise.resolve(skillsManager.setAllSkillsHidden(path, hidden)),
         skillsListSkills: ({ path }) =>
@@ -262,29 +297,27 @@ export const mainWindowRPC: MainWindowRPC =
           await traceManager.writeWorkbench(projectId, traceKey, thread);
           return null;
         },
-        updateMode: () => getUpdateModeSetting(),
+        updateMode: () => updater.getUpdateModeSetting(),
         setUpdateMode: async ({ mode }) => {
-          await setUpdateModeSetting(mode);
+          await updater.setUpdateModeSetting(mode);
           return null;
         },
-        pendingInstalledVersion: () => getInstalledVersion(),
+        pendingInstalledVersion: () => updater.getInstalledVersion(),
       },
       messages: {
         sendStreamThreadRequest: (payload) => {
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
-          // messages. `mainWindowRPC` is assigned by the time this handler runs.
-          void runStreamThread(payload, (message) =>
-            mainWindowRPC.send.receiveStreamThreadResponse(message)
+          // messages. `rpc` is initialized by the time this handler runs.
+          void streaming.run(payload, (message) =>
+            rpc.send.receiveStreamThreadResponse(message)
           );
         },
-        abortStreamThread: (payload) => abortStreamThread(payload),
+        abortStreamThread: (payload) => streaming.abort(payload),
         captureAnalyticsEvent: ({ event, properties }) =>
           analytics.capture(event, properties),
-        executeCommand: async (command) => {
-          const { executeCommandInBun } = await import("../commands");
-          const { mainWindow } = await import("../app/window");
-          executeCommandInBun(command, mainWindow);
-        },
+        executeCommand: (command) => executeCommand(command),
       },
     },
   });
+  return rpc;
+}

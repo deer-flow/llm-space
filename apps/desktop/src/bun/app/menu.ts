@@ -5,7 +5,6 @@ import {
 } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
-import { executeCommandInBun } from "../commands";
 
 import { isChineseLocale } from "./locales";
 
@@ -173,8 +172,6 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
   ];
 }
 
-ApplicationMenu.setApplicationMenu(_buildMenu(false));
-
 /**
  * Flip the app menu's update item between "Check for Updates…" and
  * "Restart to Update". Called by the updater service when a download becomes
@@ -235,13 +232,17 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
 };
 
 /**
- * Wire the application-menu actions to the main window. Called after the window
- * exists (the menu itself is set at import time above).
+ * Install the application menu and wire its actions to the main window. Called
+ * once after the window exists.
  */
-export function registerMenuActions(window: BrowserWindow) {
+export function registerMenuActions(
+  window: BrowserWindow,
+  executeCommand: (command: Command, window: BrowserWindow) => void
+) {
+  ApplicationMenu.setApplicationMenu(_buildMenu(false));
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
     const command = MENU_ACTION_COMMANDS[action];
-    if (command) executeCommandInBun(command, window);
+    if (command) executeCommand(command, window);
   });
 }
