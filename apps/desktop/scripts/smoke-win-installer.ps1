@@ -126,7 +126,9 @@ public static class ManifestReader {
 $bunManifest = [ManifestReader]::Read($bunExe)
 Assert-True ($null -ne $bunManifest) "bun.exe embeds an RT_MANIFEST resource"
 Assert-True ($bunManifest -match "<dpiAware[^>]*>\s*true\s*</dpiAware>") "bun.exe manifest declares system DPI awareness"
-Assert-True ($bunManifest -notmatch "PerMonitorV2") "bun.exe manifest is NOT PerMonitorV2 (framework can't rescale webviews)"
+# Check the element, not the raw text — the manifest's own comment block
+# explains WHY PerMonitorV2 is avoided and contains the phrase.
+Assert-True ($bunManifest -notmatch "<dpiAwareness") "bun.exe manifest has no <dpiAwareness> element (PerMonitorV2 breaks electrobun layout)"
 Assert-True ($bunManifest -match "longPathAware") "bun.exe manifest keeps longPathAware (stock bun setting)"
 
 # Icon resources: the taskbar falls back to the window-owning exe's icon.
