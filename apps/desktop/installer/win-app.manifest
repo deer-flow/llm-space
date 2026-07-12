@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Embedded into bin\bun.exe and bin\launcher.exe by scripts/brand-win-binaries.ts
+  Embedded into the bundled Windows exes by scripts/brand-win-binaries.ts
   (electrobun postBuild hook, Windows only).
 
   This is stock bun.exe's manifest (asInvoker + longPathAware + SegmentHeap —
-  keep those: bun relies on them) plus DPI awareness. The app window is created
-  inside the bun.exe process (libNativeWrapper via FFI), which ships DPI-unaware,
-  so Windows bitmap-stretches the UI at >100% scaling (blurry). PerMonitorV2
-  makes rendering crisp; the native wrapper already queries GetDpiForMonitor,
-  which returns real values once the process is DPI-aware. dpiAware true/pm is
-  the pre-1703 fallback.
+  keep those: bun relies on them) plus SYSTEM DPI awareness. The app window is
+  created inside the bun.exe process (libNativeWrapper via FFI), which ships
+  DPI-unaware, so Windows bitmap-stretches the UI at >100% scaling (blurry).
+
+  Deliberately system-aware, NOT PerMonitorV2: electrobun's win32 layer has no
+  WM_DPICHANGED handling and sizes webview bounds once at creation (only
+  fullSize views track WM_SIZE), so under PerMonitorV2 the content rendered
+  squeezed into the top-left of the window (VM round-2 finding). System-aware
+  keeps creation-time sizing self-consistent: crisp at the primary monitor's
+  scale from launch, correct layout; a mid-session monitor/scale change
+  degrades to bitmap stretch like every system-aware app. True per-monitor
+  support needs framework work in electrobun (WM_DPICHANGED + webview
+  rescale) — tracked for the upstream report.
 -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" manifestVersion="1.0">
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -21,8 +28,7 @@
   </trustInfo>
   <asmv3:application>
     <asmv3:windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
       <heapType xmlns="http://schemas.microsoft.com/SMI/2020/WindowsSettings">SegmentHeap</heapType>
     </asmv3:windowsSettings>

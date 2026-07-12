@@ -103,7 +103,7 @@ Configure a working model in Settings → Models, then create a Thread:
 | # | Step | Expected |
 |---|---|---|
 | 8.1 | Repeat §1 + §2.1–2.6 in a Win10 x64 VM | Best-effort support: working is great, problems are recorded as known limitations, non-blocking |
-| 8.2 | A display at 150% system DPI scaling | UI stays sharp, no blurriness |
+| 8.2 | A display at 150% system DPI scaling | UI is sharp at the scale that was active when the app started, and the layout fills the window. Changing the display scale (or moving to a differently-scaled monitor) mid-session may blur until relaunch — known limitation: per-monitor DPI needs upstream electrobun support |
 | 8.3 | Observe window shadow/border under a light system theme | No obvious visual glitches |
 
 ## 9. Uninstall verification (run last — removes the install)

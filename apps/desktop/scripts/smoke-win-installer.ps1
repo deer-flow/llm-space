@@ -77,14 +77,42 @@ $installLog = Join-Path $root "install.log"
 Assert-True (Test-Path $installLog) "extractor install.log persisted in channel dir"
 Assert-True ([bool](Select-String -Path $installLog -Pattern "Could not get USERPROFILE" -Quiet)) "extractor shortcut step (console-flashing PowerShell spawns) was skipped"
 
-# Branding from scripts/brand-win-binaries.ts (postBuild hook): the firewall
-# prompt is attributed to bun.exe, and bun.exe owns the app window, so its
-# VERSIONINFO and DPI manifest are what users see.
-$bunExe = Join-Path $root "app\bin\bun.exe"
-$bunInfo = (Get-Item $bunExe).VersionInfo
-Assert-True ($bunInfo.FileDescription -eq "LLM Space") "bun.exe FileDescription branded (got '$($bunInfo.FileDescription)')"
-Assert-True ($bunInfo.ProductName -eq "LLM Space") "bun.exe ProductName branded (got '$($bunInfo.ProductName)')"
-Assert-True ([bool](Select-String -Path $bunExe -Pattern "PerMonitorV2" -Quiet)) "bun.exe embeds a PerMonitorV2 DPI manifest"
+# Identity sweep from scripts/brand-win-binaries.ts (postBuild hook): every
+# statically checkable user-visible surface. bun.exe owns the window (taskbar
+# icon, firewall prompt, Task Manager); launcher.exe is the shortcut target;
+# the helpers show in Task Manager during self-updates.
+$binDir = Join-Path $root "app\bin"
+foreach ($exe in "bun.exe", "launcher.exe") {
+  $info = (Get-Item (Join-Path $binDir $exe)).VersionInfo
+  Assert-True ($info.FileDescription -eq "LLM Space") "$exe FileDescription branded (got '$($info.FileDescription)')"
+  Assert-True ($info.ProductName -eq "LLM Space") "$exe ProductName branded (got '$($info.ProductName)')"
+  Assert-True ($info.CompanyName -eq "DeerFlow") "$exe CompanyName branded (got '$($info.CompanyName)')"
+}
+foreach ($exe in "bspatch.exe", "zig-zstd.exe") {
+  $info = (Get-Item (Join-Path $binDir $exe)).VersionInfo
+  Assert-True ($info.FileDescription -eq "LLM Space update helper") "$exe FileDescription branded (got '$($info.FileDescription)')"
+}
+
+$bunExe = Join-Path $binDir "bun.exe"
+# DPI manifest: deliberately SYSTEM-aware, not PerMonitorV2 — electrobun's
+# win32 layer cannot rescale webviews mid-flight (VM round-2 regression).
+Assert-True ([bool](Select-String -Path $bunExe -Pattern "dpiAware" -Quiet)) "bun.exe embeds a DPI-aware manifest"
+Assert-True (-not (Select-String -Path $bunExe -Pattern "PerMonitorV2" -Quiet)) "bun.exe manifest is NOT PerMonitorV2 (framework can't rescale webviews)"
+
+# Icon resources: the taskbar falls back to the window-owning exe's icon.
+# ExtractAssociatedIcon returns Windows' generic exe icon for a resource-less
+# binary — compare against bspatch.exe (deliberately not icon-branded).
+Add-Type -AssemblyName System.Drawing
+function Get-IconBytes([string]$path) {
+  $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
+  $ms = New-Object System.IO.MemoryStream
+  $icon.ToBitmap().Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+  return [Convert]::ToBase64String($ms.ToArray())
+}
+$genericIcon = Get-IconBytes (Join-Path $binDir "bspatch.exe")
+Assert-True ((Get-IconBytes $bunExe) -ne $genericIcon) "bun.exe carries a real icon resource (taskbar/alt-tab identity)"
+Assert-True ((Get-IconBytes (Join-Path $binDir "launcher.exe")) -ne $genericIcon) "launcher.exe carries a real icon resource"
+
 & $bunExe --version | Out-Null
 Assert-True ($LASTEXITCODE -eq 0) "bun.exe still executes after rcedit branding"
 

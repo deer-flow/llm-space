@@ -4,22 +4,32 @@
  * the update feed tarball, and the delta-patch chain (postBuild runs before
  * electrobun's createTar/hash — nothing downstream ever sees unbranded bytes).
  *
- * Why:
- * - bun.exe ships with ProductName/FileDescription "Bun"/"Oven", and it is
- *   the process that listens on electrobun's RPC socket — so the first-run
- *   Windows Firewall prompt is attributed to "Bun". Rebrand its VERSIONINFO
- *   so the prompt (and Task Manager) say "LLM Space". The prompt itself is
- *   upstream behavior (electrobun#362-adjacent).
- * - bun.exe also owns the app window (libNativeWrapper via FFI) but ships
- *   DPI-unaware, so the UI is bitmap-stretched (blurry) at >100% scaling.
- *   Embed a PerMonitorV2 manifest (installer/win-app.manifest — stock bun
- *   manifest + DPI declarations).
- * - launcher.exe ships with no resources at all (no icon/version/manifest);
- *   give it the same treatment best-effort — it creates no windows, so this
- *   is cosmetic (Explorer/file-properties identity) and non-fatal on error.
+ * This is the systematic "identity leak" sweep: every user-visible surface on
+ * Windows that derives identity from an exe's resources gets branded here.
+ * - bun.exe is the app's real face: it owns the window (libNativeWrapper via
+ *   FFI), so the taskbar/alt-tab icon falls back to ITS icon resource, and it
+ *   listens on electrobun's RPC socket, so the first-run firewall prompt
+ *   shows ITS FileDescription (the prompt appearing at all is upstream,
+ *   electrobun#362-adjacent). Stock bun.exe says "Bun"/"Oven" and carries the
+ *   Bun icon — replace icon + VERSIONINFO, and embed the DPI manifest
+ *   (installer/win-app.manifest; system-aware — see its header for why not
+ *   PerMonitorV2).
+ * - launcher.exe (shortcut target, Explorer/file-properties surface) ships
+ *   with no resources at all — same icon/VERSIONINFO/manifest treatment.
+ * - bspatch.exe / zig-zstd.exe appear in Task Manager during self-updates —
+ *   VERSIONINFO so they read as LLM Space helpers, not anonymous tools.
+ *
+ * Surfaces that CANNOT be branded from here (for the upstream report):
+ * SmartScreen's "Unknown publisher" (needs Authenticode signing); taskbar
+ * pin identity across processes (shortcuts target launcher.exe but the
+ * window lives in bun.exe — proper AppUserModelID needs an in-process
+ * SetCurrentProcessExplicitAppUserModelID call paired with .lnk property
+ * writes; both-or-neither, else taskbar matching regresses); WebView2's
+ * msedgewebview2.exe children (Microsoft's runtime, expected).
  *
  * Invoked by scripts/post-build.ts with electrobun's hook env; a bun.exe
- * branding failure fails the build (the smoke test asserts the result).
+ * branding failure fails the build; the smoke test asserts every statically
+ * checkable surface.
  */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -58,40 +68,62 @@ for (const path of [binDir, manifest, icon]) {
   }
 }
 
+const brandedStrings = {
+  ProductName: APP_DISPLAY_NAME,
+  FileDescription: APP_DISPLAY_NAME,
+  CompanyName: PUBLISHER,
+};
+
 // The window-owning, socket-listening process: branding it is the point.
+// Its icon is what the taskbar and alt-tab show (no window-class icon is set
+// by the native layer, so Windows falls back to the exe resource).
 try {
   await rcedit(join(binDir, "bun.exe"), {
-    "version-string": {
-      ProductName: APP_DISPLAY_NAME,
-      FileDescription: APP_DISPLAY_NAME,
-      CompanyName: PUBLISHER,
-    },
+    "version-string": brandedStrings,
     "product-version": productVersion,
+    icon,
     "application-manifest": manifest,
   });
-  console.info("brand-win-binaries: bun.exe — branded (VERSIONINFO + PerMonitorV2 manifest)");
+  console.info("brand-win-binaries: bun.exe — branded (icon + VERSIONINFO + DPI manifest)");
 } catch (error) {
   console.error(`brand-win-binaries: bun.exe branding failed: ${String(error)}`);
   process.exit(1);
 }
 
-// launcher.exe has no resource section at all; rescle may or may not be able
-// to create one. Cosmetic either way (it spawns bun.exe and exits the UI
-// path), so best-effort.
-try {
-  await rcedit(join(binDir, "launcher.exe"), {
-    "version-string": {
-      ProductName: APP_DISPLAY_NAME,
-      FileDescription: APP_DISPLAY_NAME,
-      CompanyName: PUBLISHER,
+// The remaining exes are cosmetic surfaces (Explorer, file properties, Task
+// Manager during updates) — best-effort, never fail the build over them.
+const cosmetic: [string, Parameters<typeof rcedit>[1]][] = [
+  [
+    "launcher.exe",
+    {
+      "version-string": brandedStrings,
+      "product-version": productVersion,
+      icon,
+      "application-manifest": manifest,
     },
-    "product-version": productVersion,
-    icon,
-    "application-manifest": manifest,
-  });
-  console.info("brand-win-binaries: launcher.exe — branded (icon + VERSIONINFO + manifest)");
-} catch (error) {
-  console.warn(
-    `brand-win-binaries: launcher.exe branding skipped (non-fatal): ${String(error)}`
-  );
+  ],
+  [
+    "bspatch.exe",
+    {
+      "version-string": { ...brandedStrings, FileDescription: `${APP_DISPLAY_NAME} update helper` },
+      "product-version": productVersion,
+    },
+  ],
+  [
+    "zig-zstd.exe",
+    {
+      "version-string": { ...brandedStrings, FileDescription: `${APP_DISPLAY_NAME} update helper` },
+      "product-version": productVersion,
+    },
+  ],
+];
+for (const [name, options] of cosmetic) {
+  try {
+    await rcedit(join(binDir, name), options);
+    console.info(`brand-win-binaries: ${name} — branded`);
+  } catch (error) {
+    console.warn(
+      `brand-win-binaries: ${name} branding skipped (non-fatal): ${String(error)}`
+    );
+  }
 }
