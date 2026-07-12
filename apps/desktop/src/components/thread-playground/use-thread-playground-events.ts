@@ -14,13 +14,17 @@ export function useThreadPlaygroundEvents(
   callbacks: ThreadPlaygroundEventCallbacks
 ): void {
   const onChangeRef = useRef(callbacks.onChange);
-  onChangeRef.current = callbacks.onChange;
-
   const onStreamingStartRef = useRef(callbacks.onStreamingStart);
-  onStreamingStartRef.current = callbacks.onStreamingStart;
-
   const onStreamingEndRef = useRef(callbacks.onStreamingEnd);
-  onStreamingEndRef.current = callbacks.onStreamingEnd;
+
+  // Keep the callback refs current after each commit. The store subscription
+  // below reads them only when the store fires (always post-commit), so a
+  // passive effect is enough and avoids mutating refs during render.
+  useEffect(() => {
+    onChangeRef.current = callbacks.onChange;
+    onStreamingStartRef.current = callbacks.onStreamingStart;
+    onStreamingEndRef.current = callbacks.onStreamingEnd;
+  });
 
   useEffect(() => {
     return store.subscribe((state, prevState) => {
