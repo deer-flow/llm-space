@@ -40,6 +40,7 @@ import { Slider } from "../../ui/slider";
 import { Switch } from "../../ui/switch";
 import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
+import { DEFAULT_JSON_SCHEMA, JsonSchemaDialog } from "./json-schema-dialog";
 import { ModelCard } from "./model-card";
 
 const REASONING_LEVELS: { value: ReasoningLevel; label: string }[] = [
@@ -119,6 +120,14 @@ export function ModelParamsPopover({
   const temperature = params.temperature ?? DEFAULT_TEMPERATURE;
   const reasoning = params.reasoning ?? DEFAULT_REASONING;
   const maxTokens = params.maxTokens;
+
+  const responseType = params.responseType;
+  const hasResponseFormat = responseType !== undefined;
+  const responseFormat =
+    responseType?.type === "json_schema" ? "json_schema" : "json_object";
+  const responseSchema =
+    responseType?.type === "json_schema" ? responseType.jsonSchema : undefined;
+  const [schemaDialogOpen, setSchemaDialogOpen] = useState(false);
 
   const [draftMaxTokens, setDraftMaxTokens] = useState(
     maxTokens !== undefined ? String(maxTokens) : ""
@@ -304,8 +313,70 @@ export function ModelParamsPopover({
               </SelectContent>
             </Select>
           </ParamField>
+
+          <ParamField
+            label="Response format"
+            enabled={hasResponseFormat}
+            readonly={readonly}
+            onEnabledChange={(enabled) => {
+              updateModelParams({
+                responseType: enabled ? { type: "json_object" } : undefined,
+              });
+            }}
+          >
+            <Select
+              value={responseFormat}
+              disabled={readonly}
+              onValueChange={(value) => {
+                updateModelParams({
+                  responseType:
+                    value === "json_schema"
+                      ? {
+                          type: "json_schema",
+                          jsonSchema: responseSchema ?? DEFAULT_JSON_SCHEMA,
+                        }
+                      : { type: "json_object" },
+                });
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="mt-2 w-full"
+                aria-label="Response format"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="font-mono">
+                <SelectItem value="json_object">JSON object</SelectItem>
+                <SelectItem value="json_schema">JSON schema</SelectItem>
+              </SelectContent>
+            </Select>
+            {responseFormat === "json_schema" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                disabled={readonly}
+                onClick={() => setSchemaDialogOpen(true)}
+              >
+                Edit schema
+              </Button>
+            ) : null}
+          </ParamField>
         </PopoverContent>
       </Popover>
+      {/* Rendered outside the Popover so the modal survives the popover closing
+          when focus moves into the dialog. */}
+      <JsonSchemaDialog
+        open={schemaDialogOpen}
+        onOpenChange={setSchemaDialogOpen}
+        schema={responseSchema}
+        onSave={(jsonSchema) => {
+          updateModelParams({
+            responseType: { type: "json_schema", jsonSchema },
+          });
+        }}
+      />
     </div>
   );
 }

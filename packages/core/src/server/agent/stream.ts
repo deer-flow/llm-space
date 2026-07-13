@@ -9,6 +9,8 @@ import type { Api, Message, Model, Models, Tool } from "@earendil-works/pi-ai";
 import { RUN_LAST_MESSAGE_ERROR } from "../../client/run-eligibility";
 import type { AgentStreamRequest } from "../../types/agent";
 
+import { applyResponseFormat } from "./response-format";
+
 /**
  * Run a single agent stream: validate, resolve the model from the given
  * `Models` collection, and drive the agent loop — yielding each `AgentEvent`.
@@ -86,6 +88,12 @@ export async function* streamAgent(
   const hasConfiguredHeaders =
     configuredHeaders && Object.keys(configuredHeaders).length > 0;
 
+  // A configured structured-output format ("json_object"/"json_schema"). pi-ai
+  // has no typed option for it, so we inject it per-provider through the
+  // `onPayload` hook in the streamFn below (see `applyResponseFormat`).
+  const responseType = request.config?.model?.responseType;
+  const hasResponseFormat = responseType && responseType.type !== "text";
+
   const agentStream = agentLoopContinue(
     {
       ...request.context,
@@ -108,17 +116,30 @@ export async function* streamAgent(
     // provider's own `auth` config (e.g. `envApiKeyAuth`). The default
     // streamFn is the legacy compat layer, which only knows a hardcoded
     // builtin provider→env-var map and ignores custom providers' auth.
-    (streamModel, streamContext, streamOptions) =>
-      models.streamSimple(
-        streamModel,
-        streamContext,
-        hasConfiguredHeaders
-          ? {
-              ...streamOptions,
-              headers: { ...configuredHeaders, ...streamOptions?.headers },
-            }
-          : streamOptions
-      )
+    (streamModel, streamContext, streamOptions) => {
+      const mergedOptions = { ...streamOptions };
+      if (hasConfiguredHeaders) {
+        mergedOptions.headers = {
+          ...configuredHeaders,
+          ...streamOptions?.headers,
+        };
+      }
+      if (hasResponseFormat) {
+        // Chain onto any existing payload hook, then inject the response format.
+        const priorOnPayload = mergedOptions.onPayload;
+        mergedOptions.onPayload = async (payload, payloadModel) => {
+          const replaced = priorOnPayload
+            ? await priorOnPayload(payload, payloadModel)
+            : undefined;
+          return applyResponseFormat(
+            replaced ?? payload,
+            payloadModel,
+            responseType
+          );
+        };
+      }
+      return models.streamSimple(streamModel, streamContext, mergedOptions);
+    }
   );
 
   try {
