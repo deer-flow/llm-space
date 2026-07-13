@@ -1,7 +1,7 @@
 /**
  * Cut a release: preflight checks → commit-and-tag-version (bump the version in
- * apps/desktop/package.json, update CHANGELOG.md, commit, tag) → push. The tag
- * push triggers the release workflow; the `-canary` suffix selects the channel.
+ * apps/desktop/package.json, commit, tag) → push. The tag push triggers the
+ * release workflow; the `-canary` suffix selects the channel.
  *
  * Usage:
  *   bun run release                         # stable (graduates a prerelease)

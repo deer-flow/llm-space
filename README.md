@@ -61,6 +61,8 @@ Once Bun is ready, install the project from the repo root:
 bun install
 ```
 
+Contributing, or want the exact toolchain CI uses? Install [mise](https://mise.jdx.dev) and run `mise run setup` instead — it installs the locked Bun version (from `mise.lock`) plus JS deps in one step.
+
 ## Run the app
 
 Start the desktop app for local development:
