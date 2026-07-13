@@ -38,6 +38,12 @@ export function ModelConfigEditor({
   if (resolvedModel?.reasoning && model?.params?.reasoning !== undefined) {
     paramSummary.push({ label: "reasoning", value: model.params.reasoning });
   }
+  if (model?.params?.responseType !== undefined) {
+    paramSummary.push({
+      label: "response_format",
+      value: model.params.responseType.type,
+    });
+  }
 
   return (
     <div className={cn("group flex w-full", className)}>
