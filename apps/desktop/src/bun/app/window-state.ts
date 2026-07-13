@@ -1,5 +1,6 @@
 import {
   saveWindowFrame,
+  saveWindowFullScreen,
   saveWindowMaximized,
   saveWindowZoom,
 } from "@llm-space/core/server";
@@ -8,7 +9,11 @@ import { app, type BrowserWindow } from "electrobun/bun";
 const SAVE_DEBOUNCE_MS = 300;
 
 function persistWindowState(win: BrowserWindow) {
-  if (win.isMaximized()) {
+  // In fullscreen/maximized the frame reflects the expanded bounds, so we only
+  // record the flag and leave the last real frame untouched for restore.
+  if (win.isFullScreen()) {
+    void saveWindowFullScreen(true);
+  } else if (win.isMaximized()) {
     void saveWindowMaximized(true);
   } else {
     void saveWindowFrame(win.getFrame());
@@ -17,9 +22,11 @@ function persistWindowState(win: BrowserWindow) {
 
 function attachWindowStatePersistence(
   win: BrowserWindow,
-  options?: { isMaximized?: boolean },
+  options?: { isMaximized?: boolean; isFullScreen?: boolean },
 ) {
-  if (options?.isMaximized) {
+  if (options?.isFullScreen) {
+    win.setFullScreen(true);
+  } else if (options?.isMaximized) {
     win.maximize();
   }
 
@@ -90,11 +97,15 @@ export function attachWindowStates(
   win: BrowserWindow,
   options: {
     isMaximized?: boolean;
+    isFullScreen?: boolean;
     zoom?: number;
     onFullScreenChange: (fullScreen: boolean) => void;
   },
 ) {
-  attachWindowStatePersistence(win, { isMaximized: options.isMaximized });
+  attachWindowStatePersistence(win, {
+    isMaximized: options.isMaximized,
+    isFullScreen: options.isFullScreen,
+  });
   attachZoomPersistence(win, options.zoom ?? 1);
   attachFullScreenSync(win, options.onFullScreenChange);
 }

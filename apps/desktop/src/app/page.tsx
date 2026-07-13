@@ -158,6 +158,31 @@ function hasFiles(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes("Files");
 }
 
+// Persisted width (in px) of the sidebar file-tree panel, so it survives
+// restarts. Collapsing sets the panel to 0 — we never store that, so reopening
+// restores the last dragged width.
+const SIDEBAR_SIZE_KEY = "llm-space:sidebar-size";
+const DEFAULT_SIDEBAR_SIZE = "16.7%";
+
+function readSidebarSize(): number | string {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SIZE_KEY);
+    const size = raw ? Number(raw) : NaN;
+    if (Number.isFinite(size) && size > 0) return size;
+  } catch {
+    // localStorage unavailable — fall back to the default.
+  }
+  return DEFAULT_SIDEBAR_SIZE;
+}
+
+function writeSidebarSize(sizeInPixels: number): void {
+  try {
+    localStorage.setItem(SIDEBAR_SIZE_KEY, String(Math.round(sizeInPixels)));
+  } catch {
+    // Ignore write failures (e.g. storage disabled / full).
+  }
+}
+
 function PageInner() {
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
@@ -177,8 +202,11 @@ function PageInner() {
     activatePrevious,
   } = tabs;
 
-  // Collapse / expand the left side panel.
+  // Collapse / expand the left side panel. The initial width is recovered from
+  // localStorage once (lazy ref init) and fed straight into `defaultSize`, so
+  // restoring it costs no extra render on startup.
   const sidebarPanelRef = usePanelRef();
+  const defaultSidebarSize = useRef(readSidebarSize());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleSidebar = useCallback(() => {
     const panel = sidebarPanelRef.current;
@@ -386,9 +414,14 @@ function PageInner() {
             panelRef={sidebarPanelRef}
             collapsible
             collapsedSize={0}
-            defaultSize="16.7%"
+            defaultSize={defaultSidebarSize.current}
             minSize={200}
-            onResize={(size) => setSidebarOpen(size.inPixels > 0)}
+            onResize={(size) => {
+              setSidebarOpen(size.inPixels > 0);
+              // Persist the dragged width, but never the collapsed (0) state so
+              // reopening restores the last real width.
+              if (size.inPixels > 0) writeSidebarSize(size.inPixels);
+            }}
           >
             <FileSystemTreeView
               className={

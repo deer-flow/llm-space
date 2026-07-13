@@ -1,6 +1,7 @@
 import {
   DEFAULT_WINDOW_FRAME,
   getWindowFrame,
+  getWindowFullScreen,
   getWindowMaximized,
   getWindowZoom,
   loadWindowState,
@@ -59,6 +60,7 @@ export async function createMainWindow({
 
   attachWindowStates(window, {
     isMaximized: getWindowMaximized(windowState),
+    isFullScreen: getWindowFullScreen(windowState),
     zoom: savedZoom,
     onFullScreenChange: (fullScreen) => {
       rpc.send.fullScreenChanged({ fullScreen });

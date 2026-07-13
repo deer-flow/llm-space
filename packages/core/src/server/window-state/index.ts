@@ -14,6 +14,8 @@ export interface WindowState {
   frame?: WindowFrame;
   /** Whether the main window was maximized when last closed. */
   isMaximized?: boolean;
+  /** Whether the main window was in OS fullscreen when last closed. */
+  isFullScreen?: boolean;
   /** WebKit page zoom level (1.0 = 100%). */
   zoom?: number;
 }
@@ -48,6 +50,10 @@ export function getWindowMaximized(state: WindowState): boolean {
   return state.isMaximized === true;
 }
 
+export function getWindowFullScreen(state: WindowState): boolean {
+  return state.isFullScreen === true;
+}
+
 export function getWindowZoom(state: WindowState): number | undefined {
   const zoom = state.zoom;
   return typeof zoom === "number" && Number.isFinite(zoom) && zoom > 0
@@ -78,12 +84,24 @@ async function writeWindowState(next: WindowState): Promise<void> {
 
 export async function saveWindowFrame(frame: WindowFrame): Promise<void> {
   const state = await loadWindowState();
-  await writeWindowState({ ...state, frame, isMaximized: false });
+  await writeWindowState({
+    ...state,
+    frame,
+    isMaximized: false,
+    isFullScreen: false,
+  });
 }
 
 export async function saveWindowMaximized(isMaximized: boolean): Promise<void> {
   const state = await loadWindowState();
-  await writeWindowState({ ...state, isMaximized });
+  await writeWindowState({ ...state, isMaximized, isFullScreen: false });
+}
+
+export async function saveWindowFullScreen(
+  isFullScreen: boolean
+): Promise<void> {
+  const state = await loadWindowState();
+  await writeWindowState({ ...state, isFullScreen });
 }
 
 export async function saveWindowZoom(zoom: number): Promise<void> {
