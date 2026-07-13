@@ -12,7 +12,7 @@ interface GithubStarReminder {
   // How many times the app has been opened (bumped once per launch). The very
   // first appearance is gated on this reaching 2 — i.e. the second open.
   openCount?: number;
-  // When we last decided to show the reminder (ms epoch); anchors the 4-day
+  // When we last decided to show the reminder (ms epoch); anchors the 2-day
   // throttle for every appearance after the first.
   lastShownDate?: number;
   // How many times the reminder has been shown; capped at MAX_SHOWN_COUNT.
@@ -28,8 +28,8 @@ interface RemindersState {
 
 const STATE_PATH = join(getSettingsDir(), "reminders.json");
 
-/** Show the star nudge at most once every 4 days. */
-const REMINDER_INTERVAL_MS = 4 * 24 * 60 * 60 * 1000;
+/** Show the star nudge at most once every 2 days. */
+const REMINDER_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
 /** Give up (retire the reminder) after this many shows, click or no click. */
 const MAX_SHOWN_COUNT = 3;
 
@@ -62,7 +62,7 @@ function _shouldShow(
   // First appearance is gated on the *second* open of the whole lifetime, not
   // on elapsed time — the first launch just counts and stays silent.
   if (star.lastShownDate == null) return openCount >= 2;
-  // Every appearance after the first is throttled to once every 4 days.
+  // Every appearance after the first is throttled to once every 2 days.
   return now - star.lastShownDate >= REMINDER_INTERVAL_MS;
 }
 
@@ -73,7 +73,7 @@ function _shouldShow(
  * Rules (checked once per launch):
  * - Every launch bumps `openCount`; the first launch stays silent.
  * - The reminder first appears on the second open, regardless of elapsed time.
- * - Later appearances are throttled to once every 4 days since the last show.
+ * - Later appearances are throttled to once every 2 days since the last show.
  * - Retire permanently once the user clicks through, or after 3 shows.
  */
 export async function resolveGithubStarReminder(): Promise<{ show: boolean }> {
