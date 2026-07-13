@@ -18,7 +18,13 @@ export function useAutoAnimation<T extends HTMLElement = HTMLElement>(
   const frameIdsRef = useRef<number[]>([]);
   const nodeRef = useRef<T | null>(null);
 
-  configRef.current = config;
+  // Keep the latest config in a ref for the post-commit rAF consumer
+  // (`initialize`) to read. Assign in a passive effect rather than the render
+  // body so the ref is never mutated during a render React may replay or
+  // discard.
+  useEffect(() => {
+    configRef.current = config;
+  });
 
   const cancelScheduledInit = useCallback(() => {
     for (const frameId of frameIdsRef.current) {
