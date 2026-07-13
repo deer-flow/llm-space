@@ -90,7 +90,7 @@ function _map(value: unknown, fn: (data: string) => string): unknown {
  * across every run-history snapshot — collapse to a single table entry. Threads
  * with no offloadable images are returned unchanged. `thread` is never mutated.
  */
-export function packThreadImages(thread: Thread): Thread | PackedThread {
+export function packThreadImages(thread: Thread): Thread {
   const table: Record<string, string> = {};
   const hashByData = new Map<string, string>();
 
@@ -106,7 +106,7 @@ export function packThreadImages(thread: Thread): Thread | PackedThread {
   }) as Thread;
 
   if (hashByData.size === 0) return thread;
-  return { ...packed, blobs: table };
+  return { ...packed, blobs: table } as PackedThread;
 }
 
 /**
@@ -116,11 +116,9 @@ export function packThreadImages(thread: Thread): Thread | PackedThread {
  */
 export function unpackThreadImages(parsed: Thread): Thread {
   const packed = parsed as PackedThread;
-  const table = packed.blobs;
-  if (!table) return parsed;
+  if (!packed.blobs) return parsed;
 
-  const thread: Thread = { ...packed };
-  delete (thread as PackedThread).blobs;
+  const { blobs: table, ...thread } = packed;
   return _map(thread, (data) => {
     const hash = _parseRef(data);
     return hash ? (table[hash] ?? data) : data;
