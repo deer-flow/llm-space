@@ -1,14 +1,14 @@
 name: Release
 
-# Cut releases by pushing a `v*` tag (use `bun run release` / `release:canary`,
-# which bumps apps/desktop/package.json, updates CHANGELOG.md, commits and tags).
+# Cut releases by pushing a `v*` tag (use `mise run release` / `release:canary`,
+# which bumps apps/desktop/package.json, commits and tags).
 # A `-canary` suffix in the tag selects the canary channel; otherwise stable.
 #
 # Jobs: meta (validate tag) → build (macOS arm64 + x64 matrix: sign, notarize,
 # smoke-test) → publish. Artifacts land in two places:
 #   - the rolling `updates` release — the machine-readable update feed the
 #     in-app updater polls (`release.baseUrl` in electrobun.config.ts)
-#   - a versioned release per tag — DMGs + changelog for humans
+#   - a versioned release per tag — DMGs for humans (static notes)
 
 on:
   push:
@@ -31,7 +31,7 @@ concurrency:
 jobs:
   meta:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}
@@ -53,7 +53,7 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
@@ -75,6 +75,14 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
 
+      # Typecheck once on cheap ubuntu, failing fast before the macOS build
+      # matrix spins up (tsc output is architecture-independent).
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - run: bun install --frozen-lockfile
+
+      - run: mise run typecheck
+
   build:
     needs: meta
     strategy:
@@ -87,14 +95,14 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
       # v4: reads mise.lock (installs the exact locked bun with checksum
-      # verification); its [env]→GITHUB_ENV export excludes PATH entries and
-      # our [env] carries nothing else.
-      - uses: jdx/mise-action@v4
+      # verification) and exports the full `mise env` (incl. PATH) into
+      # GITHUB_ENV — our [env] carries nothing beyond PATH.
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
 
       - run: bun install --frozen-lockfile
 
@@ -133,12 +141,11 @@ jobs:
           echo "ELECTROBUN_APPLEAPIKEYPATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Build, sign and notarize
-        working-directory: apps/desktop
         env:
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.ASC_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
-        run: bun run "build:$CHANNEL"
+        run: mise run "build:$CHANNEL"
 
       - name: Smoke test the signed app
         working-directory: apps/desktop
@@ -170,7 +177,7 @@ jobs:
           }
           pkill -f "$APP/Contents/MacOS/" || true
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.arch }}
           path: apps/desktop/artifacts/
@@ -187,11 +194,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: artifacts-*
           path: artifacts

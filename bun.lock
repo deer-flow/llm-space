@@ -5,10 +5,10 @@
     "": {
       "name": "llm-space",
       "dependencies": {
-        "@earendil-works/pi-agent-core": "^0.80.6",
-        "@earendil-works/pi-ai": "^0.80.6",
-        "react": "^19.2.7",
-        "react-dom": "^19.2.7",
+        "@earendil-works/pi-agent-core": "catalog:",
+        "@earendil-works/pi-ai": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:",
         "typebox": "catalog:",
       },
       "devDependencies": {

@@ -61,6 +61,8 @@ Bun 准备好后，在仓库根目录安装依赖：
 bun install
 ```
 
+如果要参与开发、或想使用与 CI 完全一致的工具链：安装 [mise](https://mise.jdx.dev) 后运行 `mise run setup`，它会一步装好锁定版本的 Bun（来自 `mise.lock`）和 JS 依赖。
+
 ## 运行应用
 
 启动本地开发版桌面应用：

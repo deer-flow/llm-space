@@ -1,14 +1,26 @@
 # Tool versions: fuzzy spec here, exact version + checksums in mise.lock
 # (regenerate with `mise lock` after bumping).
+
+# Oldest mise this workflow supports: lockfiles read by default since 2026.2.0
+# (jdx/mise#7929), `mise lock` stable since 2026.2.5 (jdx/mise#8011).
+min_version = "2026.2.5"
+
 [tools]
 bun = "1.3"
 
 # Deliberately no NODE_ENV here: mise [env] applies to every command run in
-# this directory (and reaches CI through mise-action's shims) — a global
-# NODE_ENV=development leaks into `vite build` and ships dev-mode React.
-# Tools set their own.
+# this directory (and reaches every later CI step via mise-action's
+# `mise env` → GITHUB_ENV export) — a global NODE_ENV=development leaks into
+# `vite build` and ships dev-mode React. Tools set their own.
 [env]
 _.path = "node_modules/.bin"
+
+# mise is the task front door: every human-facing task is listed here, so
+# `mise tasks ls` is the complete inventory. Task bodies forward to
+# package.json scripts (the implementation layer); only setup and the pack*
+# tasks live natively here, for `mise install` bootstrapping and env/dir
+# combos. New user-facing commands get a mise task; new plumbing stays a
+# package.json script.
 
 # --- Setup & dev workflow ---------------------------------------------------
 
@@ -19,7 +31,7 @@ description = "One-shot bootstrap for a fresh clone: install tools + JS deps"
 run = ["mise install", "bun install"]
 
 [tasks.dev]
-description = "Run the desktop app (Vite HMR + electrobun watch)"
+description = "Run the desktop app (Vite HMR on :5173; restart to pick up bun-process changes)"
 run = "bun run dev"
 
 [tasks."dev:cef"]
@@ -27,8 +39,34 @@ description = "Run the desktop app with CEF/CDP debugging on :9333"
 run = "bun run dev:cef"
 
 [tasks.lint]
-description = "Check lint (read-only; `bun run lint` is the --fix variant)"
-run = "bun run lint:check"
+description = "Check lint (read-only)"
+run = "bun run lint"
+
+[tasks."lint:fix"]
+description = "Lint with autofix (eslint --fix)"
+run = "bun run lint:fix"
+
+[tasks.typecheck]
+description = "Typecheck all packages (tsc --noEmit, root + desktop tsconfigs)"
+run = "bun run typecheck"
+
+# --- Build & release (see AGENTS.md "Releases & auto-update") ---------------
+
+[tasks."build:canary"]
+description = "Build the canary app (vite build + electrobun build)"
+run = "bun run build:canary"
+
+[tasks."build:stable"]
+description = "Build the stable app (vite build + electrobun build)"
+run = "bun run build:stable"
+
+[tasks.release]
+description = "Cut a stable release: bump version, tag, push — triggers release CI"
+run = "bun run release"
+
+[tasks."release:canary"]
+description = "Cut a canary prerelease"
+run = "bun run release:canary"
 
 # --- Local packaging (see AGENTS.md "Releases & auto-update") ---------------
 
