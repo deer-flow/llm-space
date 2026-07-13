@@ -1,0 +1,7 @@
+# Keeps the SHA-pinned actions in .github/workflows/ up to date.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
