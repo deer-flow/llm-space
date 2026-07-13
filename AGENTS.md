@@ -4,20 +4,20 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 
 ## Tooling
 
-Use **bun** for everything (fuzzy-pinned in `mise.toml`, exact version + checksums locked in `mise.lock` — regenerate with `mise lock` when bumping). Do not use npm/pnpm/yarn.
+**mise is the task front door** — `mise tasks ls` lists every entry point; task bodies forward to package.json scripts, the implementation layer. **bun** is the package manager and JS runtime (fuzzy-pinned in `mise.toml`, exact version + checksums locked in `mise.lock` — regenerate with `mise lock` when bumping). Do not use npm/pnpm/yarn.
 
 | Task                                   | Command                                                                     | Notes                                                                                                                  |
 | -------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Set up a fresh clone                   | `mise run setup`                                                            | installs the locked toolchain (`mise install`) + JS deps (`bun install`)                                               |
 | Install deps                           | `bun install`                                                               | from repo root                                                                                                         |
-| Run desktop app                        | `bun dev`                                                                   | root script → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `vite build && electrobun dev`; restart to pick up bun main-process changes) |
-| Run desktop app with CEF/CDP debugging | `bun run dev:cef`                                                           | root script → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default                         |
-| Build (canary)                         | `bun run build:canary`                                                      | in `apps/desktop` → `vite build && electrobun build --env=canary`                                                      |
-| Build (stable)                         | `bun run build:stable`                                                      | in `apps/desktop` → `vite build && electrobun build --env=stable`                                                      |
+| Run desktop app                        | `mise run dev`                                                              | → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `vite build && electrobun dev`; restart to pick up bun main-process changes) |
+| Run desktop app with CEF/CDP debugging | `mise run dev:cef`                                                          | → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default                                     |
+| Build (canary)                         | `mise run build:canary`                                                     | → `vite build && electrobun build --env=canary` in `apps/desktop`                                                      |
+| Build (stable)                         | `mise run build:stable`                                                     | → `vite build && electrobun build --env=stable` in `apps/desktop`                                                      |
 | Local packaging / update test          | `mise run pack` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
-| Cut a release                          | `bun run release` / `bun run release:canary`                                | root script → `bun scripts/release.ts`; see "Releases & auto-update"                                                   |
-| Lint                                   | `bun lint` / `bun run lint:fix`                                             | `lint` = `eslint .` (read-only; also `mise run lint`), `lint:fix` = `eslint --fix .`; flat config at repo root         |
-| Typecheck                              | `bun run typecheck`                                                         | `tsc --noEmit` over the root + `apps/desktop` tsconfigs (also `mise run typecheck`)                                    |
+| Cut a release                          | `mise run release` / `mise run release:canary`                              | → `bun scripts/release.ts`; see "Releases & auto-update"                                                               |
+| Lint                                   | `mise run lint` / `mise run lint:fix`                                       | `lint` = `eslint .` (read-only), `lint:fix` = `eslint --fix .`; flat config at repo root                               |
+| Typecheck                              | `mise run typecheck`                                                        | `tsc --noEmit` over the root + `apps/desktop` tsconfigs                                                                |
 | Add a dependency                       | `bun add <pkg>`                                                             | run inside the target package (`apps/desktop` or `packages/core`)                                                      |
 | Add a shadcn/ui component              | `bunx --bun shadcn@latest add <component>`                                  | run inside `apps/desktop`                                                                                              |
 | Run a script from root                 | `bun --filter <pkg> <script>`                                               | e.g. `bun --filter @llm-space/desktop start`                                                                           |
@@ -34,8 +34,8 @@ When you need to inspect or debug the real desktop renderer, use the project
 skill at `./.agents/skills/electrobun-cdp-debug/SKILL.md`. Do **not** mock
 `electrobun.rpc` in a browser.
 
-Start with `bun run dev:cef`; normal `bun dev` keeps the native WebView renderer
-and does not expose CDP.
+Start with `mise run dev:cef`; normal `mise run dev` keeps the native WebView
+renderer and does not expose CDP.
 
 When CEF/CDP verification needs an isolated app data root, put runtime sandbox
 data in the system temporary directory by default, not under `.agents/` or the
@@ -43,7 +43,7 @@ repo:
 
 ```sh
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
-LLM_SPACE_HOME="$TMP_ROOT" bun run dev:cef
+LLM_SPACE_HOME="$TMP_ROOT" mise run dev:cef
 ```
 
 Only keep durable evidence in the repo, such as audit screenshots, notes, logs,
@@ -120,7 +120,7 @@ State is **persisted to disk** under the llm-space root (`~/.llm-space` by defau
 
 ### Releases & auto-update
 
-The app version has a **single source of truth: `apps/desktop/package.json`** — `electrobun.config.ts` imports it, and release CI fails if the pushed tag doesn't match. Cut releases with `bun run release` (stable) or `bun run release:canary`; the script (`scripts/release.ts`) runs `commit-and-tag-version` (conventional-commits-driven version bump + commit + `v*` tag, config in `.versionrc.json`) and pushes atomically. Changelog generation is off (`skip.changelog`), and CI publishes versioned releases with static notes (not `--generate-notes`), keeping release notes minimal. The tag triggers `.github/workflows/release.yml`: build → codesign/notarize (canary/stable only; needs the `MACOS_*`/`ASC_*` signing secrets, mapped to electrobun's `ELECTROBUN_*` env vars in the workflow) → smoke test → upload. Artifacts land in two GitHub releases: the rolling `updates` release is the machine-readable update feed (`release.baseUrl` points at it; **never delete its `.patch` files** — old installs chain through them), and a versioned release carries the DMG for humans. In-app auto-update lives in `bun/updates/` (background check → silent download → "restart to update" toast via the `updateStatusChanged` message); the dev channel never updates.
+The app version has a **single source of truth: `apps/desktop/package.json`** — `electrobun.config.ts` imports it, and release CI fails if the pushed tag doesn't match. Cut releases with `mise run release` (stable) or `mise run release:canary`; the script (`scripts/release.ts`) runs `commit-and-tag-version` (conventional-commits-driven version bump + commit + `v*` tag, config in `.versionrc.json`) and pushes atomically. Changelog generation is off (`skip.changelog`), and CI publishes versioned releases with static notes (not `--generate-notes`), keeping release notes minimal. The tag triggers `.github/workflows/release.yml`: build → codesign/notarize (canary/stable only; needs the `MACOS_*`/`ASC_*` signing secrets, mapped to electrobun's `ELECTROBUN_*` env vars in the workflow) → smoke test → upload. Artifacts land in two GitHub releases: the rolling `updates` release is the machine-readable update feed (`release.baseUrl` points at it; **never delete its `.patch` files** — old installs chain through them), and a versioned release carries the DMG for humans. In-app auto-update lives in `bun/updates/` (background check → silent download → "restart to update" toast via the `updateStatusChanged` message); the dev channel never updates.
 
 Releases ship for **macOS arm64 + x64**. Intel builds need `apps/desktop/scripts/fix-x64-headerpad.ts` (wired as the `postBuild`/`postWrap` hooks): electrobun's darwin-x64 core binaries have no Mach-O headerpad, so signing them corrupts `__text` and the app segfaults on launch (electrobun#485). The hook frees 16 bytes of load-command room before signing and no-ops everywhere else; delete it when upstream fixes #485.
 

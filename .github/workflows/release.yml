@@ -1,6 +1,6 @@
 name: Release
 
-# Cut releases by pushing a `v*` tag (use `bun run release` / `release:canary`,
+# Cut releases by pushing a `v*` tag (use `mise run release` / `release:canary`,
 # which bumps apps/desktop/package.json, commits and tags).
 # A `-canary` suffix in the tag selects the canary channel; otherwise stable.
 #
@@ -141,12 +141,11 @@ jobs:
           echo "ELECTROBUN_APPLEAPIKEYPATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Build, sign and notarize
-        working-directory: apps/desktop
         env:
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.ASC_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
-        run: bun run "build:$CHANNEL"
+        run: mise run "build:$CHANNEL"
 
       - name: Smoke test the signed app
         working-directory: apps/desktop
