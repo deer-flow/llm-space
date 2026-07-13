@@ -1,14 +1,24 @@
 # Tool versions: fuzzy spec here, exact version + checksums in mise.lock
 # (regenerate with `mise lock` after bumping).
+
+# Oldest mise this workflow supports: lockfiles read by default since 2026.2.0
+# (jdx/mise#7929), `mise lock` stable since 2026.2.5 (jdx/mise#8011).
+min_version = "2026.2.5"
+
 [tools]
 bun = "1.3"
 
 # Deliberately no NODE_ENV here: mise [env] applies to every command run in
-# this directory (and reaches CI through mise-action's shims) — a global
-# NODE_ENV=development leaks into `vite build` and ships dev-mode React.
-# Tools set their own.
+# this directory (and reaches every later CI step via mise-action's
+# `mise env` → GITHUB_ENV export) — a global NODE_ENV=development leaks into
+# `vite build` and ships dev-mode React. Tools set their own.
 [env]
 _.path = "node_modules/.bin"
+
+# Task split: mise owns bootstrap (setup), dev-loop forwarding (dev, dev:cef,
+# lint, typecheck) and env/dir packaging combos (pack*, feed:serve). build and
+# release stay bun scripts in package.json — CI locks their toolchain via
+# mise-action + mise.lock, so a mise wrapper would add nothing.
 
 # --- Setup & dev workflow ---------------------------------------------------
 
@@ -19,7 +29,7 @@ description = "One-shot bootstrap for a fresh clone: install tools + JS deps"
 run = ["mise install", "bun install"]
 
 [tasks.dev]
-description = "Run the desktop app (Vite HMR + electrobun watch)"
+description = "Run the desktop app (Vite HMR on :5173; restart to pick up bun-process changes)"
 run = "bun run dev"
 
 [tasks."dev:cef"]
@@ -27,8 +37,12 @@ description = "Run the desktop app with CEF/CDP debugging on :9333"
 run = "bun run dev:cef"
 
 [tasks.lint]
-description = "Check lint (read-only; `bun run lint` is the --fix variant)"
-run = "bun run lint:check"
+description = "Check lint (read-only)"
+run = "bun run lint"
+
+[tasks.typecheck]
+description = "Typecheck all packages (tsc --noEmit, root + desktop tsconfigs)"
+run = "bun run typecheck"
 
 # --- Local packaging (see AGENTS.md "Releases & auto-update") ---------------
 
