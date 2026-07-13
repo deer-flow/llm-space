@@ -12,6 +12,10 @@ import type { Analytics } from "../analytics";
 import { moveToTrash, revealInFileManager } from "../fs";
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
+import {
+  dismissGithubStarReminder,
+  resolveGithubStarReminder,
+} from "../reminders";
 import type { SearchSettingsManager } from "../search";
 import type { SkillsManager } from "../skills";
 import type { StreamThreadController } from "../streaming";
@@ -303,6 +307,11 @@ export function createMainWindowRPC({
           return null;
         },
         pendingInstalledVersion: () => updater.getInstalledVersion(),
+        githubStarReminderShouldShow: () => resolveGithubStarReminder(),
+        githubStarReminderDismissForever: async () => {
+          await dismissGithubStarReminder();
+          return null;
+        },
       },
       messages: {
         sendStreamThreadRequest: (payload) => {

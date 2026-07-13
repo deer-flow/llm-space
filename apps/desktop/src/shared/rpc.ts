@@ -343,6 +343,18 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: string | null;
       };
+      // Decide (and record) whether to show the GitHub-star reminder on this
+      // app open. Seeding + the 4-day throttle + the nag cap all resolve in the
+      // bun side, so the renderer only has to render when `show` is true.
+      githubStarReminderShouldShow: {
+        params: Record<string, never>;
+        response: { show: boolean };
+      };
+      // Retire the star reminder for good (the user clicked through to GitHub).
+      githubStarReminderDismissForever: {
+        params: Record<string, never>;
+        response: null;
+      };
     };
     // Messages the webview SENDS and the bun side handles.
     messages: {

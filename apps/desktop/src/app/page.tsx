@@ -15,6 +15,7 @@ import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { useExperimental } from "@/components/experimental-provider";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { FirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
+import { GithubStarReminder } from "@/components/github-star-reminder";
 import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import { TracePanel } from "@/components/trace-panel";
@@ -493,6 +494,7 @@ function PageInner() {
         </ResizablePanelGroup>
       </main>
       <FirecrawlLimitDialog />
+      <GithubStarReminder />
       <LazyOverlay open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}
