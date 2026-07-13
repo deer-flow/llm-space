@@ -8,6 +8,11 @@ import {
   type Thread,
   type ThreadStorage,
 } from "../../../types";
+import {
+  dehydrateThreadImages,
+  rehydrateThreadImages,
+  type BlobStore,
+} from "../blob";
 
 /**
  * A {@link FileSystem} and {@link ThreadStorage} backed by the local
@@ -20,11 +25,23 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
   private readonly root: string;
 
   /**
+   * Content-addressable store for large inline assets (images). {@link write}
+   * offloads big base64 images to it and {@link read} restores them, so
+   * identical images shared across run-history snapshots cost a single on-disk
+   * blob instead of one copy per snapshot.
+   */
+  private readonly _blobs: BlobStore;
+
+  /**
    * @param root The directory that backs the storage root. Resolved to an
    *   absolute path; all operations are confined within it.
+   * @param blobs Blob store used to de-duplicate large inline images out of
+   *   thread files. Reads of files this store wrote depend on it to restore the
+   *   offloaded images, so it is required rather than optional.
    */
-  constructor(root: string) {
+  constructor(root: string, blobs: BlobStore) {
     this.root = path.resolve(root);
+    this._blobs = blobs;
   }
 
   // --- FileSystem ---------------------------------------------------------
@@ -82,17 +99,17 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
 
   async read(p: string): Promise<Thread> {
     const text = await fs.readFile(this._resolve(p), "utf8");
-    return normalizeThread(JSON.parse(text) as Thread);
+    const parsed = JSON.parse(text) as Thread;
+    const hydrated = await rehydrateThreadImages(parsed, this._blobs);
+    return normalizeThread(hydrated);
   }
 
   async write(p: string, thread: Thread): Promise<void> {
     const real = this._resolve(p);
     await fs.mkdir(path.dirname(real), { recursive: true });
-    await fs.writeFile(
-      real,
-      JSON.stringify(normalizeThread(thread), null, 2),
-      "utf8"
-    );
+    const normalized = normalizeThread(thread);
+    const serializable = await dehydrateThreadImages(normalized, this._blobs);
+    await fs.writeFile(real, JSON.stringify(serializable, null, 2), "utf8");
   }
 
   /**
