@@ -28,12 +28,37 @@ function persistWindowState(win: BrowserWindow) {
   }
 }
 
+/**
+ * Restore a saved maximized state. On win32 electrobun creates the WebView2
+ * controller asynchronously, drops webview resizes that arrive while the
+ * controller doesn't exist yet, and then applies the webview's creation-time
+ * bounds once it does — so maximizing right after window creation reliably
+ * loses that race and leaves the webview at its pre-maximize size (a white
+ * band along the right/bottom edges until the next real resize). The
+ * `did-navigate` event (WebView2's NavigationCompleted) can only fire once
+ * the controller is live, so deferring the maximize until then guarantees
+ * its WM_SIZE reaches the webview. Elsewhere webview frames apply
+ * synchronously and the immediate maximize is fine.
+ */
+function restoreMaximized(win: BrowserWindow) {
+  if (process.platform !== "win32") {
+    win.maximize();
+    return;
+  }
+  let maximized = false;
+  win.webview?.on("did-navigate", () => {
+    if (maximized) return;
+    maximized = true;
+    win.maximize();
+  });
+}
+
 function attachWindowStatePersistence(
   win: BrowserWindow,
   options?: { isMaximized?: boolean },
 ) {
   if (options?.isMaximized) {
-    win.maximize();
+    restoreMaximized(win);
   }
 
   win.on("close", () => {
