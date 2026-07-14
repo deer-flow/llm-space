@@ -2,10 +2,14 @@ import {
   DEFAULT_WINDOW_FRAME,
   getWindowFrame,
   getWindowMaximized,
+  getWindowScaleFactor,
   getWindowZoom,
   loadWindowState,
+  resolveInitialWindowFrame,
+  type WindowFrame,
+  type WindowState,
 } from "@llm-space/core/server";
-import { BrowserWindow, Updater } from "electrobun/bun";
+import { BrowserWindow, Screen, Updater } from "electrobun/bun";
 
 import { mainWindowRPC } from "../rpc";
 
@@ -32,9 +36,30 @@ async function getMainViewUrl(): Promise<string> {
   return "views://mainview/index.html";
 }
 
+/**
+ * On win32 the native layer takes frames as raw physical pixels (no DPI
+ * compensation on the way to CreateWindowExA), so the DIP default — and any
+ * saved frame recorded under a different display scale — must be rescaled to
+ * the current display's scale factor and clamped into its work area.
+ * Everywhere else frames are DIPs end to end and pass through verbatim.
+ */
+function initialWindowFrame(state: WindowState): WindowFrame {
+  const savedFrame = getWindowFrame(state);
+  if (process.platform !== "win32") {
+    return savedFrame ?? DEFAULT_WINDOW_FRAME;
+  }
+  const display = Screen.getPrimaryDisplay();
+  return resolveInitialWindowFrame({
+    savedFrame,
+    savedScaleFactor: getWindowScaleFactor(state),
+    currentScaleFactor: display.scaleFactor,
+    workArea: display.workArea,
+  });
+}
+
 const url = await getMainViewUrl();
 const windowState = await loadWindowState();
-const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
+const initialFrame = initialWindowFrame(windowState);
 const savedZoom = getWindowZoom(windowState) ?? 1;
 
 export const mainWindow = new BrowserWindow({
@@ -50,7 +75,7 @@ export const mainWindow = new BrowserWindow({
   ...(process.platform === "darwin"
     ? { trafficLightOffset: { x: 2, y: 16 } }
     : {}),
-  frame: savedFrame,
+  frame: initialFrame,
 });
 
 attachWindowStates(mainWindow, {

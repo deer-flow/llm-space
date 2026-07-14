@@ -3,15 +3,28 @@ import {
   saveWindowMaximized,
   saveWindowZoom,
 } from "@llm-space/core/server";
-import { app, type BrowserWindow } from "electrobun/bun";
+import { app, Screen, type BrowserWindow } from "electrobun/bun";
 
 const SAVE_DEBOUNCE_MS = 300;
+
+/**
+ * The display scale factor frames are captured under, recorded so a later
+ * launch can rescale them (`resolveInitialWindowFrame`). Only win32 reports a
+ * real factor: it is the one platform where `getFrame()` speaks physical
+ * pixels. macOS/Linux frames are DIPs that never need rescaling — and on a
+ * Retina display `Screen.scaleFactor` would wrongly claim 2.
+ */
+function currentFrameScaleFactor(): number {
+  if (process.platform !== "win32") return 1;
+  const { scaleFactor } = Screen.getPrimaryDisplay();
+  return Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
+}
 
 function persistWindowState(win: BrowserWindow) {
   if (win.isMaximized()) {
     void saveWindowMaximized(true);
   } else {
-    void saveWindowFrame(win.getFrame());
+    void saveWindowFrame(win.getFrame(), currentFrameScaleFactor());
   }
 }
 
