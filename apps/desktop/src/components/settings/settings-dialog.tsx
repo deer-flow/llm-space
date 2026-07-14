@@ -4,6 +4,7 @@ import {
   Boxes,
   Cable,
   FlaskConical,
+  Network,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -17,6 +18,7 @@ import { ExperimentalPage } from "./experimental-page";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
 import { ModelsPage } from "./models-page";
+import { NetworkPage } from "./network-page";
 import { SearchPage } from "./search-page";
 import { SkillsPage } from "./skills-page";
 
@@ -29,6 +31,7 @@ const PAGES = [
   },
   { value: "models", label: "Models", icon: Boxes, Page: ModelsPage },
   { value: "mcp", label: "MCP", icon: Cable, Page: McpPage },
+  { value: "network", label: "Network", icon: Network, Page: NetworkPage },
   { value: "search", label: "Search", icon: Search, Page: SearchPage },
   { value: "skills", label: "Skills", icon: Sparkles, Page: SkillsPage },
   {

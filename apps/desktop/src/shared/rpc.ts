@@ -18,6 +18,7 @@ import type {
   McpServerToolsResponse,
   McpServerView,
 } from "./mcp";
+import type { NetworkSettings, SystemProxyDetection } from "./network";
 import type { SearchSettings } from "./search";
 import type { SkillContent, SkillInfo, SkillsSettings } from "./skills";
 import type {
@@ -242,6 +243,19 @@ export interface DesktopRPCType {
       setSearchSettings: {
         params: { settings: SearchSettings };
         response: SearchSettings;
+      };
+      // The proxy config governing the Bun process's outbound HTTP egress.
+      getNetworkSettings: {
+        params: Record<string, never>;
+        response: NetworkSettings;
+      };
+      setNetworkSettings: {
+        params: { settings: NetworkSettings };
+        response: NetworkSettings;
+      };
+      detectSystemProxy: {
+        params: Record<string, never>;
+        response: SystemProxyDetection;
       };
       // The discovery folders + hidden skills backing the built-in Skill tool.
       skillsGetSettings: {

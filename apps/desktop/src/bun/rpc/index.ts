@@ -12,6 +12,7 @@ import type { Analytics } from "../analytics";
 import { moveToTrash, revealInFileManager } from "../fs";
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
+import type { NetworkSettingsManager } from "../network";
 import {
   dismissGithubStarReminder,
   resolveGithubStarReminder,
@@ -60,6 +61,7 @@ export interface MainWindowRPCDependencies {
   localFs: LocalFileSystem;
   mcpManager: McpManager;
   modelManager: ModelManager;
+  networkSettings: NetworkSettingsManager;
   searchSettings: SearchSettingsManager;
   skillsManager: SkillsManager;
   streaming: StreamThreadController;
@@ -78,6 +80,7 @@ export function createMainWindowRPC({
   localFs,
   mcpManager,
   modelManager,
+  networkSettings,
   searchSettings,
   skillsManager,
   streaming,
@@ -255,6 +258,9 @@ export function createMainWindowRPC({
           Promise.resolve(analytics.setEnabled(enabled)),
         getSearchSettings: () => searchSettings.get(),
         setSearchSettings: ({ settings }) => searchSettings.set(settings),
+        getNetworkSettings: () => networkSettings.get(),
+        setNetworkSettings: ({ settings }) => networkSettings.set(settings),
+        detectSystemProxy: () => networkSettings.detectSystemProxy(),
         skillsGetSettings: () => Promise.resolve(skillsManager.getConfig()),
         skillsBrowseForPath: async () => {
           const selected = await Utils.openFileDialog({

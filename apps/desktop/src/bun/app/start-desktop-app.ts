@@ -13,6 +13,7 @@ import { executeCommandInBun } from "../commands";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
 import { ModelManager } from "../models";
+import { NetworkSettingsManager } from "../network";
 import { createMainWindowRPC, type MainWindowRPC } from "../rpc";
 import { SearchSettingsManager } from "../search";
 import { SkillsManager } from "../skills";
@@ -34,6 +35,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const homePath = getLlmSpaceHomePath();
   const workspacePath = path.join(homePath, "workspace");
   const analytics = new Analytics();
+  // Apply the configured proxy to `process.env` before anything spawns a
+  // subprocess (MCP) or makes a request, so egress is routed from the start.
+  const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
   const searchSettings = new SearchSettingsManager();
@@ -101,6 +105,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       localFs,
       mcpManager,
       modelManager,
+      networkSettings,
       searchSettings,
       skillsManager,
       streaming,
