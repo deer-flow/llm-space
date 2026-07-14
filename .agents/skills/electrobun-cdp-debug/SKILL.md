@@ -40,24 +40,24 @@ the project uses one-off `bunx --bun` invocations.
 From the repo root:
 
 ```sh
-bun run dev:cef
+mise run dev:cef
 ```
 
 This runs the desktop app with CEF and opens CDP on `127.0.0.1:9333`.
 If the port is busy:
 
 ```sh
-LLM_SPACE_DESKTOP_CDP_PORT=9334 bun run dev:cef
+LLM_SPACE_DESKTOP_CDP_PORT=9334 mise run dev:cef
 ```
 
-Normal `bun dev` keeps the native WebView renderer and does not expose CDP.
+Normal `mise run dev` keeps the native WebView renderer and does not expose CDP.
 
 When verification needs an isolated app data root, keep runtime data outside the
 repo:
 
 ```sh
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/llm-space-XXXXXX")"
-LLM_SPACE_HOME="$TMP_ROOT" bun run dev:cef
+LLM_SPACE_HOME="$TMP_ROOT" mise run dev:cef
 ```
 
 ## Inspect Electrobun With The Raw CDP AXI Wrapper
@@ -111,7 +111,7 @@ present, evaluates in the page context, and prints JSON.
 `chrome-devtools-axi` supports existing DevTools endpoints through
 `CHROME_DEVTOOLS_AXI_BROWSER_URL`, but the current CLI and its underlying
 `chrome-devtools-mcp` transport do not yet operate correctly against the
-Electrobun CEF endpoint exposed by `bun run dev:cef`.
+Electrobun CEF endpoint exposed by `mise run dev:cef`.
 
 The observed smoke test shape is:
 

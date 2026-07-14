@@ -68,13 +68,13 @@ bun install
 启动本地开发版桌面应用：
 
 ```bash
-bun dev
+mise run dev
 ```
 
 构建 canary 版本：
 
 ```bash
-bun run build:canary
+mise run build:canary
 ```
 
 ## 用户指南

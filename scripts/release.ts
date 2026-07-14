@@ -4,10 +4,10 @@
  * release workflow; the `-canary` suffix selects the channel.
  *
  * Usage:
- *   bun run release                         # stable (graduates a prerelease)
- *   bun run release:canary                  # next canary prerelease
- *   bun run release --release-as 0.2.0      # force an exact version
- *   bun run release --dry-run               # preview without touching anything
+ *   mise run release                          # stable (graduates a prerelease)
+ *   mise run release:canary                   # next canary prerelease
+ *   mise run release -- --release-as 0.2.0    # force an exact version
+ *   mise run release -- --dry-run             # preview without touching anything
  */
 import { $ } from "bun";
 

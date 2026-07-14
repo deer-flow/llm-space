@@ -68,13 +68,13 @@ Contributing, or want the exact toolchain CI uses? Install [mise](https://mise.j
 Start the desktop app for local development:
 
 ```bash
-bun dev
+mise run dev
 ```
 
 Build a canary release:
 
 ```bash
-bun run build:canary
+mise run build:canary
 ```
 
 ## User guide
