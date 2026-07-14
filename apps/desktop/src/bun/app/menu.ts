@@ -160,6 +160,7 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
       submenu: [
         { label: "View Documentation", action: "openDocument" },
         { type: "divider" },
+        { label: "Visit Official Website", action: "openOfficialWebsite" },
         { label: "Visit GitHub Project", action: "openGitHubProject" },
         { label: "Visit Harness 101", action: "openHarness101" },
         { type: "divider" },
@@ -212,6 +213,10 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
   openGitHubProject: {
     type: "openLink",
     args: { url: "https://github.com/deer-flow/llm-space/tree/main" },
+  },
+  openOfficialWebsite: {
+    type: "openLink",
+    args: { url: "https://deer-flow.github.io/llm-space/" },
   },
   reportBugs: { type: "reportBugs", args: {} },
   checkForUpdates: { type: "checkForUpdates", args: {} },
