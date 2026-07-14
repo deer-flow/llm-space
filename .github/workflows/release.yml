@@ -83,17 +83,23 @@ jobs:
 
       - run: mise run typecheck
 
+  # Every tag builds both editions: the regular one drives the system WebView,
+  # the Performance one embeds Chromium (CEF). They are separate apps (own name,
+  # identifier and update feed — see electrobun.config.ts), so a user can run
+  # either or both.
   build:
     needs: meta
     strategy:
       matrix:
         include:
-          - runner: macos-15
-            arch: arm64
-          - runner: macos-15-intel
-            arch: x64
+          - { runner: macos-15, arch: arm64, edition: regular }
+          - { runner: macos-15-intel, arch: x64, edition: regular }
+          - { runner: macos-15, arch: arm64, edition: performance }
+          - { runner: macos-15-intel, arch: x64, edition: performance }
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # Generous: the Performance bundle carries a ~300 MB CEF framework, so its
+    # notarization upload and round-trip are far slower than the regular one's.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
@@ -145,6 +151,9 @@ jobs:
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.ASC_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
+          # The edition's only build-time switch: electrobun.config.ts forks the
+          # app name, identifier and update feed off it. Empty = regular edition.
+          LLM_SPACE_DESKTOP_RENDERER: ${{ matrix.edition == 'performance' && 'cef' || '' }}
         run: mise run "build:$CHANNEL"
 
       - name: Smoke test the signed app
@@ -163,23 +172,40 @@ jobs:
           xcrun stapler validate "$APP"
           # The bundle left in build/ is the self-extracting installer wrapper
           # (the real app only exists inside the tar.zst): on first launch it
-          # swaps the real app into the same bundle path and relaunches it.
-          # Launch it and require a live process from that path well after
-          # extraction has finished — a signed-but-corrupted binary dies
-          # instantly (electrobun#485 on x64; scripts/fix-x64-headerpad.ts is
-          # the workaround this gates), so this covers the whole
-          # extract→relaunch user path on both architectures.
+          # swaps the real app into the same bundle path and relaunches it. This
+          # check must observe the *relaunched* app — a signed-but-corrupted
+          # binary dies instantly (electrobun#485 on x64), and this launch is the
+          # only regression gate on scripts/fix-x64-headerpad.ts, since codesign
+          # --verify / spctl / stapler all pass on a corrupted-but-signed binary.
+          #
+          # Do NOT go back to a fixed `sleep`: the extractor itself runs from
+          # $APP/Contents/MacOS/, so a bare pgrep on that path is satisfied by
+          # extraction still being in flight. The Performance edition's 127 MB
+          # payload takes ~33s to decompress on Apple silicon and longer on the
+          # Intel runner, so any sleep short enough to be tolerable is a lie.
+          # Poll for the swapped-in bundle instead (Resources/main.js only exists
+          # in the real app, never in the wrapper), then assert the real process.
           open "$APP"
-          sleep 25
-          pgrep -f "$APP/Contents/MacOS/" > /dev/null || {
-            echo "::error::app did not stay alive after launch"
+          for _ in $(seq 1 150); do
+            [ -f "$APP/Contents/Resources/main.js" ] && break
+            sleep 1
+          done
+          if [ ! -f "$APP/Contents/Resources/main.js" ]; then
+            echo "::error::self-extraction never completed"
+            exit 1
+          fi
+          sleep 15
+          # The real main process runs `./bun …/MacOS/../Resources/main.js`
+          # (argv[0] is `./bun`, so matching on MacOS/bun would not work).
+          pgrep -f "$APP/Contents/MacOS/../Resources/main.js" > /dev/null || {
+            echo "::error::app did not stay alive after relaunch"
             exit 1
           }
-          pkill -f "$APP/Contents/MacOS/" || true
+          pkill -f "$APP/Contents/" || true
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: artifacts-${{ matrix.arch }}
+          name: artifacts-${{ matrix.edition }}-${{ matrix.arch }}
           path: apps/desktop/artifacts/
           if-no-files-found: error
 
@@ -190,7 +216,9 @@ jobs:
   publish:
     needs: [meta, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Uploading two editions' worth of artifacts; the Performance tarballs are
+    # an order of magnitude bigger than the regular ones.
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -198,28 +226,45 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
+      # Editions must land in separate directories. Their update.json files are
+      # named `{channel}-{os}-{arch}-update.json` with no app name in them, so
+      # both editions produce the *same* file name — merging them into one
+      # directory would silently overwrite one edition's feed with the other's.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: artifacts-*
-          path: artifacts
+          pattern: artifacts-regular-*
+          path: artifacts/regular
           merge-multiple: true
 
-      - name: Publish update feed (rolling `updates` release)
-        working-directory: artifacts
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: artifacts-performance-*
+          path: artifacts/performance
+          merge-multiple: true
+
+      - name: Publish update feeds (one rolling release per edition)
         run: |
-          gh release view updates --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 || \
-            gh release create updates --repo "$GITHUB_REPOSITORY" --prerelease \
-              --title "Update feed" \
-              --notes "Machine-readable update feed polled by the in-app updater. Download installers from the versioned releases instead."
-          # Upload order is load-bearing: update.json is the update trigger and
-          # must land last, after the patches and tarballs it points at —
-          # across both architectures.
-          shopt -s nullglob
-          for f in *.patch; do
-            gh release upload updates "$f" --repo "$GITHUB_REPOSITORY" --clobber
-          done
-          gh release upload updates *.tar.zst --repo "$GITHUB_REPOSITORY" --clobber
-          gh release upload updates *update.json --repo "$GITHUB_REPOSITORY" --clobber
+          publish_feed() {
+            local dir="$1" release="$2" title="$3"
+            gh release view "$release" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 || \
+              gh release create "$release" --repo "$GITHUB_REPOSITORY" --prerelease \
+                --title "$title" \
+                --notes "Machine-readable update feed polled by the in-app updater. Download installers from the versioned releases instead."
+            # Upload order is load-bearing: update.json is the update trigger and
+            # must land last, after the patches and tarballs it points at —
+            # across both architectures.
+            (
+              cd "$dir"
+              shopt -s nullglob
+              for f in *.patch; do
+                gh release upload "$release" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+              done
+              gh release upload "$release" *.tar.zst --repo "$GITHUB_REPOSITORY" --clobber
+              gh release upload "$release" *update.json --repo "$GITHUB_REPOSITORY" --clobber
+            )
+          }
+          publish_feed artifacts/regular updates "Update feed"
+          publish_feed artifacts/performance updates-performance "Update feed (Performance edition)"
 
       - name: Publish versioned release
         env:
@@ -229,7 +274,15 @@ jobs:
           # Static notes only. No changelog extraction and no --generate-notes:
           # both list commits/authors and a "New Contributors" section, which
           # we deliberately don't surface.
-          NOTES="Download the DMG below. Existing installs update in place."
+          NOTES="$(cat <<'EOF'
+          Two editions. Install either, or both — they share the same `~/.llm-space` data, so switching keeps your threads and settings.
+
+          - **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
+          - **LLM Space Performance** — embeds its own rendering engine (~127 MB). Rendering stays consistent across macOS versions, and usually performs better.
+
+          Download a DMG below. Existing installs update in place.
+          EOF
+          )"
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "canary" ]; then
             PRERELEASE_ARGS=(--prerelease)
@@ -243,5 +296,9 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --title "$TAG" --notes "$NOTES" "${PRERELEASE_ARGS[@]}"
           fi
-          gh release upload "$TAG" artifacts/*.dmg \
+          # Both editions' DMGs go to the same versioned release — no clash, the
+          # file name carries the app name (e.g. "stable-macos-arm64-LLMSpace.dmg"
+          # vs "stable-macos-arm64-LLMSpacePerformance.dmg"). Only update.json is
+          # name-less, which is why the feeds above are kept apart.
+          gh release upload "$TAG" artifacts/regular/*.dmg artifacts/performance/*.dmg \
             --repo "$GITHUB_REPOSITORY" --clobber
