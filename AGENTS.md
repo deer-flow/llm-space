@@ -22,7 +22,7 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 | Add a shadcn/ui component              | `bunx --bun shadcn@latest add <component>`                                  | run inside `apps/desktop`                                                                                              |
 | Run a script from root                 | `bun --filter <pkg> <script>`                                               | e.g. `bun --filter @llm-space/desktop start`                                                                           |
 
-There is **no test framework**. CI (`.github/workflows/ci.yml`) runs lint + typecheck on PRs and pushes to main.
+There is **no test framework**. CI (`.github/workflows/ci.yml`) runs lint + typecheck + a production `vite build` + workflow-YAML validation on PRs and pushes to main. The last two exist because both failure modes are invisible until a release tag is pushed, and then take the release down with them: a renderer bundle that outgrows the runner's V8 heap (`build:view` sets `--max-old-space-size=4096`; the default ~2 GB stopped being enough at 14701 modules) and a malformed workflow file. Keep the renderer bundle in mind — if `vite build` starts OOMing again, raise the ceiling in `build:view` or cut the bundle down, and don't discover it at release time.
 
 GUI commits (VS Code, Fork) failing with `bun: command not found`: husky hooks need bun on PATH — add `export PATH="$HOME/.local/share/mise/shims:$PATH"` to `~/.config/husky/init.sh` (husky's documented fix for version managers).
 
