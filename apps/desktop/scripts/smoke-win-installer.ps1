@@ -155,6 +155,77 @@ foreach ($name in "DisplayName", "DisplayVersion", "Publisher", "DisplayIcon", "
 Assert-True ($reg.NoModify -eq 1 -and $reg.NoRepair -eq 1) "uninstall entry NoModify/NoRepair"
 Assert-True ($reg.EstimatedSize -gt 0) "uninstall entry EstimatedSize > 0"
 
+# The single gap that let a launch-dead build ship as "CI green": nothing ever
+# executed launcher.exe. Launch it the way the shortcut does and require a live
+# bun.exe under the install root. Headless-runner-safe: the pass condition is
+# "process alive after a generous wait and no exit code 1 observed", NOT
+# "window visible" (MainWindowHandle is recorded only when non-zero).
+Write-Host "== launch: launcher.exe must yield a live bun.exe =="
+$appLog = Join-Path $binDir "app.log"   # native wrapper appends here (cwd = app\bin)
+$crashLog = Join-Path $env:APPDATA "llm-space\logs\startup-crash.log"
+
+function Write-LaunchDiagnostics {
+  foreach ($log in $appLog, $installLog, $crashLog) {
+    Write-Host "---- $log ----"
+    if (Test-Path $log) { Get-Content $log | Write-Host } else { Write-Host "(not present)" }
+  }
+  Write-Host "---- end launch diagnostics ----"
+}
+
+function Get-AppBunProcess {
+  Get-Process -Name "bun" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq $bunExe }
+}
+
+$launchedAt = Get-Date
+$launcherProc = Start-Process -FilePath $launcher -PassThru
+try {
+  # First launches are the slow case (AV first-sight scans, cold x64-on-ARM
+  # translation caches), so poll generously instead of a fixed sleep. bun.exe
+  # must be alive for at least $minAliveSeconds — the silent-death failure mode
+  # is "appears briefly, then exits", which a single early sighting would miss.
+  $minAliveSeconds = 20
+  $deadline = $launchedAt.AddSeconds(90)
+  while ((Get-Date) -lt $deadline) {
+    if ($launcherProc.HasExited) { break }
+    $elapsed = ((Get-Date) - $launchedAt).TotalSeconds
+    if ($elapsed -ge $minAliveSeconds -and (Get-AppBunProcess)) { break }
+    Start-Sleep -Seconds 2
+  }
+  # launcher.exe waits on its child and propagates the exit code, so any early
+  # exit means bun.exe is already dead (code 1 = swallowed uncaughtException).
+  if ($launcherProc.HasExited) {
+    Write-LaunchDiagnostics
+    throw "ASSERT FAILED: launcher.exe exited with code $($launcherProc.ExitCode) instead of keeping the app alive"
+  }
+  $appBun = Get-AppBunProcess
+  if (-not $appBun) {
+    Write-LaunchDiagnostics
+    throw "ASSERT FAILED: no live bun.exe under $binDir within 90s of launching launcher.exe"
+  }
+  Write-Host "ok: bun.exe (pid $($appBun.Id)) alive under install root ${minAliveSeconds}s+ after launch"
+  $appBun.Refresh()
+  if ($appBun.MainWindowHandle -ne 0) {
+    Write-Host "ok: main window present (handle $($appBun.MainWindowHandle))"
+  } else {
+    Write-Host "note: MainWindowHandle is 0 (normal on a headless runner; not asserted)"
+  }
+} finally {
+  # Always tear down what we spawned: the uninstall assertions below need the
+  # install root unlocked. Filter by the names we launch (querying .Path on
+  # arbitrary system processes can throw under EAP=Stop).
+  foreach ($name in "bun", "launcher") {
+    Get-Process -Name $name -ErrorAction SilentlyContinue |
+      Where-Object { $_.Path -like (Join-Path $root "*") } |
+      Stop-Process -Force -ErrorAction SilentlyContinue
+  }
+  # WebView2 children live under Program Files, so the path filter above never
+  # matches them — kill the ones holding this install's user-data folder.
+  Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match [regex]::Escape($root) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
 Write-Host "== silent uninstall =="
 $uninstall = Start-Process -FilePath (Join-Path $root "uninstall.exe") -ArgumentList "/S" -Wait -PassThru
 Assert-True ($uninstall.ExitCode -eq 0) "silent uninstall exit code 0 (got $($uninstall.ExitCode))"
