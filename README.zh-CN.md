@@ -15,6 +15,7 @@ LLM Space 是 [DeerFlow](https://github.com/bytedance/deer-flow) 的姊妹项目
 - [功能特性](#功能特性)
 - [技术栈](#技术栈)
 - [项目结构](#项目结构)
+- [下载](#下载)
 - [安装](#安装)
 - [运行应用](#运行应用)
 - [用户指南](#用户指南)
@@ -51,9 +52,18 @@ apps/
   desktop/    # 桌面应用：Electrobun shell + React UI
 ```
 
+## 下载
+
+从 [最新 release](https://github.com/deer-flow/llm-space/releases/latest) 下载 DMG —— 支持 macOS 的 Apple Silicon 和 Intel。有两个版本：
+
+- **LLM Space** —— 使用系统 WebView。体积小（约 27 MB），内存和耗电更低。
+- **LLM Space Performance** —— 内嵌渲染引擎（约 127 MB）。渲染在不同 macOS 版本上保持一致，性能通常更好。
+
+装其中一个，或者两个都装。它们共享同一份 `~/.llm-space` 数据，所以切换版本后 thread 和设置都还在，两者也都会自动更新。
+
 ## 安装
 
-你需要先安装 [Bun](https://bun.com)。Bun 是一个快速、一体化的 JavaScript runtime 和 package manager，可以理解为 Node.js 和 npm 的替代方案。请参考 [官方安装指南](https://bun.com/docs/installation)。
+要从源码构建的话，你需要先安装 [Bun](https://bun.com)。Bun 是一个快速、一体化的 JavaScript runtime 和 package manager，可以理解为 Node.js 和 npm 的替代方案。请参考 [官方安装指南](https://bun.com/docs/installation)。
 
 Bun 准备好后，在仓库根目录安装依赖：
 

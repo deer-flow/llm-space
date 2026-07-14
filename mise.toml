@@ -76,6 +76,12 @@ dir = "apps/desktop"
 env = { LLM_SPACE_SKIP_SIGNING = "1" }
 run = "bun run build:canary"
 
+[tasks."pack:perf"]
+description = "Unsigned Performance (CEF) canary build — the edition that embeds Chromium"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_SIGNING = "1", LLM_SPACE_DESKTOP_RENDERER = "cef" }
+run = "bun run build:canary"
+
 [tasks."pack:adhoc"]
 description = "Ad-hoc signed canary build — exercises the signing path with no Apple creds"
 dir = "apps/desktop"

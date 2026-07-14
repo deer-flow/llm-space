@@ -12,7 +12,15 @@ import { DEFAULT_UPDATE_MODE, type UpdateMode } from "../../shared/updates";
  */
 interface UpdatesState {
   mode?: UpdateMode;
-  lastSeenHash?: string;
+  /**
+   * Last launched bundle hash, keyed by app identifier. `settings/` is shared
+   * by every edition (`getLlmSpaceHomePath()` is app-name independent), but the
+   * hash covers the whole bundle — so the regular and Performance editions
+   * always differ, even at the same version. A single flat hash here would read
+   * as "we just updated" on every switch between them and pop a false toast.
+   * `mode` stays flat: it is a user preference, not bundle identity.
+   */
+  lastSeenHashes?: Record<string, string>;
 }
 
 const STATE_PATH = join(getSettingsDir(), "updates.json");
@@ -42,10 +50,16 @@ export async function setUpdateMode(mode: UpdateMode): Promise<void> {
   await _merge({ mode });
 }
 
-export async function getLastSeenHash(): Promise<string | undefined> {
-  return (await _load()).lastSeenHash;
+export async function getLastSeenHash(
+  identifier: string
+): Promise<string | undefined> {
+  return (await _load()).lastSeenHashes?.[identifier];
 }
 
-export async function setLastSeenHash(lastSeenHash: string): Promise<void> {
-  await _merge({ lastSeenHash });
+export async function setLastSeenHash(
+  identifier: string,
+  hash: string
+): Promise<void> {
+  const lastSeenHashes = (await _load()).lastSeenHashes ?? {};
+  await _merge({ lastSeenHashes: { ...lastSeenHashes, [identifier]: hash } });
 }

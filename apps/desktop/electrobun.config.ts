@@ -2,9 +2,18 @@ import type { ElectrobunConfig } from "electrobun";
 
 import packageJson from "./package.json";
 
-const desktopRenderer = Bun.env.LLM_SPACE_DESKTOP_RENDERER;
-const useCefRenderer = desktopRenderer === "cef";
-const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT ?? "9333";
+// LLM_SPACE_DESKTOP_RENDERER=cef selects the Performance edition: it embeds
+// Chromium (CEF) instead of driving the system WebView. It ships as a separate
+// app — own name, own identifier, own update feed — so it installs alongside
+// the regular edition. Both read the same ~/.llm-space data directory
+// (getLlmSpaceHomePath() is name-independent), so switching editions keeps
+// threads, model config and API keys.
+const isPerformanceEdition = Bun.env.LLM_SPACE_DESKTOP_RENDERER === "cef";
+
+// Opt-in only. A CDP port left open in a shipped build lets any local process
+// drive the renderer and read whatever is on screen — `dev:cef` passes the
+// port explicitly, release builds never do.
+const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT;
 
 // Local-testing escape hatches — CI leaves all of these unset:
 //   LLM_SPACE_SKIP_SIGNING=1  → unsigned canary/stable build (no Apple creds
@@ -20,14 +29,25 @@ const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT ?? "9333";
 const skipSigning = Boolean(Bun.env.LLM_SPACE_SKIP_SIGNING);
 const skipNotarize =
   skipSigning || Boolean(Bun.env.LLM_SPACE_SKIP_NOTARIZE);
+
+// Each edition needs its own feed. update.json is named `{channel}-{os}-{arch}`
+// and carries no app name, so both editions would otherwise fight over
+// `stable-macos-arm64-update.json` inside the same GitHub release.
+const RELEASE_DOWNLOADS =
+  "https://github.com/deer-flow/llm-space/releases/download";
 const updateBaseUrl =
   Bun.env.LLM_SPACE_UPDATE_BASE_URL ??
-  "https://github.com/deer-flow/llm-space/releases/download/updates";
+  `${RELEASE_DOWNLOADS}/${isPerformanceEdition ? "updates-performance" : "updates"}`;
 
 export default {
   app: {
-    name: "LLM Space",
-    identifier: "tech.deerflow.llm-space",
+    // Name and identifier both fork per edition: the name keeps the artifact
+    // file names apart (tarball/DMG are named after it), the identifier keeps
+    // macOS from treating the two apps as the same install.
+    name: isPerformanceEdition ? "LLM Space Performance" : "LLM Space",
+    identifier: isPerformanceEdition
+      ? "tech.deerflow.llm-space.performance"
+      : "tech.deerflow.llm-space",
     // Single source of truth for the app version; release tags must match
     // (CI validates `v{version}` against the pushed tag).
     version: packageJson.version,
@@ -49,14 +69,10 @@ export default {
       // ELECTROBUN_DEVELOPER_ID + App Store Connect API key env vars (CI).
       codesign: !skipSigning,
       notarize: !skipNotarize,
-      bundleCEF: useCefRenderer,
-      ...(useCefRenderer
-        ? {
-            defaultRenderer: "cef" as const,
-            chromiumFlags: {
-              "remote-debugging-port": cdpPort,
-            },
-          }
+      bundleCEF: isPerformanceEdition,
+      ...(isPerformanceEdition ? { defaultRenderer: "cef" as const } : {}),
+      ...(isPerformanceEdition && cdpPort
+        ? { chromiumFlags: { "remote-debugging-port": cdpPort } }
         : {}),
       icons: "icon.iconset",
     },
@@ -75,8 +91,9 @@ export default {
   },
   release: {
     // Burned into every shipped bundle — the updater fetches
-    // `{baseUrl}/{channel}-{os}-{arch}-update.json` from here. Both channels
-    // share the rolling `updates` GitHub release (artifacts are channel-prefixed).
+    // `{baseUrl}/{channel}-{os}-{arch}-update.json` from here. Within an
+    // edition both channels share one rolling GitHub release (artifacts are
+    // channel-prefixed); the two editions get one rolling release each.
     baseUrl: updateBaseUrl,
   },
 } satisfies ElectrobunConfig;

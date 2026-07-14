@@ -15,6 +15,7 @@ LLM Space is a sister project of [DeerFlow](https://github.com/bytedance/deer-fl
 - [Features](#features)
 - [Tech stack](#tech-stack)
 - [Project layout](#project-layout)
+- [Download](#download)
 - [Install](#install)
 - [Run the app](#run-the-app)
 - [User guide](#user-guide)
@@ -51,9 +52,18 @@ apps/
   desktop/    # The desktop app (Electrobun shell + React UI)
 ```
 
+## Download
+
+Grab a DMG from the [latest release](https://github.com/deer-flow/llm-space/releases/latest) — macOS, Apple Silicon and Intel. It comes in two editions:
+
+- **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
+- **LLM Space Performance** — embeds its own rendering engine (~127 MB). Rendering stays consistent across macOS versions, and usually performs better.
+
+Install either, or both. They share the same `~/.llm-space` data, so switching editions keeps your threads and settings, and both update themselves in place.
+
 ## Install
 
-You need [Bun](https://bun.com) first. Bun is a fast, all-in-one runtime and package manager for JavaScript — think of it as a drop-in replacement for Node.js and npm. Follow the [official install guide](https://bun.com/docs/installation).
+Building from source? You need [Bun](https://bun.com) first. Bun is a fast, all-in-one runtime and package manager for JavaScript — think of it as a drop-in replacement for Node.js and npm. Follow the [official install guide](https://bun.com/docs/installation).
 
 Once Bun is ready, install the project from the repo root:
 

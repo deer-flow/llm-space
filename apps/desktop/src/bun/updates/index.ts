@@ -101,12 +101,12 @@ export class UpdaterService {
   }
 
   async start(): Promise<void> {
-    const { channel, hash, version } = await Updater.getLocalInfo();
+    const { channel, hash, version, identifier } = await Updater.getLocalInfo();
     if (channel === "dev") return;
 
-    const lastSeen = await getLastSeenHash();
+    const lastSeen = await getLastSeenHash(identifier);
     if (lastSeen && lastSeen !== hash) this._installedVersion = version;
-    if (lastSeen !== hash) await setLastSeenHash(hash);
+    if (lastSeen !== hash) await setLastSeenHash(identifier, hash);
 
     this._applySchedule(await getUpdateMode());
   }
