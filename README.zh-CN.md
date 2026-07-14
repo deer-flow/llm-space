@@ -57,7 +57,7 @@ apps/
 从 [最新 release](https://github.com/deer-flow/llm-space/releases/latest) 下载 DMG —— 支持 macOS 的 Apple Silicon 和 Intel。有两个版本：
 
 - **LLM Space** —— 使用系统 WebView。体积小（约 27 MB），内存和耗电更低。
-- **LLM Space Performance** —— 内嵌渲染引擎（约 127 MB）。渲染在不同 macOS 版本上保持一致，性能通常更好。
+- **LLM Space Performance** —— 内嵌渲染引擎（约 130 MB）。渲染在不同 macOS 版本上保持一致，性能通常更好。
 
 装其中一个，或者两个都装。它们共享同一份 `~/.llm-space` 数据，所以切换版本后 thread 和设置都还在，两者也都会自动更新。
 
