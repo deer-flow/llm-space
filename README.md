@@ -57,7 +57,7 @@ apps/
 Grab a DMG from the [latest release](https://github.com/deer-flow/llm-space/releases/latest) — macOS, Apple Silicon and Intel. It comes in two editions:
 
 - **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
-- **LLM Space Performance** — embeds its own rendering engine (~127 MB). Rendering stays consistent across macOS versions, and usually performs better.
+- **LLM Space Performance** — embeds its own rendering engine (~130 MB). Rendering stays consistent across macOS versions, and usually performs better.
 
 Install either, or both. They share the same `~/.llm-space` data, so switching editions keeps your threads and settings, and both update themselves in place.
 

@@ -112,6 +112,15 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # electrobun images the app with `hdiutil create -srcfolder .dmg-staging`,
+      # which fails with "Resource busy" if Spotlight is still indexing that
+      # directory — it took out the x64 Performance build once, since a ~400 MB
+      # CEF bundle keeps `mds` busy far longer than the regular one. A CI runner
+      # has no use for a Spotlight index. Non-fatal: never let the mitigation
+      # itself fail the release.
+      - name: Disable Spotlight indexing (hdiutil "Resource busy")
+        run: sudo mdutil -a -i off || true
+
       - name: Import signing certificate
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
@@ -180,9 +189,10 @@ jobs:
           #
           # Do NOT go back to a fixed `sleep`: the extractor itself runs from
           # $APP/Contents/MacOS/, so a bare pgrep on that path is satisfied by
-          # extraction still being in flight. The Performance edition's 127 MB
-          # payload takes ~33s to decompress on Apple silicon and longer on the
-          # Intel runner, so any sleep short enough to be tolerable is a lie.
+          # extraction still being in flight. The Performance edition's ~120 MB
+          # compressed payload takes ~33s to decompress on Apple silicon and
+          # longer on the Intel runner, so any sleep short enough to be
+          # tolerable is a lie.
           # Poll for the swapped-in bundle instead (Resources/main.js only exists
           # in the real app, never in the wrapper), then assert the real process.
           open "$APP"
@@ -246,10 +256,18 @@ jobs:
         run: |
           publish_feed() {
             local dir="$1" release="$2" title="$3"
-            gh release view "$release" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 || \
+            # `gh release view` is the existence check, but it fails transiently
+            # often enough to matter: one flaky read sent us into `create`, which
+            # then died on "HTTP 422: Release.tag_name already exists" and took
+            # the whole release with it. So a failed `create` is only forgiven
+            # when a re-check proves the release really does exist — a genuine
+            # create failure still fails the job.
+            if ! gh release view "$release" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
               gh release create "$release" --repo "$GITHUB_REPOSITORY" --prerelease \
                 --title "$title" \
-                --notes "Machine-readable update feed polled by the in-app updater. Download installers from the versioned releases instead."
+                --notes "Machine-readable update feed polled by the in-app updater. Download installers from the versioned releases instead." \
+                || gh release view "$release" --repo "$GITHUB_REPOSITORY" > /dev/null
+            fi
             # Upload order is load-bearing: update.json is the update trigger and
             # must land last, after the patches and tarballs it points at —
             # across both architectures.
@@ -278,7 +296,7 @@ jobs:
           Two editions. Install either, or both — they share the same `~/.llm-space` data, so switching keeps your threads and settings.
 
           - **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
-          - **LLM Space Performance** — embeds its own rendering engine (~127 MB). Rendering stays consistent across macOS versions, and usually performs better.
+          - **LLM Space Performance** — embeds its own rendering engine (~130 MB). Rendering stays consistent across macOS versions, and usually performs better.
 
           Download a DMG below. Existing installs update in place.
           EOF
@@ -290,6 +308,17 @@ jobs:
           # Always (re)set the static notes — edit if the release already
           # exists (e.g. a re-run, or a leftover from an earlier tag) so it
           # never keeps stale auto-generated notes.
+          #
+          # This deliberately does NOT get publish_feed's flake guard. The
+          # exposure is inverted: a feed release always exists, so one flaky
+          # `view` there escalates to a fatal 422 on every run. A versioned
+          # release does not exist yet on a tag push, so a flaky `view` lands in
+          # the `create` branch it was headed for anyway — the normal path is
+          # flake-immune. Only "re-run of a tag whose release already exists" +
+          # "a transient failure in that same run" can 422 here, and it fails
+          # closed: the feeds are already published and nothing is corrupted, so
+          # a plain re-run fixes it. Don't "unify" these two — the guard would be
+          # dead weight.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
           else
