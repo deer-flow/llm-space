@@ -105,6 +105,25 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
+      # DMG imaging once ran the x64 Performance leg out of disk (`hdiutil
+      # create` → "No space left on device", v0.1.1-canary.3): the hosted
+      # runners' free space leaves too little margin over what the CEF build
+      # plus DMG staging need. Evict the biggest preinstalled things this job
+      # never touches — Simulator runtimes (tens of GB in a handful of disk
+      # images, so seconds to delete), their dyld caches, and the Homebrew
+      # download cache. The build itself only needs mise/bun and the Xcode
+      # command-line tools (codesign, hdiutil, stapler), none of which live
+      # there. Best-effort insurance on every leg: cleanup must never fail the
+      # release, and the df bookends put the reclaimed headroom in each log.
+      - name: Free runner disk space (hdiutil "No space left on device")
+        continue-on-error: true
+        run: |
+          df -h /
+          sudo xcrun simctl runtime delete all || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Caches || true
+          rm -rf "$(brew --cache)" || true
+          df -h /
+
       # v4: reads mise.lock (installs the exact locked bun with checksum
       # verification) and exports the full `mise env` (incl. PATH) into
       # GITHUB_ENV — our [env] carries nothing beyond PATH.
