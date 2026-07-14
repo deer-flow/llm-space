@@ -31,3 +31,10 @@ jobs:
       - run: mise run lint
 
       - run: mise run typecheck
+
+      # `vite build` otherwise runs only inside a release build, so a renderer
+      # change that breaks — or just outgrows the runner's V8 heap — stays
+      # invisible until a version tag is pushed, and takes the release with it.
+      # (That is exactly how v0.1.1-canary.0 died: 14701 modules OOMing a ~2 GB
+      # default heap. build:view raises it; this step is what keeps it honest.)
+      - run: bun --filter @llm-space/desktop build:view
