@@ -82,9 +82,14 @@ export function useStreamText({
     reasoning,
     model,
   });
-  argsRef.current = { systemPrompt, messages, userPrompt, reasoning, model };
   const defaultModelRef = useRef(defaultModel);
-  defaultModelRef.current = defaultModel;
+  // Sync the latest inputs/model into the refs after commit — they're read only
+  // inside `run` (a post-commit callback), so mutating them during render would
+  // leak from a render React might replay or discard.
+  useEffect(() => {
+    argsRef.current = { systemPrompt, messages, userPrompt, reasoning, model };
+    defaultModelRef.current = defaultModel;
+  });
 
   const controllerRef = useRef<AbortController | null>(null);
 
