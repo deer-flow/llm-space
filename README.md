@@ -123,13 +123,18 @@ LLM Space is free and open source, and it stays that way thanks to our sponsors.
 
 Want to see your logo here? We would love to talk - [reach out by opening an issue](https://github.com/deer-flow/llm-space/issues) or [support the project](#donate).
 
-### Golden sponsor
+
+### 🏅 Golden sponsor
 We strongly recommend using the VolcEngine Coding Plan as your default model provider:
 
-![](https://github.com/user-attachments/assets/45407347-d7fc-4958-9ab1-fc9f182e4965)
+<p align="center">
+  <a href="https://www.byteplus.com/en/activity/codingplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space" target="_blank" rel="noopener">
+    <img width="600" height="150" alt="image" src="https://github.com/user-attachments/assets/e6c62cad-a798-4dc4-9beb-c96503526458" />
+  </a>
+</p>
 
-- [VolcEngine Coding Plan](https://www.volcengine.com/activity/codingplan?utm_campaign=deer_flow&utm_content=deer_flow&utm_medium=devrel&utm_source=OWO&utm_term=deer_flow)
-- [火山引擎 Coding Plan - 中国大陆地区](https://www.volcengine.com/activity/codingplan?utm_campaign=deer_flow&utm_content=deer_flow&utm_medium=devrel&utm_source=OWO&utm_term=deer_flow)
+- [VolcEngine Coding Plan](https://www.byteplus.com/en/activity/codingplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space)
+- [火山引擎 Coding Plan - 中国大陆地区](https://ai.volcengine.com/activity/agentplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space)
 
 ## Donate
 
