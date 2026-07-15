@@ -8,6 +8,8 @@ English | [中文](./README.zh-CN.md)
 
 [**LLM Space** v4](https://github.com/deer-flow/llm-space) is a desktop app for agent builders — prototype your next agent ideas, inspect every step of your harness execution, debug failures, and evaluate performance, all in one place.
 
+**Official website:** https://deer-flow.github.io/llm-space/
+
 LLM Space is a sister project of [DeerFlow](https://github.com/bytedance/deer-flow), and we dogfood it heavily: every version of DeerFlow is built and debugged with LLM Space. The project started in March 2023, and v4 is its fourth major iteration.
 
 ## Contents

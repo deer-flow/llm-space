@@ -8,6 +8,8 @@
 
 [**LLM Space** v4](https://github.com/deer-flow/llm-space) 是一款为 Agent 开发者打造的桌面应用。你可以在一个地方原型验证新的 Agent 想法，观察 harness 执行的每一步，调试失败原因，并评估性能表现。
 
+**官方网站：** https://deer-flow.github.io/llm-space/
+
 LLM Space 是 [DeerFlow](https://github.com/bytedance/deer-flow) 的姊妹项目，DeerFlow 团队也一直在重度使用它：DeerFlow 的每个版本都会用 LLM Space 来构建和调试。这个项目始于 2023 年 3 月，v4 是它的第四次大版本迭代。
 
 ## 目录
