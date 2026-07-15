@@ -96,6 +96,46 @@ describe("Brave Search provider", () => {
     );
   });
 
+  test("surfaces error details returned by Brave Search", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(
+        Response.json(
+          {
+            type: "ErrorResponse",
+            error: {
+              status: 422,
+              detail: "The provided subscription token is invalid.",
+              code: "SUBSCRIPTION_TOKEN_INVALID",
+            },
+          },
+          { status: 422 }
+        )
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => ({
+        provider: "brave",
+        braveApiKey: "invalid-brave-key",
+        firecrawlApiKey: "",
+        tavilyApiKey: "",
+      }),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe(
+      "The provided subscription token is invalid."
+    );
+  });
+
   test("delegates web_fetch to Firecrawl", async () => {
     let request: { url: string; headers: Headers } | undefined;
     globalThis.fetch = ((input, init) => {

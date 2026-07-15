@@ -93,6 +93,9 @@ interface BraveSearchResponse {
       extra_snippets?: string[];
     }[];
   };
+  error?: {
+    detail?: string;
+  };
   message?: string;
   detail?: string;
 }
@@ -319,7 +322,10 @@ class BraveSearchProvider implements SearchProvider {
 
     if (!res.ok) {
       throw new Error(
-        json.message ?? json.detail ?? `web_search failed: ${res.status}`
+        json.error?.detail ??
+          json.message ??
+          json.detail ??
+          `web_search failed: ${res.status}`
       );
     }
 
