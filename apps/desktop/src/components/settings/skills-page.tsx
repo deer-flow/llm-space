@@ -119,7 +119,6 @@ export function SkillsPage() {
 
   return (
     <SettingsPage
-      className="flex size-full min-h-0"
       title="Skills"
       description={
         <>
@@ -127,16 +126,18 @@ export function SkillsPage() {
         </>
       }
     >
-      <PathList
-        paths={paths}
-        selectedPath={selectedPath}
-        onSelect={setSelectedPath}
-        onAdd={() => void handleAdd()}
-        onRemove={(path) => void handleRemove(path)}
-        onEnableAll={(path) => void handleSetAll(path, false)}
-        onDisableAll={(path) => void handleSetAll(path, true)}
-      />
-      <PathSkills key={`${selectedPath}:${reloadToken}`} path={selectedPath} />
+      <div className="flex h-full min-h-0 gap-4">
+        <PathList
+          paths={paths}
+          selectedPath={selectedPath}
+          onSelect={setSelectedPath}
+          onAdd={() => void handleAdd()}
+          onRemove={(path) => void handleRemove(path)}
+          onEnableAll={(path) => void handleSetAll(path, false)}
+          onDisableAll={(path) => void handleSetAll(path, true)}
+        />
+        <PathSkills key={`${selectedPath}:${reloadToken}`} path={selectedPath} />
+      </div>
     </SettingsPage>
   );
 }
@@ -161,7 +162,7 @@ function PathList({
   const [listRef] = useAutoAnimation<HTMLDivElement>();
 
   return (
-    <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+    <div className="flex h-full w-64 shrink-0 flex-col gap-3 border-r pr-4">
       <ScrollArea className="min-h-0 grow">
         {paths.length === 0 ? (
           <div className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">
@@ -382,7 +383,7 @@ function PathSkills({ path }: { path: string | null }) {
   }, [handleToggle, listRef, path, skills]);
 
   return (
-    <div className="flex min-w-0 grow flex-col">
+    <div className="flex h-full min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
         <div className="flex flex-col gap-2 pr-4 pl-6">{content}</div>
       </ScrollArea>

@@ -83,9 +83,13 @@ export function SettingsDialog({
               ))}
             </TabsList>
           </aside>
-          <div className="min-w-0 grow">
+          <div className="flex min-w-0 grow flex-col overflow-hidden">
             {PAGES.map(({ value, Page }) => (
-              <TabsContent key={value} value={value} className="size-full">
+              <TabsContent
+                key={value}
+                value={value}
+                className="min-h-0 flex-1 data-[state=inactive]:hidden"
+              >
                 <Page />
               </TabsContent>
             ))}
