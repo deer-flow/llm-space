@@ -6,6 +6,8 @@
 
 ![screenshot](https://github.com/user-attachments/assets/7fe0a937-a7fa-4a3c-9417-34ee5a35b19d)
 
+https://github.com/user-attachments/assets/2ba7a600-1f1a-44c0-b9f1-34ad42100213
+
 [**LLM Space** v4](https://github.com/deer-flow/llm-space) 是一款为 Agent 开发者打造的桌面应用。你可以在一个地方原型验证新的 Agent 想法，观察 harness 执行的每一步，调试失败原因，并评估性能表现。
 
 **官方网站：** https://deer-flow.github.io/llm-space/
