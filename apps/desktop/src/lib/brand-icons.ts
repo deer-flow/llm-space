@@ -216,6 +216,7 @@ export const PROVIDER_ICON_ALIASES: Record<string, string> = {
   "amazon-bedrock": "bedrock",
   "ant-ling": "antgroup",
   ark: "volcengine",
+  "ark-agent-plan": "volcengine",
   "ark-coding-plan": "volcengine",
   "azure-openai-responses": "azure",
   "minimax-cn": "minimax",

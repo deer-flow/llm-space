@@ -206,6 +206,7 @@ function ProviderList({
  */
 const RECOMMENDED_PROVIDER_IDS = new Set([
   "ark",
+  "ark-agent-plan",
   "ark-coding-plan",
   "openai",
   "anthropic",

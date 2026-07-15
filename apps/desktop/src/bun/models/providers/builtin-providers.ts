@@ -22,6 +22,7 @@ import { zaiProvider } from "@earendil-works/pi-ai/providers/zai";
 import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
 
 import { arkProvider } from "./ark";
+import { arkAgentPlanProvider } from "./ark-agent-plan";
 import { arkCodingPlanProvider } from "./ark-coding-plan";
 
 /** Static, non-`Provider` metadata for a builtin provider. */
@@ -39,6 +40,10 @@ export const BUILTIN_PROVIDER_META: Record<string, BuiltinProviderMeta> = {
   "ant-ling": { websiteLink: "https://www.ant-ling.com/" },
   anthropic: { websiteLink: "https://claude.com/platform/api" },
   ark: { websiteLink: "https://www.volcengine.com/product/ark" },
+  "ark-agent-plan": {
+    websiteLink:
+      "https://ai.volcengine.com/activity/agentplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space",
+  },
   "ark-coding-plan": {
     websiteLink:
       "https://www.volcengine.com/activity/codingplan?utm_campaign=deer_flow&utm_content=deer_flow&utm_medium=devrel&utm_source=OWO&utm_term=deer_flow",
@@ -72,6 +77,7 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   "ant-ling": antLingProvider(),
   anthropic: anthropicProvider(),
   ark: arkProvider(),
+  "ark-agent-plan": arkAgentPlanProvider(),
   "ark-coding-plan": arkCodingPlanProvider(),
   "azure-openai-responses": azureOpenAIResponsesProvider(),
   deepseek: deepseekProvider(),

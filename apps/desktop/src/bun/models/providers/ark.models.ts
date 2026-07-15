@@ -45,8 +45,8 @@ export const ARK_MODELS = {
       cacheWrite: 0,
     },
   } satisfies Model<"openai-completions">,
-  "doubao-seed-2-1-evolving": {
-    id: "doubao-seed-2-1-evolving",
+  "doubao-seed-evolving": {
+    id: "doubao-seed-evolving",
     provider: "ark",
     name: "Doubao-Seed-Evolving",
     api: "openai-completions",

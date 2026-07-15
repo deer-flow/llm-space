@@ -3,6 +3,27 @@ import type { Model } from "@earendil-works/pi-ai";
 const BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3";
 
 export const ARK_CODING_PLAN_MODELS = {
+  "doubao-seed-evolving": {
+    id: "doubao-seed-evolving",
+    provider: "ark-agent-plan",
+    name: "Doubao-Seed-Evolving",
+    api: "openai-completions",
+    baseUrl: BASE_URL,
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    compat: {
+      supportsDeveloperRole: false,
+      thinkingFormat: "deepseek",
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  } satisfies Model<"openai-completions">,
   "doubao-seed-2.0-code": {
     id: "doubao-seed-2.0-code",
     provider: "ark-coding-plan",
