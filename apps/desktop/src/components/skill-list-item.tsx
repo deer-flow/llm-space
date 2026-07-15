@@ -33,9 +33,13 @@ function _SkillListItem({
       <ItemMedia>
         <SparklesIcon className="text-muted-foreground size-4" />
       </ItemMedia>
-      <ItemContent className={cn(!checked && "opacity-50")}>
+      <ItemContent className={cn("min-w-0", !checked && "opacity-50")}>
         <ItemTitle>{name}</ItemTitle>
-        {description && <ItemDescription>{description}</ItemDescription>}
+        {description && (
+          <ItemDescription className="wrap-anywhere">
+            {description}
+          </ItemDescription>
+        )}
       </ItemContent>
       <Switch
         size="sm"
