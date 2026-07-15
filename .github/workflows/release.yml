@@ -284,6 +284,32 @@ jobs:
           publish_feed artifacts/regular updates "Update feed"
           publish_feed artifacts/performance updates-performance "Update feed (Performance edition)"
 
+      - name: Rename installers for the versioned release
+        env:
+          TAG: ${{ needs.meta.outputs.tag }}
+        run: |
+          # electrobun names DMGs `{channel}-macos-{arch}-{AppName}.dmg`
+          # (e.g. stable-macos-arm64-LLMSpace.dmg). Humans download these from the
+          # versioned release, so give them a stable, channel-free scheme:
+          #   LLMSpace-{vX.Y.Z}-macos-{arch}.dmg
+          #   LLMSpace-performance-{vX.Y.Z}-macos-{arch}.dmg
+          # version (the tag, so it keeps the `v`), os and arch are all lowercase.
+          # This runs AFTER the update feeds are published and only touches *.dmg,
+          # so the feed files (*.patch / *.tar.zst / *update.json) keep their
+          # electrobun names — the in-app updater fetches those verbatim.
+          VLOWER="$(echo "$TAG" | tr '[:upper:]' '[:lower:]')"
+          rename_dmgs() {
+            local dir="$1" prefix="$2"
+            shopt -s nullglob
+            for f in "$dir"/*.dmg; do
+              # Third dash-delimited field of the electrobun name is the arch.
+              arch="$(basename "$f" | sed -E 's/^[^-]+-macos-([^-]+)-.*/\1/')"
+              mv "$f" "$dir/$prefix-$VLOWER-macos-$arch.dmg"
+            done
+          }
+          rename_dmgs artifacts/regular LLMSpace
+          rename_dmgs artifacts/performance LLMSpace-performance
+
       - name: Publish versioned release
         env:
           TAG: ${{ needs.meta.outputs.tag }}
@@ -326,8 +352,9 @@ jobs:
               --title "$TAG" --notes "$NOTES" "${PRERELEASE_ARGS[@]}"
           fi
           # Both editions' DMGs go to the same versioned release — no clash, the
-          # file name carries the app name (e.g. "stable-macos-arm64-LLMSpace.dmg"
-          # vs "stable-macos-arm64-LLMSpacePerformance.dmg"). Only update.json is
+          # rename step above gives them distinct human-facing names (e.g.
+          # "LLMSpace-v4.0.1-macos-arm64.dmg" vs
+          # "LLMSpace-performance-v4.0.1-macos-arm64.dmg"). Only update.json is
           # name-less, which is why the feeds above are kept apart.
           gh release upload "$TAG" artifacts/regular/*.dmg artifacts/performance/*.dmg \
             --repo "$GITHUB_REPOSITORY" --clobber
