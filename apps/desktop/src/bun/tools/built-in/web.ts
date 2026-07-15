@@ -10,6 +10,7 @@ export interface WebBuiltInToolsDependencies {
 
 const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
+const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 
 interface WebFetchResult {
   url: string;
@@ -81,6 +82,19 @@ interface TavilyExtractResponse {
     url?: string;
     error?: string;
   }[];
+}
+
+interface BraveSearchResponse {
+  web?: {
+    results?: {
+      title?: string;
+      url?: string;
+      description?: string;
+      extra_snippets?: string[];
+    }[];
+  };
+  message?: string;
+  detail?: string;
 }
 
 function _truncateText(text: string, maxChars: number): string {
@@ -261,12 +275,83 @@ class TavilySearchProvider implements SearchProvider {
   }
 }
 
+/**
+ * Brave-backed web search. Brave does not expose a single-page extraction
+ * endpoint, so `web_fetch` delegates to Firecrawl instead of fetching arbitrary
+ * URLs from the trusted Bun process, which would widen the tool's SSRF surface.
+ */
+class BraveSearchProvider implements SearchProvider {
+  constructor(
+    private readonly _apiKey: string,
+    private readonly _fetchProvider: SearchProvider
+  ) {
+    if (!_apiKey) {
+      throw new Error(
+        "Brave Search API key is not configured. Add one in Settings → Search."
+      );
+    }
+  }
+
+  fetch(url: string): Promise<WebFetchResult> {
+    return this._fetchProvider.fetch(url);
+  }
+
+  async search(
+    query: string,
+    limit: number,
+    includeContent: boolean
+  ): Promise<WebSearchResult[]> {
+    const url = new URL(BRAVE_SEARCH_URL);
+    url.searchParams.set("q", query);
+    url.searchParams.set("count", String(Math.max(1, Math.min(20, limit))));
+    url.searchParams.set("text_decorations", "false");
+    if (includeContent) {
+      url.searchParams.set("extra_snippets", "true");
+    }
+
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "X-Subscription-Token": this._apiKey,
+      },
+    });
+    const json = (await res.json()) as BraveSearchResponse;
+
+    if (!res.ok) {
+      throw new Error(
+        json.message ?? json.detail ?? `web_search failed: ${res.status}`
+      );
+    }
+
+    return (json.web?.results ?? []).map((item) => {
+      const snippets = [item.description, ...(item.extra_snippets ?? [])]
+        .filter((value): value is string => Boolean(value))
+        .join("\n\n");
+      return {
+        title: item.title ?? "Untitled",
+        url: item.url ?? "",
+        snippet: item.description,
+        content:
+          includeContent && snippets
+            ? _truncateText(snippets, 2_000)
+            : undefined,
+      };
+    });
+  }
+}
+
 /** Build the provider selected in `settings/search.json` with its resolved key. */
 function _getSearchProvider({
   env,
   getSearchSettings,
 }: WebBuiltInToolsDependencies): SearchProvider {
   const settings = getSearchSettings();
+  if (settings.provider === "brave") {
+    return new BraveSearchProvider(
+      _resolveApiKey(settings.braveApiKey, env),
+      new FirecrawlSearchProvider(_resolveApiKey(settings.firecrawlApiKey, env))
+    );
+  }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
   }

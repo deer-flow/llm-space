@@ -59,8 +59,9 @@ export function SearchPage() {
       title="Search"
       description={
         <>
-          These settings only apply to the built-in <code>web_search</code> and{" "}
-          <code>web_fetch</code> tools.
+          Choose the provider for the built-in <code>web_search</code> tool.
+          When Brave Search is selected, <code>web_fetch</code> continues to use
+          Firecrawl for safe page extraction.
         </>
       }
     >
@@ -77,6 +78,7 @@ export function SearchPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="brave">Brave Search</SelectItem>
               <SelectItem value="firecrawl">Firecrawl</SelectItem>
               <SelectItem value="tavily">Tavily</SelectItem>
             </SelectContent>
@@ -84,6 +86,16 @@ export function SearchPage() {
         </div>
 
         <Separator />
+
+        <ApiKeyField
+          label="Brave Search API key"
+          value={settings.braveApiKey}
+          getKeyUrl="https://api-dashboard.search.brave.com/app/keys"
+          onChange={(e) =>
+            setSettings({ ...settings, braveApiKey: e.target.value })
+          }
+          onBlur={() => void persist(settings)}
+        />
 
         <ApiKeyField
           label="Firecrawl API key"
@@ -107,7 +119,8 @@ export function SearchPage() {
 
         <p className="text-muted-foreground text-xs">
           Values starting with <code>$</code> are read from the environment
-          (e.g. <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>).
+          (e.g. <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
+          <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>).
         </p>
       </div>
     </SettingsPage>

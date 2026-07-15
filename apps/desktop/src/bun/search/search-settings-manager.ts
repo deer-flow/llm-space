@@ -9,7 +9,11 @@ import {
   type SearchSettings,
 } from "../../shared/search";
 
-const VALID_PROVIDERS: readonly SearchProviderId[] = ["firecrawl", "tavily"];
+const VALID_PROVIDERS: readonly SearchProviderId[] = [
+  "brave",
+  "firecrawl",
+  "tavily",
+];
 
 /**
  * Owns `settings/search.json`: the in-memory source of truth for the built-in
@@ -78,6 +82,10 @@ export class SearchSettingsManager {
         : DEFAULT_SEARCH_SETTINGS.provider;
     return {
       provider,
+      braveApiKey:
+        typeof input.braveApiKey === "string"
+          ? input.braveApiKey
+          : DEFAULT_SEARCH_SETTINGS.braveApiKey,
       firecrawlApiKey:
         typeof input.firecrawlApiKey === "string"
           ? input.firecrawlApiKey

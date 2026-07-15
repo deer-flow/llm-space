@@ -20,6 +20,7 @@ describe("built-in tools module", () => {
               : null,
           getSearchSettings: () => ({
             provider: "firecrawl",
+            braveApiKey: "",
             firecrawlApiKey: "",
             tavilyApiKey: "",
           }),
@@ -67,6 +68,7 @@ describe("built-in tools module", () => {
           findSkill: undefined,
           getSearchSettings: () => ({
             provider: "firecrawl",
+            braveApiKey: "",
             firecrawlApiKey: "",
             tavilyApiKey: "",
           }),
