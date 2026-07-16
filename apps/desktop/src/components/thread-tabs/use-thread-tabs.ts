@@ -1,5 +1,6 @@
 "use client";
 
+import { uuid } from "@llm-space/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { localFs, traceClient } from "@/client";
@@ -10,6 +11,8 @@ export interface ThreadTab {
   id: string;
   type: "thread";
   path: string;
+  /** Stable editor identity that survives path rewrites. */
+  paneId: string;
   /** Bumped by `refresh(id)` to force the pane to reload from disk. */
   refreshNonce?: number;
 }
@@ -75,6 +78,8 @@ export interface ThreadTabs {
   handleRemove: (removed: string) => void;
   /** File-tree rename/move: rewrite open thread tab paths under `from` to `to`. */
   handleMove: (from: string, to: string) => void;
+  /** Consume the marker that prevents an overwritten editor from writing back. */
+  consumeDiscardedPane: (paneId: string) => boolean;
   /** Trace metadata edit: update labels for already-open trace tabs. */
   handleTraceTitleChange: (
     projectId: string,
@@ -101,7 +106,12 @@ function _traceTabId(projectId: string, traceKey: string): string {
 }
 
 function _createThreadTab(path: string): ThreadTab {
-  return { id: _threadTabId(path), type: "thread", path };
+  return {
+    id: _threadTabId(path),
+    type: "thread",
+    path,
+    paneId: `thread-pane:${uuid()}`,
+  };
 }
 
 function _createTraceTab({
@@ -147,6 +157,15 @@ function _fromPersisted(tab: PersistedTab): AppTab | null {
   return null;
 }
 
+function _dedupeTabs(tabs: AppTab[]): AppTab[] {
+  const seen = new Set<string>();
+  return tabs.filter((tab) => {
+    if (seen.has(tab.id)) return false;
+    seen.add(tab.id);
+    return true;
+  });
+}
+
 function _loadPersistedTabs(): AppTab[] {
   if (typeof window === "undefined") return [];
   try {
@@ -154,23 +173,27 @@ function _loadPersistedTabs(): AppTab[] {
     if (raw !== null) {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map((item): PersistedTab | null => {
-          if (!item || typeof item !== "object") return null;
-          const t = item as PersistedTab;
-          return t.type === "thread" || t.type === "trace" ? t : null;
-        })
-        .map((item) => (item ? _fromPersisted(item) : null))
-        .filter((tab): tab is AppTab => tab !== null);
+      return _dedupeTabs(
+        parsed
+          .map((item): PersistedTab | null => {
+            if (!item || typeof item !== "object") return null;
+            const t = item as PersistedTab;
+            return t.type === "thread" || t.type === "trace" ? t : null;
+          })
+          .map((item) => (item ? _fromPersisted(item) : null))
+          .filter((tab): tab is AppTab => tab !== null)
+      );
     }
 
     const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacyRaw === null) return [];
     const legacy: unknown = JSON.parse(legacyRaw);
     return Array.isArray(legacy)
-      ? legacy
-          .filter((path): path is string => typeof path === "string")
-          .map(_createThreadTab)
+      ? _dedupeTabs(
+          legacy
+            .filter((path): path is string => typeof path === "string")
+            .map(_createThreadTab)
+        )
       : [];
   } catch {
     return [];
@@ -257,6 +280,7 @@ export function useThreadTabs(): ThreadTabs {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const closedStack = useRef<PersistedTab[][]>([]);
+  const discardedPaneIds = useRef(new Set<string>());
   const pushClosed = useCallback((closed: AppTab[]) => {
     if (closed.length > 0) {
       closedStack.current.push(closed.map(_persistable));
@@ -408,10 +432,14 @@ export function useThreadTabs(): ThreadTabs {
       )
     ).filter((tab): tab is AppTab => tab !== null);
     if (alive.length === 0) return;
-    setTabs((prev) => [
-      ...prev,
-      ...alive.filter((tab) => !prev.some((current) => current.id === tab.id)),
-    ]);
+    setTabs((prev) =>
+      _dedupeTabs([
+        ...prev,
+        ...alive.filter(
+          (tab) => !prev.some((current) => current.id === tab.id)
+        ),
+      ])
+    );
     setActiveId(alive[alive.length - 1]?.id ?? null);
   }, []);
 
@@ -451,26 +479,56 @@ export function useThreadTabs(): ThreadTabs {
     const rewrite = (p: string): string =>
       p === from ? to : _isUnder(p, from) ? to + p.slice(from.length) : p;
 
-    setTabs((prev) => {
-      if (
-        !prev.some((tab) => tab.type === "thread" && _isUnder(tab.path, from))
-      ) {
-        return prev;
+    const currentTabs = tabsRef.current;
+    const sourceTabs = currentTabs.filter(
+      (tab): tab is ThreadTab =>
+        tab.type === "thread" && _isUnder(tab.path, from)
+    );
+    const destinationTabs = currentTabs.filter(
+      (tab): tab is ThreadTab => tab.type === "thread" && _isUnder(tab.path, to)
+    );
+    const sourceIsOpen = sourceTabs.length > 0;
+
+    if (sourceIsOpen) {
+      for (const tab of destinationTabs) {
+        discardedPaneIds.current.add(tab.paneId);
       }
-      return prev.map((tab) => {
-        if (tab.type !== "thread" || !_isUnder(tab.path, from)) {
-          return tab;
+    }
+
+    setTabs((prev) => {
+      const next = prev.flatMap((tab): AppTab[] => {
+        if (tab.type !== "thread") return [tab];
+        if (_isUnder(tab.path, from)) {
+          const path = rewrite(tab.path);
+          return [{ ...tab, id: _threadTabId(path), path }];
         }
-        const path = rewrite(tab.path);
-        return { ...tab, id: _threadTabId(path), path };
+        if (!_isUnder(tab.path, to)) return [tab];
+        if (sourceIsOpen) return [];
+        return [{ ...tab, refreshNonce: (tab.refreshNonce ?? 0) + 1 }];
       });
+      return _dedupeTabs(next);
     });
     setActiveId((current) => {
-      const activeTab = tabsRef.current.find((tab) => tab.id === current);
-      return activeTab?.type === "thread" && _isUnder(activeTab.path, from)
-        ? _threadTabId(rewrite(activeTab.path))
-        : current;
+      const activeTab = currentTabs.find((tab) => tab.id === current);
+      if (activeTab?.type !== "thread") return current;
+      if (_isUnder(activeTab.path, from)) {
+        return _threadTabId(rewrite(activeTab.path));
+      }
+      if (!_isUnder(activeTab.path, to) || !sourceIsOpen) return current;
+
+      const replacement = sourceTabs.find(
+        (tab) => rewrite(tab.path) === activeTab.path
+      );
+      return replacement
+        ? _threadTabId(rewrite(replacement.path))
+        : _threadTabId(rewrite(sourceTabs[0].path));
     });
+  }, []);
+
+  const consumeDiscardedPane = useCallback((paneId: string) => {
+    if (!discardedPaneIds.current.has(paneId)) return false;
+    discardedPaneIds.current.delete(paneId);
+    return true;
   }, []);
 
   const handleTraceTitleChange = useCallback(
@@ -508,6 +566,7 @@ export function useThreadTabs(): ThreadTabs {
     activateNext,
     activatePrevious,
     refresh,
+    consumeDiscardedPane,
     handleRemove,
     handleMove,
     handleTraceTitleChange,
