@@ -334,10 +334,20 @@ jobs:
           TAG: ${{ needs.meta.outputs.tag }}
           CHANNEL: ${{ needs.meta.outputs.channel }}
         run: |
-          # Static notes only. No changelog extraction and no --generate-notes:
-          # both list commits/authors and a "New Contributors" section, which
-          # we deliberately don't surface.
-          NOTES="$(cat <<'EOF'
+          # Release notes = this version's hand-curated CHANGELOG.md section
+          # (so no commit/author dumps or "New Contributors" that --generate-notes
+          # would add) followed by the install blurb. The section is empty for
+          # prereleases with no entry (e.g. canary) — those fall back to
+          # install-only notes.
+          VERSION="${TAG#v}"
+          CHANGES="$(awk -v h="## [$VERSION]" '
+            index($0, h) == 1 { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md | sed -e '/./,$!d')"
+          INSTALL="$(cat <<'EOF'
+          ## Install
+
           Two editions. Install either, or both — they share the same `~/.llm-space` data, so switching keeps your threads and settings.
 
           - **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
@@ -346,6 +356,11 @@ jobs:
           Download a DMG below. Existing installs update in place.
           EOF
           )"
+          if [ -n "$CHANGES" ]; then
+            NOTES="$(printf "## What's Changed\n\n%s\n\n%s\n\n**Full changelog:** https://github.com/%s/blob/%s/CHANGELOG.md\n" "$CHANGES" "$INSTALL" "$GITHUB_REPOSITORY" "$TAG")"
+          else
+            NOTES="$INSTALL"
+          fi
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "canary" ]; then
             PRERELEASE_ARGS=(--prerelease)
