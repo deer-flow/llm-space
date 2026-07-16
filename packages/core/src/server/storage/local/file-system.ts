@@ -68,7 +68,19 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
   }
 
   async mv(src: string, dest: string): Promise<void> {
-    await fs.rename(this._resolve(src), this._resolve(dest));
+    const source = this._resolve(src);
+    const destination = this._resolve(dest);
+    if (source === destination) return;
+
+    try {
+      await fs.lstat(destination);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      await fs.rename(source, destination);
+      return;
+    }
+
+    throw new Error(`Cannot move: destination already exists: ${dest}`);
   }
 
   async rm(p: string): Promise<void> {

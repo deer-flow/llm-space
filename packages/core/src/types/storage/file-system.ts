@@ -48,7 +48,9 @@ export interface FileSystem {
   cp(src: string, dest: string): Promise<void>;
 
   /**
-   * Move or rename a file or directory.
+   * Move or rename a file or directory. Rejects if the destination already
+   * exists; callers that explicitly support replacing an entry must remove it
+   * first.
    */
   mv(src: string, dest: string): Promise<void>;
 
