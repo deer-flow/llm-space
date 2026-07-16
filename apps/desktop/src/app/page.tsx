@@ -479,6 +479,7 @@ function PageInner() {
                 activeId={tabs.activeId}
                 activate={tabs.activate}
                 refresh={tabs.refresh}
+                consumeDiscardedPane={tabs.consumeDiscardedPane}
                 sidebarOpen={sidebarOpen}
                 fullScreen={fullScreen}
                 close={handleCloseTab}

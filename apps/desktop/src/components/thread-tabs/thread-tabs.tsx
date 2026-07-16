@@ -63,6 +63,7 @@ interface ThreadTabsProps {
   fullScreen?: boolean;
   activate: (id: string) => void;
   refresh: (id: string) => void;
+  consumeDiscardedPane: (paneId: string) => boolean;
   close: (id: string) => void;
   closeOthers: (id: string) => void;
   closeAll: () => void;
@@ -90,6 +91,7 @@ export function ThreadTabs({
   fullScreen = false,
   activate,
   refresh,
+  consumeDiscardedPane,
   close,
   closeOthers,
   closeAll,
@@ -348,12 +350,14 @@ export function ThreadTabs({
         {tabs.map((tab) =>
           tab.type === "thread" ? (
             <ThreadTabPane
-              key={tab.id}
+              key={tab.paneId}
+              paneId={tab.paneId}
               path={tab.path}
               active={tab.id === activeId}
               refreshNonce={tab.refreshNonce ?? 0}
               onMove={onMove}
               onClose={(path) => close(`thread:${path}`)}
+              consumeDiscardedPane={consumeDiscardedPane}
             />
           ) : (
             <TraceTabPane

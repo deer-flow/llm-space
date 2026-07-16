@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 const rpcTransport = createRpcTransport();
 
 interface ThreadTabPaneProps {
+  paneId: string;
   path: string;
   active: boolean;
   /**
@@ -25,6 +26,8 @@ interface ThreadTabPaneProps {
   onMove?: (from: string, to: string) => void;
   /** Close this pane's tab, e.g. after its thread fails to load. */
   onClose?: (path: string) => void;
+  /** Return true once when an overwritten pane must drop pending writes. */
+  consumeDiscardedPane?: (paneId: string) => boolean;
 }
 
 /**
@@ -33,14 +36,21 @@ interface ThreadTabPaneProps {
  * in-progress streaming run survive tab switches.
  */
 export function ThreadTabPane({
+  paneId,
   path,
   active,
   refreshNonce = 0,
   onMove,
   onClose,
+  consumeDiscardedPane,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
-  const { data: thread, isLoading, isError, error } = useQuery({
+  const {
+    data: thread,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["thread", path],
     queryFn: () => localFs.read(path),
     // A workspace file can change on disk outside the app, so never serve a
@@ -93,12 +103,19 @@ export function ThreadTabPane({
     [flushPending]
   );
 
-  // Flush any pending write when the tab closes so the last edit is never dropped.
+  // Flush pending edits on a normal close. An editor displaced by an overwrite
+  // instead drops them so stale destination content cannot replace the moved file.
   useEffect(() => {
     return () => {
+      if (consumeDiscardedPane?.(paneId)) {
+        if (writeTimer.current) clearTimeout(writeTimer.current);
+        writeTimer.current = null;
+        pending.current = null;
+        return;
+      }
       void flushPending();
     };
-  }, [flushPending]);
+  }, [consumeDiscardedPane, flushPending, paneId]);
 
   // "Refresh" the thread from disk: re-read the file and remount the playground
   // on a fresh store (via reloadKey), discarding any in-memory edits. Driven by
