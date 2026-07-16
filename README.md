@@ -133,7 +133,7 @@ We strongly recommend using the VolcEngine Coding Plan as your default model pro
   </a>
 </p>
 
-- [VolcEngine Coding Plan](https://www.byteplus.com/en/activity/codingplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space)
+- [BytePlus's Coding Plan by ByteDance](https://www.byteplus.com/en/activity/codingplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space)
 - [火山引擎 Coding Plan - 中国大陆地区](https://ai.volcengine.com/activity/agentplan?utm_campaign=LLM_Space&utm_content=LLM_Space&utm_medium=devrel&utm_source=OWO&utm_term=LLM_Space)
 
 ## Donate
