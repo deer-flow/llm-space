@@ -24,6 +24,8 @@ import {
   type McpToolSummary,
 } from "@/shared/mcp";
 
+import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
+
 function _McpToolImportDialog({
   existingToolNames,
   initialServerId,
@@ -185,7 +187,18 @@ function _McpToolImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0"
+        onInteractOutside={(event) => {
+          if (
+            document.querySelector(
+              '[data-slot="dropdown-menu-content"][data-state="open"]'
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>Add MCP tools</DialogTitle>
           <DialogDescription>
@@ -203,28 +216,59 @@ function _McpToolImportDialog({
                 servers.map((server) => {
                   const count = server.toolCount ?? server.readiness?.toolCount;
                   const selected = server.id === selectedServerId;
+                  const serverTools =
+                    server.id === selectedServerId
+                      ? tools
+                      : (server.readiness?.tools ?? []);
                   return (
-                    <button
+                    <div
                       key={server.id}
-                      type="button"
                       className={cn(
-                        "focus-visible:ring-ring/30 flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors outline-none focus-visible:ring-2",
+                        "group/row relative flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors",
                         selected
                           ? "bg-accent text-accent-foreground"
                           : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
                       )}
-                      onClick={() => setSelectedServerId(server.id)}
                     >
+                      <button
+                        type="button"
+                        aria-label={server.name}
+                        className="focus-visible:ring-ring/30 absolute inset-0 rounded-md outline-none focus-visible:ring-2"
+                        onClick={() => setSelectedServerId(server.id)}
+                      />
                       <Cable className="size-3.5 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">
                         {server.name}
                       </span>
-                      {count != null ? (
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[0.625rem]">
-                          {count}
-                        </span>
-                      ) : null}
-                    </button>
+                      <ToolImportSidebarActions
+                        count={count}
+                        onEnableAll={() => {
+                          for (const tool of serverTools) {
+                            if (
+                              tool.available &&
+                              !existingToolNames.has(tool.directName)
+                            ) {
+                              onAdd({
+                                type: "mcp",
+                                name: tool.directName,
+                                description: tool.description,
+                                parameters: tool.inputSchema,
+                                serverId: server.id,
+                                serverName: server.serverName,
+                                toolName: tool.toolName,
+                              });
+                            }
+                          }
+                        }}
+                        onDisableAll={() => {
+                          for (const tool of serverTools) {
+                            if (existingToolNames.has(tool.directName)) {
+                              onRemove(tool.directName);
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                   );
                 })
               )}

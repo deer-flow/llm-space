@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
+import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
 type BuiltInToolCategoryId = "fileSystem" | "web" | "misc";
 
@@ -156,7 +157,18 @@ function _BuiltInToolImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0"
+        onInteractOutside={(event) => {
+          if (
+            document.querySelector(
+              '[data-slot="dropdown-menu-content"][data-state="open"]'
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>Add built-in tools</DialogTitle>
           <DialogDescription>
@@ -178,28 +190,46 @@ function _BuiltInToolImportDialog({
             <div className="flex flex-col gap-1">
             {BUILT_IN_TOOL_CATEGORIES.map((category) => {
               const CategoryIcon = category.icon;
-              const count = toolsByCategory.get(category.id)?.length ?? 0;
+              const categoryTools = toolsByCategory.get(category.id) ?? [];
               const selected = category.id === selectedCategoryId;
               return (
-                <button
+                <div
                   key={category.id}
-                  type="button"
                   className={cn(
-                    "focus-visible:ring-ring/30 flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors outline-none focus-visible:ring-2",
+                    "group/row relative flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors",
                     selected
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
                   )}
-                  onClick={() => setSelectedCategoryId(category.id)}
                 >
+                  <button
+                    type="button"
+                    aria-label={category.label}
+                    className="focus-visible:ring-ring/30 absolute inset-0 rounded-md outline-none focus-visible:ring-2"
+                    onClick={() => setSelectedCategoryId(category.id)}
+                  />
                   <CategoryIcon className="size-3.5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">
                     {category.label}
                   </span>
-                  <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[0.625rem]">
-                    {count}
-                  </span>
-                </button>
+                  <ToolImportSidebarActions
+                    count={categoryTools.length}
+                    onEnableAll={() => {
+                      for (const tool of categoryTools) {
+                        if (!existingToolNames.has(tool.name)) {
+                          onAdd(tool);
+                        }
+                      }
+                    }}
+                    onDisableAll={() => {
+                      for (const tool of categoryTools) {
+                        if (existingToolNames.has(tool.name)) {
+                          onRemove(tool.name);
+                        }
+                      }
+                    }}
+                  />
+                </div>
               );
             })}
             </div>

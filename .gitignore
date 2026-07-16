@@ -9,6 +9,9 @@ out
 dist
 *.tgz
 
+# Playwright
+.playwright-mcp
+
 # code coverage
 coverage
 *.lcov

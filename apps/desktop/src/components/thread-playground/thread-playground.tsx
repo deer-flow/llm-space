@@ -419,7 +419,7 @@ function ThreadPlaygroundContent({
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Tools
                     </div>
-                    <div className="flex grow items-center">
+                    <div className="flex max-h-48 grow items-start overflow-y-auto">
                       <ToolListView readonly={readonly} />
                     </div>
                   </div>
