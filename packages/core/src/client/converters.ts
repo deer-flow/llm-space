@@ -107,6 +107,9 @@ function _convertMessageContents(
     for (const content of message.content) {
       if (content.type === "text") {
         contents.push({ ...content } satisfies pi.TextContent);
+      } else if (content.type === "image_data") {
+        // Assistant messages may not carry images; drop them on conversion.
+        continue;
       } else {
         throw new Error(`Unsupported content type: ${JSON.stringify(content)}`);
       }

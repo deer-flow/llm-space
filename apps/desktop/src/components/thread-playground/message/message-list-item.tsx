@@ -63,13 +63,17 @@ function _MessageListItem({
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageDataContent; contentIndex: number }[] = [];
+    // Assistant messages must not display images.
+    if (message.role === "assistant") {
+      return result;
+    }
     message.content.forEach((content, contentIndex) => {
       if (content.type === "image_data") {
         result.push({ content, contentIndex });
       }
     });
     return result;
-  }, [message.content]);
+  }, [message.content, message.role]);
   const toolCallSummary = useMemo(
     () =>
       message.role === "assistant" && message.toolCalls?.length
