@@ -132,7 +132,7 @@ export function OnboardDialog({
 
   const handleReady = useCallback(() => {
     onOpenChange(false);
-  }, []);
+  }, [onOpenChange]);
 
   const readyProviderName =
     addedProviderName ?? models[0]?.name ?? models[0]?.id ?? null;

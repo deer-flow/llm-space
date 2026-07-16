@@ -95,8 +95,11 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       .map((id) => runById.get(id))
       .filter((run): run is RunSnapshot => Boolean(run));
   }, [runById, selectedRunIds]);
-  const comparisonRuns =
-    selectedRuns.length === 2 ? [selectedRuns[0], selectedRuns[1]] : null;
+  const comparisonRuns = useMemo(
+    () =>
+      selectedRuns.length === 2 ? [selectedRuns[0], selectedRuns[1]] : null,
+    [selectedRuns]
+  );
   const selectedEvaluation = useMemo(() => {
     if (!comparisonRuns) {
       return null;

@@ -119,8 +119,10 @@ function _PromptVariablesPanel({
       ),
     [variableVariants]
   );
-  const customValues =
-    variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {};
+  const customValues = useMemo(
+    () => variableVariants.variants[DEFAULT_VARIABLE_VARIANT_NAME] ?? {},
+    [variableVariants]
+  );
 
   // Seed from the chip-open target so the fallback effect below (which runs in
   // the same mount commit) doesn't clobber it back to the first variable.

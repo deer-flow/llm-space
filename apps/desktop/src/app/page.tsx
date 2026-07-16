@@ -313,6 +313,7 @@ function PageInner() {
   // Deps intentionally empty: this is a one-shot startup check, not reactive.
   useEffect(() => {
     if (models.length === 0) setOnboardOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot startup check; must not re-run when models change
   }, []);
 
   // Bridge commands dispatched from the bun process (native menu / shortcuts)

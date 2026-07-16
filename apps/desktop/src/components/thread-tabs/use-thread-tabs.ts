@@ -316,6 +316,7 @@ export function useThreadTabs(): ThreadTabs {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restoration check; reads the initial activeId, must not re-run when it changes
   }, []);
 
   const open = useCallback((path: string) => {

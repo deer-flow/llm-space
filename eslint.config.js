@@ -3,6 +3,7 @@ import { defineConfig } from "eslint/config";
 import pluginPrettier from "eslint-config-prettier";
 import pluginImportX from "eslint-plugin-import-x";
 import pluginReact from "eslint-plugin-react";
+import pluginReactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -16,6 +17,7 @@ export default defineConfig([
       "**/.next/**",
       "**/.turbo/**",
       ".agents/**",
+      ".llm-space/**",
       "apps/desktop/electrobun.config.ts",
       "apps/desktop/src/components/ui/**",
       "apps/desktop/vite.config.ts",
@@ -44,6 +46,7 @@ export default defineConfig([
 
   // React rules
   pluginReact.configs.flat.recommended,
+  pluginReactHooks.configs.flat["recommended-latest"],
   {
     settings: {
       react: {
@@ -105,6 +108,16 @@ export default defineConfig([
       ],
       "no-console": ["warn", { allow: ["info", "warn", "error"] }],
       "no-unused-vars": "off",
+      // The house `export const Foo = memo(_Foo)` pattern names the inner
+      // implementation `_Foo`, which rules-of-hooks reads as a non-component
+      // (must start with an uppercase letter), flagging every hook call inside.
+      "react-hooks/rules-of-hooks": "off",
+      // These two React-Compiler rules mostly flag intentional, correct
+      // patterns in this codebase — the latest-ref pattern, drag-and-drop
+      // render props, and controlled-state resets — so they're off.
+      // exhaustive-deps (warn, upstream) stays on.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
       "react/react-in-jsx-scope": "off",
     },
   },

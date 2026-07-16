@@ -201,7 +201,7 @@ function ThreadPlaygroundContent({
   }, [readonlyFromProps, status]);
   const handleRun = useCallback(async () => {
     await run();
-  }, []);
+  }, [run]);
   // Expose run as a command, but only from the active tab so a global
   // `runThread` targets it (and no-ops when no tab is active). Skip while
   // already running to avoid run()'s "already running" throw.
@@ -219,7 +219,7 @@ function ThreadPlaygroundContent({
     } catch {
       // Ignored
     }
-  }, []);
+  }, [abort]);
   const runHistoryPanelRef = usePanelRef();
   const [historyOpen, setHistoryOpen] = useState(false);
   const toggleHistory = useCallback(() => {
@@ -235,7 +235,7 @@ function ThreadPlaygroundContent({
   }, [runHistoryPanelRef]);
   const closeHistory = useCallback(() => {
     runHistoryPanelRef.current?.collapse();
-  }, []);
+  }, [runHistoryPanelRef]);
   const handleShortcuts = useShortcuts({ readonly: readonlyFromProps });
   return (
     <div

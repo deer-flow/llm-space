@@ -501,5 +501,6 @@ export function useModel(ref: {
   provider: string;
 }): pi.Model<pi.Api> | null {
   const ctx = useModelProvider();
-  return useMemo(() => ctx.getModel(ref), [ctx, ref.id, ref.provider]);
+  const { id, provider } = ref;
+  return useMemo(() => ctx.getModel({ id, provider }), [ctx, id, provider]);
 }

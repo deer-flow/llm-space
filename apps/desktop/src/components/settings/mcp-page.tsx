@@ -192,6 +192,7 @@ export function McpPage() {
       setForm(_formFromServer(selectedServer));
       setTools([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when the selected server's id changes, not on every object update (would clobber in-progress edits)
   }, [creating, selectedServer?.id]);
 
   const createServer = () => {

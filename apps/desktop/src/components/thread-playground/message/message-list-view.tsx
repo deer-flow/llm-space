@@ -43,12 +43,15 @@ export function MessageListView({
   const handleDragStart = useCallback(() => {
     setDragging(true);
   }, []);
-  const handleDragEnd = useCallback((result: DropResult) => {
-    setDragging(false);
-    const { source, destination } = result;
-    if (!destination || source.index === destination.index) return;
-    moveMessage(source.index, destination.index);
-  }, []);
+  const handleDragEnd = useCallback(
+    (result: DropResult) => {
+      setDragging(false);
+      const { source, destination } = result;
+      if (!destination || source.index === destination.index) return;
+      moveMessage(source.index, destination.index);
+    },
+    [moveMessage]
+  );
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollToBottom = useCallback(() => {
