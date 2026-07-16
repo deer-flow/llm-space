@@ -139,6 +139,30 @@ export function replaceThreadPromptVariableReferences(
   return next;
 }
 
+/** Return whether an editable, model-facing text surface references a variable. */
+export function hasThreadPromptVariableReference(
+  context: ThreadContext | undefined,
+  name: string
+): boolean {
+  const probeName = `${name}__reference_probe`;
+  if (
+    context?.systemPrompt !== undefined &&
+    replacePromptVariableReferences(context.systemPrompt, name, probeName) !==
+      context.systemPrompt
+  ) {
+    return true;
+  }
+
+  return Boolean(
+    context?.messages &&
+    _replaceMessagesPromptVariableReferences(
+      context.messages,
+      name,
+      probeName
+    ) !== context.messages
+  );
+}
+
 /**
  * Drop frozen values for prompt places whose editable source text changed.
  * Other places remain frozen, preserving cache-stable historical values.

@@ -9,6 +9,7 @@ import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   formatCurrentDateVariable,
   formatSkillsVariable,
+  hasThreadPromptVariableReference,
   normalizePromptVariableState,
   VARIABLE_NAME_RE,
 } from "@llm-space/core/thread";
@@ -93,6 +94,7 @@ function _PromptVariablesPanel({
   const systemPrompt = useThreadStore(
     (s) => s.thread.context?.systemPrompt ?? ""
   );
+  const messages = useThreadStore((s) => s.thread.context?.messages);
   const {
     updatePromptVariable,
     renamePromptVariable,
@@ -132,9 +134,10 @@ function _PromptVariablesPanel({
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
-  const [pendingRemoveCustom, setPendingRemoveCustom] = useState<string | null>(
-    null
-  );
+  const [pendingRemoveCustom, setPendingRemoveCustom] = useState<{
+    name: string;
+    hasReferences: boolean;
+  } | null>(null);
   const initialSelectionKey = initialSelection
     ? `${initialSelection.kind}:${initialSelection.name}`
     : null;
@@ -253,13 +256,15 @@ function _PromptVariablesPanel({
 
   const confirmRemoveCustom = useCallback(
     (name: string) => {
-      if (_promptContainsVariable(systemPrompt, name)) {
-        setPendingRemoveCustom(name);
-        return;
-      }
-      removeCustomVariable(name);
+      setPendingRemoveCustom({
+        name,
+        hasReferences: hasThreadPromptVariableReference(
+          { systemPrompt, messages },
+          name
+        ),
+      });
     },
-    [removeCustomVariable, systemPrompt]
+    [messages, systemPrompt]
   );
   const detailFillsAvailableHeight =
     selection?.kind === "custom" ||
@@ -377,13 +382,15 @@ function _PromptVariablesPanel({
         title="Delete custom variable?"
         description={
           pendingRemoveCustom
-            ? `The system prompt references "{{${pendingRemoveCustom}}}". Deleting this variable will block runs until the prompt is updated.`
+            ? pendingRemoveCustom.hasReferences
+              ? `This thread references "{{${pendingRemoveCustom.name}}}". Deleting this variable will leave unresolved placeholders.`
+              : `This removes "{{${pendingRemoveCustom.name}}}" and its value from this thread.`
             : undefined
         }
         confirmLabel="Delete variable"
         onConfirm={() => {
           if (pendingRemoveCustom) {
-            removeCustomVariable(pendingRemoveCustom);
+            removeCustomVariable(pendingRemoveCustom.name);
           }
           setPendingRemoveCustom(null);
         }}
@@ -1028,11 +1035,6 @@ function _isCustomNameAvailable(
   );
 }
 
-function _promptContainsVariable(systemPrompt: string, name: string): boolean {
-  const re = new RegExp(`\\{\\{\\s*${_escapeRegExp(name)}\\s*\\}\\}`);
-  return re.test(systemPrompt);
-}
-
 function _uniqueName(base: string, used: Set<string>): string {
   if (!used.has(base)) {
     return base;
@@ -1042,10 +1044,6 @@ function _uniqueName(base: string, used: Set<string>): string {
     index += 1;
   }
   return `${base}_${index}`;
-}
-
-function _escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export const PromptVariablesPanel = memo(_PromptVariablesPanel);

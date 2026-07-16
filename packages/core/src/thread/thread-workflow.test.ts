@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { ModelUsage, Thread } from "@llm-space/core";
 import {
   aggregateMessageUsage,
+  hasThreadPromptVariableReference,
   normalizePromptVariableState,
   recordRun,
   renderThreadPromptVariables,
@@ -263,6 +264,55 @@ describe("public headless thread workflow", () => {
       "message:user-1:text": { value: "frozen" },
       "toolResult:assistant-1:tool-1:text": { value: "frozen" },
     });
+  });
+
+  test("detects references across every model-facing text surface", () => {
+    const contexts: NonNullable<Thread["context"]>[] = [
+      { systemPrompt: "System {{customer}}" },
+      {
+        messages: [
+          {
+            id: "user-1",
+            role: "user",
+            content: [{ type: "text", text: "User {{ customer }}" }],
+          },
+        ],
+      },
+      {
+        messages: [
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: [],
+            toolCalls: [
+              {
+                id: "tool-1",
+                input: { name: "lookup", arguments: {} },
+                output: {
+                  content: [{ type: "text", text: "Tool {{customer}}" }],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        systemPrompt: "System {{other}}",
+        messages: [
+          {
+            id: "user-2",
+            role: "user",
+            content: [{ type: "text", text: "User {{other}}" }],
+          },
+        ],
+      },
+    ];
+
+    expect(
+      contexts.map((context) =>
+        hasThreadPromptVariableReference(context, "customer")
+      )
+    ).toEqual([true, true, true, false]);
   });
 
   test("preserves the missing-skill error contract", async () => {
