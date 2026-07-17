@@ -12,8 +12,10 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 | Install deps                           | `bun install`                                                               | from repo root                                                                                                         |
 | Run desktop app                        | `mise run dev`                                                              | → `cd apps/desktop && bun run dev:hmr` (Vite HMR on :5173 + `vite build && electrobun dev`; restart to pick up bun main-process changes) |
 | Run desktop app with CEF/CDP debugging | `mise run dev:cef`                                                          | → `cd apps/desktop && bun run dev:cef`; exposes CDP on `127.0.0.1:9333` by default                                     |
+| Run the web site (landing + viewer)    | `mise run dev:web`                                                          | → `bun --filter @llm-space/web dev` (Vite on :5175). Landing at `/llm-space/`, viewer at `/llm-space/#/thread/<user>/<gist-id>` |
 | Build (canary)                         | `mise run build:canary`                                                     | → `vite build && electrobun build --env=canary` in `apps/desktop`                                                      |
 | Build (stable)                         | `mise run build:stable`                                                     | → `vite build && electrobun build --env=stable` in `apps/desktop`                                                      |
+| Build the web site                     | `mise run build:web`                                                        | → `bun --filter @llm-space/web build` (static, `base=/llm-space/`, out to `web/dist`). CI + the Pages workflow run this |
 | Local packaging / update test          | `mise run pack` · `pack:perf` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / CEF Performance edition / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
 | Cut a release                          | `mise run release` / `mise run release:canary`                              | → `bun scripts/release.ts`; see "Releases & auto-update"                                                               |
 | Lint                                   | `mise run lint` / `mise run lint:fix`                                       | `lint` = `eslint .` (read-only), `lint:fix` = `eslint --fix .`; flat config at repo root                               |
@@ -145,6 +147,16 @@ Every cross-boundary user action (menus, context menus, toolbar buttons, shortcu
 - `shared/` — code used by both contexts: `rpc.ts`, `commands.ts`.
 - `components/` — desktop-only UI: `thread-tabs/`, `file-system-tree-view/`, `settings/`, `command-palette.tsx`, `onboard-dialog.tsx`, and the account/update/github widgets. **The Thread Playground, model-provider, code-editor, shadcn `ui/`, and design tokens moved to `@llm-space/ui`** — import them from there, not from `@/components`.
 - Design tokens live in `@llm-space/ui/styles/globals.css` (Tailwind v4 + OKLch), imported once by `app/layout.tsx`. The app is dark-themed.
+
+### Web site (GitHub Pages) — how it publishes
+
+The site at **`deer-flow.github.io/llm-space/`** (landing page + shared-thread viewer) is the `@llm-space/web` app (`web/`). Publishing is **fully automated via GitHub Actions** — there is no manual deploy and no `gh-pages` branch anymore:
+
+- **`.github/workflows/pages.yml`** runs on every push to `main` (and `workflow_dispatch`): `bun --filter @llm-space/web build` → `actions/upload-pages-artifact` (`web/dist`) → `actions/deploy-pages`. So **merging to `main` publishes the site** — nothing else to do.
+- **One-time repo setting (already done once):** Settings → Pages → **Source = "GitHub Actions"**. If Pages ever reverts to "Deploy from a branch", the workflow's `deploy-pages` step fails until it's set back.
+- `web/` uses `base: "/llm-space/"`; absolute asset refs in JSX must go through `import.meta.env.BASE_URL`. No `.nojekyll` is needed (the Actions artifact bypasses Jekyll).
+- CI (`ci.yml`) also runs `build:web` on PRs, so a Vite break is caught before it reaches Pages.
+- **The old model is retired:** the `gh-pages` branch and its `scripts/deploy.ts` (which committed a built `/docs` folder and pushed the branch) are gone. Don't recreate them; publish by merging to `main`.
 
 ### Static assets (images, etc.)
 

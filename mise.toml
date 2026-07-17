@@ -38,6 +38,10 @@ run = "bun run dev"
 description = "Run the desktop app with CEF/CDP debugging on :9333"
 run = "bun run dev:cef"
 
+[tasks."dev:web"]
+description = "Run the static web app (landing page + shared-thread viewer) on :5175"
+run = "bun run dev:web"
+
 [tasks.lint]
 description = "Check lint (read-only)"
 run = "bun run lint"
@@ -59,6 +63,10 @@ run = "bun run build:canary"
 [tasks."build:stable"]
 description = "Build the stable app (vite build + electrobun build)"
 run = "bun run build:stable"
+
+[tasks."build:web"]
+description = "Build the static web app for GitHub Pages (base=/llm-space/)"
+run = "bun run build:web"
 
 [tasks.release]
 description = "Cut a stable release: bump version, tag, push — triggers release CI"

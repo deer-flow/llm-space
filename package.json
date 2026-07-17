@@ -9,8 +9,11 @@
   "scripts": {
     "dev": "cd apps/desktop && bun run dev:hmr",
     "dev:cef": "cd apps/desktop && bun run dev:cef",
+    "dev:web": "bun --filter @llm-space/web dev",
     "build:canary": "cd apps/desktop && bun run build:canary",
     "build:stable": "cd apps/desktop && bun run build:stable",
+    "build:web": "bun --filter @llm-space/web build",
+    "preview:web": "bun --filter @llm-space/web preview",
     "release": "bun scripts/release.ts",
     "release:canary": "bun scripts/release.ts --prerelease canary",
     "lint": "eslint .",
