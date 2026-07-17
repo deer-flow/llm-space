@@ -1,9 +1,9 @@
+import { cn } from "@llm-space/ui/lib/utils";
+import { CollapsibleContent } from "@llm-space/ui/ui/collapsible-content";
 import { ChevronDownIcon } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
-import { cn } from "@/lib/utils";
 
-import { CollapsibleContent } from "../../ui/collapsible-content";
 
 function _ThinkingView({
   className,

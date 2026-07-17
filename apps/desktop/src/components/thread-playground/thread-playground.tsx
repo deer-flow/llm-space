@@ -1,6 +1,27 @@
 "use client";
 
 import type { AgentTransport, Thread } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { ButtonGroup } from "@llm-space/ui/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
+import { Kbd, KbdGroup } from "@llm-space/ui/ui/kbd";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@llm-space/ui/ui/resizable";
+import { Spinner } from "@llm-space/ui/ui/spinner";
+import { Switch } from "@llm-space/ui/ui/switch";
 import {
   ChevronDownIcon,
   HistoryIcon,
@@ -26,28 +47,6 @@ import {
   useFirstAvailableModel,
   useModels,
 } from "@/components/model-provider";
-import { threadTitleFromPath } from "@/lib/thread-file";
-import { cn } from "@/lib/utils";
-
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import { ButtonGroup } from "../ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { Kbd, KbdGroup } from "../ui/kbd";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "../ui/resizable";
-import { Spinner } from "../ui/spinner";
-import { Switch } from "../ui/switch";
 
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";

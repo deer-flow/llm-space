@@ -8,6 +8,10 @@ import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   normalizePromptVariableState,
 } from "@llm-space/core/thread";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   BracesIcon,
   CalendarDaysIcon,
@@ -19,11 +23,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useCommands, useRegisterCommands } from "@/commands";
-import { Tooltip } from "@/components/tooltip";
-import { useAutoAnimation } from "@/lib/use-auto-animation";
-import { cn } from "@/lib/utils";
 
-import { Button } from "../../ui/button";
 import { useThreadStore } from "../stores";
 
 import { PROMPT_DATE_FORMATS } from "./prompt-variable-options";

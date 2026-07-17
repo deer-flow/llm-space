@@ -1,5 +1,15 @@
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@llm-space/ui/ui/dialog";
 import {
   CheckIcon,
   DownloadIcon,
@@ -9,18 +19,7 @@ import {
 } from "lucide-react";
 import { type ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
 import type { UpdateStatus } from "@/shared/updates";
-
-import { Button } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
 
 type Tone = "primary" | "success" | "danger";
 

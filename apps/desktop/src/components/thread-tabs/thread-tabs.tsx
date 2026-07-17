@@ -1,5 +1,18 @@
 "use client";
 
+import { useTheme } from "@llm-space/ui/components/theme-provider";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@llm-space/ui/ui/context-menu";
+import { Kbd, KbdGroup } from "@llm-space/ui/ui/kbd";
 import { Tabs } from "@sinm/react-chrome-tabs";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
@@ -14,21 +27,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useTheme } from "@/components/theme-provider";
 import { electrobun } from "@/lib/electrobun";
-import { cn } from "@/lib/utils";
-
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuGroup,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "../ui/context-menu";
-import { Kbd, KbdGroup } from "../ui/kbd";
 
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";

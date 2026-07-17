@@ -1,6 +1,6 @@
+import { PROVIDER_ICON_ALIASES, resolveProviderIcon } from "@llm-space/ui/lib/brand-icons";
 import { memo, useMemo } from "react";
 
-import { PROVIDER_ICON_ALIASES, resolveProviderIcon } from "@/lib/brand-icons";
 
 import { BrandAvatar } from "./brand-avatar";
 

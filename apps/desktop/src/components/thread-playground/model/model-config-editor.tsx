@@ -1,7 +1,8 @@
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
+
 import { useModel, useResolveModelConfig } from "@/components/model-provider";
-import { cn } from "@/lib/utils";
 
 import { useThreadStore } from "../stores";
 

@@ -1,6 +1,6 @@
+import { cn } from "@llm-space/ui/lib/utils";
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
 
 /**
  * Shared layout for a single settings page: a sticky title header (with an

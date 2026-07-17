@@ -1,9 +1,9 @@
+import { cn } from "@llm-space/ui/lib/utils";
 import { XIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
-import { cn } from "@/lib/utils";
 
 /** The repository we nudge users to star. */
 const STAR_URL = "https://github.com/deer-flow/llm-space";

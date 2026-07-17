@@ -1,7 +1,7 @@
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { create } from "zustand";
 
 import { useCommands } from "@/commands";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface FirecrawlLimitDialogState {
   open: boolean;

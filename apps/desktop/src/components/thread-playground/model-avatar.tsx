@@ -1,6 +1,6 @@
+import { resolveModelIcon } from "@llm-space/ui/lib/brand-icons";
 import { memo, useMemo } from "react";
 
-import { resolveModelIcon } from "@/lib/brand-icons";
 
 import { BrandAvatar } from "./brand-avatar";
 

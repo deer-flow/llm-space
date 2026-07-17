@@ -6,13 +6,12 @@ import {
   type DroppableProvided,
 } from "@hello-pangea/dnd";
 import type { AssistantMessage, Message, ThreadContext } from "@llm-space/core";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { cn } from "@/lib/utils";
-
-import { Button } from "../../ui/button";
-import { ScrollArea } from "../../ui/scroll-area";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import { MessageListItem } from "./message-list-item";

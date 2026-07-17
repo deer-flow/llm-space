@@ -1,13 +1,13 @@
-import { ChevronDown, type LucideIcon } from "lucide-react";
 
-import { Button } from "../ui/button";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
+} from "@llm-space/ui/ui/dropdown-menu";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 
 /** An entry that renders as a plain divider in the menu. */
 interface SeparatorItem { type: "separator" }

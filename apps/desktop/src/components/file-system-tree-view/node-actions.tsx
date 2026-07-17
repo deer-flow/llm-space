@@ -1,6 +1,14 @@
 "use client";
 
 import type { FileNode } from "@llm-space/core";
+import { cn } from "@llm-space/ui/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@llm-space/ui/ui/dropdown-menu";
 import {
   ClipboardCopy,
   ClipboardPaste,
@@ -20,14 +28,6 @@ import { toast } from "sonner";
 
 import { localFs } from "@/client";
 import { useCommands } from "@/commands";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);

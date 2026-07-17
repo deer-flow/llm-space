@@ -1,5 +1,19 @@
 "use client";
 
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   Check,
   CircleAlert,
@@ -29,20 +43,6 @@ import {
   removeMcpServer,
   updateMcpServer,
 } from "@/client/mcp";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Tooltip } from "@/components/tooltip";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import {
   getMcpReadinessLabel,
   normalizeMcpName,

@@ -1,14 +1,15 @@
-import { memo } from "react";
 
-import { CodeEditor } from "@/components/code-editor";
-import { Markdown } from "@/components/markdown";
+import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@llm-space/ui/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@llm-space/ui/ui/tabs";
+import { memo } from "react";
+
+import { Markdown } from "@/components/markdown";
 
 export type PreviewType = "text" | "json";
 export type PreviewMode = "code" | "markdown" | "html";

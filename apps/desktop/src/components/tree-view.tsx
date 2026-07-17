@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
 import { cva } from "class-variance-authority";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Accordion as AccordionPrimitive } from "radix-ui";
 import React from "react";
 
-import { cn } from "@/lib/utils";
 
 const treeVariants = cva(
   "group relative flex w-full items-center rounded-md px-2 opacity-67 transition-all hover:bg-accent/30 hover:opacity-100"

@@ -1,15 +1,16 @@
 "use client";
 
-import { ArrowDownToLineIcon } from "lucide-react";
 
-import { useCommands } from "@/commands";
-import { Tooltip } from "@/components/tooltip";
-import { Button } from "@/components/ui/button";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@llm-space/ui/ui/popover";
+import { ArrowDownToLineIcon } from "lucide-react";
+
+import { useCommands } from "@/commands";
 import { useUpdateStatus } from "@/components/update-status-provider";
 
 /**

@@ -2,14 +2,14 @@ import {
   createDefaultThreadParserRegistry,
   type ModelProviderGroup,
 } from "@llm-space/core";
-
-import { localFs } from "@/client";
-
 import {
   importStemFromFileName,
   joinPath,
   uniqueThreadFileName,
-} from "./thread-file";
+} from "@llm-space/ui/lib/thread-file";
+
+import { localFs } from "@/client";
+
 
 export interface ThreadImportFile {
   name: string;

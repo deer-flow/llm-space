@@ -1,12 +1,6 @@
 "use client";
 
-import { CheckIcon, CopyIcon, Loader2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
-
-import { useCommands } from "@/commands";
-import { useGithubAuth } from "@/components/github-auth-provider";
-import { GitHubIcon } from "@/components/github-icon";
-import { Button } from "@/components/ui/button";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +8,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@llm-space/ui/ui/dialog";
+import { CheckIcon, CopyIcon, Loader2Icon } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { useCommands } from "@/commands";
+import { useGithubAuth } from "@/components/github-auth-provider";
+import { GitHubIcon } from "@/components/github-icon";
 
 /**
  * The Device Flow dialog. Shown while signing in: it surfaces the pairing code

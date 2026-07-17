@@ -1,5 +1,15 @@
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@llm-space/ui/ui/empty";
 import {
   ArrowUpRightIcon,
   PlusIcon,
@@ -10,17 +20,7 @@ import { useCallback, type MouseEvent } from "react";
 
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
-import { cn } from "@/lib/utils";
 
-import { Button } from "./ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "./ui/empty";
 
 interface WelcomeProps {
   className?: string;

@@ -1,8 +1,8 @@
 import { usageForRun, type RunSnapshot } from "@llm-space/core/thread";
+import { cn } from "@llm-space/ui/lib/utils";
 import { memo } from "react";
 import { format } from "timeago.js";
 
-import { cn } from "@/lib/utils";
 
 import { MessageListView } from "./message/message-list-view";
 import { TokenUsageSummary } from "./message/token-usage-summary";

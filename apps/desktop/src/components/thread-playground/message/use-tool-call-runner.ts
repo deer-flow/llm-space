@@ -1,8 +1,8 @@
 import { isExecutableTool, type Tool, type ToolCall } from "@llm-space/core";
+import { isFirecrawlLimitError } from "@llm-space/ui/lib/firecrawl";
 import { useCallback, useMemo } from "react";
 
 import { executeTool } from "@/client/tool-execution";
-import { isFirecrawlLimitError } from "@/lib/firecrawl";
 
 import { useThreadStore, useThreadStoreActions } from "../stores";
 

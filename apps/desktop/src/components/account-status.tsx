@@ -1,19 +1,19 @@
 "use client";
 
-import { ChevronsUpDown, Loader2Icon, LogOut, XIcon } from "lucide-react";
-
-import { useCommands } from "@/commands";
-import { useGithubAuth } from "@/components/github-auth-provider";
-import { GithubAvatar } from "@/components/github-avatar";
-import { GitHubIcon } from "@/components/github-icon";
-import { Tooltip } from "@/components/tooltip";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@llm-space/ui/ui/dropdown-menu";
+import { ChevronsUpDown, Loader2Icon, LogOut, XIcon } from "lucide-react";
+
+import { useCommands } from "@/commands";
+import { useGithubAuth } from "@/components/github-auth-provider";
+import { GithubAvatar } from "@/components/github-avatar";
+import { GitHubIcon } from "@/components/github-icon";
 import type { GithubUser } from "@/shared/auth";
 
 /** The bottom-of-sidebar GitHub account widget: sign in / signing in / signed in. */

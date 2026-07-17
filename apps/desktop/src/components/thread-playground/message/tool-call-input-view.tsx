@@ -1,4 +1,14 @@
 import { type ToolCallInput } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
 import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -6,16 +16,6 @@ import { toast } from "sonner";
 import { revealAbsolutePath, revealSkill } from "@/client/built-in-tools";
 import { useCommands } from "@/commands";
 import { PreviewDialog } from "@/components/preview-dialog-lazy";
-import { Tooltip } from "@/components/tooltip";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 
 import { parseTodoWriteInput, TodoWriteView } from "./todo-write-view";
 

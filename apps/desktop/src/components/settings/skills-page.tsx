@@ -1,5 +1,17 @@
 "use client";
 
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
   Ban,
   CheckCheck,
@@ -21,21 +33,9 @@ import {
   setAllSkillsHidden,
   setSkillHidden,
 } from "@/client/skills";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAutoAnimation } from "@/lib/use-auto-animation";
-import { cn } from "@/lib/utils";
 import type { SkillInfo, SkillsSettings } from "@/shared/skills";
 
-import { ConfirmDialog } from "../confirm-dialog";
 import { SkillListItem } from "../skill-list-item";
-import { ScrollArea } from "../ui/scroll-area";
 
 import { SettingsPage } from "./settings-page";
 

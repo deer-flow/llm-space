@@ -1,4 +1,5 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@llm-space/ui/lib/utils";
+
 import type { GithubUser } from "@/shared/auth";
 
 /** A GitHub avatar with a monogram fallback when the image is absent. */

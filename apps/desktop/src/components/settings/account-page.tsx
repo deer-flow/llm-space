@@ -1,12 +1,12 @@
 "use client";
 
+import { Button } from "@llm-space/ui/ui/button";
+import { Separator } from "@llm-space/ui/ui/separator";
 import { Loader2Icon, LogOut } from "lucide-react";
 
 import { useGithubAuth } from "@/components/github-auth-provider";
 import { GithubAvatar } from "@/components/github-avatar";
 import { GitHubIcon } from "@/components/github-icon";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
 import { SettingsPage } from "./settings-page";
 

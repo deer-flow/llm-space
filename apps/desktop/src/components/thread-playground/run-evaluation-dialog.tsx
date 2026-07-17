@@ -7,23 +7,23 @@ import {
   type EvaluationRunScores,
   type RunSnapshot,
 } from "@llm-space/core/thread";
-import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { format } from "timeago.js";
-
-import { cn } from "@/lib/utils";
-
-import { ConfirmDialog } from "../confirm-dialog";
-import { Button } from "../ui/button";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "../ui/dialog";
-import { Textarea } from "../ui/textarea";
+} from "@llm-space/ui/ui/dialog";
+import { Textarea } from "@llm-space/ui/ui/textarea";
+import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { format } from "timeago.js";
+
+
 
 import { EvaluationRubricEditor } from "./evaluation-rubric-editor";
 import { RunEvaluationScorecard } from "./run-evaluation-scorecard";

@@ -1,19 +1,13 @@
 "use client";
 
-import { SparklesIcon } from "lucide-react";
 
-import {
-  PROMPT_EXAMPLES,
-  isPromptExample,
-  type PromptExample,
-} from "@/components/thread-playground/examples/prompts";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@llm-space/ui/ui/dialog";
 import {
   Item,
   ItemContent,
@@ -22,8 +16,15 @@ import {
   ItemMedia,
   ItemSeparator,
   ItemTitle,
-} from "@/components/ui/item";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@llm-space/ui/ui/item";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import { SparklesIcon } from "lucide-react";
+
+import {
+  PROMPT_EXAMPLES,
+  isPromptExample,
+  type PromptExample,
+} from "@/components/thread-playground/examples/prompts";
 
 import { Markdown } from "./markdown";
 

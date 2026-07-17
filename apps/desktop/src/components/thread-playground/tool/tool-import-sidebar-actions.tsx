@@ -1,15 +1,15 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
-import { memo, useState } from "react";
-
+import { cn } from "@llm-space/ui/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+} from "@llm-space/ui/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
+import { memo, useState } from "react";
+
 
 /**
  * Right-side slot for a tool-import sidebar row: shows the tool count badge at

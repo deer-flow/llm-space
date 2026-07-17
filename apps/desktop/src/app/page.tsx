@@ -1,3 +1,9 @@
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@llm-space/ui/ui/resizable";
 import { FileTextIcon, GitBranchIcon } from "lucide-react";
 import {
   lazy,
@@ -22,12 +28,6 @@ import { GithubStarReminder } from "@/components/github-star-reminder";
 import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import { TracePanel } from "@/components/trace-panel";
-import { Button } from "@/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";

@@ -1,5 +1,35 @@
 "use client";
 
+
+
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@llm-space/ui/ui/dialog";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@llm-space/ui/ui/empty";
+import { Input } from "@llm-space/ui/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Spinner } from "@llm-space/ui/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@llm-space/ui/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
@@ -26,7 +56,6 @@ import { toast } from "sonner";
 
 import { traceClient } from "@/client";
 import { useCommands, useRegisterCommands } from "@/commands";
-import { cn } from "@/lib/utils";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
@@ -35,34 +64,6 @@ import type {
   TraceRecord,
   TraceRemoteTraceSummary,
 } from "@/shared/traces";
-
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../ui/dialog";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "../ui/empty";
-import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { Spinner } from "../ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 interface TracePanelProps {
   className?: string;

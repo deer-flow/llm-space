@@ -19,7 +19,7 @@ export default defineConfig([
       ".agents/**",
       ".llm-space/**",
       "apps/desktop/electrobun.config.ts",
-      "apps/desktop/src/components/ui/**",
+      "packages/ui/src/ui/**",
       "apps/desktop/vite.config.ts",
     ],
   },

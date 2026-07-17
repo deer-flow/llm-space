@@ -1,5 +1,8 @@
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import { getMessageText, type Message } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   BotIcon,
   ChevronDownIcon,
@@ -12,10 +15,8 @@ import {
 import { memo, useCallback, useMemo, useState } from "react";
 
 import { PreviewDialog } from "@/components/preview-dialog-lazy";
-import { cn } from "@/lib/utils";
 
-import { Tooltip } from "../../tooltip";
-import { Button } from "../../ui/button";
+
 import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";

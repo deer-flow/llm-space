@@ -7,11 +7,6 @@ import {
   type Thread,
   type Tool,
 } from "@llm-space/core";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-
-import { localFs } from "@/client";
 import {
   basename,
   joinPath,
@@ -19,7 +14,12 @@ import {
   parentOf,
   threadTitleFromPath,
   uniqueThreadFileName,
-} from "@/lib/thread-file";
+} from "@llm-space/ui/lib/thread-file";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import { localFs } from "@/client";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {

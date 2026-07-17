@@ -21,7 +21,9 @@ export default defineConfig({
     // CodeMirror extensions carry identity-sensitive values from these packages.
     // Bun may keep older nested copies in transitive package folders, so force
     // Vite to resolve every editor package against the desktop app's copy.
-    dedupe: CODEMIRROR_SINGLETON_DEPS,
+    // react/react-dom are deduped so the shared `@llm-space/ui` package and the
+    // app resolve the same React copy (else hooks throw "invalid hook call").
+    dedupe: [...CODEMIRROR_SINGLETON_DEPS, "react", "react-dom"],
   },
   build: {
     outDir: "../../dist",

@@ -3,5 +3,7 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["packages/*/src", "scripts"]
+  "include": ["packages/*/src", "scripts"],
+  "//": "packages/ui is React/DOM code, typechecked by its own project (see the typecheck script) — this Bun-flavored config lacks DOM libs, so exclude it here.",
+  "exclude": ["packages/ui"]
 }

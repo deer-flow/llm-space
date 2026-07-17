@@ -1,0 +1,23 @@
+{
+  "//": "Mirrors apps/desktop/tsconfig.json (the environment these files were written under) rather than the stricter tsconfig.base.json, so moving the design system here introduces no new type errors. No `@/*` paths — the package uses relative imports.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "incremental": true
+  },
+  "include": ["src"]
+}

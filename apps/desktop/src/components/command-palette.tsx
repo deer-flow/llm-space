@@ -1,6 +1,5 @@
 "use client";
 
-import { useCommands } from "@/commands";
 import {
   Command,
   CommandDialog,
@@ -8,7 +7,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@llm-space/ui/ui/command";
+
+import { useCommands } from "@/commands";
 import {
   COMMAND_META,
   type Command as AppCommand,

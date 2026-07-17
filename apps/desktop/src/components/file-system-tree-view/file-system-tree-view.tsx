@@ -1,6 +1,21 @@
 "use client";
 
 import type { FileNode, Message, Tool } from "@llm-space/core";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import {
+  basename,
+  parentOf,
+  threadFileNameFromTitle,
+  validateThreadFileStem,
+} from "@llm-space/ui/lib/thread-file";
+import { cn } from "@llm-space/ui/lib/utils";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@llm-space/ui/ui/empty";
+import { Spinner } from "@llm-space/ui/ui/spinner";
 import { MessagesSquare } from "lucide-react";
 import {
   memo,
@@ -13,7 +28,6 @@ import {
 } from "react";
 
 import { useRegisterCommands } from "@/commands";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   getPromptExample,
   resolveSeed,
@@ -23,21 +37,7 @@ import {
   type TreeDataItem,
   type TreeRenderItemParams,
 } from "@/components/tree-view";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  basename,
-  parentOf,
-  threadFileNameFromTitle,
-  validateThreadFileStem,
-} from "@/lib/thread-file";
 import { useFullScreen } from "@/lib/use-full-screen";
-import { cn } from "@/lib/utils";
 
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";

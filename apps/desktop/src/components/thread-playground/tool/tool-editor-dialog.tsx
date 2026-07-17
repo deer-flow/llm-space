@@ -7,18 +7,8 @@ import {
   type FunctionTool,
   type Message,
 } from "@llm-space/core";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-import { CodeEditor } from "@/components/code-editor";
-import { GeneratePopoverButton } from "@/components/thread-playground/generate-popover-button";
-import {
-  useThreadStore,
-  useThreadStoreActions,
-} from "@/components/thread-playground/stores/thread-store";
-import { useStreamText } from "@/components/thread-playground/use-stream-text";
-
-import { Button } from "../../ui/button";
+import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +16,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../ui/dialog";
+} from "@llm-space/ui/ui/dialog";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { GeneratePopoverButton } from "@/components/thread-playground/generate-popover-button";
+import {
+  useThreadStore,
+  useThreadStoreActions,
+} from "@/components/thread-playground/stores/thread-store";
+import { useStreamText } from "@/components/thread-playground/use-stream-text";
+
 import metaToolPrompt from "../examples/meta-tool.md?raw";
 import { DEFAULT_TOOL, TOOL_EXAMPLES } from "../examples/tools";
 import { ExamplesMenu } from "../examples-menu";

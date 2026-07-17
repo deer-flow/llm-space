@@ -1,6 +1,49 @@
 "use client";
 
 import type { CustomModel, ModelProviderGroup } from "@llm-space/core";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@llm-space/ui/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
+import { Input } from "@llm-space/ui/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemMedia,
+  ItemTitle,
+} from "@llm-space/ui/ui/item";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@llm-space/ui/ui/popover";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Switch } from "@llm-space/ui/ui/switch";
 import {
   Ban,
   CableIcon,
@@ -17,48 +60,6 @@ import {
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useAutoAnimation } from "@/lib/use-auto-animation";
-import { cn } from "@/lib/utils";
-
-import { ConfirmDialog } from "../confirm-dialog";
 import { Link } from "../link";
 import {
   useAddCustomProvider,
@@ -74,8 +75,6 @@ import {
 } from "../model-provider";
 import { ModelAvatar } from "../thread-playground/model-avatar";
 import { ProviderAvatar } from "../thread-playground/provider-avatar";
-import { Tooltip } from "../tooltip";
-import { ScrollArea } from "../ui/scroll-area";
 
 import { ApiKeyField } from "./api-key-field";
 import {

@@ -1,12 +1,6 @@
 "use client";
 
-import { SearchIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
-
-import type { SkillInfo } from "@/shared/skills";
-
-import { SkillListItem } from "../../skill-list-item";
-import { Button } from "../../ui/button";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,9 +8,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../ui/dialog";
-import { Input } from "../../ui/input";
-import { ScrollArea } from "../../ui/scroll-area";
+} from "@llm-space/ui/ui/dialog";
+import { Input } from "@llm-space/ui/ui/input";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import { SearchIcon } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+
+import type { SkillInfo } from "@/shared/skills";
+
+import { SkillListItem } from "../../skill-list-item";
 
 interface SkillSelectionDialogProps {
   open: boolean;

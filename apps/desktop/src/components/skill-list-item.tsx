@@ -1,17 +1,17 @@
 "use client";
 
-import { SparklesIcon } from "lucide-react";
-import { memo } from "react";
-
+import { cn } from "@llm-space/ui/lib/utils";
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle,
-} from "@/components/ui/item";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+} from "@llm-space/ui/ui/item";
+import { Switch } from "@llm-space/ui/ui/switch";
+import { SparklesIcon } from "lucide-react";
+import { memo } from "react";
+
 
 interface SkillListItemProps {
   name: string;

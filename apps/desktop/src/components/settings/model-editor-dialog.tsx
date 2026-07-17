@@ -1,11 +1,7 @@
 "use client";
 
 import type { CustomModel } from "@llm-space/core";
-import { CableIcon, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-import { Button } from "@/components/ui/button";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,16 +9,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@llm-space/ui/ui/dialog";
+import { Input } from "@llm-space/ui/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+} from "@llm-space/ui/ui/select";
+import { Switch } from "@llm-space/ui/ui/switch";
+import { CableIcon, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import {
   useTestModelConnection,

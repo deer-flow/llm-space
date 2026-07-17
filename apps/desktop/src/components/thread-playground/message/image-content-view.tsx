@@ -1,12 +1,11 @@
 import type { ImageDataContent } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@llm-space/ui/ui/dialog";
 import { XIcon } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
-import { cn } from "@/lib/utils";
-
-import { Tooltip } from "../../tooltip";
-import { Button } from "../../ui/button";
-import { Dialog, DialogContent, DialogTitle } from "../../ui/dialog";
 import { useThreadStoreActions } from "../stores";
 
 const FRAME_SIZE_PX = 192; // size-48

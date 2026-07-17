@@ -1,11 +1,12 @@
 import type { ModelUsage } from "@llm-space/core";
 import { hasModelUsage } from "@llm-space/core/thread";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
 import { GaugeIcon } from "lucide-react";
 import { memo, useMemo } from "react";
 
-import { cn } from "@/lib/utils";
 
-import { Tooltip } from "../../tooltip";
+
 import {
   formatCompactUsage,
   formatUsageSummary,

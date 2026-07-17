@@ -1,14 +1,14 @@
 "use client";
 
-import { memo } from "react";
-
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "../../ui/dialog";
+} from "@llm-space/ui/ui/dialog";
+import { memo } from "react";
+
 
 import {
   PromptVariablesPanel,

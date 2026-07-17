@@ -4,19 +4,18 @@ import {
   type EvaluationRubricRecord,
   type EvaluationRubricSnapshot,
 } from "@llm-space/core/thread";
-import { Edit3Icon, PlusIcon } from "lucide-react";
-import { useMemo, type KeyboardEvent } from "react";
-
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import { ButtonGroup } from "../ui/button-group";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { Button } from "@llm-space/ui/ui/button";
+import { ButtonGroup } from "@llm-space/ui/ui/button-group";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
+} from "@llm-space/ui/ui/select";
+import { Edit3Icon, PlusIcon } from "lucide-react";
+import { useMemo, type KeyboardEvent } from "react";
 
 import {
   averageScoreForRun,

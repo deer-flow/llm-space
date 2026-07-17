@@ -13,6 +13,20 @@ import {
   normalizePromptVariableState,
   VARIABLE_NAME_RE,
 } from "@llm-space/core/thread";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
+import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   BracesIcon,
   CalendarDaysIcon,
@@ -31,22 +45,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Tooltip } from "@/components/tooltip";
-import { cn } from "@/lib/utils";
 import type { SkillInfo } from "@/shared/skills";
 
-import { Button } from "../../ui/button";
-import { Input } from "../../ui/input";
-import { ScrollArea } from "../../ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../ui/select";
-import { Textarea } from "../../ui/textarea";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import {

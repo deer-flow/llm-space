@@ -1,6 +1,16 @@
 "use client";
 
 import { type FunctionTool, type Tool } from "@llm-space/core";
+import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
 import {
   CableIcon,
   FunctionSquareIcon,
@@ -13,17 +23,6 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "@/components/thread-playground/stores/thread-store";
-import { useAutoAnimation } from "@/lib/use-auto-animation";
-import { cn } from "@/lib/utils";
-
-import { Button } from "../../ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../ui/dropdown-menu";
 
 import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
 import { McpToolImportDialog } from "./mcp-tool-import-popover";

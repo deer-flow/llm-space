@@ -1,16 +1,17 @@
 "use client";
 
-import { ClipboardPasteIcon, FileIcon, ImagePlusIcon } from "lucide-react";
-import { useCallback, useRef } from "react";
-
-import { Button } from "../../ui/button";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "../../ui/dropdown-menu";
+} from "@llm-space/ui/ui/dropdown-menu";
+import { ClipboardPasteIcon, FileIcon, ImagePlusIcon } from "lucide-react";
+import { useCallback, useRef } from "react";
+
+
 import { useThreadStoreActions } from "../stores/thread-store";
 
 function readImageFile(

@@ -9,6 +9,11 @@ import {
   type EvaluationRubricInput,
   type EvaluationRubricRecord,
 } from "@llm-space/core/thread";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
+import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
@@ -18,12 +23,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { ConfirmDialog } from "../confirm-dialog";
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
 
 function _emptyCriterion(): EvaluationCriterion {
   return { id: uuid(), name: "" };

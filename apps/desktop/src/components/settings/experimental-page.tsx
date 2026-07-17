@@ -1,11 +1,11 @@
 "use client";
 
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Switch } from "@llm-space/ui/ui/switch";
 import { useState } from "react";
 
 import { useCommands } from "@/commands";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useExperimental } from "@/components/experimental-provider";
-import { Switch } from "@/components/ui/switch";
 
 import { SettingsPage } from "./settings-page";
 

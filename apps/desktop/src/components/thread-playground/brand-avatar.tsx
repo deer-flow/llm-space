@@ -1,7 +1,6 @@
 import { extractInitials } from "@llm-space/core";
-
-import type { BrandIcon } from "@/lib/brand-icons";
-import { cn } from "@/lib/utils";
+import type { BrandIcon } from "@llm-space/ui/lib/brand-icons";
+import { cn } from "@llm-space/ui/lib/utils";
 
 /**
  * Shared avatar body for {@link ModelAvatar} and {@link ProviderAvatar}: renders

@@ -1,8 +1,8 @@
+import { cn } from "@llm-space/ui/lib/utils";
 import { memo, useMemo } from "react";
 import ReactMarkdown, { Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { cn } from "@/lib/utils";
 
 import { Link } from "./link";
 

@@ -1,6 +1,16 @@
 "use client";
 
 import { type BuiltinTool } from "@llm-space/core";
+import { cn } from "@llm-space/ui/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@llm-space/ui/ui/dialog";
+import { Input } from "@llm-space/ui/ui/input";
+import { Switch } from "@llm-space/ui/ui/switch";
 import {
   CloudSunIcon,
   FilesIcon,
@@ -12,16 +22,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { listBuiltInTools } from "@/client/built-in-tools";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";

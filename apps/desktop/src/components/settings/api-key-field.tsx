@@ -1,10 +1,10 @@
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
+import { Input } from "@llm-space/ui/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 import { Link } from "../link";
 

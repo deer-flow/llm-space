@@ -1,10 +1,11 @@
 import { uuid, type Message } from "@llm-space/core";
 import { SYSTEM_PROMPT_PLACE_KEY } from "@llm-space/core/thread";
+import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import { cn } from "@llm-space/ui/lib/utils";
 import { memo, useCallback, useEffect } from "react";
 
-import { cn } from "@/lib/utils";
 
-import { CodeEditor } from "../../code-editor";
+
 import metaPrompt from "../examples/meta-prompt.md?raw";
 import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";

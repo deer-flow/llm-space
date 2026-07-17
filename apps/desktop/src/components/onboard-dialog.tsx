@@ -1,6 +1,11 @@
 "use client";
 
 import type { ModelProviderGroup } from "@llm-space/core";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Dialog, DialogClose, DialogContent } from "@llm-space/ui/ui/dialog";
+import { RainbowButton } from "@llm-space/ui/ui/rainbow-button";
+import { Spinner } from "@llm-space/ui/ui/spinner";
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -12,9 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useCommands } from "@/commands";
-import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { track } from "@/lib/analytics";
-import { cn } from "@/lib/utils";
 
 import {
   useAddProvider,
@@ -22,9 +25,6 @@ import {
   useModels,
 } from "./model-provider";
 import { ProviderAvatar } from "./thread-playground/provider-avatar";
-import { Button } from "./ui/button";
-import { RainbowButton } from "./ui/rainbow-button";
-import { Spinner } from "./ui/spinner";
 
 /**
  * First-run onboarding dialog. Shown automatically when no models are configured

@@ -1,5 +1,8 @@
 "use client";
 
+
+import { Dialog, DialogContent } from "@llm-space/ui/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@llm-space/ui/ui/tabs";
 import {
   Boxes,
   Cable,
@@ -11,8 +14,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsTab } from "@/shared/commands";
 
 import { AccountPage } from "./account-page";

@@ -1,6 +1,31 @@
 "use client";
 
 import { type ReasoningLevel } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@llm-space/ui/ui/hover-card";
+import { Input } from "@llm-space/ui/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@llm-space/ui/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Slider } from "@llm-space/ui/ui/slider";
+import { Switch } from "@llm-space/ui/ui/switch";
 import { InfoIcon, SettingsIcon, SlidersHorizontal } from "lucide-react";
 import {
   type ReactNode,
@@ -12,32 +37,7 @@ import {
 
 import { useCommands } from "@/commands";
 import { useFirstAvailableModel } from "@/components/model-provider";
-import { cn } from "@/lib/utils";
 
-import { Tooltip } from "../../tooltip";
-import { Button } from "../../ui/button";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "../../ui/hover-card";
-import { Input } from "../../ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "../../ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../ui/select";
-import { Slider } from "../../ui/slider";
-import { Switch } from "../../ui/switch";
 import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
 import { DEFAULT_JSON_SCHEMA, JsonSchemaDialog } from "./json-schema-dialog";

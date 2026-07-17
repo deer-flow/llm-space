@@ -55,6 +55,7 @@ import {
   type EvaluationRunScores,
   type RunSnapshot,
 } from "@llm-space/core/thread";
+import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 import { createContext, useContext } from "react";
 import { toast } from "sonner";
 import { Compile } from "typebox/compile";
@@ -62,7 +63,6 @@ import { createStore, useStore, type StoreApi } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/shallow";
 
-import { createFrameThrottle } from "@/lib/frame-throttle";
 
 import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";

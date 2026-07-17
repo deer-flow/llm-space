@@ -5,6 +5,13 @@ import {
   type ToolCallInput,
 } from "@llm-space/core";
 import { createToolResultPromptVariablePlaceKey } from "@llm-space/core/thread";
+import { CodeEditor, type CodeEditorProps } from "@llm-space/ui/components/code-editor";
+import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
+import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -18,14 +25,7 @@ import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { PreviewDialog } from "@/components/preview-dialog-lazy";
-import { useRenderingFidelity } from "@/components/theme-provider";
-import { Tooltip } from "@/components/tooltip";
-import { Marker, MarkerContent } from "@/components/ui/marker";
-import { cn } from "@/lib/utils";
 
-import { CodeEditor, type CodeEditorProps } from "../../code-editor";
-import { Button } from "../../ui/button";
-import { Input } from "../../ui/input";
 import { useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 

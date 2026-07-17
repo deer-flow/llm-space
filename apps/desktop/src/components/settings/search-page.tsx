@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-
-import { getSearchSettings, setSearchSettings } from "@/client/search";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+} from "@llm-space/ui/ui/select";
+import { Separator } from "@llm-space/ui/ui/separator";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { getSearchSettings, setSearchSettings } from "@/client/search";
 import {
   DEFAULT_SEARCH_SETTINGS,
   type SearchProviderId,

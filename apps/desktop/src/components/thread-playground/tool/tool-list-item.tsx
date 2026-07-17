@@ -1,12 +1,12 @@
 "use client";
 
 import { type Tool } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
 import { CableIcon, FunctionSquareIcon, XIcon } from "lucide-react";
 import React, { memo, useCallback, useMemo } from "react";
 
-import { cn } from "@/lib/utils";
 
-import { Tooltip } from "../../tooltip";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 

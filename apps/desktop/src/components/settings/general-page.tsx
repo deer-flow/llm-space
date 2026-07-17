@@ -1,6 +1,26 @@
 "use client";
 
 import {
+  DEFAULT_PRIMARY,
+  usePrimaryColor,
+  useRenderingFidelity,
+  useTheme,
+  type RenderingFidelity,
+  type Theme,
+} from "@llm-space/ui/components/theme-provider";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
+import { Switch } from "@llm-space/ui/ui/switch";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -18,32 +38,12 @@ import {
   useModels,
   useSetDefaultModel,
 } from "@/components/model-provider";
-import {
-  DEFAULT_PRIMARY,
-  usePrimaryColor,
-  useRenderingFidelity,
-  useTheme,
-  type RenderingFidelity,
-  type Theme,
-} from "@/components/theme-provider";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
 import { Link } from "../link";
 import { ModelAvatar } from "../thread-playground/model-avatar";
-import { Button } from "../ui/button";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";

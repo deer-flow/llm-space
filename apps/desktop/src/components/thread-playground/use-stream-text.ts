@@ -8,10 +8,10 @@ import {
   type ReasoningLevel,
   type ReducedMessageContent,
 } from "@llm-space/core";
+import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createRpcTransport } from "@/client/rpc-transport";
-import { createFrameThrottle } from "@/lib/frame-throttle";
 
 import { useDefaultTextGenerationModel } from "../model-provider";
 

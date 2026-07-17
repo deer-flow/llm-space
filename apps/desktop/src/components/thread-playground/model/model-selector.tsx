@@ -1,13 +1,7 @@
 "use client";
 
 import { type ModelConfig } from "@llm-space/core";
-import { SettingsIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { useCommands } from "@/commands";
-import { cn } from "@/lib/utils";
-
-import { useModels, useRefreshModels } from "../../model-provider";
+import { cn } from "@llm-space/ui/lib/utils";
 import {
   Combobox,
   ComboboxCollection,
@@ -19,7 +13,13 @@ import {
   ComboboxLabel,
   ComboboxList,
   ComboboxSeparator,
-} from "../../ui/combobox";
+} from "@llm-space/ui/ui/combobox";
+import { SettingsIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useCommands } from "@/commands";
+
+import { useModels, useRefreshModels } from "../../model-provider";
 import { ModelAvatar } from "../model-avatar";
 import { ProviderAvatar } from "../provider-avatar";
 import { useThreadStoreActions } from "../stores";

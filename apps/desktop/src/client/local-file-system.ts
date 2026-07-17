@@ -1,7 +1,7 @@
 import type { FileNode, FileSystem, Thread, ThreadStorage } from "@llm-space/core";
+import { normalizeThreadForPath } from "@llm-space/ui/lib/thread-file";
 
 import { electrobun } from "@/lib/electrobun";
-import { normalizeThreadForPath } from "@/lib/thread-file";
 
 /**
  * Client-side `FileSystem` + `ThreadStorage` that talks to the bun side over

@@ -1,6 +1,16 @@
 "use client";
 
 import { type McpTool } from "@llm-space/core";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@llm-space/ui/ui/dialog";
+import { Switch } from "@llm-space/ui/ui/switch";
 import { Cable, Loader2, RefreshCw, Settings2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,16 +18,6 @@ import { format } from "timeago.js";
 
 import { listMcpServers, listMcpTools } from "@/client/mcp";
 import { useCommands } from "@/commands";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 import {
   getMcpReadinessLabel,
   type McpServerView,

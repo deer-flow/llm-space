@@ -1,14 +1,14 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
 import { ModelProviderGroup } from "@llm-space/core";
+import { ThemeProvider, useTheme } from "@llm-space/ui/components/theme-provider";
+import "@llm-space/ui/styles/globals.css";
+import { Toaster } from "@llm-space/ui/ui/sonner";
+import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
 import { ModelProvider } from "@/components/model-provider";
-import { ThemeProvider, useTheme } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { electrobun } from "@/lib/electrobun";
-import "@/styles/globals.css";
 
 import { QueryProvider } from "./query-provider";
 

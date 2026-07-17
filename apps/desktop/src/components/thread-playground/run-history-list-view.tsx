@@ -2,6 +2,12 @@ import {
   type EvaluationRecord,
   type RunSnapshot,
 } from "@llm-space/core/thread";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { Item, ItemContent, ItemDescription, ItemGroup } from "@llm-space/ui/ui/item";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -23,14 +29,6 @@ import {
   type MouseEvent,
 } from "react";
 import { format } from "timeago.js";
-
-import { cn } from "@/lib/utils";
-
-import { useAutoAnimation } from "../../lib/use-auto-animation";
-import { ConfirmDialog } from "../confirm-dialog";
-import { Tooltip } from "../tooltip";
-import { Button } from "../ui/button";
-import { Item, ItemContent, ItemDescription, ItemGroup } from "../ui/item";
 
 import { RunEvaluationDialog } from "./run-evaluation-dialog";
 import {

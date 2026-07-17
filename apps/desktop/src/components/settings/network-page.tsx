@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@llm-space/ui/ui/input";
+import { Separator } from "@llm-space/ui/ui/separator";
+import { Switch } from "@llm-space/ui/ui/switch";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -8,9 +11,6 @@ import {
   getNetworkSettings,
   setNetworkSettings,
 } from "@/client/network";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import {
   DEFAULT_NETWORK_SETTINGS,
   isSupportedProxyUrl,

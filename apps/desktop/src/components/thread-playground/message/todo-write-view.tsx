@@ -1,11 +1,11 @@
 import { type ToolCallInput } from "@llm-space/core";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
 import { CheckIcon, EyeIcon } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
 import { PreviewDialog } from "@/components/preview-dialog-lazy";
-import { Tooltip } from "@/components/tooltip";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 type TodoStatus = "pending" | "in_progress" | "completed";
 

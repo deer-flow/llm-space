@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@llm-space/ui/ui/button";
 import { CheckIcon, Loader2Icon, XIcon } from "lucide-react";
 import {
   createContext,
@@ -13,7 +14,6 @@ import {
 import { toast } from "sonner";
 
 import { useCommands } from "@/commands";
-import { Button } from "@/components/ui/button";
 import { UpdateDialog } from "@/components/update-dialog";
 import { electrobun } from "@/lib/electrobun";
 import type {

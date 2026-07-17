@@ -1,10 +1,10 @@
 "use client";
 
 import { uuid } from "@llm-space/core";
+import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { localFs, traceClient } from "@/client";
-import { threadTitleFromPath } from "@/lib/thread-file";
 
 /** An open workspace thread tab. `id` is stable as `thread:{path}`. */
 export interface ThreadTab {

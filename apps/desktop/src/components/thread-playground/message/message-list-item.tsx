@@ -8,21 +8,21 @@ import {
   type ToolCall,
 } from "@llm-space/core";
 import { createMessagePromptVariablePlaceKey } from "@llm-space/core/thread";
+import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
+import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { cn } from "@llm-space/ui/lib/utils";
+import { Button } from "@llm-space/ui/ui/button";
+import { CollapsibleContent } from "@llm-space/ui/ui/collapsible-content";
+import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
+import { ShineBorder } from "@llm-space/ui/ui/shine-border";
+import { Skeleton } from "@llm-space/ui/ui/skeleton";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { openFirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
-import { useRenderingFidelity } from "@/components/theme-provider";
-import { cn } from "@/lib/utils";
 
-import { CodeEditor } from "../../code-editor";
-import { Tooltip } from "../../tooltip";
-import { Button } from "../../ui/button";
-import { CollapsibleContent } from "../../ui/collapsible-content";
-import { Marker, MarkerContent } from "../../ui/marker";
-import { ShineBorder } from "../../ui/shine-border";
-import { Skeleton } from "../../ui/skeleton";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
