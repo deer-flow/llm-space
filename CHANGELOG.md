@@ -4,6 +4,20 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-07-17
+
+Share your threads with anyone via a link.
+
+### Added
+
+- **Share a thread.** Click the **share icon** in the thread toolbar (top-right,
+  next to run history) — or use **File → Share…**, or right-click a thread in the
+  file tree and choose **Share…** — to publish it as a link anyone can open in
+  their browser. The thread is published as a **secret GitHub Gist** under your
+  account; delete the gist to revoke access.
+- **GitHub sign-in.** Sign in to GitHub from **Settings → Account**. Sharing
+  needs it, so the Share dialog also walks you through signing in the first time.
+
 ## [4.1.1] - 2026-07-16
 
 A small UX release focused on the tool import dialogs.
@@ -46,6 +60,7 @@ Baseline for this changelog. See the
 [GitHub releases](https://github.com/deer-flow/llm-space/releases) for earlier
 history.
 
+[4.2.0]: https://github.com/deer-flow/llm-space/releases/tag/v4.2.0
 [4.1.1]: https://github.com/deer-flow/llm-space/releases/tag/v4.1.1
 [4.1.0]: https://github.com/deer-flow/llm-space/releases/tag/v4.1.0
 [4.0.1]: https://github.com/deer-flow/llm-space/releases/tag/v4.0.1
