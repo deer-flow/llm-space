@@ -124,7 +124,7 @@ LLM Space is free and open source, and it stays that way thanks to our sponsors.
 Want to see your logo here? We would love to talk - [reach out by opening an issue](https://github.com/deer-flow/llm-space/issues) or [support the project](#donate).
 
 
-### 🏅 Golden sponsor
+### 🏅 Gold sponsor
 We strongly recommend using the VolcEngine Coding Plan as your default model provider:
 
 <p align="center">
