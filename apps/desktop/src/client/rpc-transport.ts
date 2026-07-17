@@ -5,6 +5,7 @@ import type { StreamThreadResponsePayload } from "@/shared/rpc";
 
 const ABORT_ERROR = () =>
   new DOMException("The operation was aborted.", "AbortError");
+const EVENT_COMPACTION_THRESHOLD = 1024;
 
 /**
  * An {@link AgentTransport} backed by Electrobun RPC. It sends the prepared
@@ -19,7 +20,8 @@ export function createRpcTransport(): AgentTransport {
     }
 
     const streamId = uuid();
-    const events: AgentEvent[] = [];
+    let events: (AgentEvent | undefined)[] = [];
+    let eventHead = 0;
     let wake: (() => void) | null = null;
     let finished = false;
     let aborted = false;
@@ -61,8 +63,22 @@ export function createRpcTransport(): AgentTransport {
     try {
       rpc.send.sendStreamThreadRequest({ streamId, request });
       while (true) {
-        while (events.length > 0) {
-          yield events.shift()!;
+        while (eventHead < events.length) {
+          const event = events[eventHead];
+          events[eventHead] = undefined;
+          eventHead += 1;
+          yield event!;
+
+          if (eventHead === events.length) {
+            events.length = 0;
+            eventHead = 0;
+          } else if (
+            eventHead >= EVENT_COMPACTION_THRESHOLD &&
+            eventHead * 2 >= events.length
+          ) {
+            events = events.slice(eventHead);
+            eventHead = 0;
+          }
         }
         if (aborted) {
           throw ABORT_ERROR();
