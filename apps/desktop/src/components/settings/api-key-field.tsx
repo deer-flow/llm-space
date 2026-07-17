@@ -1,12 +1,12 @@
 "use client";
 
+import { Link } from "@llm-space/ui/components/link";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Input } from "@llm-space/ui/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 
 
-import { Link } from "../link";
 
 /**
  * A labelled secret-input row: a password input with a show/hide eye toggle, an

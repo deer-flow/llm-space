@@ -1,3 +1,5 @@
+import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
+import { useModels } from "@llm-space/ui/components/model-provider";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   ResizableHandle,
@@ -21,16 +23,15 @@ import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
 import { useExperimental } from "@/components/experimental-provider";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
-import { FirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
-import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import { TracePanel } from "@/components/trace-panel";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
+import { DesktopHostProvider } from "@/host/host-services";
 import { track } from "@/lib/analytics";
 import { electrobun } from "@/lib/electrobun";
 import {
@@ -127,11 +128,13 @@ function _SidebarModeSwitch({
 export function Page() {
   return (
     <CommandProvider>
-      <UpdateStatusProvider>
-        <GithubAuthProvider>
-          <PageInner />
-        </GithubAuthProvider>
-      </UpdateStatusProvider>
+      <DesktopHostProvider>
+        <UpdateStatusProvider>
+          <GithubAuthProvider>
+            <PageInner />
+          </GithubAuthProvider>
+        </UpdateStatusProvider>
+      </DesktopHostProvider>
     </CommandProvider>
   );
 }

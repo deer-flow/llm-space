@@ -20,6 +20,10 @@ export default defineConfig([
       ".llm-space/**",
       "apps/desktop/electrobun.config.ts",
       "packages/ui/src/ui/**",
+      // Excluded from packages/ui's typecheck project (no test runner), so the
+      // typed-lint project service can't resolve them.
+      "packages/ui/src/**/*.test.ts",
+      "packages/ui/src/**/*.test.tsx",
       "apps/desktop/vite.config.ts",
     ],
   },

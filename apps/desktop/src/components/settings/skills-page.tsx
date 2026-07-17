@@ -2,6 +2,7 @@
 
 import type { SkillInfo, SkillsSettings } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { SkillListItem } from "@llm-space/ui/components/skill-list-item";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -35,7 +36,6 @@ import {
   setSkillHidden,
 } from "@/client/skills";
 
-import { SkillListItem } from "../skill-list-item";
 
 import { SettingsPage } from "./settings-page";
 

@@ -3,6 +3,11 @@
 import type { FileNode, Message, Tool } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import {
+  getPromptExample,
+  resolveSeed,
+} from "@llm-space/ui/components/thread-playground/examples/prompts";
+import { useHostServices } from "@llm-space/ui/host";
+import {
   basename,
   parentOf,
   threadFileNameFromTitle,
@@ -28,10 +33,6 @@ import {
 } from "react";
 
 import { useRegisterCommands } from "@/commands";
-import {
-  getPromptExample,
-  resolveSeed,
-} from "@/components/thread-playground/examples/prompts";
 import {
   TreeView,
   type TreeDataItem,
@@ -65,6 +66,7 @@ function _FileSystemTreeView({
   onMove?: (from: string, to: string) => void;
 }) {
   const fullScreen = useFullScreen();
+  const seedHost = useHostServices();
   const {
     nodesByPath,
     loadingByPath,
@@ -164,9 +166,9 @@ function _FileSystemTreeView({
       // time — e.g. the General Agent's live skills list) before seeding.
       void (async () => {
         const [content, tools, messages] = await Promise.all([
-          resolveSeed(example.content),
-          resolveSeed(example.tools),
-          resolveSeed(example.messages),
+          resolveSeed(example.content, seedHost),
+          resolveSeed(example.tools, seedHost),
+          resolveSeed(example.messages, seedHost),
         ]);
         await createThreadFromPromptExample(
           parent,

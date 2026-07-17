@@ -62,10 +62,16 @@ export interface PathsHost {
  * run action into a host command palette / shortcut and returns a disposer.
  */
 export interface HostActions {
-  openModelSettings(): void;
-  openMcpSettings(): void;
+  /** Open the host's settings surface on a tab (e.g. "models", "mcp", "search"). */
+  openSettings(tab: string): void;
   openLink(url: string): void;
+  /** Request opening the variables dialog (handled within the playground). */
   openVariables(variableName?: string): void;
+  /** Register the variables-dialog opener; returns a disposer. No-op on web. */
+  registerOpenVariables(
+    handler: (variableName?: string) => void
+  ): () => void;
+  /** Register the run-thread action for the host palette/shortcut; disposer. */
   registerRunThread(run: () => void): () => void;
 }
 

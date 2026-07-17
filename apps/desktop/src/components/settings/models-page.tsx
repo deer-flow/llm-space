@@ -2,6 +2,21 @@
 
 import type { CustomModel, ModelProviderGroup } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Link } from "@llm-space/ui/components/link";
+import {
+  useAddCustomProvider,
+  useAddProvider,
+  useFetchBuiltinProviders,
+  useModels,
+  useRemoveCustomModel,
+  useRemoveProvider,
+  useSetAllModelsEnabled,
+  useSetModelEnabled,
+  useTestModelConnection,
+  useUpdateProvider,
+} from "@llm-space/ui/components/model-provider";
+import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
+import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -60,21 +75,6 @@ import {
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Link } from "../link";
-import {
-  useAddCustomProvider,
-  useAddProvider,
-  useFetchBuiltinProviders,
-  useModels,
-  useRemoveCustomModel,
-  useRemoveProvider,
-  useSetAllModelsEnabled,
-  useSetModelEnabled,
-  useTestModelConnection,
-  useUpdateProvider,
-} from "../model-provider";
-import { ModelAvatar } from "../thread-playground/model-avatar";
-import { ProviderAvatar } from "../thread-playground/provider-avatar";
 
 import { ApiKeyField } from "./api-key-field";
 import {

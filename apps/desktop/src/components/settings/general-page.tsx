@@ -1,6 +1,12 @@
 "use client";
 
 import {
+  isModelAvailable,
+  useDefaultModel,
+  useModels,
+  useSetDefaultModel,
+} from "@llm-space/ui/components/model-provider";
+import {
   DEFAULT_PRIMARY,
   usePrimaryColor,
   useRenderingFidelity,
@@ -8,6 +14,7 @@ import {
   type RenderingFidelity,
   type Theme,
 } from "@llm-space/ui/components/theme-provider";
+import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Select,
@@ -32,18 +39,9 @@ import { toast } from "sonner";
 import { getAnalyticsSettings, setAnalyticsSettings } from "@/client/analytics";
 import { getWorkspacePath } from "@/client/paths";
 import { useCommands } from "@/commands";
-import {
-  isModelAvailable,
-  useDefaultModel,
-  useModels,
-  useSetDefaultModel,
-} from "@/components/model-provider";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
-
-import { Link } from "../link";
-import { ModelAvatar } from "../thread-playground/model-avatar";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
@@ -245,6 +243,7 @@ function AnalyticsRow() {
 }
 
 function WorkspaceFolderLink() {
+  const { executeCommand } = useCommands();
   const [path, setPath] = useState<string | null>(null);
 
   useEffect(() => {
@@ -266,13 +265,16 @@ function WorkspaceFolderLink() {
   }
 
   return (
-    <Link
-      command={{ type: "openWorkspaceFolder", args: {} }}
-      className="text-primary max-w-[50%] truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
+    <button
+      type="button"
+      onClick={() =>
+        executeCommand({ type: "openWorkspaceFolder", args: {} })
+      }
+      className="text-primary max-w-[50%] cursor-pointer truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
       title={path}
     >
       {path}
-    </Link>
+    </button>
   );
 }
 

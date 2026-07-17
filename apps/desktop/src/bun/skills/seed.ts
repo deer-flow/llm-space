@@ -5,9 +5,9 @@ import { getLlmSpaceHomePath } from "@llm-space/core/server";
 
 // The bundled skills ship with the app; inline their SKILL.md text so the
 // bundle is self-contained (no runtime file read of the renderer source tree).
-import deepResearchSkill from "../../components/thread-playground/examples/deep-research-skill.md" with { type: "text" };
-import frontendDesignSkill from "../../components/thread-playground/examples/frontend-design-skill.md" with { type: "text" };
-import grillMeSkill from "../../components/thread-playground/examples/grill-me-skill.md" with { type: "text" };
+import deepResearchSkill from "./seed-skills/deep-research-skill.md" with { type: "text" };
+import frontendDesignSkill from "./seed-skills/frontend-design-skill.md" with { type: "text" };
+import grillMeSkill from "./seed-skills/grill-me-skill.md" with { type: "text" };
 
 /** The llm-space-managed skills discovery folder (`<root>/skills`). */
 export function getManagedSkillsDir(): string {

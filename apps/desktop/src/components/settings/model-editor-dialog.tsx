@@ -1,6 +1,12 @@
 "use client";
 
 import type { CustomModel } from "@llm-space/core";
+import {
+  useTestModelConnection,
+  useUpdateProvider,
+  useUpsertCustomModel,
+} from "@llm-space/ui/components/model-provider";
+import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -23,12 +29,6 @@ import { CableIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  useTestModelConnection,
-  useUpdateProvider,
-  useUpsertCustomModel,
-} from "../model-provider";
-import { ModelAvatar } from "../thread-playground/model-avatar";
 
 import {
   CUSTOM_PROVIDER_API_TYPES,

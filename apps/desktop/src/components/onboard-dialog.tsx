@@ -1,6 +1,12 @@
 "use client";
 
 import type { ModelProviderGroup } from "@llm-space/core";
+import {
+  useAddProvider,
+  useFetchBuiltinProviders,
+  useModels,
+} from "@llm-space/ui/components/model-provider";
+import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogClose, DialogContent } from "@llm-space/ui/ui/dialog";
@@ -19,12 +25,6 @@ import { toast } from "sonner";
 import { useCommands } from "@/commands";
 import { track } from "@/lib/analytics";
 
-import {
-  useAddProvider,
-  useFetchBuiltinProviders,
-  useModels,
-} from "./model-provider";
-import { ProviderAvatar } from "./thread-playground/provider-avatar";
 
 /**
  * First-run onboarding dialog. Shown automatically when no models are configured

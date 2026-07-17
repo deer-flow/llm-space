@@ -1,23 +1,24 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
-import { ModelProviderGroup } from "@llm-space/core";
+import { ModelProvider } from "@llm-space/ui/components/model-provider";
 import { ThemeProvider, useTheme } from "@llm-space/ui/components/theme-provider";
 import "@llm-space/ui/styles/globals.css";
 import { Toaster } from "@llm-space/ui/ui/sonner";
 import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
-import { ModelProvider } from "@/components/model-provider";
-import { electrobun } from "@/lib/electrobun";
+import { createElectrobunModelClient } from "@/host/host-services";
 
 import { QueryProvider } from "./query-provider";
+
+const modelClient = createElectrobunModelClient();
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <ExperimentalProvider>
         <QueryProvider>
-          <ModelProvider fetcher={fetchModels}>
+          <ModelProvider client={modelClient}>
             <TooltipProvider delayDuration={1000}>
               <div className="flex size-full flex-col">
                 <ThemedToaster />
@@ -48,12 +49,4 @@ function ThemedToaster() {
       }}
     />
   );
-}
-
-async function fetchModels(): Promise<ModelProviderGroup[]> {
-  if (!electrobun.rpc) {
-    throw new Error("Electrobun RPC is not initialized");
-  }
-  const models = await electrobun.rpc.request.availableModels({});
-  return models;
 }

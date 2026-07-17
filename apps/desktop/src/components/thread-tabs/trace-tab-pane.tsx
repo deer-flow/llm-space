@@ -1,6 +1,7 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
+import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -10,7 +11,6 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
-import { ThreadPlayground } from "@/components/thread-playground";
 import type { TraceRecord } from "@/shared/traces";
 
 const rpcTransport = createRpcTransport();

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
+import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, localFs } from "@/client";
-import { ThreadPlayground } from "@/components/thread-playground";
 
 // One transport for the app: stream agent runs over Electrobun RPC to the bun
 // process (there is no HTTP server in the desktop app).

@@ -1,6 +1,12 @@
 "use client";
 
 
+import { Markdown } from "@llm-space/ui/components/markdown";
+import {
+  PROMPT_EXAMPLES,
+  isPromptExample,
+  type PromptExample,
+} from "@llm-space/ui/components/thread-playground/examples/prompts";
 import {
   Dialog,
   DialogContent,
@@ -20,13 +26,7 @@ import {
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { SparklesIcon } from "lucide-react";
 
-import {
-  PROMPT_EXAMPLES,
-  isPromptExample,
-  type PromptExample,
-} from "@/components/thread-playground/examples/prompts";
 
-import { Markdown } from "./markdown";
 
 export function StartFromExampleDialog({
   open,
