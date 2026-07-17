@@ -109,7 +109,12 @@ export function useCommands(): CommandContextValue {
 export function useRegisterCommands(handlers: CommandHandlers, enabled = true) {
   const { registerCommandHandlers } = useCommands();
   const latest = useRef(handlers);
-  latest.current = handlers;
+  // Keep the latest handlers in a ref without mutating during render. The ref is
+  // read only post-commit (the registration effect below and the trampoline
+  // closures it installs), so syncing after every commit is behavior-preserving.
+  useEffect(() => {
+    latest.current = handlers;
+  });
 
   useEffect(() => {
     if (!enabled) return;
