@@ -16,6 +16,7 @@
     "preview:web": "bun --filter @llm-space/web preview",
     "release": "bun scripts/release.ts",
     "release:canary": "bun scripts/release.ts --prerelease canary",
+    "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p apps/desktop/tsconfig.json && tsc --noEmit -p web/tsconfig.json",

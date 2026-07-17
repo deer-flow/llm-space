@@ -42,6 +42,10 @@ run = "bun run dev:cef"
 description = "Run the static web app (landing page + shared-thread viewer) on :5175"
 run = "bun run dev:web"
 
+[tasks.test]
+description = "Run all Bun tests"
+run = "bun run test"
+
 [tasks.lint]
 description = "Check lint (read-only)"
 run = "bun run lint"
@@ -51,7 +55,7 @@ description = "Lint with autofix (eslint --fix)"
 run = "bun run lint:fix"
 
 [tasks.typecheck]
-description = "Typecheck all packages (tsc --noEmit, root + desktop tsconfigs)"
+description = "Typecheck all four projects (root, packages/ui, apps/desktop, web)"
 run = "bun run typecheck"
 
 # --- Build & release (see AGENTS.md "Releases & auto-update") ---------------
