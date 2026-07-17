@@ -38,6 +38,10 @@ run = "bun run dev"
 description = "Run the desktop app with CEF/CDP debugging on :9333"
 run = "bun run dev:cef"
 
+[tasks.test]
+description = "Run all Bun tests"
+run = "bun run test"
+
 [tasks.lint]
 description = "Check lint (read-only)"
 run = "bun run lint"

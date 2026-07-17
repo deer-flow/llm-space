@@ -12,6 +12,7 @@
     "build:stable": "cd apps/desktop && bun run build:stable",
     "release": "bun scripts/release.ts",
     "release:canary": "bun scripts/release.ts --prerelease canary",
+    "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/desktop/tsconfig.json",

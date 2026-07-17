@@ -28,6 +28,8 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - run: mise run test
+
       - run: mise run lint
 
       - run: mise run typecheck
