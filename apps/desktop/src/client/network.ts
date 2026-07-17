@@ -1,5 +1,6 @@
+import type { NetworkSettings, SystemProxyDetection } from "@llm-space/core";
+
 import { electrobun } from "@/lib/electrobun";
-import type { NetworkSettings, SystemProxyDetection } from "@/shared/network";
 
 function _rpc() {
   if (!electrobun.rpc) {

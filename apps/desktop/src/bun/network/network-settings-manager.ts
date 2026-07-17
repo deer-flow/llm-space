@@ -1,14 +1,13 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
-
 import {
   DEFAULT_NETWORK_SETTINGS,
   isSupportedProxyUrl,
   type NetworkSettings,
   type SystemProxyDetection,
-} from "../../shared/network";
+} from "@llm-space/core";
+import { getSettingsDir } from "@llm-space/core/server";
 
 /**
  * Proxy environment variables we own. Both cases are managed because Bun's

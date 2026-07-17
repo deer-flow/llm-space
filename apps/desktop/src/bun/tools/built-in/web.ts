@@ -1,6 +1,5 @@
-import type { BuiltinTool } from "@llm-space/core";
+import type { BuiltinTool, SearchSettings } from "@llm-space/core";
 
-import type { SearchSettings } from "../../../shared/search";
 import type { ToolEntry } from "../tool-registry";
 
 export interface WebBuiltInToolsDependencies {

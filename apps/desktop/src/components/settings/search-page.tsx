@@ -1,6 +1,11 @@
 "use client";
 
 import {
+  DEFAULT_SEARCH_SETTINGS,
+  type SearchProviderId,
+  type SearchSettings,
+} from "@llm-space/core";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -12,11 +17,6 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { getSearchSettings, setSearchSettings } from "@/client/search";
-import {
-  DEFAULT_SEARCH_SETTINGS,
-  type SearchProviderId,
-  type SearchSettings,
-} from "@/shared/search";
 
 import { ApiKeyField } from "./api-key-field";
 import { SettingsPage } from "./settings-page";

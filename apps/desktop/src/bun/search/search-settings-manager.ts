@@ -1,13 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
-
 import {
   DEFAULT_SEARCH_SETTINGS,
   type SearchProviderId,
   type SearchSettings,
-} from "../../shared/search";
+} from "@llm-space/core";
+import { getSettingsDir } from "@llm-space/core/server";
 
 const VALID_PROVIDERS: readonly SearchProviderId[] = [
   "brave",

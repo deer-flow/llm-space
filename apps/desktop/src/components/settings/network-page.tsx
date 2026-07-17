@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  DEFAULT_NETWORK_SETTINGS,
+  isSupportedProxyUrl,
+  type NetworkSettings,
+  type SystemProxyDetection,
+} from "@llm-space/core";
 import { Input } from "@llm-space/ui/ui/input";
 import { Separator } from "@llm-space/ui/ui/separator";
 import { Switch } from "@llm-space/ui/ui/switch";
@@ -11,12 +17,6 @@ import {
   getNetworkSettings,
   setNetworkSettings,
 } from "@/client/network";
-import {
-  DEFAULT_NETWORK_SETTINGS,
-  isSupportedProxyUrl,
-  type NetworkSettings,
-  type SystemProxyDetection,
-} from "@/shared/network";
 
 import { SettingsPage } from "./settings-page";
 

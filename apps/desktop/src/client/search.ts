@@ -1,5 +1,6 @@
+import type { SearchSettings } from "@llm-space/core";
+
 import { electrobun } from "@/lib/electrobun";
-import type { SearchSettings } from "@/shared/search";
 
 function _rpc() {
   if (!electrobun.rpc) {

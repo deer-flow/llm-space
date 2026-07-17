@@ -6,6 +6,9 @@ import type {
   FileNode,
   ModelConfig,
   ModelProviderGroup,
+  NetworkSettings,
+  SearchSettings,
+  SystemProxyDetection,
   Thread,
 } from "@llm-space/core";
 import type {
@@ -20,8 +23,6 @@ import type { RPCSchema } from "electrobun";
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
 import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
-import type { NetworkSettings, SystemProxyDetection } from "./network";
-import type { SearchSettings } from "./search";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
