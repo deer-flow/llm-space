@@ -4,7 +4,10 @@ import {
   type ToolCall,
   type ToolCallInput,
 } from "@llm-space/core";
-import { createToolResultPromptVariablePlaceKey } from "@llm-space/core/thread";
+import {
+  createToolResultPromptVariablePlaceKey,
+  getToolCallOutputText,
+} from "@llm-space/core/thread";
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -31,7 +34,6 @@ import { useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ToolCallInputView } from "./tool-call-input-view";
-import { getToolCallOutputText } from "./tool-call-status";
 import { useToolCallRunner } from "./use-tool-call-runner";
 import {
   parseWebSearchOutput,

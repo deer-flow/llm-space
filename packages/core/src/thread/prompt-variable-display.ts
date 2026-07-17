@@ -1,4 +1,5 @@
-import type { ThreadContext, ThreadSkillsVariable } from "@llm-space/core";
+import type { ThreadContext, ThreadSkillsVariable } from "../types";
+
 import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   formatCurrentDateVariable,
@@ -6,7 +7,7 @@ import {
   normalizePromptVariableState,
   VARIABLE_NAME_RE,
   type PromptSkill,
-} from "@llm-space/core/thread";
+} from "./prompt-variables";
 
 export interface PromptVariableCompletion {
   name: string;

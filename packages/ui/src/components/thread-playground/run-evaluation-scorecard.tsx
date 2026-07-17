@@ -1,8 +1,11 @@
 import {
+  averageScoreForRun,
+  completeRunScores,
   MAX_EVALUATION_RUBRICS,
   snapshotEvaluationRubric,
   type EvaluationRubricRecord,
   type EvaluationRubricSnapshot,
+  type EvaluationScoreDraft,
 } from "@llm-space/core/thread";
 import { Edit3Icon, PlusIcon } from "lucide-react";
 import { useMemo, type KeyboardEvent } from "react";
@@ -18,11 +21,6 @@ import {
   SelectValue,
 } from "@llm-space/ui/ui/select";
 
-import {
-  averageScoreForRun,
-  completeRunScores,
-  type EvaluationScoreDraft,
-} from "./run-evaluation-utils";
 
 const NO_RUBRIC = "none";
 const SAVED_RUBRIC = "saved";

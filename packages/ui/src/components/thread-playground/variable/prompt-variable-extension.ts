@@ -16,11 +16,10 @@ import {
   type Tooltip,
   type ViewUpdate,
 } from "@codemirror/view";
-
 import type {
   PromptVariableCompletion,
   VariableResolution,
-} from "./prompt-variable-display";
+} from "@llm-space/core/thread";
 
 /**
  * Resolves a `{{name}}` to its display value. May return synchronously (date /

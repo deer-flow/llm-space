@@ -1,10 +1,21 @@
 import {
+  completeRunScores,
+  initialRubricForEvaluation,
+  requiresScoreRemovalConfirmation,
+  runLastUserText,
+  runMessageCountLabel,
+  runModelLabel,
+  runResultText,
+  scoreDraftForRubricChange,
+  scoreDraftFromEvaluation,
   snapshotEvaluationRubric,
+  summarizeRun,
   type EvaluationRecord,
   type EvaluationRubricInput,
   type EvaluationRubricRecord,
   type EvaluationRubricSnapshot,
   type EvaluationRunScores,
+  type EvaluationScoreDraft,
   type RunSnapshot,
 } from "@llm-space/core/thread";
 import { ArrowLeftIcon, CheckIcon, EyeIcon, SaveIcon } from "lucide-react";
@@ -28,21 +39,6 @@ import { Textarea } from "@llm-space/ui/ui/textarea";
 
 import { EvaluationRubricEditor } from "./evaluation-rubric-editor";
 import { RunEvaluationScorecard } from "./run-evaluation-scorecard";
-import {
-  completeRunScores,
-  initialRubricForEvaluation,
-  requiresScoreRemovalConfirmation,
-  scoreDraftFromEvaluation,
-  scoreDraftForRubricChange,
-  type EvaluationScoreDraft,
-} from "./run-evaluation-utils";
-import {
-  runLastUserText,
-  runMessageCountLabel,
-  runModelLabel,
-  runResultText,
-  summarizeRun,
-} from "./run-history-utils";
 import { RunTraceView } from "./run-trace-view";
 
 const VERDICT_OPTIONS: {

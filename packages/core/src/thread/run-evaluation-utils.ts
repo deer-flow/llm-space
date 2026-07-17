@@ -3,7 +3,7 @@ import type {
   EvaluationRubricRecord,
   EvaluationRubricSnapshot,
   EvaluationRunScores,
-} from "@llm-space/core/thread";
+} from "./history";
 
 export type EvaluationScoreDraft = Record<string, Record<string, number>>;
 
@@ -124,7 +124,10 @@ export function reconcileScoreDraft(
         Object.fromEntries(
           rubric.criteria.flatMap((criterion) => {
             const score = current[criterion.id];
-            return Number.isInteger(score) && score >= 1 && score <= 5
+            return score !== undefined &&
+              Number.isInteger(score) &&
+              score >= 1 &&
+              score <= 5
               ? [[criterion.id, score]]
               : [];
           })
@@ -172,25 +175,22 @@ export function completeRunScores(
   draft: EvaluationScoreDraft,
   runIds: [string, string]
 ): EvaluationRunScores[] | null {
-  const result = runIds.map((runId) => ({
-    runId,
-    scores: rubric.criteria.map((criterion) => ({
-      criterionId: criterion.id,
-      score: draft[runId]?.[criterion.id],
-    })),
-  }));
-  if (
-    result.some((run) =>
-      run.scores.some(
-        ({ score }) =>
-          !Number.isInteger(score) ||
-          score === undefined ||
-          score < 1 ||
-          score > 5
-      )
-    )
-  ) {
-    return null;
+  const result: EvaluationRunScores[] = [];
+  for (const runId of runIds) {
+    const scores: EvaluationRunScores["scores"] = [];
+    for (const criterion of rubric.criteria) {
+      const score = draft[runId]?.[criterion.id];
+      if (
+        score === undefined ||
+        !Number.isInteger(score) ||
+        score < 1 ||
+        score > 5
+      ) {
+        return null;
+      }
+      scores.push({ criterionId: criterion.id, score });
+    }
+    result.push({ runId, scores });
   }
   return result;
 }

@@ -1,5 +1,6 @@
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import { getMessageText, type Message } from "@llm-space/core";
+import { summarizeToolCalls } from "@llm-space/core/thread";
 import {
   BotIcon,
   ChevronDownIcon,
@@ -22,7 +23,6 @@ import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";
 import { TokenUsageSummary } from "./token-usage-summary";
-import { summarizeToolCalls } from "./tool-call-status";
 
 function _MessageListItemHeader({
   className,

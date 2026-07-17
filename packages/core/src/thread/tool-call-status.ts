@@ -1,4 +1,4 @@
-import type { ToolCall } from "@llm-space/core";
+import type { ToolCall } from "../types";
 
 export type ToolCallStatus = "needsResponse" | "ready" | "error";
 

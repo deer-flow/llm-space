@@ -1,10 +1,10 @@
+import { describe, expect, test } from "bun:test";
+
 import type {
   EvaluationRecord,
   EvaluationRubricRecord,
   EvaluationRubricSnapshot,
-} from "@llm-space/core/thread";
-import { describe, expect, test } from "bun:test";
-
+} from "./history";
 import {
   averageScoreForRun,
   completeRunScores,

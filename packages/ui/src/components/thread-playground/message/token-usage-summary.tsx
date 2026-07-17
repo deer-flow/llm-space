@@ -1,5 +1,10 @@
 import type { ModelUsage } from "@llm-space/core";
-import { hasModelUsage } from "@llm-space/core/thread";
+import {
+  formatCompactUsage,
+  formatUsageSummary,
+  hasModelUsage,
+  usageBreakdownRows,
+} from "@llm-space/core/thread";
 import { GaugeIcon } from "lucide-react";
 import { memo, useMemo } from "react";
 
@@ -8,11 +13,6 @@ import { cn } from "@llm-space/ui/lib/utils";
 
 
 
-import {
-  formatCompactUsage,
-  formatUsageSummary,
-  usageBreakdownRows,
-} from "../token-usage";
 
 function _TokenUsageSummary({
   className,

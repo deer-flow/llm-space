@@ -1,16 +1,16 @@
 import { type Extension } from "@codemirror/state";
 import type { ThreadContext } from "@llm-space/core";
 import type { SkillInfo } from "@llm-space/core";
+import {
+  listPromptVariableCompletions,
+  resolvePromptVariableValueForPlace,
+} from "@llm-space/core/thread";
 import { useCallback, useContext, useMemo } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
 
 import { ThreadStoreContext, type ThreadStore } from "../stores";
 
-import {
-  listPromptVariableCompletions,
-  resolvePromptVariableValueForPlace,
-} from "./prompt-variable-display";
 import { createPromptVariableExtension } from "./prompt-variable-extension";
 import { listEnabledPromptVariableSkills } from "./prompt-variable-skills";
 

@@ -7,7 +7,10 @@ import {
   type ThreadContext,
   type ToolCall,
 } from "@llm-space/core";
-import { createMessagePromptVariablePlaceKey } from "@llm-space/core/thread";
+import {
+  createMessagePromptVariablePlaceKey,
+  summarizeToolCalls,
+} from "@llm-space/core/thread";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -31,7 +34,6 @@ import { ImageContentList } from "./image-content-view";
 import { MessageListItemHeader } from "./message-list-item-header";
 import { ThinkingView } from "./thinking-view";
 import { ToolCallListItem } from "./tool-call-list-item";
-import { summarizeToolCalls } from "./tool-call-status";
 import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _MessageListItem({

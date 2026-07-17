@@ -1,4 +1,10 @@
-import { usageForRun, type RunSnapshot } from "@llm-space/core/thread";
+import {
+  runMessageCountLabel,
+  runModelLabel,
+  summarizeRun,
+  usageForRun,
+  type RunSnapshot,
+} from "@llm-space/core/thread";
 import { memo } from "react";
 import { format } from "timeago.js";
 
@@ -7,11 +13,6 @@ import { cn } from "@llm-space/ui/lib/utils";
 
 import { MessageListView } from "./message/message-list-view";
 import { TokenUsageSummary } from "./message/token-usage-summary";
-import {
-  runMessageCountLabel,
-  runModelLabel,
-  summarizeRun,
-} from "./run-history-utils";
 
 function _RunTraceView({
   className,

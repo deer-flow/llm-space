@@ -1,4 +1,4 @@
-import type { ModelUsage, ModelUsageCost } from "@llm-space/core";
+import type { ModelUsage, ModelUsageCost } from "../types";
 
 const INTEGER_FORMATTER = new Intl.NumberFormat("en", {
   maximumFractionDigits: 0,

@@ -3,7 +3,7 @@ import {
   type AssistantMessage,
   type Message,
   type ThreadSnapshot,
-} from "@llm-space/core";
+} from "../types";
 
 /**
  * A short summary of a run's resulting thread, derived from its last message.
