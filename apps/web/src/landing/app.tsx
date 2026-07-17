@@ -17,13 +17,13 @@ import { RELEASES_URL, type Build } from '@/landing/lib/releases';
 import { useReleases } from '@/landing/lib/use-releases';
 import { PROVIDERS, type ProviderLogo } from '@/landing/lib/providers';
 import { useI18n } from '@/landing/lib/i18n';
+import {
+  DOCS_URL,
+  GITHUB_URL,
+  QUICK_START_URL,
+  ZH_DOCS_URL,
+} from '@/landing/lib/links';
 import RippleGrid from './components/ui/ripple-grid';
-
-const GITHUB_URL = 'https://github.com/deer-flow/llm-space';
-const QUICK_START_URL = `${GITHUB_URL}/blob/main/docs/get-started.md`;
-const DOCS_URL = `${GITHUB_URL}/blob/main/docs/index.md`;
-// Chinese docs live in a Feishu wiki rather than the English Markdown on `main`.
-const ZH_DOCS_URL = 'https://my.feishu.cn/wiki/QnGGwGkoti8nwok2cEOc2oMvnrd';
 
 // The showcase screenshots, in order. Their copy (title/caption/alt) is
 // translated per-locale in `t.showcase.slides` and zipped with these sources.
@@ -62,6 +62,17 @@ export function App() {
   const releases = useReleases();
   const primary = releases.stable;
   const { t, lang } = useI18n();
+
+  // The landing is a long scrolling page, so restore native overscroll
+  // (index.html locks it to `none` globally for the fixed-height pages). Revert
+  // on unmount so navigating to the viewer gets the locked behavior again.
+  useEffect(() => {
+    const el = document.documentElement;
+    el.style.overscrollBehavior = 'auto';
+    return () => {
+      el.style.overscrollBehavior = '';
+    };
+  }, []);
 
   return (
     // Near-black marketing background, scoped to the landing (the shared globals

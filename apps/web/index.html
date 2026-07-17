@@ -19,6 +19,15 @@
     <meta name="theme-color" content="#08080a" />
     <link rel="icon" type="image/png" href="/images/icon.png" />
 
+    <!-- Lock overscroll (no rubber-banding) everywhere by default. The landing
+         page re-enables it in React on mount (it's a long scrolling page); the
+         shared-thread viewer and other fixed-height pages keep it off. -->
+    <style>
+      html {
+        overscroll-behavior: none;
+      }
+    </style>
+
     <!-- Open Graph (Facebook, LinkedIn, Slack, …) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="LLM Space" />

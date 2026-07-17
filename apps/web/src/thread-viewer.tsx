@@ -1,59 +1,67 @@
-import type { Thread } from "@llm-space/core";
+import type {
+  SharedThread,
+  SharedThreadMeta,
+  SharedThreadSource,
+  ThreadConnector,
+} from "@llm-space/core";
+import { readLatestThread } from "@llm-space/core/storage";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { Button } from "@llm-space/ui/ui/button";
-import { DownloadIcon, Loader2Icon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ExternalLinkIcon, FileJsonIcon, Loader2Icon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-interface GistFile {
-  filename?: string;
-  content?: string;
-  truncated?: boolean;
-  raw_url?: string;
+import { SiteHeader } from "@/components/site-header";
+import { openInApp } from "@/lib/open-in-app";
+import { NotFound } from "@/not-found";
+
+/** `llm-space://shared/{connectorId}/threads/{threadId}` — desktop deep link. */
+function deepLink(connectorId: string, threadId: string): string {
+  return `llm-space://shared/${connectorId}/threads/${threadId}`;
 }
 
-/**
- * Fetch a shared thread from a public/secret gist. Anonymous read — no auth. The
- * GitHub API returns the file list; we pick the first `.json` file and parse it
- * (following `raw_url` when the inline content was truncated).
- */
-async function fetchGistThread(gistId: string): Promise<Thread> {
-  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) {
-    throw new Error(`Couldn't load this gist (HTTP ${res.status}).`);
+function hasReadShared(
+  storage: ThreadConnector["storage"]
+): storage is ThreadConnector["storage"] & SharedThreadSource {
+  return "readShared" in storage;
+}
+
+/** Read the shared thread + display metadata through the connector. */
+async function loadShared(
+  connector: ThreadConnector,
+  threadId: string
+): Promise<SharedThread> {
+  if (hasReadShared(connector.storage)) {
+    return connector.storage.readShared(threadId);
   }
-  const gist = (await res.json()) as { files?: Record<string, GistFile> };
-  const files = Object.values(gist.files ?? {});
-  const file = files.find((f) => f.filename?.endsWith(".json")) ?? files[0];
-  if (!file) {
-    throw new Error("This gist has no readable file.");
-  }
-  const content =
-    file.truncated && file.raw_url
-      ? await (await fetch(file.raw_url)).text()
-      : (file.content ?? "");
-  try {
-    return JSON.parse(content) as Thread;
-  } catch {
-    throw new Error("This gist is not a valid thread file.");
-  }
+  // Fallback: a connector without shared metadata still yields the thread.
+  const thread = await readLatestThread(connector.storage, threadId);
+  return {
+    thread,
+    meta: { connectorId: connector.connectorId, threadId, title: thread.title },
+  };
 }
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; thread: Thread };
+  | { status: "ready"; shared: SharedThread };
 
-export function ThreadViewer({ gistId }: { gistId: string }) {
+export function ThreadViewer({
+  connector,
+  threadId,
+}: {
+  connector: ThreadConnector;
+  threadId: string;
+}) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
-    fetchGistThread(gistId)
-      .then((thread) => {
-        if (!cancelled) setState({ status: "ready", thread });
+    loadShared(connector, threadId)
+      .then((shared) => {
+        if (!cancelled) setState({ status: "ready", shared });
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -67,58 +75,116 @@ export function ThreadViewer({ gistId }: { gistId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [gistId]);
-
-  const download = useMemo(() => {
-    if (state.status !== "ready") return undefined;
-    return () => {
-      const blob = new Blob([JSON.stringify(state.thread, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "thread.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-  }, [state]);
+  }, [connector, threadId]);
 
   if (state.status === "loading") {
     return (
-      <div className="text-muted-foreground flex h-dvh items-center justify-center gap-2 text-sm">
+      <div className="dark flex h-dvh items-center justify-center gap-2 bg-[#08080a] text-sm text-neutral-400">
         <Loader2Icon className="size-4 animate-spin" />
         Loading shared thread…
       </div>
     );
   }
   if (state.status === "error") {
-    return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-2 px-6 text-center">
-        <div className="text-sm font-medium">
-          Couldn&apos;t open this thread
-        </div>
-        <div className="text-muted-foreground text-xs">{state.message}</div>
-      </div>
-    );
+    return <NotFound message={state.message} />;
   }
 
+  const { thread, meta } = state.shared;
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <span className="text-sm font-medium">Shared thread</span>
-        <Button size="sm" variant="outline" onClick={download}>
-          <DownloadIcon className="size-3.5" />
-          Download thread.json
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1">
-        <ThreadPlayground
-          path={`shared/${gistId}`}
-          readonly
-          initialValue={state.thread}
+    <div className="dark flex h-dvh flex-col bg-[#08080a] text-[#ededf0]">
+      <SiteHeader />
+      <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col px-6 min-h-0 sm:px-10">
+        <SharedThreadMetaBlock
+          meta={meta}
+          deepLink={deepLink(connector.connectorId, threadId)}
         />
-      </div>
+        <div className="min-h-0 flex-1 pb-6">
+          <ThreadPlayground
+            className="size-full overflow-hidden rounded-xl border shadow-lg"
+            path={`shared/${connector.connectorId}/threads/${threadId}`}
+            title={meta.title}
+            readonly
+            initialValue={thread}
+          />
+        </div>
+      </main>
     </div>
+  );
+}
+
+function SharedThreadMetaBlock({
+  meta,
+  deepLink,
+}: {
+  meta: SharedThreadMeta;
+  deepLink: string;
+}) {
+  const navigate = useNavigate();
+
+  // Try to hand off to the installed desktop app; if it doesn't take over
+  // within the timeout, fall back to the homepage (where the download lives).
+  const openApp = () => openInApp(deepLink, () => navigate("/"));
+
+  return (
+    <section className="flex shrink-0 flex-col gap-6 py-8 sm:flex-row sm:items-start sm:justify-between">
+      <div className="space-y-3">
+        <div className="text-xs font-medium tracking-widest text-neutral-500 uppercase">
+          Shared thread
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
+          {meta.title ?? "Untitled thread"}
+        </h1>
+        {meta.description ? (
+          <p className="max-w-2xl text-sm text-neutral-400">
+            {meta.description}
+          </p>
+        ) : null}
+        {meta.filename ? (
+          meta.rawUrl ? (
+            <a
+              href={meta.rawUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 hover:underline"
+            >
+              <FileJsonIcon className="size-3.5" />
+              {meta.filename}
+            </a>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <FileJsonIcon className="size-3.5" />
+              {meta.filename}
+            </div>
+          )
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-start gap-4 sm:items-end">
+        {meta.author ? (
+          <a
+            href={meta.author.profileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-sm text-neutral-300 hover:text-white"
+          >
+            {meta.author.avatarUrl ? (
+              <img
+                src={meta.author.avatarUrl}
+                alt=""
+                className="size-8 rounded-full border border-white/10"
+              />
+            ) : null}
+            <span>
+              Shared by{" "}
+              <span className="font-medium text-white">{meta.author.name}</span>
+            </span>
+          </a>
+        ) : null}
+        <Button size="lg" onClick={openApp}>
+          Open in LLM Space
+          <ExternalLinkIcon className="size-4" />
+        </Button>
+      </div>
+    </section>
   );
 }

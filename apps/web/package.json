@@ -24,6 +24,7 @@
     "ogl": "^1.0.11",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-router-dom": "^7.18.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
