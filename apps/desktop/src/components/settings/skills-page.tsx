@@ -1,5 +1,6 @@
 "use client";
 
+import type { SkillInfo, SkillsSettings } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -33,7 +34,6 @@ import {
   setAllSkillsHidden,
   setSkillHidden,
 } from "@/client/skills";
-import type { SkillInfo, SkillsSettings } from "@/shared/skills";
 
 import { SkillListItem } from "../skill-list-item";
 

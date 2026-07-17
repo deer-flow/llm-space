@@ -1,6 +1,11 @@
 "use client";
 
 import { type McpTool } from "@llm-space/core";
+import {
+  getMcpReadinessLabel,
+  type McpServerView,
+  type McpToolSummary,
+} from "@llm-space/core";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -18,11 +23,6 @@ import { format } from "timeago.js";
 
 import { listMcpServers, listMcpTools } from "@/client/mcp";
 import { useCommands } from "@/commands";
-import {
-  getMcpReadinessLabel,
-  type McpServerView,
-  type McpToolSummary,
-} from "@/shared/mcp";
 
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 

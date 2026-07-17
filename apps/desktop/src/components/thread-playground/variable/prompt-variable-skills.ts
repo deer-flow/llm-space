@@ -1,5 +1,6 @@
+import type { SkillInfo } from "@llm-space/core";
+
 import { getSkillsSettings, listSkills } from "@/client/skills";
-import type { SkillInfo } from "@/shared/skills";
 
 /** Return enabled local skills in stable name order for core prompt rendering. */
 export async function listEnabledPromptVariableSkills(): Promise<SkillInfo[]> {

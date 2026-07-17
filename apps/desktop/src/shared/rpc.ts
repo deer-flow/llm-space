@@ -8,20 +8,20 @@ import type {
   ModelProviderGroup,
   Thread,
 } from "@llm-space/core";
-import type { RPCSchema } from "electrobun";
-
-import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
-import type { GithubAuthState } from "./auth";
-import type { Command } from "./commands";
 import type {
   McpCallToolResponse,
   McpServerDraft,
   McpServerToolsResponse,
   McpServerView,
-} from "./mcp";
+} from "@llm-space/core";
+import type { SkillContent, SkillInfo, SkillsSettings } from "@llm-space/core";
+import type { RPCSchema } from "electrobun";
+
+import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
+import type { GithubAuthState } from "./auth";
+import type { Command } from "./commands";
 import type { NetworkSettings, SystemProxyDetection } from "./network";
 import type { SearchSettings } from "./search";
-import type { SkillContent, SkillInfo, SkillsSettings } from "./skills";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,

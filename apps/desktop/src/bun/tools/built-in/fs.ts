@@ -4,8 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { BuiltinTool } from "@llm-space/core";
+import type { SkillContent } from "@llm-space/core";
 
-import type { SkillContent } from "../../../shared/skills";
 import { openPath, revealInFileManager } from "../../fs";
 import type { ToolEntry } from "../tool-registry";
 

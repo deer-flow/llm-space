@@ -1,5 +1,6 @@
+import type { SkillContent, SkillInfo, SkillsSettings } from "@llm-space/core";
+
 import { electrobun } from "@/lib/electrobun";
-import type { SkillContent, SkillInfo, SkillsSettings } from "@/shared/skills";
 
 function _rpc() {
   if (!electrobun.rpc) {

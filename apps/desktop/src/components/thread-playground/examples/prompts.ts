@@ -1,4 +1,5 @@
 import { uuid, type Message, type Tool } from "@llm-space/core";
+import type { SkillInfo } from "@llm-space/core";
 import {
   BookOpenTextIcon,
   BotIcon,
@@ -13,7 +14,6 @@ import {
 
 import { ensureRootDir } from "@/client/paths";
 import { getSkillsSettings, listSkills } from "@/client/skills";
-import type { SkillInfo } from "@/shared/skills";
 
 import compactMemoryPrompt from "./compact-memory.md?raw";
 import deepResearchPrompt from "./deep-research.md?raw";

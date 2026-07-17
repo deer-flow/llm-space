@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  getMcpReadinessLabel,
+  normalizeMcpName,
+  type McpDiagnosticStep,
+  type McpServerDraft,
+  type McpServerReadiness,
+  type McpServerView,
+  type McpToolSummary,
+  type McpToolView,
+  type McpTransportType,
+} from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -43,17 +54,6 @@ import {
   removeMcpServer,
   updateMcpServer,
 } from "@/client/mcp";
-import {
-  getMcpReadinessLabel,
-  normalizeMcpName,
-  type McpDiagnosticStep,
-  type McpServerDraft,
-  type McpServerReadiness,
-  type McpServerView,
-  type McpToolSummary,
-  type McpToolView,
-  type McpTransportType,
-} from "@/shared/mcp";
 
 import { SettingsPage } from "./settings-page";
 

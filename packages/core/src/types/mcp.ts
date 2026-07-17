@@ -1,4 +1,4 @@
-import type { JSONSchema } from "@llm-space/core";
+import type { JSONSchema } from "./shared";
 
 export type McpTransportType = "stdio" | "streamableHttp" | "sse";
 export type McpRemoteTransportType = Exclude<McpTransportType, "stdio">;

@@ -1,9 +1,9 @@
 import { type Extension } from "@codemirror/state";
 import type { ThreadContext } from "@llm-space/core";
+import type { SkillInfo } from "@llm-space/core";
 import { useContext, useMemo } from "react";
 
 import { useCommands } from "@/commands";
-import type { SkillInfo } from "@/shared/skills";
 
 import { ThreadStoreContext, type ThreadStore } from "../stores";
 

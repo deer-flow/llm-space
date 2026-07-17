@@ -1,5 +1,6 @@
 "use client";
 
+import type { SkillInfo } from "@llm-space/core";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -14,7 +15,6 @@ import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { SearchIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
-import type { SkillInfo } from "@/shared/skills";
 
 import { SkillListItem } from "../../skill-list-item";
 

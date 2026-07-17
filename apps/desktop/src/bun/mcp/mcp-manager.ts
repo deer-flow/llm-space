@@ -2,6 +2,25 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { uuid } from "@llm-space/core";
+import {
+  buildMcpToolName,
+  normalizeMcpName,
+  type McpCallToolResponse,
+  type McpDiagnosticCategory,
+  type McpDiagnosticOutcome,
+  type McpDiagnosticStep,
+  type McpDiagnosticStepStatus,
+  type McpRemoteTransportType,
+  type McpServerDiagnostic,
+  type McpServerReadiness,
+  type McpServerConfig,
+  type McpServerDraft,
+  type McpServersConfig,
+  type McpServerToolsResponse,
+  type McpServerView,
+  type McpToolSummary,
+  type McpToolView,
+} from "@llm-space/core";
 import { getSettingsDir } from "@llm-space/core/server";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -24,25 +43,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import {
-  buildMcpToolName,
-  normalizeMcpName,
-  type McpCallToolResponse,
-  type McpDiagnosticCategory,
-  type McpDiagnosticOutcome,
-  type McpDiagnosticStep,
-  type McpDiagnosticStepStatus,
-  type McpRemoteTransportType,
-  type McpServerDiagnostic,
-  type McpServerReadiness,
-  type McpServerConfig,
-  type McpServerDraft,
-  type McpServersConfig,
-  type McpServerToolsResponse,
-  type McpServerView,
-  type McpToolSummary,
-  type McpToolView,
-} from "../../shared/mcp";
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const LIST_TIMEOUT_MS = 10_000;

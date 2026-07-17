@@ -5,6 +5,7 @@ import type {
   ThreadSkillsVariable,
   ThreadVariable,
 } from "@llm-space/core";
+import type { SkillInfo } from "@llm-space/core";
 import {
   DEFAULT_VARIABLE_VARIANT_NAME,
   formatCurrentDateVariable,
@@ -45,7 +46,6 @@ import {
   type ReactNode,
 } from "react";
 
-import type { SkillInfo } from "@/shared/skills";
 
 import { useThreadStore, useThreadStoreActions } from "../stores";
 

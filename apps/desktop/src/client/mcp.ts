@@ -1,10 +1,11 @@
-import { electrobun } from "@/lib/electrobun";
 import type {
   McpCallToolResponse,
   McpServerDraft,
   McpServerToolsResponse,
   McpServerView,
-} from "@/shared/mcp";
+} from "@llm-space/core";
+
+import { electrobun } from "@/lib/electrobun";
 
 function _rpc() {
   if (!electrobun.rpc) {

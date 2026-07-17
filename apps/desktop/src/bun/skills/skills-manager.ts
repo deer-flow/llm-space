@@ -2,17 +2,17 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
-import matter from "gray-matter";
-import { isValidSkillName, validateSkillFrontmatter } from "skills-handler";
-
 import {
   DEFAULT_SKILLS_SETTINGS,
   type DiscoveryPathConfig,
   type SkillContent,
   type SkillInfo,
   type SkillsSettings,
-} from "../../shared/skills";
+} from "@llm-space/core";
+import { getSettingsDir } from "@llm-space/core/server";
+import matter from "gray-matter";
+import { isValidSkillName, validateSkillFrontmatter } from "skills-handler";
+
 
 import { getManagedSkillsDir } from "./seed";
 
