@@ -8,7 +8,13 @@ import { readLatestThread } from "@llm-space/core/storage";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { Button } from "@llm-space/ui/ui/button";
-import { ExternalLinkIcon, FileJsonIcon, Loader2Icon } from "lucide-react";
+import {
+  ExpandIcon,
+  ExternalLinkIcon,
+  FileJsonIcon,
+  Loader2Icon,
+  ShrinkIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -74,6 +80,13 @@ export function ThreadViewer({
   threadId: string;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [fullscreen, setFullscreen] = useState(false);
+  const navigate = useNavigate();
+
+  // Try to hand off to the installed desktop app; if it doesn't take over
+  // within the timeout, fall back to the homepage (where the download lives).
+  const openApp = () =>
+    openInApp(deepLink(connector.connectorId, threadId), () => navigate("/"));
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +109,16 @@ export function ThreadViewer({
     };
   }, [connector, threadId]);
 
+  // Let Escape leave full screen.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen]);
+
   if (state.status === "loading") {
     return (
       <div className="dark flex h-dvh items-center justify-center gap-2 bg-[#08080a] text-sm text-neutral-400">
@@ -109,22 +132,58 @@ export function ThreadViewer({
   }
 
   const { thread, meta } = state.shared;
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {fullscreen ? (
+        <Button size="sm" onClick={openApp}>
+          Open in LLM Space
+          <ExternalLinkIcon className="size-3.5" />
+        </Button>
+      ) : null}
+      <Tooltip content={fullscreen ? "Exit full screen" : "Full screen"}>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          aria-label={fullscreen ? "Exit full screen" : "Enter full screen"}
+          aria-pressed={fullscreen}
+          onClick={() => setFullscreen((value) => !value)}
+        >
+          {fullscreen ? (
+            <ShrinkIcon className="size-4" />
+          ) : (
+            <ExpandIcon className="size-4" />
+          )}
+        </Button>
+      </Tooltip>
+    </div>
+  );
+  const playground = (
+    <ThreadPlayground
+      className={
+        fullscreen
+          ? "size-full overflow-hidden"
+          : "size-full overflow-hidden rounded-xl border shadow-lg"
+      }
+      path={`shared/${connector.connectorId}/threads/${threadId}`}
+      title={meta.title}
+      readonly
+      initialValue={thread}
+      headerActions={headerActions}
+    />
+  );
   return (
     <div className="dark flex h-dvh flex-col bg-[#08080a] text-[#ededf0]">
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col px-6 min-h-0 sm:px-10">
-        <SharedThreadMetaBlock
-          meta={meta}
-          deepLink={deepLink(connector.connectorId, threadId)}
-        />
+        <SharedThreadMetaBlock meta={meta} onOpenApp={openApp} />
         <div className="min-h-0 flex-1 pb-6">
-          <ThreadPlayground
-            className="size-full overflow-hidden rounded-xl border shadow-lg"
-            path={`shared/${connector.connectorId}/threads/${threadId}`}
-            title={meta.title}
-            readonly
-            initialValue={thread}
-          />
+          <div
+            className={
+              fullscreen ? "fixed inset-0 z-50 bg-[#08080a]" : "h-full"
+            }
+          >
+            {playground}
+          </div>
         </div>
       </main>
     </div>
@@ -133,20 +192,14 @@ export function ThreadViewer({
 
 function SharedThreadMetaBlock({
   meta,
-  deepLink,
+  onOpenApp,
 }: {
   meta: SharedThreadMeta;
-  deepLink: string;
+  onOpenApp: () => void;
 }) {
-  const navigate = useNavigate();
-
-  // Try to hand off to the installed desktop app; if it doesn't take over
-  // within the timeout, fall back to the homepage (where the download lives).
-  const openApp = () => openInApp(deepLink, () => navigate("/"));
-
   return (
-    <section className="flex shrink-0 flex-col gap-6 py-8 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-3">
+    <section className="flex shrink-0 flex-col gap-6 py-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="space-y-2">
         <div className="text-xs font-medium tracking-widest text-neutral-500 uppercase">
           Shared thread
         </div>
@@ -212,7 +265,7 @@ function SharedThreadMetaBlock({
             </span>
           </a>
         ) : null}
-        <Button size="lg" onClick={openApp}>
+        <Button size="lg" onClick={onOpenApp}>
           Open in LLM Space
           <ExternalLinkIcon className="size-4" />
         </Button>
