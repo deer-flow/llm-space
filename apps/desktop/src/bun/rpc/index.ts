@@ -1,4 +1,3 @@
-import { mkdirSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 
@@ -29,6 +28,8 @@ import type { StreamThreadController } from "../streaming";
 import type { ToolRegistry } from "../tools/tool-registry";
 import type { TraceManager } from "../traces";
 import type { UpdaterService } from "../updates";
+
+import { ensureRootDir } from "./ensure-root-dir";
 
 async function _getModelProviderGroups(modelManager: ModelManager) {
   const models = await modelManager.getAvailableModels();
@@ -189,8 +190,7 @@ export function createMainWindowRPC({
           return { fullScreen: mainWindow.isFullScreen() };
         },
         ensureRootDir: ({ relativePath }) => {
-          const dir = path.join(homePath, relativePath);
-          mkdirSync(dir, { recursive: true });
+          const dir = ensureRootDir(homePath, relativePath);
           return Promise.resolve({ path: dir });
         },
         fsLs: ({ path }) => localFs.ls(path),
