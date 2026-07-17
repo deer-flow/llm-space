@@ -652,7 +652,6 @@ export class ModelManager {
         }
       } else {
         const res = await provider.auth.apiKey?.resolve({
-          model: provider.getModels()[0],
           ctx: {
             env: (name) => Promise.resolve(env[name]),
             fileExists: (path) => Promise.resolve(existsSync(path)),
