@@ -3,6 +3,7 @@
 import {
   Boxes,
   Cable,
+  CircleUser,
   FlaskConical,
   Network,
   Search,
@@ -14,6 +15,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsTab } from "@/shared/commands";
 
+import { AccountPage } from "./account-page";
 import { ExperimentalPage } from "./experimental-page";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
@@ -29,6 +31,7 @@ const PAGES = [
     icon: SlidersHorizontal,
     Page: GeneralPage,
   },
+  { value: "account", label: "Account", icon: CircleUser, Page: AccountPage },
   { value: "models", label: "Models", icon: Boxes, Page: ModelsPage },
   { value: "mcp", label: "MCP", icon: Cable, Page: McpPage },
   { value: "network", label: "Network", icon: Network, Page: NetworkPage },

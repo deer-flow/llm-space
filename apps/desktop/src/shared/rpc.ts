@@ -11,6 +11,7 @@ import type {
 import type { RPCSchema } from "electrobun";
 
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
+import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
 import type {
   McpCallToolResponse,
@@ -369,6 +370,12 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: null;
       };
+      // The current GitHub sign-in state, pulled once on mount. Later transitions
+      // arrive via the `githubAuthChanged` message. Never carries the token.
+      githubAuthStatus: {
+        params: Record<string, never>;
+        response: GithubAuthState;
+      };
     };
     // Messages the webview SENDS and the bun side handles.
     messages: {
@@ -391,6 +398,9 @@ export interface DesktopRPCType {
       fullScreenChanged: { fullScreen: boolean };
       // App-update flow progress from the bun-side updater service.
       updateStatusChanged: UpdateStatusChangedPayload;
+      // GitHub sign-in state changed (signed in/out, or a Device Flow started /
+      // failed). Drives the sidebar account widget and the Account settings page.
+      githubAuthChanged: GithubAuthState;
       // A unified command dispatched from the bun process (native menu / global
       // shortcuts) to run in the webview. See `shared/commands.ts`.
       executeCommand: Command;

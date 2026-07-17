@@ -9,6 +9,7 @@ import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
 import type { Analytics } from "../analytics";
+import type { GitHubAuthManager } from "../auth";
 import { moveToTrash, revealInFileManager } from "../fs";
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
@@ -56,6 +57,7 @@ export type MainWindowRPC = ReturnType<
 export interface MainWindowRPCDependencies {
   analytics: Analytics;
   executeCommand: (command: Command) => void;
+  githubAuth: GitHubAuthManager;
   getMainWindow: () => BrowserWindow;
   homePath: string;
   localFs: LocalFileSystem;
@@ -75,6 +77,7 @@ const MAX_REQUEST_TIME_MS = 5 * 60_000 + 10_000;
 export function createMainWindowRPC({
   analytics,
   executeCommand,
+  githubAuth,
   getMainWindow,
   homePath,
   localFs,
@@ -318,6 +321,7 @@ export function createMainWindowRPC({
           await dismissGithubStarReminder();
           return null;
         },
+        githubAuthStatus: () => Promise.resolve(githubAuth.getState()),
       },
       messages: {
         sendStreamThreadRequest: (payload) => {

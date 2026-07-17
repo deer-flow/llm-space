@@ -7,6 +7,7 @@ import { COMMAND_META, type Command } from "../shared/commands";
 
 import { isChineseLocale } from "./app/locales";
 import { saveZoom } from "./app/window-state";
+import type { GitHubAuthManager } from "./auth";
 import {
   importFilesWithNativePicker,
   importTextFromClipboard,
@@ -33,6 +34,7 @@ export interface BunCommandDependencies {
   sendToWebview: (command: Command) => void;
   updater: Pick<UpdaterService, "applyUpdateAndRestart" | "checkForUpdates">;
   workspacePath: string;
+  githubAuth: Pick<GitHubAuthManager, "signIn" | "signOut">;
 }
 
 /**
@@ -110,6 +112,14 @@ export function executeCommandInBun(
     case "openWorkspaceFolder": {
       mkdirSync(dependencies.workspacePath, { recursive: true });
       Utils.openPath(dependencies.workspacePath);
+      return;
+    }
+    case "githubLogin": {
+      void dependencies.githubAuth.signIn();
+      return;
+    }
+    case "githubLogout": {
+      dependencies.githubAuth.signOut();
       return;
     }
     case "checkForUpdates": {

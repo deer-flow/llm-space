@@ -12,9 +12,12 @@ import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
+import { AccountStatus } from "@/components/account-status";
 import { useExperimental } from "@/components/experimental-provider";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { FirecrawlLimitDialog } from "@/components/firecrawl-limit-dialog";
+import { GithubAuthProvider } from "@/components/github-auth-provider";
+import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
 import { useModels } from "@/components/model-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
@@ -125,7 +128,9 @@ export function Page() {
   return (
     <CommandProvider>
       <UpdateStatusProvider>
-        <PageInner />
+        <GithubAuthProvider>
+          <PageInner />
+        </GithubAuthProvider>
       </UpdateStatusProvider>
     </CommandProvider>
   );
@@ -455,6 +460,7 @@ function PageInner() {
                 />
               </div>
             )}
+            <AccountStatus />
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel minSize={640}>
@@ -500,6 +506,7 @@ function PageInner() {
         </ResizablePanelGroup>
       </main>
       <FirecrawlLimitDialog />
+      <GithubDeviceDialog />
       <GithubStarReminder />
       <LazyOverlay open={settingsOpen}>
         <SettingsDialog

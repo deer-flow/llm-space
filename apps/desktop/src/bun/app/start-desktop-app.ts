@@ -9,6 +9,7 @@ import Electrobun, {
 
 import type { Command } from "../../shared/commands";
 import { Analytics } from "../analytics";
+import { GitHubAuthManager } from "../auth";
 import { executeCommandInBun } from "../commands";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
@@ -42,6 +43,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const modelManager = new ModelManager();
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager();
+  const githubAuth = new GitHubAuthManager({
+    onChange: (state) => getRpc().send.githubAuthChanged(state),
+  });
   const localFs = createLocalFileSystem(homePath);
   const traceManager = new TraceManager();
   const streaming = new StreamThreadController(modelManager, analytics);
@@ -78,6 +82,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     sendToWebview: (command: Command) => getRpc().send.executeCommand(command),
     updater,
     workspacePath,
+    githubAuth,
   };
   const executeCommand = (command: Command, window: BrowserWindow): void =>
     executeCommandInBun(command, window, commandDependencies);
@@ -90,6 +95,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
         ["streaming", () => streaming.shutdown()],
         ["desktop host", () => host.stop()],
         ["MCP manager", () => mcpManager.shutdown()],
+        ["GitHub auth", () => githubAuth.cancelSignIn()],
         ["analytics", () => analytics.shutdown()],
       ]);
       return stopPromise;
@@ -100,6 +106,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     rpc = createMainWindowRPC({
       analytics,
       executeCommand: (command) => executeCommand(command, getMainWindow()),
+      githubAuth,
       getMainWindow,
       homePath,
       localFs,

@@ -192,6 +192,7 @@ export interface ToggleSidebarCommand extends GenericCommand<"toggleSidebar"> {}
 
 /** Which Settings tab to show. */
 export type SettingsTab =
+  | "account"
   | "general"
   | "models"
   | "mcp"
@@ -260,6 +261,18 @@ export interface ReportBugsCommand extends GenericCommand<"reportBugs"> {}
 /** Open the workspace folder (`LLM_SPACE_HOME/workspace`) in the OS file manager. */
 export interface OpenWorkspaceFolderCommand extends GenericCommand<"openWorkspaceFolder"> {}
 
+// --- GitHub auth (bun-side) ------------------------------------------------
+
+/**
+ * Start the GitHub OAuth Device Flow: the bun side requests a code, opens the
+ * verification window, and polls for the token. Modelled as a command so any
+ * surface (Account page, a future "sign in to share" prompt) can trigger it.
+ */
+export interface GithubLoginCommand extends GenericCommand<"githubLogin"> {}
+
+/** Sign out of GitHub: forget the stored token. */
+export interface GithubLogoutCommand extends GenericCommand<"githubLogout"> {}
+
 // --- Updates ---------------------------------------------------------------
 
 /**
@@ -311,6 +324,8 @@ export type Command =
   | OpenDocumentCommand
   | ReportBugsCommand
   | OpenWorkspaceFolderCommand
+  | GithubLoginCommand
+  | GithubLogoutCommand
   | CheckForUpdatesCommand
   | ApplyUpdateAndRestartCommand;
 
@@ -382,6 +397,8 @@ export const COMMAND_META: Record<
   openDocument: { label: "Documents", target: "bun" },
   reportBugs: { label: "Report Bug", target: "bun" },
   openWorkspaceFolder: { label: "Open Workspace Folder", target: "bun" },
+  githubLogin: { label: "Sign in with GitHub", target: "bun" },
+  githubLogout: { label: "Sign out of GitHub", target: "bun" },
   checkForUpdates: { label: "Check for Updates...", target: "bun" },
   applyUpdateAndRestart: { label: "Restart to Update", target: "bun" },
 };
