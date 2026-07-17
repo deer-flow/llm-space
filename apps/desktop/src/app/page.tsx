@@ -28,7 +28,6 @@ import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
 import { SharedImportProvider } from "@/components/shared-import-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
-import { TracePanel } from "@/components/trace-panel";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
@@ -73,6 +72,11 @@ const ShareThreadDialog = lazy(() =>
     default: m.ShareThreadDialog,
   }))
 );
+const LazyTracePanel = lazy(() =>
+  import("@/components/trace-panel").then((m) => ({
+    default: m.TracePanel,
+  }))
+);
 
 /**
  * Renders a lazily-loaded overlay only once `open` first becomes true, then
@@ -82,7 +86,7 @@ const ShareThreadDialog = lazy(() =>
  * so the lazy `import()` starts in the same render that opens the overlay,
  * without a wasted extra render of the page tree.
  */
-function LazyOverlay({
+function LazyMount({
   open,
   children,
 }: {
@@ -474,14 +478,16 @@ function PageInner() {
               onMove={tabs.handleMove}
             />
             {tracingEnabled && (
-              <TracePanel
-                className={
-                  effectiveSidebarMode === "traces"
-                    ? "min-h-0 flex-1"
-                    : "hidden"
-                }
-                onOpenTrace={handleOpenTrace}
-              />
+              <LazyMount open={effectiveSidebarMode === "traces"}>
+                <LazyTracePanel
+                  className={
+                    effectiveSidebarMode === "traces"
+                      ? "min-h-0 flex-1"
+                      : "hidden"
+                  }
+                  onOpenTrace={handleOpenTrace}
+                />
+              </LazyMount>
             )}
             {tracingEnabled && (
               <div className="border-border/70 electrobun-webkit-app-region-no-drag flex shrink-0 border-t px-3 py-2">
@@ -540,32 +546,32 @@ function PageInner() {
       <FirecrawlLimitDialog />
       <GithubDeviceDialog />
       <GithubStarReminder />
-      <LazyOverlay open={settingsOpen}>
+      <LazyMount open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           onTabChange={setSettingsTab}
         />
-      </LazyOverlay>
-      <LazyOverlay open={commandPaletteOpen}>
+      </LazyMount>
+      <LazyMount open={commandPaletteOpen}>
         <CommandPalette
           open={commandPaletteOpen}
           onOpenChange={setCommandPaletteOpen}
           blacklist={COMMAND_PALETTE_BLACKLIST}
         />
-      </LazyOverlay>
-      <LazyOverlay open={onboardOpen}>
+      </LazyMount>
+      <LazyMount open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
-      </LazyOverlay>
-      <LazyOverlay open={shareOpen}>
+      </LazyMount>
+      <LazyMount open={shareOpen}>
         <ShareThreadDialog
           open={shareOpen}
           path={shareTargetRef.current}
           onOpenChange={setShareOpen}
         />
-      </LazyOverlay>
-      <LazyOverlay open={examplesOpen}>
+      </LazyMount>
+      <LazyMount open={examplesOpen}>
         <StartFromExampleDialog
           open={examplesOpen}
           onOpenChange={setExamplesOpen}
@@ -579,7 +585,7 @@ function PageInner() {
             })
           }
         />
-      </LazyOverlay>
+      </LazyMount>
       {isDraggingFiles && (
         <div className="border-primary bg-primary/10 text-primary pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium backdrop-blur-sm">
           Drop files to import as threads
