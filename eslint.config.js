@@ -27,6 +27,9 @@ export default defineConfig([
       "apps/desktop/vite.config.ts",
       "web/vite.config.ts",
       "web/postcss.config.js",
+      // Vendored marketing page migrated from the gh-pages branch (its own
+      // style); typechecked via web/tsconfig.json but not style-linted here.
+      "web/src/landing/**",
     ],
   },
 

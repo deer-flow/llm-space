@@ -5,6 +5,8 @@ import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 import { useEffect, useState } from "react";
 
 import { webHost, webModelClient } from "@/host/web-host";
+import { App as Landing } from "@/landing/app";
+import { I18nProvider } from "@/landing/lib/i18n";
 import { ThreadViewer } from "@/thread-viewer";
 
 /** Parse `#/thread/:user/:gistId` (user is cosmetic; the gist id is the key). */
@@ -33,24 +35,13 @@ export function App() {
             {route ? (
               <ThreadViewer gistId={route.gistId} />
             ) : (
-              <Home />
+              <I18nProvider>
+                <Landing />
+              </I18nProvider>
             )}
           </TooltipProvider>
         </HostServicesProvider>
       </ModelProvider>
     </ThemeProvider>
-  );
-}
-
-function Home() {
-  return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-2 px-6 text-center">
-      <div className="text-sm font-medium">LLM Space — shared thread viewer</div>
-      <div className="text-muted-foreground max-w-md text-xs">
-        Open a shared link of the form{" "}
-        <code>/llm-space/#/thread/&lt;user&gt;/&lt;gist-id&gt;</code> to view a
-        thread read-only.
-      </div>
-    </div>
   );
 }

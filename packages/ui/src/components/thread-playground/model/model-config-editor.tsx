@@ -1,8 +1,8 @@
 "use client";
 
 import { useModel, useResolveModelConfig } from "@llm-space/ui/components/model-provider";
+import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
-
 
 import { useThreadStore } from "../stores";
 
@@ -20,6 +20,8 @@ export function ModelConfigEditor({
   // resolve it for display (own → default → first available). `null` when there
   // are no models at all.
   const savedModel = useThreadStore((s) => s.thread.model);
+  const modelName = useThreadStore((s) => s.thread.modelName);
+  const { presentational } = useHostServices();
   const model = useResolveModelConfig(savedModel);
   const resolvedModel = useModel({
     id: model?.id ?? "",
@@ -50,7 +52,15 @@ export function ModelConfigEditor({
     <div className={cn("group flex w-full", className)}>
       <div className="flex min-w-0 grow flex-col gap-2">
         <div className="flex cursor-default items-center text-sm">
-          <ModelSelector value={model ?? null} readonly={readonly} />
+          {presentational ? (
+            // No model provider list on the web viewer — show the name that was
+            // resolved at share time (or the raw saved id) as static text.
+            <span className="text-muted-foreground truncate px-2 font-mono text-sm">
+              {modelName ?? savedModel?.id ?? "(No model)"}
+            </span>
+          ) : (
+            <ModelSelector value={model ?? null} readonly={readonly} />
+          )}
         </div>
         {paramSummary.length > 0 ? (
           <div className="text-muted-foreground pl-2 text-xs">

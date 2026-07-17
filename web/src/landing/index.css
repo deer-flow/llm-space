@@ -1,0 +1,77 @@
+/* Landing-page-only styles, additive to `@llm-space/ui/styles/globals.css`
+   (which owns `@import "tailwindcss"`, the `dark` variant, and the shadcn color
+   tokens). We keep ONLY the landing's unique tokens/keyframes/helpers here — the
+   shadcn `--color-*` tokens and the global `body` background were dropped so the
+   near-black landing look can't leak into the shared-thread viewer. The landing
+   restores its near-black background on its own root wrapper (see app.tsx). */
+
+@theme {
+  /* Brand accent + the marquee animation used by the provider logos. */
+  --color-brand: oklch(0.629 0.1692 268.32);
+  --color-brand-bright: oklch(0.7 0.16 275);
+  --animate-marquee: marquee var(--duration, 40s) linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+/* Faint blueprint grid, fading out toward the edges so it reads as texture. */
+.grid-backdrop {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 100% 80% at 50% 35%,
+    #000 0%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    ellipse 100% 80% at 50% 35%,
+    #000 0%,
+    transparent 78%
+  );
+}
+
+/* The animated wordmark gradient used on "LLM Space". */
+.wordmark-gradient {
+  background-image: linear-gradient(
+    100deg,
+    #ff9a5a 0%,
+    #ff5db1 30%,
+    #c25cff 62%,
+    #6b8cff 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: wordmark-pan 8s ease-in-out infinite alternate;
+}
+
+@keyframes wordmark-pan {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}

@@ -3,7 +3,120 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LLM Space — Shared Thread</title>
+
+    <!-- Primary SEO -->
+    <title>LLM Space — Build, trace, and debug agents in one place</title>
+    <meta
+      name="description"
+      content="LLM Space is a local-first desktop app to prototype agent ideas, inspect every harness step, replay failures, and evaluate performance — all in one place."
+    />
+    <meta
+      name="keywords"
+      content="LLM Space, AI agents, agent development, prompt engineering, LLM tracing, agent debugging, agent evaluation, DeerFlow, desktop app"
+    />
+    <meta name="author" content="DeerFlow" />
+    <link rel="canonical" href="https://deer-flow.github.io/llm-space/" />
+    <meta name="theme-color" content="#08080a" />
+    <link rel="icon" type="image/png" href="/images/icon.png" />
+
+    <!-- Open Graph (Facebook, LinkedIn, Slack, …) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LLM Space" />
+    <meta
+      property="og:title"
+      content="LLM Space — Build, trace, and debug agents in one place"
+    />
+    <meta
+      property="og:description"
+      content="A local-first desktop app to prototype agent ideas, inspect every harness step, replay failures, and evaluate performance."
+    />
+    <meta property="og:url" content="https://deer-flow.github.io/llm-space/" />
+    <meta
+      property="og:image"
+      content="https://deer-flow.github.io/llm-space/images/screenshot-01.png"
+    />
+    <meta property="og:image:width" content="3092" />
+    <meta property="og:image:height" content="2052" />
+    <meta
+      property="og:image:alt"
+      content="LLM Space desktop app: model, tools, and system prompt on the left; a live agent run streaming thinking, tool calls, and raw responses on the right."
+    />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="LLM Space — Build, trace, and debug agents in one place"
+    />
+    <meta
+      name="twitter:description"
+      content="A local-first desktop app to prototype agent ideas, inspect every harness step, replay failures, and evaluate performance."
+    />
+    <meta
+      name="twitter:image"
+      content="https://deer-flow.github.io/llm-space/images/screenshot-01.png"
+    />
+
+    <!-- PostHog analytics — shared write-only, client-side key (safe to ship),
+         reused from the desktop app so web + product land in one project. -->
+    <script>
+      !(function (t, e) {
+        var o, n, p, r;
+        e.__SV ||
+          ((window.posthog = e),
+          (e._i = []),
+          (e.init = function (i, s, a) {
+            function g(t, e) {
+              var o = e.split('.');
+              (2 == o.length && ((t = t[o[0]]), (e = o[1])),
+                (t[e] = function () {
+                  t.push([e].concat(Array.prototype.slice.call(arguments, 0)));
+                }));
+            }
+            (((p = t.createElement('script')).type = 'text/javascript'),
+              (p.crossOrigin = 'anonymous'),
+              (p.async = !0),
+              (p.src =
+                s.api_host.replace('.i.posthog.com', '-assets.i.posthog.com') +
+                '/static/array.js'),
+              (r = t.getElementsByTagName('script')[0]).parentNode.insertBefore(
+                p,
+                r,
+              ));
+            var u = e;
+            for (
+              void 0 !== a ? (u = e[a] = []) : (a = 'posthog'),
+                u.people = u.people || [],
+                u.toString = function (t) {
+                  var e = 'posthog';
+                  return (
+                    'posthog' !== a && (e += '.' + a),
+                    t || (e += ' (stub)'),
+                    e
+                  );
+                },
+                u.people.toString = function () {
+                  return u.toString(1) + '.people (stub)';
+                },
+                o =
+                  'init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric'.split(
+                    ' ',
+                  ),
+                n = 0;
+              n < o.length;
+              n++
+            )
+              g(u, o[n]);
+            e._i.push([i, s, a]);
+          }),
+          (e.__SV = 1));
+      })(document, window.posthog || []);
+      posthog.init('phc_t8sHZoJnt85kTQWtXjPmBHdha5sEvvcRFogKJiN9ihDY', {
+        api_host: 'https://eu.i.posthog.com',
+        person_profiles: 'identified_only',
+        defaults: '2025-05-24',
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

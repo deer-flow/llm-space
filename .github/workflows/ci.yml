@@ -38,3 +38,8 @@ jobs:
       # (That is exactly how v0.1.1-canary.0 died: 14701 modules OOMing a ~2 GB
       # default heap. build:view raises it; this step is what keeps it honest.)
       - run: bun --filter @llm-space/desktop build:view
+
+      # The static web app (landing page + shared-thread viewer) is only built by
+      # the Pages workflow on `main`, so a change that breaks its Vite build would
+      # otherwise stay invisible until it hit Pages. Build it on PRs too.
+      - run: bun --filter @llm-space/web build
