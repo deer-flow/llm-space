@@ -3,8 +3,7 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "web"
+    "apps/*"
   ],
   "scripts": {
     "dev": "cd apps/desktop && bun run dev:hmr",
@@ -19,7 +18,7 @@
     "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p apps/desktop/tsconfig.json && tsc --noEmit -p web/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p apps/desktop/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
     "prepare": "husky"
   },
   "lint-staged": {

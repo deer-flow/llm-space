@@ -55,7 +55,7 @@ description = "Lint with autofix (eslint --fix)"
 run = "bun run lint:fix"
 
 [tasks.typecheck]
-description = "Typecheck all four projects (root, packages/ui, apps/desktop, web)"
+description = "Typecheck all four projects (root, packages/ui, apps/desktop, apps/web)"
 run = "bun run typecheck"
 
 # --- Build & release (see AGENTS.md "Releases & auto-update") ---------------

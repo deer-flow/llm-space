@@ -1,6 +1,6 @@
 name: Deploy web to GitHub Pages
 
-# Builds the static `web/` app (landing page + shared-thread viewer) and
+# Builds the static `apps/web/` app (landing page + shared-thread viewer) and
 # publishes it to GitHub Pages. Replaces the old manual `gh-pages` branch +
 # scripts/deploy.ts flow. Requires the repo's Pages "Source" to be set to
 # "GitHub Actions" (Settings → Pages) — a one-time change.
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
-          path: web/dist
+          path: apps/web/dist
 
   deploy:
     needs: build

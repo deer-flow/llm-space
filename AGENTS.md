@@ -15,7 +15,7 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 | Run the web site (landing + viewer)    | `mise run dev:web`                                                          | → `bun --filter @llm-space/web dev` (Vite on :5175). Landing at `/llm-space/`, viewer at `/llm-space/#/thread/<user>/<gist-id>` |
 | Build (canary)                         | `mise run build:canary`                                                     | → `vite build && electrobun build --env=canary` in `apps/desktop`                                                      |
 | Build (stable)                         | `mise run build:stable`                                                     | → `vite build && electrobun build --env=stable` in `apps/desktop`                                                      |
-| Build the web site                     | `mise run build:web`                                                        | → `bun --filter @llm-space/web build` (static, `base=/llm-space/`, out to `web/dist`). CI + the Pages workflow run this |
+| Build the web site                     | `mise run build:web`                                                        | → `bun --filter @llm-space/web build` (static, `base=/llm-space/`, out to `apps/web/dist`). CI + the Pages workflow run this |
 | Local packaging / update test          | `mise run pack` · `pack:perf` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / CEF Performance edition / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
 | Cut a release                          | `mise run release` / `mise run release:canary`                              | → `bun scripts/release.ts`; see "Releases & auto-update"                                                               |
 | Test                                   | `mise run test`                                                             | runs the complete Bun test suite from the repository root                                                                  |
@@ -56,7 +56,7 @@ fixture is intentionally preserved for review and the reason is documented.
 
 ## Architecture
 
-Bun-workspace monorepo. Workspaces are `packages/*`, `apps/*`, and `web`.
+Bun-workspace monorepo. Workspaces are `packages/*` and `apps/*` (the static site now lives at `apps/web`).
 
 - **`@llm-space/core`** (`packages/core`) — domain library, **no build step**; its TypeScript is consumed directly via the `exports` map. Entrypoints:
   - `.` → re-exports the internal `client`, `parsers`, `types`, and `utils` directories (all browser-safe).
@@ -69,7 +69,7 @@ Bun-workspace monorepo. Workspaces are `packages/*`, `apps/*`, and `web`.
 - **`@llm-space/desktop`** (`apps/desktop`) — the Electrobun app. Built with Vite (React 19) for the renderer and `electrobun` for the shell. Two runtime contexts bridged by a single typed RPC channel:
   - **bun main process** (`src/bun/`) — owns the native window, menu, filesystem, model config, and agent streaming.
   - **webview renderer** (`src/app`, `src/components`, `src/mainview`) — the React UI. The Thread Playground and design system now live in `@llm-space/ui`; the renderer imports them and provides the desktop `HostServices`/`ModelClient`.
-- **`@llm-space/web`** (`web/`) — the **static site**: the marketing **landing page** at `/llm-space/` and a **display-only shared-thread viewer** at `/llm-space/#/thread/<user>/<gist-id>` (fetches a gist's JSON, renders `@llm-space/ui`'s `ThreadPlayground` with a stub `HostServices`, `presentational: true`). No Electrobun, no backend. `base: "/llm-space/"`; CodeMirror is **not** deduped in `web/vite.config.ts` (no direct dep — one copy already resolves through the package). The landing page is **vendored** under `web/src/landing/` (self-contained, its own single-quote style — ESLint-ignored, still typechecked); its extra CSS is additive in `web/src/landing/index.css` (the shadcn tokens live in `@llm-space/ui/styles/globals.css`; the near-black bg is scoped to the landing root). **Deploy:** `.github/workflows/pages.yml` builds `web/` on push to `main` and publishes via `actions/deploy-pages` (repo Pages Source is **GitHub Actions**). CI (`ci.yml`) also builds `web/` so PRs catch breakage.
+- **`@llm-space/web`** (`apps/web/`) — the **static site**: the marketing **landing page** at `/llm-space/` and a **display-only shared-thread viewer** at `/llm-space/#/thread/<user>/<gist-id>` (fetches a gist's JSON, renders `@llm-space/ui`'s `ThreadPlayground` with a stub `HostServices`, `presentational: true`). No Electrobun, no backend. `base: "/llm-space/"`; CodeMirror is **not** deduped in `apps/web/vite.config.ts` (no direct dep — one copy already resolves through the package). The landing page is **vendored** under `apps/web/src/landing/` (self-contained, its own single-quote style — ESLint-ignored, still typechecked); its extra CSS is additive in `apps/web/src/landing/index.css` (the shadcn tokens live in `@llm-space/ui/styles/globals.css`; the near-black bg is scoped to the landing root). **Deploy:** `.github/workflows/pages.yml` builds `apps/web/` on push to `main` and publishes via `actions/deploy-pages` (repo Pages Source is **GitHub Actions**). CI (`ci.yml`) also builds `apps/web/` so PRs catch breakage.
 
 ### The RPC bridge
 
@@ -151,11 +151,11 @@ Every cross-boundary user action (menus, context menus, toolbar buttons, shortcu
 
 ### Web site (GitHub Pages) — how it publishes
 
-The site at **`deer-flow.github.io/llm-space/`** (landing page + shared-thread viewer) is the `@llm-space/web` app (`web/`). Publishing is **fully automated via GitHub Actions** — there is no manual deploy step:
+The site at **`deer-flow.github.io/llm-space/`** (landing page + shared-thread viewer) is the `@llm-space/web` app (`apps/web/`). Publishing is **fully automated via GitHub Actions** — there is no manual deploy step:
 
-- **`.github/workflows/pages.yml`** runs on every push to `main` (and `workflow_dispatch`): `bun --filter @llm-space/web build` → `actions/upload-pages-artifact` (`web/dist`) → `actions/deploy-pages`. So **merging to `main` publishes the site** — nothing else to do.
+- **`.github/workflows/pages.yml`** runs on every push to `main` (and `workflow_dispatch`): `bun --filter @llm-space/web build` → `actions/upload-pages-artifact` (`apps/web/dist`) → `actions/deploy-pages`. So **merging to `main` publishes the site** — nothing else to do.
 - **One-time repo setting (already done once):** Settings → Pages → **Source = "GitHub Actions"**. If Pages ever reverts to "Deploy from a branch", the workflow's `deploy-pages` step fails until it's set back.
-- `web/` uses `base: "/llm-space/"`; absolute asset refs in JSX must go through `import.meta.env.BASE_URL`. No `.nojekyll` is needed (the Actions artifact bypasses Jekyll).
+- `apps/web/` uses `base: "/llm-space/"`; absolute asset refs in JSX must go through `import.meta.env.BASE_URL`. No `.nojekyll` is needed (the Actions artifact bypasses Jekyll).
 - CI (`ci.yml`) also runs `build:web` on PRs, so a Vite break is caught before it reaches Pages.
 
 ### Static assets (images, etc.)
