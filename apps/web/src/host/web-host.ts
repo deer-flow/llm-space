@@ -35,6 +35,9 @@ export const webHost: HostServices = {
       /* no settings surface in the viewer */
     },
     openLink: (url) => window.open(url, "_blank", "noopener,noreferrer"),
+    shareThread: () => {
+      /* no share surface in the viewer */
+    },
     openVariables: () => {
       /* no variables dialog in the viewer */
     },

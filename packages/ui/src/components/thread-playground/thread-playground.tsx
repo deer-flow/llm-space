@@ -6,6 +6,7 @@ import {
   HistoryIcon,
   PlayIcon,
   Redo2Icon,
+  Share2Icon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -75,6 +76,8 @@ export interface ThreadPlaygroundProps {
   path: string;
   title?: string;
   headerDetails?: ReactNode;
+  /** Extra actions rendered at the right edge of the header (always visible). */
+  headerActions?: ReactNode;
   initialValue: Thread;
   readonly?: boolean;
   /**
@@ -170,6 +173,7 @@ function ThreadPlaygroundContent({
   path,
   title: titleFromProps,
   headerDetails,
+  headerActions,
   onRenameTitle,
   validateTitle,
   readonly: readonlyFromProps = false,
@@ -308,8 +312,18 @@ function ThreadPlaygroundContent({
                   <HistoryIcon className="size-4" />
                 </Button>
               </Tooltip>
+              <Tooltip content="Share thread">
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label="Share thread"
+                  onClick={() => actions.shareThread(path)}
+                >
+                  <Share2Icon className="size-4" />
+                </Button>
+              </Tooltip>
             </div>
-            <div className="flex items-center px-3">
+            <div className="flex items-center gap-1 px-3">
               <ButtonGroup
                 className={cn(
                   "transition-transform active:translate-y-px",
@@ -399,6 +413,7 @@ function ThreadPlaygroundContent({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </ButtonGroup>
+              {headerActions}
             </div>
           </header>
           <ResizablePanelGroup

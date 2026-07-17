@@ -91,6 +91,16 @@ export interface CopyFileCommand extends GenericCommand<
 /** Refresh (re-list) the file tree. */
 export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
 
+/**
+ * Reveal a workspace file in the tree: expand its ancestor folders, refresh the
+ * listing, then select, open, and scroll to it once it appears (e.g. after a
+ * deep-link import writes into `shared/`).
+ */
+export interface RevealInTreeCommand extends GenericCommand<
+  "revealInTree",
+  { path: string }
+> {}
+
 export interface ImportFilePayload {
   name: string;
   text: string;
@@ -220,6 +230,16 @@ export interface OpenOnboardCommand extends GenericCommand<"openOnboard"> {}
 export interface RunThreadCommand extends GenericCommand<"runThread"> {}
 
 /**
+ * Open the Share dialog for a thread. `path` targets a specific thread file
+ * (tree/tab context menus); omitting it shares the active thread (header button,
+ * native menu). No-op when there is no active thread tab. Webview only.
+ */
+export interface ShareThreadCommand extends GenericCommand<
+  "shareThread",
+  { path?: string }
+> {}
+
+/**
  * Open the Variables dialog for the active thread. When `variableName` is given,
  * the dialog opens focused on that variable; otherwise it opens at the default
  * selection. Webview only, and intentionally excluded from the command palette.
@@ -297,6 +317,7 @@ export type Command =
   | RevealFileCommand
   | CopyFileCommand
   | RefreshTreeCommand
+  | RevealInTreeCommand
   | ImportFilesCommand
   | ImportFromClipboardCommand
   | CreateTraceProjectCommand
@@ -315,6 +336,7 @@ export type Command =
   | OpenCommandPaletteCommand
   | OpenOnboardCommand
   | RunThreadCommand
+  | ShareThreadCommand
   | OpenVariablesCommand
   | ZoomInCommand
   | ZoomOutCommand
@@ -364,6 +386,7 @@ export const COMMAND_META: Record<
   revealFile: { label: "Reveal in Finder", target: "webview" },
   copyFile: { label: "Copy", target: "bun" },
   refreshTree: { label: "Refresh", target: "webview" },
+  revealInTree: { label: "Reveal in Tree", target: "webview" },
   importFiles: { label: "Import from Files...", target: "webview" },
   importFromClipboard: { label: "Import from Clipboard", target: "bun" },
   createTraceProject: { label: "New Trace Project", target: "webview" },
@@ -388,6 +411,7 @@ export const COMMAND_META: Record<
   openCommandPalette: { label: "Command Palette", target: "webview" },
   openOnboard: { label: "Onboard...", target: "webview" },
   runThread: { label: "Run Thread", target: "webview" },
+  shareThread: { label: "Share...", target: "webview" },
   openVariables: { label: "Variables", target: "webview" },
   zoomIn: { label: "Zoom In", target: "bun" },
   zoomOut: { label: "Zoom Out", target: "bun" },

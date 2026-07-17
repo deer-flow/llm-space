@@ -68,6 +68,7 @@ interface ThreadTabsProps {
   closeAll: () => void;
   reveal: (path: string) => void;
   moveToTrash: (path: string) => void;
+  share: (path: string) => void;
   reorder: (from: number, to: number) => void;
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
@@ -96,6 +97,7 @@ export function ThreadTabs({
   closeAll,
   reveal,
   moveToTrash,
+  share,
   reorder,
   onNewFile,
   onMove,
@@ -328,6 +330,12 @@ export function ThreadTabs({
             </ContextMenuGroup>
             {contextMenuTab?.type === "thread" && (
               <>
+                <ContextMenuSeparator />
+                <ContextMenuGroup>
+                  <ContextMenuItem onSelect={() => share(contextMenuTab.path)}>
+                    Share...
+                  </ContextMenuItem>
+                </ContextMenuGroup>
                 <ContextMenuSeparator />
                 <ContextMenuGroup>
                   <ContextMenuItem onSelect={() => reveal(contextMenuTab.path)}>

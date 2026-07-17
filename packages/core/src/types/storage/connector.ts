@@ -60,7 +60,10 @@ export interface SharedThread {
  * `"readShared" in storage`.
  */
 export interface SharedThreadSource {
-  readShared(threadId: string): Promise<SharedThread>;
+  readShared(
+    threadId: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<SharedThread>;
 }
 
 /**

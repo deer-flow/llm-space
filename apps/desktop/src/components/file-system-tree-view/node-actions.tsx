@@ -21,6 +21,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   SettingsIcon,
+  Share2,
   TextCursorInput,
   Trash2,
 } from "lucide-react";
@@ -184,6 +185,22 @@ export function NodeActions({
             <FolderOpen />
             {REVEAL_LABEL}
           </DropdownMenuItem>
+          {!isDir && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() =>
+                  executeCommand({
+                    type: "shareThread",
+                    args: { path: node.path },
+                  })
+                }
+              >
+                <Share2 />
+                Share...
+              </DropdownMenuItem>
+            </>
+          )}
           {isDir && (
             <>
               <DropdownMenuItem

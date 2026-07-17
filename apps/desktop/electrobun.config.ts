@@ -51,6 +51,13 @@ export default {
     // Single source of truth for the app version; release tags must match
     // (CI validates `v{version}` against the pushed tag).
     version: packageJson.version,
+    // Deep-link scheme for shared-thread imports
+    // (llm-space://shared/<connectorId>/threads/<threadId>). The CLI turns this
+    // into Info.plist CFBundleURLTypes. macOS only, and only registers once the
+    // app is in /Applications — so deep links don't resolve under `electrobun
+    // dev`. Both editions declare the same scheme; Launch Services arbitrates
+    // when both are installed.
+    urlSchemes: ["llm-space"],
   },
   build: {
     // Vite builds to dist/, we copy from there. `assets/` holds hashed,

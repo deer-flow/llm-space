@@ -4,10 +4,15 @@ import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
 import type { LocalFileSystem } from "@llm-space/core/server";
+import {
+  GIST_CONNECTOR_ID,
+  type GistThreadWriter,
+} from "@llm-space/core/storage";
 import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
+import { buildWebShareUrl } from "../../shared/share";
 import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
 import { moveToTrash, revealInFileManager } from "../fs";
@@ -57,8 +62,12 @@ export type MainWindowRPC = ReturnType<
 export interface MainWindowRPCDependencies {
   analytics: Analytics;
   executeCommand: (command: Command) => void;
+  /** Cancel the in-flight deep-link shared-thread import (Cancel button). */
+  onCancelSharedImport: () => void;
   githubAuth: GitHubAuthManager;
   getMainWindow: () => BrowserWindow;
+  /** Publishes a thread as a secret gist for the `shareThread` request. */
+  gistWriter: GistThreadWriter;
   homePath: string;
   localFs: LocalFileSystem;
   mcpManager: McpManager;
@@ -77,8 +86,10 @@ const MAX_REQUEST_TIME_MS = 5 * 60_000 + 10_000;
 export function createMainWindowRPC({
   analytics,
   executeCommand,
+  onCancelSharedImport,
   githubAuth,
   getMainWindow,
+  gistWriter,
   homePath,
   localFs,
   mcpManager,
@@ -209,6 +220,24 @@ export function createMainWindowRPC({
           await localFs.write(path, thread);
           return null;
         },
+        // Publish a thread as a secret gist and return its web viewer link.
+        // `title`/`description` override the shared copy's display metadata
+        // without touching the local thread file. The writer throws when signed
+        // out or on a gist API failure; the error propagates to the renderer,
+        // which maps it to friendly copy. Each call creates a fresh gist (no id
+        // reuse), so a re-share yields a new link.
+        shareThread: async ({ path, title, description }) => {
+          const thread = await localFs.read(path);
+          const shared =
+            title !== undefined ? { ...thread, title } : thread;
+          const locator = await gistWriter.write(shared, undefined, {
+            description,
+          });
+          return {
+            gistId: locator.id,
+            shareUrl: buildWebShareUrl(GIST_CONNECTOR_ID, locator.id),
+          };
+        },
         fsReveal: async ({ path }) => {
           await revealInFileManager(localFs.realpath(path));
           return null;
@@ -335,6 +364,7 @@ export function createMainWindowRPC({
         captureAnalyticsEvent: ({ event, properties }) =>
           analytics.capture(event, properties),
         executeCommand: (command) => executeCommand(command),
+        cancelSharedImport: () => onCancelSharedImport(),
       },
     },
   });

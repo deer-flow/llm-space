@@ -100,12 +100,16 @@ export class GistThreadReader
    * shared-viewer page needs (title, description, author, source link) — a
    * single `GET /gists/{id}`.
    */
-  async readShared(threadId: string): Promise<SharedThread> {
+  async readShared(
+    threadId: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<SharedThread> {
+    const signal = options?.signal;
     const gist = await gistRequest<GistResponse>(
       this._fetch,
       this._baseUrl,
       `/gists/${threadId}`,
-      { token: await this._token() }
+      { token: await this._token(), init: { signal } }
     );
 
     const file = selectThreadFile(gist.files);
@@ -113,7 +117,7 @@ export class GistThreadReader
       throw new Error(`Gist ${threadId} has no readable file.`);
     }
 
-    const thread = normalizeThread(await this._readThreadFile(file));
+    const thread = normalizeThread(await this._readThreadFile(file, signal));
     const meta: SharedThreadMeta = {
       connectorId: GIST_CONNECTOR_ID,
       threadId,
@@ -137,10 +141,13 @@ export class GistThreadReader
   }
 
   /** Read a gist file's content, following `raw_url` when truncated (>1 MB). */
-  private async _readThreadFile(file: GistFile): Promise<Thread> {
+  private async _readThreadFile(
+    file: GistFile,
+    signal?: AbortSignal
+  ): Promise<Thread> {
     const content =
       file.truncated && file.raw_url
-        ? await this._fetch(file.raw_url).then((r) => r.text())
+        ? await this._fetch(file.raw_url, { signal }).then((r) => r.text())
         : (file.content ?? "");
     return _parseThread(content);
   }

@@ -21,7 +21,7 @@ import {
   EmptyTitle,
 } from "@llm-space/ui/ui/empty";
 import { Spinner } from "@llm-space/ui/ui/spinner";
-import { MessagesSquare } from "lucide-react";
+import { FolderBookmarkIcon, MessagesSquare } from "lucide-react";
 import {
   memo,
   useCallback,
@@ -48,6 +48,25 @@ const TRASH_NAME =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
     ? "Recycle Bin"
     : "Trash";
+
+/** The special workspace folder that deep-link shared-thread imports land in. */
+const SHARED_DIR = "shared";
+/** Accent color for the `shared` folder's icon and label. */
+const SHARED_DIR_COLOR = "text-sky-400";
+
+/** Ancestor directory paths of a workspace file, shallowest-first (`a/b/c.json`
+ * → `["a", "a/b"]`). */
+function _ancestorDirs(filePath: string): string[] {
+  const parts = filePath.split("/");
+  parts.pop(); // drop the filename
+  const dirs: string[] = [];
+  let acc = "";
+  for (const part of parts) {
+    acc = acc ? `${acc}/${part}` : part;
+    dirs.push(acc);
+  }
+  return dirs;
+}
 
 function _FileSystemTreeView({
   className,
@@ -185,6 +204,14 @@ function _FileSystemTreeView({
     deleteFile: ({ path }) => setDeleting(path),
     revealFile: ({ path }) => void reveal(path),
     refreshTree: () => refresh(),
+    revealInTree: ({ path }) => {
+      // Expand every ancestor folder so the file's row can render, refresh so a
+      // just-written file appears, then reuse the reveal flow (select + open +
+      // scroll once its parent listing loads).
+      for (const dir of _ancestorDirs(path)) expand(dir);
+      refresh();
+      setPendingThread(path);
+    },
   });
 
   // Once the new thread shows up in its parent's listing, reveal it (select +
@@ -295,12 +322,21 @@ function _FileSystemTreeView({
     };
 
     // Only directories and *.json files are shown in the tree.
-    const build = (dirPath: string): TreeDataItem[] =>
-      (nodesByPath.get(dirPath) ?? [])
+    const build = (dirPath: string): TreeDataItem[] => {
+      const items = (nodesByPath.get(dirPath) ?? [])
         .filter(
           (node) => node.type === "directory" || node.name.endsWith(".json")
         )
         .map(toItem);
+      // Pin the special "shared" folder (deep-link imports land here) to the top
+      // of the root. Array.sort is stable, so everything else keeps its order.
+      if (dirPath === "") {
+        items.sort((a, b) =>
+          a.id === SHARED_DIR ? -1 : b.id === SHARED_DIR ? 1 : 0
+        );
+      }
+      return items;
+    };
 
     return build("");
   }, [
@@ -340,8 +376,16 @@ function _FileSystemTreeView({
     // Files carry an icon; folders don't (chevron only). Keyed off the item, not
     // `isLeaf`, since a folder is rendered as a leaf while being renamed.
     const Icon = p.item.icon;
+    // The special "shared" folder (deep-link imports) gets a bookmark icon and
+    // accent color so it stands out from user folders.
+    const isSharedFolder = p.item.id === SHARED_DIR;
     return (
       <>
+        {isSharedFolder && (
+          <FolderBookmarkIcon
+            className={cn("mr-2 h-4 w-4 shrink-0", SHARED_DIR_COLOR)}
+          />
+        )}
         {Icon && <Icon className="text-primary mr-2 h-4 w-4 shrink-0" />}
         {isRenaming ? (
           <RenameInput
@@ -383,7 +427,12 @@ function _FileSystemTreeView({
             }}
           />
         ) : (
-          <span className="min-w-0 grow truncate text-left text-sm">
+          <span
+            className={cn(
+              "min-w-0 grow truncate text-left text-sm",
+              isSharedFolder && cn("font-medium", SHARED_DIR_COLOR)
+            )}
+          >
             {p.item.name}
           </span>
         )}

@@ -65,6 +65,11 @@ export interface HostActions {
   /** Open the host's settings surface on a tab (e.g. "models", "mcp", "search"). */
   openSettings(tab: string): void;
   openLink(url: string): void;
+  /**
+   * Open the host's Share surface for a thread. `path` targets a specific
+   * thread; omitting it shares the active thread. No-op on web (presentational).
+   */
+  shareThread(path?: string): void;
   /** Request opening the variables dialog (handled within the playground). */
   openVariables(variableName?: string): void;
   /** Register the variables-dialog opener; returns a disposer. No-op on web. */

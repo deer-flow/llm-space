@@ -26,6 +26,7 @@ import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
+import { SharedImportProvider } from "@/components/shared-import-provider";
 import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
 import { TracePanel } from "@/components/trace-panel";
 import { UpdateIndicator } from "@/components/update-indicator";
@@ -65,6 +66,11 @@ const OnboardDialog = lazy(() =>
 const StartFromExampleDialog = lazy(() =>
   import("@/components/start-from-example-dialog").then((m) => ({
     default: m.StartFromExampleDialog,
+  }))
+);
+const ShareThreadDialog = lazy(() =>
+  import("@/components/share-thread-dialog").then((m) => ({
+    default: m.ShareThreadDialog,
   }))
 );
 
@@ -146,6 +152,7 @@ const COMMAND_PALETTE_BLACKLIST = [
   "duplicateFile",
   "deleteFile",
   "revealFile",
+  "revealInTree",
   "copyFile",
   "openLink",
   "openCommandPalette",
@@ -237,6 +244,9 @@ function PageInner() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  // The thread path being shared (a specific file, or the resolved active tab).
+  const shareTargetRef = useRef("");
   const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
@@ -306,6 +316,19 @@ function PageInner() {
       examplesParentRef.current = parent;
       setExamplesOpen(true);
     },
+    // Share a specific thread, or the active thread when no path is given (the
+    // header button / native menu / palette). The active tab id is `thread:{path}`.
+    shareThread: ({ path }) => {
+      const activeId = activeTabIdRef.current;
+      const target =
+        path ??
+        (activeId?.startsWith("thread:")
+          ? activeId.slice("thread:".length)
+          : undefined);
+      if (!target) return;
+      shareTargetRef.current = target;
+      setShareOpen(true);
+    },
     importFiles: ({ parent = "", files }) => {
       if (files) {
         void handleImportFiles(files, parent);
@@ -364,6 +387,10 @@ function PageInner() {
     (path: string) => executeCommand({ type: "deleteFile", args: { path } }),
     [executeCommand]
   );
+  const handleShareThread = useCallback(
+    (path: string) => executeCommand({ type: "shareThread", args: { path } }),
+    [executeCommand]
+  );
   const handleNewFile = useCallback(
     () => executeCommand({ type: "newFile", args: {} }),
     [executeCommand]
@@ -406,6 +433,7 @@ function PageInner() {
         void handleImportFiles(e.dataTransfer.files, "");
       }}
     >
+      <SharedImportProvider />
       <input
         ref={fileInputRef}
         type="file"
@@ -497,6 +525,7 @@ function PageInner() {
                 closeAll={handleCloseAllTabs}
                 reveal={handleRevealFile}
                 moveToTrash={handleMoveToTrash}
+                share={handleShareThread}
                 reorder={tabs.reorder}
                 onNewFile={handleNewFile}
                 onMove={tabs.handleMove}
@@ -528,6 +557,13 @@ function PageInner() {
       </LazyOverlay>
       <LazyOverlay open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
+      </LazyOverlay>
+      <LazyOverlay open={shareOpen}>
+        <ShareThreadDialog
+          open={shareOpen}
+          path={shareTargetRef.current}
+          onOpenChange={setShareOpen}
+        />
       </LazyOverlay>
       <LazyOverlay open={examplesOpen}>
         <StartFromExampleDialog

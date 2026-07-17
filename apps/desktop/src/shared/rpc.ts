@@ -23,6 +23,7 @@ import type { RPCSchema } from "electrobun";
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
 import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
+import type { SharedImportStatusPayload } from "./shared-import";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
@@ -167,6 +168,16 @@ export interface DesktopRPCType {
       fsRm: { params: { path: string }; response: null };
       fsRead: { params: { path: string }; response: Thread };
       fsWrite: { params: { path: string; thread: Thread }; response: null };
+      // Publish a workspace thread as a shareable link: read the thread from
+      // disk, create a secret GitHub Gist (requires GitHub sign-in), and return
+      // the web viewer URL + gist id. `title`/`description` override the shared
+      // copy's display metadata (the gist description drives the viewer's
+      // description). Throws when signed out or the gist API fails; the renderer
+      // maps the error to friendly copy.
+      shareThread: {
+        params: { path: string; title?: string; description?: string };
+        response: { shareUrl: string; gistId: string };
+      };
       // Reveal a file/directory in the OS file manager (Finder/Explorer).
       fsReveal: { params: { path: string }; response: null };
       // Reveal an arbitrary absolute path (not confined to the workspace) in the
@@ -388,6 +399,9 @@ export interface DesktopRPCType {
       // Fire-and-forget: a renderer-only, anonymous analytics event. The bun
       // side is the single network egress for telemetry. See `shared/analytics.ts`.
       captureAnalyticsEvent: AnalyticsEvent;
+      // Cancel the in-flight deep-link shared-thread import (aborts the read; no
+      // file is written). Sent when the user clicks Cancel on the import modal.
+      cancelSharedImport: Record<string, never>;
     };
   }>;
   webview: RPCSchema<{
@@ -405,6 +419,9 @@ export interface DesktopRPCType {
       // A unified command dispatched from the bun process (native menu / global
       // shortcuts) to run in the webview. See `shared/commands.ts`.
       executeCommand: Command;
+      // Deep-link shared-thread import progress: drives the "importing…" modal
+      // and, on success, opens the imported thread. See `bun/deep-link`.
+      sharedImportStatusChanged: SharedImportStatusPayload;
     };
   }>;
 }

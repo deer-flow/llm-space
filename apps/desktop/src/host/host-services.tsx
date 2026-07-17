@@ -92,6 +92,8 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
             args: { tab: tab as SettingsTab },
           }),
         openLink: (url) => executeCommand({ type: "openLink", args: { url } }),
+        shareThread: (path) =>
+          executeCommand({ type: "shareThread", args: { path } }),
         openVariables: (variableName) =>
           executeCommand({ type: "openVariables", args: { variableName } }),
         registerOpenVariables: (handler) =>

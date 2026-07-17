@@ -60,16 +60,28 @@ export class GistThreadWriter implements WritableThreadStorage {
    * With an `id`, overwrite the existing thread file in place (reusing its
    * filename so a title change doesn't orphan the old file) and return the new
    * revision's locator.
+   *
+   * The gist's `description` (surfaced as {@link SharedThreadMeta.description} in
+   * the viewer) is taken from `options.description` when provided; otherwise it
+   * falls back to the thread title. Pass an empty string to publish with no
+   * description.
    */
-  async write(thread: Thread, id?: string): Promise<ThreadLocator> {
+  async write(
+    thread: Thread,
+    id?: string,
+    options?: { description?: string }
+  ): Promise<ThreadLocator> {
     const token = await this._getToken();
     if (!token) {
       throw new Error("GitHub sign-in required to save to a gist.");
     }
 
     const normalized = normalizeThread(thread);
-    const content = JSON.stringify(normalized, null, 2);
-    const description = normalized.title ?? "";
+    // Publish a clean thread: local run history is per-machine debug state, not
+    // part of what's shared, so upload it with an empty `runHistory`.
+    const published: Thread = { ...normalized, runHistory: [] };
+    const content = JSON.stringify(published, null, 2);
+    const description = options?.description ?? normalized.title ?? "";
 
     return id
       ? this._update(id, content, description, token)

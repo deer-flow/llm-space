@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { getLlmSpaceHomePath } from "@llm-space/core/server";
+import { GistThreadWriter } from "@llm-space/core/storage";
 import Electrobun, {
   app,
   type BrowserWindow,
@@ -11,6 +12,8 @@ import type { Command } from "../../shared/commands";
 import { Analytics } from "../analytics";
 import { GitHubAuthManager } from "../auth";
 import { executeCommandInBun } from "../commands";
+import { createDeepLinkHandler, type DeepLinkHandler } from "../deep-link";
+import { setDeepLinkHandler } from "../deep-link/launch";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
 import { ModelManager } from "../models";
@@ -47,6 +50,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     onChange: (state) => getRpc().send.githubAuthChanged(state),
   });
   const localFs = createLocalFileSystem(homePath);
+  // Write-side gist connector for the "Share thread" flow. Reuses the signed-in
+  // GitHub token (the `gist` scope); creates secret gists readable by URL.
+  const gistWriter = new GistThreadWriter({
+    getToken: () => githubAuth.getAccessToken(),
+  });
   const traceManager = new TraceManager();
   const streaming = new StreamThreadController(modelManager, analytics);
   const host = new DesktopHost({
@@ -63,6 +71,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
 
   let mainWindow: BrowserWindow | null = null;
   let rpc: MainWindowRPC | null = null;
+  let deepLink: DeepLinkHandler | null = null;
   const getRpc = (): MainWindowRPC => {
     if (!rpc) {
       throw new Error("Main window RPC is not ready.");
@@ -106,8 +115,10 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     rpc = createMainWindowRPC({
       analytics,
       executeCommand: (command) => executeCommand(command, getMainWindow()),
+      onCancelSharedImport: () => deepLink?.cancel(),
       githubAuth,
       getMainWindow,
+      gistWriter,
       homePath,
       localFs,
       mcpManager,
@@ -121,6 +132,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       updater,
     });
     mainWindow = await createMainWindow({ rpc, executeCommand });
+
+    // The window + rpc are ready — wire the importer and flush any deep links
+    // buffered at process entry during a cold-start launch (see deep-link/launch).
+    deepLink = createDeepLinkHandler({ localFs, githubAuth, getRpc });
+    setDeepLinkHandler((url) => void deepLink?.handle(url));
 
     analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
     void updater.start();
