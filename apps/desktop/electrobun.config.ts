@@ -91,11 +91,10 @@ export default {
     },
   },
   scripts: {
-    // Both run right before their respective codesign step. They pin the
-    // deployment target to macOS 14 and apply the electrobun#485 x64 headerpad
-    // workaround; see the individual script headers.
-    postBuild: "scripts/prepare-macos-binaries.ts",
-    postWrap: "scripts/prepare-macos-binaries.ts",
+    // Both run right before their respective codesign step. Workaround for
+    // electrobun#485 (x64-only, no-op elsewhere); see the script header.
+    postBuild: "scripts/fix-x64-headerpad.ts",
+    postWrap: "scripts/fix-x64-headerpad.ts",
   },
   release: {
     // Burned into every shipped bundle — the updater fetches
