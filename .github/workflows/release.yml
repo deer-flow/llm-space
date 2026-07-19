@@ -198,6 +198,17 @@ jobs:
           codesign --verify --deep --strict "$APP"
           spctl -a -t exec -vv "$APP"
           xcrun stapler validate "$APP"
+          MINOS="$(vtool -show-build "$APP/Contents/MacOS/launcher" \
+            | awk '$1 == "minos" { print $2; exit }')"
+          if [ -z "$MINOS" ] || ! awk -v version="$MINOS" 'BEGIN {
+            split(version, part, ".")
+            supported = part[1] + 0 < 14 || \
+              (part[1] + 0 == 14 && part[2] + 0 == 0 && part[3] + 0 == 0)
+            exit !supported
+          }'; then
+            echo "::error::wrapper requires macOS $MINOS; expected 14.0 or older"
+            exit 1
+          fi
           # The bundle left in build/ is the self-extracting installer wrapper
           # (the real app only exists inside the tar.zst): on first launch it
           # swaps the real app into the same bundle path and relaunches it. This
