@@ -78,7 +78,12 @@ export function ThreadTabPane({
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Thread | null>(null);
   const pathRef = useRef(path);
-  pathRef.current = path;
+  // Keep the latest path in a ref for post-commit reads (debounced write flush,
+  // refresh refetch, rename) without mutating during render. Declared before the
+  // effects below so they observe the fresh path.
+  useEffect(() => {
+    pathRef.current = path;
+  });
 
   const flushPending = useCallback(async () => {
     if (writeTimer.current) {
