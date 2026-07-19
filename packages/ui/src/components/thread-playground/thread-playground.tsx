@@ -442,7 +442,8 @@ function ThreadPlaygroundContent({
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Tools
                     </div>
-                    <div className="flex max-h-48 grow items-start overflow-y-auto">
+                    {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
+                    <div className="flex max-h-24 grow items-start overflow-y-auto">
                       <ToolListView readonly={readonly} />
                     </div>
                   </div>
@@ -450,7 +451,8 @@ function ThreadPlaygroundContent({
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Variables
                     </div>
-                    <div className="flex grow items-center">
+                    {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
+                    <div className="flex max-h-24 grow items-start overflow-y-auto">
                       <PromptVariablesListView
                         disabled={readonly || systemPromptStreaming}
                         active={active}
