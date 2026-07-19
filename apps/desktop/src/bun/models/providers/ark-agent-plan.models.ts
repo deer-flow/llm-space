@@ -142,10 +142,10 @@ export const ARK_AGENT_PLAN_MODELS = {
       cacheWrite: 0,
     },
   } satisfies Model<"openai-completions">,
-  "kimi-k2.7-code": {
-    id: "kimi-k2.7-code",
+  "kimi-k3": {
+    id: "kimi-k3",
     provider: "ark-agent-plan",
-    name: "Kimi K2.7 Code",
+    name: "Kimi K3",
     api: "openai-completions",
     baseUrl: BASE_URL,
     reasoning: true,
