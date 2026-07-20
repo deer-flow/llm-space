@@ -158,13 +158,7 @@ export function ModelParamsPopover({
 
   return (
     <div
-      className={cn(
-        cn(
-          "flex shrink-0 gap-1 opacity-0 group-hover:opacity-100",
-          popoverOpen && "opacity-100"
-        ),
-        readonly && "invisible"
-      )}
+      className={cn("flex shrink-0 gap-1", readonly && "invisible")}
     >
       <HoverCard>
         <HoverCardTrigger asChild>

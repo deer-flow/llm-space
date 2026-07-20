@@ -2,6 +2,7 @@
 
 import { type ModelConfig } from "@llm-space/core";
 import { SettingsIcon } from "lucide-react";
+import type { FocusEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
@@ -89,6 +90,13 @@ export function ModelSelector({
   }, [providers]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // Select-all when the input gains focus. Base UI re-syncs the input
+  // value/caret asynchronously when the popup opens (and a pointer focus's
+  // mouseup re-places the caret), both of which clobber an immediate
+  // select(). Defer past that settle so the selection sticks.
+  const handleInputFocus = useCallback(() => {
+    setTimeout(() => inputRef.current?.select(), 100);
+  }, []);
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
@@ -157,6 +165,7 @@ export function ModelSelector({
         triggerClassName="opacity-0! group-hover/model-select:opacity-100"
         placeholder="(No model selected)"
         disabled={readonly}
+        onFocus={handleInputFocus}
       />
       <ComboboxContent className="w-96">
         <ComboboxEmpty>No models found.</ComboboxEmpty>
