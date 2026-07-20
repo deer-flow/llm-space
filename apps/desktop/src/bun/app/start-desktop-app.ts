@@ -6,6 +6,7 @@ import Electrobun, {
   app,
   type BrowserWindow,
   type ElectrobunEvent,
+  Utils,
 } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
@@ -88,6 +89,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     getRpc().send.updateStatusChanged(message)
   );
   const commandDependencies = {
+    openExternal: Utils.openExternal,
     sendToWebview: (command: Command) => getRpc().send.executeCommand(command),
     updater,
     workspacePath,

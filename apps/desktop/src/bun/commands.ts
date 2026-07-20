@@ -12,6 +12,7 @@ import {
   importFilesWithNativePicker,
   importTextFromClipboard,
 } from "./import-files";
+import { parseExternalUrl } from "./parse-external-url";
 import type { UpdaterService } from "./updates";
 
 /** The documentation website opened by the `openDocument` command. */
@@ -31,10 +32,11 @@ const clampZoom = (zoom: number) =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 
 export interface BunCommandDependencies {
+  githubAuth: Pick<GitHubAuthManager, "signIn" | "signOut">;
+  openExternal: (url: string) => void;
   sendToWebview: (command: Command) => void;
   updater: Pick<UpdaterService, "applyUpdateAndRestart" | "checkForUpdates">;
   workspacePath: string;
-  githubAuth: Pick<GitHubAuthManager, "signIn" | "signOut">;
 }
 
 /**
@@ -86,7 +88,14 @@ export function executeCommandInBun(
       return;
     }
     case "openLink": {
-      Utils.openExternal(command.args.url);
+      let url: URL;
+      try {
+        url = parseExternalUrl(command.args.url);
+      } catch {
+        console.error("Blocked unsafe external URL.");
+        return;
+      }
+      dependencies.openExternal(url.href);
       return;
     }
     case "openDocument": {
