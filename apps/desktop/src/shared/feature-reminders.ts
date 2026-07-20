@@ -39,5 +39,6 @@ export const FEATURE_REMINDERS: FeatureReminder[] = [
       "templates that adapt to your data instead of editing text by hand.",
     imageUrl:
       "https://raw.githubusercontent.com/deer-flow/llm-space/main/docs/images/reminders/jinja-templates.png",
+    link: "https://github.com/deer-flow/llm-space/blob/main/docs/variables-and-templates.md",
   },
 ];
