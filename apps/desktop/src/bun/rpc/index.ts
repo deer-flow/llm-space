@@ -21,6 +21,8 @@ import type { ModelManager } from "../models";
 import type { NetworkSettingsManager } from "../network";
 import {
   dismissGithubStarReminder,
+  getNextFeatureReminder,
+  markFeatureReminderSeen,
   resolveGithubStarReminder,
 } from "../reminders";
 import type { SearchSettingsManager } from "../search";
@@ -364,6 +366,11 @@ export function createMainWindowRPC({
         githubStarReminderShouldShow: () => resolveGithubStarReminder(),
         githubStarReminderDismissForever: async () => {
           await dismissGithubStarReminder();
+          return null;
+        },
+        featureReminderNext: () => getNextFeatureReminder(),
+        featureReminderMarkSeen: async ({ id }) => {
+          await markFeatureReminderSeen(id);
           return null;
         },
         githubAuthStatus: () => Promise.resolve(githubAuth.getState()),

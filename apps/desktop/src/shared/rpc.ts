@@ -23,6 +23,7 @@ import type { RPCSchema } from "electrobun";
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
 import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
+import type { FeatureReminder } from "./feature-reminders";
 import type { SharedImportStatusPayload } from "./shared-import";
 import type {
   TraceConnectedProjectInput,
@@ -390,6 +391,19 @@ export interface DesktopRPCType {
       // Retire the star reminder for good (the user clicked through to GitHub).
       githubStarReminderDismissForever: {
         params: Record<string, never>;
+        response: null;
+      };
+      // The next unseen one-time feature reminder (`null` once all are seen).
+      // Pure read — recording is deferred to `featureReminderMarkSeen`, so this
+      // is idempotent and can't burn a reminder that never actually showed.
+      featureReminderNext: {
+        params: Record<string, never>;
+        response: FeatureReminder | null;
+      };
+      // Record a feature reminder as seen (on dismiss / click-through) so it
+      // never appears again.
+      featureReminderMarkSeen: {
+        params: { id: string };
         response: null;
       };
       // The current GitHub sign-in state, pulled once on mount. Later transitions

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
 import { useExperimental } from "@/components/experimental-provider";
+import { FeatureReminderDialog } from "@/components/feature-reminder-dialog";
 import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
@@ -546,6 +547,7 @@ function PageInner() {
       <FirecrawlLimitDialog />
       <GithubDeviceDialog />
       <GithubStarReminder />
+      <FeatureReminderDialog />
       <LazyMount open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}

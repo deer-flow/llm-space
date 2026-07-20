@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 import { getSettingsDir } from "@llm-space/core/server";
 
+import type { FeatureReminder } from "../../shared/feature-reminders";
+import { FEATURE_REMINDERS } from "../../shared/feature-reminders";
+
 /**
  * Persisted reminder state (`settings/reminders.json`). Today it backs the
  * GitHub-star nudge; the file is namespaced per reminder so future pushes
@@ -24,6 +27,9 @@ interface GithubStarReminder {
 
 interface RemindersState {
   githubStar?: GithubStarReminder;
+  // Ids of one-time feature reminders the user has already been shown. Each
+  // reminder pops at most once ever; see `resolveNextFeatureReminder`.
+  featureRemindersSeen?: string[];
 }
 
 const STATE_PATH = join(getSettingsDir(), "reminders.json");
@@ -42,14 +48,17 @@ async function _load(): Promise<RemindersState> {
   }
 }
 
-async function _saveGithubStar(patch: GithubStarReminder): Promise<void> {
+/** Merge a patch over the top-level state and persist it. */
+async function _patchState(patch: Partial<RemindersState>): Promise<void> {
   const state = await _load();
-  const next: RemindersState = {
-    ...state,
-    githubStar: { ...state.githubStar, ...patch },
-  };
+  const next: RemindersState = { ...state, ...patch };
   await mkdir(getSettingsDir(), { recursive: true });
   await writeFile(STATE_PATH, JSON.stringify(next, null, 2));
+}
+
+async function _saveGithubStar(patch: GithubStarReminder): Promise<void> {
+  const state = await _load();
+  await _patchState({ githubStar: { ...state.githubStar, ...patch } });
 }
 
 /** Whether the reminder should appear on this open (pure; no side effects). */
@@ -99,4 +108,24 @@ export async function resolveGithubStarReminder(): Promise<{ show: boolean }> {
 /** Retire the star reminder for good (the user clicked through to GitHub). */
 export async function dismissGithubStarReminder(): Promise<void> {
   await _saveGithubStar({ dismissedForever: true });
+}
+
+/**
+ * The next unseen feature reminder for this launch (in `FEATURE_REMINDERS`
+ * order), or `null` once all are seen. Pure read — recording is deferred to
+ * `markFeatureReminderSeen` so this stays idempotent (safe to call repeatedly,
+ * e.g. under a StrictMode double-invoke) and can't burn a reminder that never
+ * actually got shown.
+ */
+export async function getNextFeatureReminder(): Promise<FeatureReminder | null> {
+  const seen = new Set((await _load()).featureRemindersSeen ?? []);
+  return FEATURE_REMINDERS.find((reminder) => !seen.has(reminder.id)) ?? null;
+}
+
+/** Record a feature reminder as seen so it never appears again. */
+export async function markFeatureReminderSeen(id: string): Promise<void> {
+  const seen = new Set((await _load()).featureRemindersSeen ?? []);
+  if (seen.has(id)) return;
+  seen.add(id);
+  await _patchState({ featureRemindersSeen: [...seen] });
 }
