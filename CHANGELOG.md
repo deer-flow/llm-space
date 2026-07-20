@@ -4,6 +4,20 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] - 2026-07-20
+
+A small maintenance release: a new model and a couple of fixes.
+
+### Added
+
+- **Kimi K3** is now available as a built-in model.
+
+### Fixed
+
+- Codex CLI authentication is restored.
+- The tool and variable lists in the thread playground now scroll within a
+  bounded height instead of pushing the layout.
+
 ## [4.2.0] - 2026-07-17
 
 Share your threads with anyone via a link.
