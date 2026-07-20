@@ -4,6 +4,37 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-07-20
+
+Prompt templates grow up: Jinja2 logic, richer variables, and in-app reminders
+that point you to what's new.
+
+### Added
+
+- **Jinja2 prompt templates.** Prompts now support Jinja2 syntax — `{% if %}` /
+  `{% for %}`, field access (`{{ user.name }}`), filters (`{{ x | upper }}`), and
+  an `@include("path/to/file")` macro to inline another file's contents.
+- **New variable types.** Alongside plain **Text**, add **JSON** variables
+  (parsed at render into an object you can branch and iterate over; a bare
+  `{{ data }}` prints pretty JSON) and **File content** variables (pick a file
+  via the native OS picker or type a path; its contents are inlined at run time).
+
+### Changed
+
+- The model selector shows its parameter buttons by default and selects the model
+  name on focus for quicker editing.
+
+### Fixed
+
+- External links are restricted to safe URL schemes.
+- Root directory creation is confined to the expected location.
+- Thread files are written atomically to avoid corruption on interrupted writes.
+
+### Performance
+
+- The trace sidebar is lazy-loaded.
+- The RPC stream queue is now amortized O(1).
+
 ## [4.2.1] - 2026-07-20
 
 A small maintenance release: a new model and a couple of fixes.
