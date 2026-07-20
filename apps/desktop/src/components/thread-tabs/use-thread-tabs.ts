@@ -278,7 +278,13 @@ export function useThreadTabs(): ThreadTabs {
   );
 
   const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
+  // Keep tabsRef pointing at the latest committed tabs. Syncing in a passive
+  // effect instead of the render body avoids leaking work from renders React
+  // discards or replays; every read of tabsRef happens post-commit (effects and
+  // event handlers), so the seeded ref stays consistent.
+  useEffect(() => {
+    tabsRef.current = tabs;
+  });
   const closedStack = useRef<PersistedTab[][]>([]);
   const discardedPaneIds = useRef(new Set<string>());
   const pushClosed = useCallback((closed: AppTab[]) => {
