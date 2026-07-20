@@ -1,3 +1,7 @@
+English | [中文](./index.zh-CN.md)
+
+---
+
 # User Manual
 
 This is the English user manual for LLM Space. Start with the quick start guide, then read the core concepts, UI layout, settings, and shortcut keys.

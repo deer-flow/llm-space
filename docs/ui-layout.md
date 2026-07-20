@@ -1,3 +1,7 @@
+English | [中文](./ui-layout.zh-CN.md)
+
+---
+
 # UI Layout
 
 The LLM Space main interface is organized around editing, running, and debugging Threads. The left side manages workspace files, the middle area contains the active Thread editor, and the right side shows run output, previews, and debugging context.

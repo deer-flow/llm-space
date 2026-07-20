@@ -1,3 +1,7 @@
+[English](./shortcut-keys.md) | 中文
+
+---
+
 # 常用快捷键
 
 LLM Space 的桌面菜单和 Thread 编辑器都支持快捷键。本文用 macOS 的 `Command` 写法说明；在 Windows / Linux 上，对应按键通常是 `Ctrl`。

@@ -1,3 +1,7 @@
+English | [中文](./get-started.zh-CN.md)
+
+---
+
 # LLM Space 4 Quick Start
 
 Welcome to LLM Space 4.

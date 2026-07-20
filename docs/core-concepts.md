@@ -1,3 +1,7 @@
+English | [中文](./core-concepts.zh-CN.md)
+
+---
+
 # Core Concepts
 
 LLM Space is a desktop workbench for developing, debugging, and evaluating prompts and agents. You can think of a Thread as a saved experiment file: it records the conversation context, the selected model, available tools, and the messages and tool call results produced during a run.

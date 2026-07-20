@@ -1,3 +1,7 @@
+English | [中文](./settings.zh-CN.md)
+
+---
+
 # Settings
 
 Settings is the global configuration center for LLM Space. It manages application appearance, default model, model providers, MCP Servers, built-in search tools, and Skill discovery folders.

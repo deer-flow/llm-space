@@ -1,3 +1,7 @@
+[English](./get-started.md) | 中文
+
+---
+
 # LLM Space 4 快速开始
 
 欢迎使用 LLM Space 4。

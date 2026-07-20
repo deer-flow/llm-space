@@ -1,3 +1,7 @@
+English | [中文](./variables-and-templates.zh-CN.md)
+
+---
+
 # Variables and Templates
 
 Variables and templates let you keep prompts DRY and dynamic: pull out content that changes or is reused, reference it by name, and add logic such as conditionals, loops, and file includes. Everything here works in every text surface — the **System Prompt**, **messages**, and **tool results** — and the stored Thread template stays untouched; substitution happens only at run time.

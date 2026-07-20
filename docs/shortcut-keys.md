@@ -1,3 +1,7 @@
+English | [中文](./shortcut-keys.zh-CN.md)
+
+---
+
 # Shortcut Keys
 
 LLM Space supports shortcuts from both the desktop menu and the Thread editor. This document uses the macOS `Command` key in examples; on Windows / Linux, the equivalent key is usually `Ctrl`.

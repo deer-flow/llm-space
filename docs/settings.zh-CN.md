@@ -1,3 +1,7 @@
+[English](./settings.md) | 中文
+
+---
+
 # 设置
 
 Settings 是 LLM Space 的全局配置中心。这里管理应用外观、默认模型、模型提供商、MCP Server、内置搜索工具和 Skill 发现目录。
