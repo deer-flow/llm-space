@@ -104,8 +104,10 @@ function _hostPort(url: string | null): string | null {
 /** The muted "Detected: …" line under the system-proxy toggle. */
 function DetectedProxy({
   detection,
+  environmentOnly,
 }: {
   detection: SystemProxyDetection | null;
+  environmentOnly: boolean;
 }) {
   if (!detection) {
     return null;
@@ -121,18 +123,22 @@ function DetectedProxy({
   if (!hostPort) {
     return (
       <span className="text-muted-foreground text-xs">
-        No system proxy detected.
+        {environmentOnly
+          ? "No proxy environment variables detected."
+          : "No system proxy detected."}
       </span>
     );
   }
   return (
     <span className="text-muted-foreground text-xs">
-      Detected: <span className="font-mono">{hostPort}</span> (System Settings)
+      Detected: <span className="font-mono">{hostPort}</span>{" "}
+      {environmentOnly ? "(environment variables)" : "(System Settings)"}
     </span>
   );
 }
 
 export function NetworkPage() {
+  const environmentOnly = navigator.userAgent.includes("Windows");
   const [settings, setSettings] = useState<NetworkSettings>(
     DEFAULT_NETWORK_SETTINGS
   );
@@ -196,13 +202,25 @@ export function NetworkPage() {
 
             <div className="flex flex-col gap-2">
               <ToggleRow
-                title="Use system proxy"
+                title={
+                  environmentOnly
+                    ? "Use proxy environment variables"
+                    : "Use system proxy"
+                }
+                hint={
+                  environmentOnly
+                    ? "Reads HTTP_PROXY, HTTPS_PROXY, and NO_PROXY. Windows Internet Settings and WinHTTP are not detected automatically."
+                    : undefined
+                }
                 checked={settings.useSystemProxy}
                 onCheckedChange={(next) =>
                   void persist({ ...settings, useSystemProxy: next })
                 }
               />
-              <DetectedProxy detection={detection} />
+              <DetectedProxy
+                detection={detection}
+                environmentOnly={environmentOnly}
+              />
             </div>
 
             {settings.useSystemProxy ? null : (
