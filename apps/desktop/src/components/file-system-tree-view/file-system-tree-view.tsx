@@ -553,7 +553,7 @@ function _FileSystemTreeView({
 // mode-derived className) are stable across tab changes.
 export const FileSystemTreeView = memo(_FileSystemTreeView);
 
-/** In-place rename input: Enter confirms, Esc / blur cancels. */
+/** In-place rename input: Enter / blur confirms, Esc cancels. */
 function RenameInput({
   initial,
   onConfirm,
@@ -580,7 +580,13 @@ function RenameInput({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onFocus={(e) => e.currentTarget.select()}
-        onBlur={onCancel}
+        onBlur={() => {
+          if (validation.valid) {
+            onConfirm(validation.value);
+          } else {
+            onCancel();
+          }
+        }}
         onKeyDown={(e) => {
           // Stop the accordion trigger (this input lives inside its button) from
           // reacting to keys like Space/Enter that would toggle the node.
