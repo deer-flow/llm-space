@@ -11,6 +11,32 @@ import type { MainWindowRPC } from "../rpc";
 
 /** `llm-space://shared/<connectorId>/threads/<threadId>` */
 const DEEP_LINK_RE = /^llm-space:\/\/shared\/([^/]+)\/threads\/([^/?#]+)/;
+const SHARE_WEB_ORIGIN = "https://deer-flow.github.io";
+const SHARE_WEB_PATH = "/llm-space/";
+const SHARE_WEB_HASH_RE = /^#\/shared\/([^/]+)\/threads\/([^/?#]+)/;
+
+export function parseSharedImportUrl(
+  value: string
+): { connectorId: string; threadId: string } | null {
+  const trimmed = value.trim();
+  const deepLink = DEEP_LINK_RE.exec(trimmed);
+  if (deepLink) {
+    return { connectorId: deepLink[1], threadId: deepLink[2] };
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (url.origin !== SHARE_WEB_ORIGIN || url.pathname !== SHARE_WEB_PATH) {
+      return null;
+    }
+    const webLink = SHARE_WEB_HASH_RE.exec(url.hash);
+    return webLink
+      ? { connectorId: webLink[1], threadId: webLink[2] }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Where imported shared threads land (workspace-relative). */
 const IMPORT_DIR = "shared";
@@ -51,9 +77,9 @@ export function createDeepLinkHandler({
 
   return {
     async handle(url) {
-      const match = DEEP_LINK_RE.exec(url);
-      if (!match) return; // not a shared-thread deep link — ignore
-      const [, connectorId, threadId] = match;
+      const shared = parseSharedImportUrl(url);
+      if (!shared) return; // not a shared-thread URL — ignore
+      const { connectorId, threadId } = shared;
 
       const connector = connectors[connectorId];
       if (!connector || !("readShared" in connector.storage)) {

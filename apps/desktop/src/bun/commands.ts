@@ -8,6 +8,7 @@ import { COMMAND_META, type Command } from "../shared/commands";
 import { isChineseLocale } from "./app/locales";
 import { saveZoom } from "./app/window-state";
 import type { GitHubAuthManager } from "./auth";
+import { parseSharedImportUrl } from "./deep-link";
 import {
   importFilesWithNativePicker,
   importTextFromClipboard,
@@ -33,6 +34,7 @@ const clampZoom = (zoom: number) =>
 
 export interface BunCommandDependencies {
   githubAuth: Pick<GitHubAuthManager, "signIn" | "signOut">;
+  importSharedUrl: (url: string) => void;
   openExternal: (url: string) => void;
   sendToWebview: (command: Command) => void;
   updater: Pick<UpdaterService, "applyUpdateAndRestart" | "checkForUpdates">;
@@ -57,7 +59,16 @@ export function executeCommandInBun(
     return;
   }
   if (command.type === "importFromClipboard") {
-    importTextFromClipboard(dependencies.sendToWebview, command.args.parent);
+    const text = Utils.clipboardReadText() ?? "";
+    if (parseSharedImportUrl(text)) {
+      dependencies.importSharedUrl(text.trim());
+    } else {
+      importTextFromClipboard(
+        dependencies.sendToWebview,
+        command.args.parent,
+        text
+      );
+    }
     return;
   }
 

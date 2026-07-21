@@ -1,11 +1,12 @@
 import { describe, expect, mock, spyOn, test } from "bun:test";
 
 const NATIVE_OPENED_URLS: string[] = [];
+let CLIPBOARD_TEXT = "";
 
 await mock.module("electrobun/bun", () => ({
   app: { on: () => undefined },
   Utils: {
-    clipboardReadText: () => "",
+    clipboardReadText: () => CLIPBOARD_TEXT,
     openExternal: (url: string) => NATIVE_OPENED_URLS.push(url),
     openFileDialog: () => Promise.resolve([]),
     openPath: () => undefined,
@@ -15,14 +16,19 @@ await mock.module("electrobun/bun", () => ({
 
 const { executeCommandInBun } = await import("./commands");
 
-function _createDependencies(openedUrls: string[]) {
+function _createDependencies(
+  openedUrls: string[],
+  importedSharedUrls: string[] = [],
+  sentCommands: unknown[] = []
+) {
   return {
     githubAuth: {
       signIn: () => Promise.resolve(),
       signOut: () => undefined,
     },
+    importSharedUrl: (url: string) => importedSharedUrls.push(url),
     openExternal: (url: string) => openedUrls.push(url),
-    sendToWebview: () => undefined,
+    sendToWebview: (command: unknown) => sentCommands.push(command),
     updater: {
       applyUpdateAndRestart: () => Promise.resolve(),
       checkForUpdates: () => Promise.resolve(),
@@ -72,5 +78,51 @@ describe("executeCommandInBun openLink", () => {
     } finally {
       error.mockRestore();
     }
+  });
+});
+
+
+describe("executeCommandInBun importFromClipboard", () => {
+  test("routes an HTTPS shared-thread URL to the shared importer", () => {
+    const importedSharedUrls: string[] = [];
+    const sentCommands: unknown[] = [];
+    CLIPBOARD_TEXT =
+      " https://deer-flow.github.io/llm-space/#/shared/gist/threads/abc123 ";
+
+    executeCommandInBun(
+      { type: "importFromClipboard", args: {} },
+      {} as never,
+      _createDependencies([], importedSharedUrls, sentCommands)
+    );
+
+    expect(importedSharedUrls).toEqual([
+      "https://deer-flow.github.io/llm-space/#/shared/gist/threads/abc123",
+    ]);
+    expect(sentCommands).toEqual([]);
+  });
+
+  test("keeps JSON clipboard imports on the existing file path", () => {
+    const importedSharedUrls: string[] = [];
+    const sentCommands: unknown[] = [];
+    CLIPBOARD_TEXT = '{"title":"Clipboard"}';
+
+    executeCommandInBun(
+      { type: "importFromClipboard", args: { parent: "imports" } },
+      {} as never,
+      _createDependencies([], importedSharedUrls, sentCommands)
+    );
+
+    expect(importedSharedUrls).toEqual([]);
+    expect(sentCommands).toEqual([
+      {
+        type: "importFiles",
+        args: {
+          parent: "imports",
+          files: [
+            { name: "clipboard.json", text: '{"title":"Clipboard"}' },
+          ],
+        },
+      },
+    ]);
   });
 });
