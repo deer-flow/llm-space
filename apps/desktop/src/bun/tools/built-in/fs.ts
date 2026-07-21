@@ -12,6 +12,7 @@ import type { ToolEntry } from "../tool-registry";
 export interface FsBuiltInToolsDependencies {
   workspaceRoot: string;
   findSkill: (name: string) => SkillContent | null;
+  bashPath: string | null;
 }
 
 /**
@@ -597,18 +598,29 @@ const BASH_MAX_TIMEOUT_MS = 600_000;
 
 export async function bash(
   command: string,
-  timeout?: number
+  timeout: number | undefined,
+  bashPath: string | null,
+  runCommand: (
+    command: string,
+    args: string[],
+    timeoutMs?: number
+  ) => Promise<{ stdout: string; stderr: string; code: number }> = _run
 ): Promise<{
   stdout: string;
   stderr: string;
   exitCode: number;
 }> {
+  if (!bashPath) {
+    throw new Error(
+      "Bash is unavailable on this system. Install Bash (Git for Windows includes Git Bash) and add it to PATH; the structured file tools remain available."
+    );
+  }
   const timeoutMs = Math.min(
     timeout ?? BASH_DEFAULT_TIMEOUT_MS,
     BASH_MAX_TIMEOUT_MS
   );
-  const { stdout, stderr, code } = await _run(
-    "bash",
+  const { stdout, stderr, code } = await runCommand(
+    bashPath,
     ["-c", command],
     timeoutMs
   );
@@ -708,6 +720,7 @@ function _isHtmlFile(filePath: string): boolean {
 export function createFsBuiltInTools({
   workspaceRoot,
   findSkill,
+  bashPath,
 }: FsBuiltInToolsDependencies): ToolEntry[] {
   return [
     {
@@ -783,15 +796,20 @@ export function createFsBuiltInTools({
         );
       },
     },
-    {
-      tool: bashTool,
-      async execute(args: Record<string, unknown>) {
-        return bash(
-          _requireString(args, "command"),
-          _optionalNumber(args, "timeout")
-        );
-      },
-    },
+    ...(bashPath
+      ? [
+          {
+            tool: bashTool,
+            async execute(args: Record<string, unknown>) {
+              return bash(
+                _requireString(args, "command"),
+                _optionalNumber(args, "timeout"),
+                bashPath
+              );
+            },
+          },
+        ]
+      : []),
     {
       tool: presentFilesTool,
       async execute(args: Record<string, unknown>) {

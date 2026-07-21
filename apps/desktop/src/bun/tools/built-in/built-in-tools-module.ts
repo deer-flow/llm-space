@@ -41,6 +41,12 @@ function _assertDependencies(
   if (!dependencies.workspaceRoot) {
     throw new Error('Missing built-in tools dependency "workspaceRoot".');
   }
+  if (
+    dependencies.bashPath !== null &&
+    typeof dependencies.bashPath !== "string"
+  ) {
+    throw new Error('Missing built-in tools dependency "bashPath".');
+  }
   if (typeof dependencies.findSkill !== "function") {
     throw new Error('Missing built-in tools dependency "findSkill".');
   }

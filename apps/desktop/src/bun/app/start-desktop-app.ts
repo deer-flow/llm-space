@@ -62,6 +62,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     modules: [
       createBuiltInToolsModule({
         env: process.env,
+        bashPath: Bun.which("bash"),
         findSkill: skillsManager.findSkill.bind(skillsManager),
         getSearchSettings: searchSettings.get.bind(searchSettings),
         workspaceRoot: workspacePath,
@@ -89,6 +90,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     getRpc().send.updateStatusChanged(message)
   );
   const commandDependencies = {
+    importSharedUrl: (url: string) => void deepLink?.handle(url),
     openExternal: Utils.openExternal,
     sendToWebview: (command: Command) => getRpc().send.executeCommand(command),
     updater,

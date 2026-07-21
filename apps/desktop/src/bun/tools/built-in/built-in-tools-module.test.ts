@@ -10,6 +10,7 @@ describe("built-in tools module", () => {
       modules: [
         createBuiltInToolsModule({
           env: {},
+          bashPath: "/bin/bash",
           findSkill: (name) =>
             name === "fixture"
               ? {
@@ -65,6 +66,7 @@ describe("built-in tools module", () => {
       modules: [
         createBuiltInToolsModule({
           env: {},
+          bashPath: "/bin/bash",
           findSkill: undefined,
           getSearchSettings: () => ({
             provider: "firecrawl",
