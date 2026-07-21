@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import type { ThreadContext } from "../types";
 
-import { renderThreadPromptVariables } from "./prompt-variables";
+import {
+  removePromptVariableSnapshotNames,
+  renderThreadPromptVariables,
+  SYSTEM_PROMPT_PLACE_KEY,
+} from "./prompt-variables";
 
 function context(systemPrompt: string, extra?: Partial<ThreadContext>) {
   return {
@@ -68,6 +72,76 @@ describe("renderThreadPromptVariables — template output freeze", () => {
       loadFile: file("V2"),
     });
     expect(fresh.context.systemPrompt).toBe("V2");
+  });
+});
+
+describe("removePromptVariableSnapshotNames — value-edit invalidation", () => {
+  const withGreeting = (systemPrompt: string, value: string) =>
+    context(systemPrompt, {
+      variableVariants: { active: "default", variants: { default: { greeting: value } } },
+    });
+
+  test("re-run stays frozen without invalidation, re-renders after it", async () => {
+    const first = await renderThreadPromptVariables({
+      context: withGreeting("{{ greeting }}", "Hi"),
+    });
+    expect(first.context.systemPrompt).toBe("Hi");
+    expect(first.snapshot?.variables?.[SYSTEM_PROMPT_PLACE_KEY]?.greeting).toBe(
+      "Hi"
+    );
+
+    // Edit the value but keep the snapshot: the frozen value still wins.
+    const frozen = await renderThreadPromptVariables({
+      context: { ...withGreeting("{{ greeting }}", "Hello"), snapshot: first.snapshot },
+    });
+    expect(frozen.context.systemPrompt).toBe("Hi");
+
+    // Invalidate the edited variable's snapshot: the new value renders.
+    const snapshot = removePromptVariableSnapshotNames(first.snapshot, [
+      "greeting",
+    ]);
+    const refreshed = await renderThreadPromptVariables({
+      context: { ...withGreeting("{{ greeting }}", "Hello"), snapshot },
+    });
+    expect(refreshed.context.systemPrompt).toBe("Hello");
+  });
+
+  test("empties collapse to an undefined snapshot", () => {
+    const snapshot = { variables: { [SYSTEM_PROMPT_PLACE_KEY]: { greeting: "Hi" } } };
+    expect(removePromptVariableSnapshotNames(snapshot, ["greeting"])).toBeUndefined();
+  });
+
+  test("other names and places stay frozen", () => {
+    const snapshot = {
+      variables: {
+        [SYSTEM_PROMPT_PLACE_KEY]: { greeting: "Hi", location: "SF" },
+        "message:m1:text": { greeting: "Hi" },
+      },
+    };
+    const next = removePromptVariableSnapshotNames(snapshot, ["greeting"]);
+    expect(next?.variables?.[SYSTEM_PROMPT_PLACE_KEY]).toEqual({ location: "SF" });
+    // The message place held only greeting, so it is pruned entirely.
+    expect(next?.variables?.["message:m1:text"]).toBeUndefined();
+  });
+
+  test("template frozen output is dropped so the place re-renders", async () => {
+    const base = context('{{@include("f.md")}}');
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadFile: file("V1"),
+    });
+    expect(first.context.systemPrompt).toBe("V1");
+
+    // Invalidation clears the whole frozen template output (it isn't keyed by
+    // variable name), so the next run picks up the changed file.
+    const snapshot = removePromptVariableSnapshotNames(first.snapshot, [
+      "greeting",
+    ]);
+    const refreshed = await renderThreadPromptVariables({
+      context: { ...base, snapshot },
+      loadFile: file("V2"),
+    });
+    expect(refreshed.context.systemPrompt).toBe("V2");
   });
 });
 

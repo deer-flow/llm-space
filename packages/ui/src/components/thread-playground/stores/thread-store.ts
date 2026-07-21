@@ -41,6 +41,7 @@ import {
   normalizeRunHistory,
   PromptVariableError,
   recordRun,
+  removePromptVariableSnapshotNames,
   removePromptVariableSnapshotPlaces,
   renderThreadPromptVariables,
   replaceThreadPromptVariableReferences,
@@ -262,9 +263,23 @@ export function createThreadStore(
       const setVariableState = (
         variables: ThreadVariables,
         variableVariants: ThreadVariableVariants,
-        systemPrompt = get().thread.context?.systemPrompt
+        systemPrompt = get().thread.context?.systemPrompt,
+        // Variable names whose captured snapshot values must be dropped so their
+        // existing references re-render with the edited value (see below).
+        invalidateSnapshotNames?: Iterable<string>
       ) => {
-        patchContext({ variables, variableVariants, systemPrompt });
+        const partial: Partial<Thread["context"]> = {
+          variables,
+          variableVariants,
+          systemPrompt,
+        };
+        if (invalidateSnapshotNames) {
+          partial.snapshot = removePromptVariableSnapshotNames(
+            get().thread.context?.snapshot,
+            invalidateSnapshotNames
+          );
+        }
+        patchContext(partial);
       };
 
       const defaultCustomValues = (variableVariants: ThreadVariableVariants) =>
@@ -287,12 +302,14 @@ export function createThreadStore(
       const setDefaultCustomValues = (
         variables: ThreadVariables,
         values: Record<string, string>,
-        systemPrompt = get().thread.context?.systemPrompt
+        systemPrompt = get().thread.context?.systemPrompt,
+        invalidateSnapshotNames?: Iterable<string>
       ) => {
         setVariableState(
           variables,
           withDefaultCustomValues(values),
-          systemPrompt
+          systemPrompt,
+          invalidateSnapshotNames
         );
       };
 
@@ -561,14 +578,16 @@ export function createThreadStore(
           const { variables, variableVariants } = getVariableState();
           setVariableState(
             { ...variables, [name]: variable },
-            variableVariants
+            variableVariants,
+            undefined,
+            [name]
           );
         },
         removePromptVariable(name) {
           const { variables, variableVariants } = getVariableState();
           const nextVariables = { ...variables };
           delete nextVariables[name];
-          setVariableState(nextVariables, variableVariants);
+          setVariableState(nextVariables, variableVariants, undefined, [name]);
         },
         renamePromptVariable(oldName, newName) {
           if (oldName === newName) {
@@ -613,13 +632,23 @@ export function createThreadStore(
             showDuplicateVariableName(name);
             return false;
           }
-          setDefaultCustomValues(variables, { ...customValues, [name]: value });
+          setDefaultCustomValues(
+            variables,
+            { ...customValues, [name]: value },
+            undefined,
+            [name]
+          );
           return true;
         },
         updateCustomVariable(name, value) {
           const { variables, variableVariants } = getVariableState();
           const customValues = defaultCustomValues(variableVariants);
-          setDefaultCustomValues(variables, { ...customValues, [name]: value });
+          setDefaultCustomValues(
+            variables,
+            { ...customValues, [name]: value },
+            undefined,
+            [name]
+          );
         },
         renameCustomVariable(oldName, newName) {
           if (oldName === newName) {
@@ -660,7 +689,7 @@ export function createThreadStore(
           const { variables, variableVariants } = getVariableState();
           const nextValues = { ...defaultCustomValues(variableVariants) };
           delete nextValues[name];
-          setDefaultCustomValues(variables, nextValues);
+          setDefaultCustomValues(variables, nextValues, undefined, [name]);
         },
         updateTitle(title: string | undefined) {
           patchThread({ title });
