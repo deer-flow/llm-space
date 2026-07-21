@@ -4,8 +4,8 @@ name: Release
 # which bumps apps/desktop/package.json, commits and tags).
 # A `-canary` suffix in the tag selects the canary channel; otherwise stable.
 #
-# Jobs: meta (validate tag) → build (macOS arm64 + x64 matrix: sign, notarize,
-# smoke-test) → publish. Artifacts land in two places:
+# Jobs: meta (validate tag) → macOS + Windows builds (platform-native smoke
+# tests) → publish. Artifacts land in two places:
 #   - the rolling `updates` release — the machine-readable update feed the
 #     in-app updater polls (`release.baseUrl` in electrobun.config.ts)
 #   - a versioned release per tag — DMGs for humans (static notes)
@@ -182,6 +182,9 @@ jobs:
           # The edition's only build-time switch: electrobun.config.ts forks the
           # app name, identifier and update feed off it. Empty = regular edition.
           LLM_SPACE_DESKTOP_RENDERER: ${{ matrix.edition == 'performance' && 'cef' || '' }}
+          # Keep releases from forks self-contained instead of baking the
+          # canonical upstream feed into their binaries.
+          LLM_SPACE_UPDATE_BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ matrix.edition == 'performance' && 'updates-performance' || 'updates' }}
         run: mise run "build:$CHANNEL"
 
       - name: Smoke test the signed app
@@ -242,8 +245,43 @@ jobs:
         if: always()
         run: security delete-keychain build.keychain || true
 
+  # Windows is a separate host-native job: the macOS matrix is intentionally
+  # left Apple-specific (codesign, notarization, DMG and launch checks).
+  build-windows:
+    needs: meta
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build unsigned Windows x64 regular edition
+        env:
+          CHANNEL: ${{ needs.meta.outputs.channel }}
+          LLM_SPACE_SKIP_SIGNING: "1"
+          LLM_SPACE_UPDATE_BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/updates
+        run: mise run "build:$env:CHANNEL"
+
+      - run: mise run verify:pack:win
+
+      - run: mise run smoke:win
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # Only Canary joins the regular publish set. Stable is built and smoke
+          # tested for forward compatibility but remains unpublished until the
+          # Authenticode/Stable follow-up is complete.
+          name: ${{ needs.meta.outputs.channel == 'canary' && 'artifacts-regular-win-x64' || 'artifacts-windows-stable-validation' }}
+          path: apps/desktop/artifacts/
+          if-no-files-found: error
+
   publish:
-    needs: [meta, build]
+    needs: [meta, build, build-windows]
     runs-on: ubuntu-latest
     # Uploading two editions' worth of artifacts; the Performance tarballs are
     # an order of magnitude bigger than the regular ones.
@@ -329,6 +367,13 @@ jobs:
           rename_dmgs artifacts/regular LLMSpace
           rename_dmgs artifacts/performance LLMSpace-performance
 
+          # Windows is Canary-only in this PR. Keep the Setup ZIP out of the
+          # rolling feed and give the versioned-release download a stable name.
+          shopt -s nullglob
+          for f in artifacts/regular/*-win-x64-*Setup*.zip; do
+            mv "$f" "artifacts/regular/LLMSpace-$VLOWER-windows-x64.zip"
+          done
+
       - name: Publish versioned release
         env:
           TAG: ${{ needs.meta.outputs.tag }}
@@ -348,7 +393,9 @@ jobs:
           INSTALL="$(cat <<'EOF'
           ## Install
 
-          Two editions. Install either, or both — they share the same `~/.llm-space` data, so switching keeps your threads and settings.
+          ### macOS
+
+          Install either edition, or both — they share the same `~/.llm-space` data, so switching keeps your threads and settings.
 
           - **LLM Space** — uses the system WebView. Small download (~27 MB), light on memory and battery.
           - **LLM Space Performance** — embeds its own rendering engine (~130 MB). Rendering stays consistent across macOS versions, and usually performs better.
@@ -356,6 +403,17 @@ jobs:
           Download a DMG below. Existing installs update in place.
           EOF
           )"
+          if [ "$CHANNEL" = "canary" ]; then
+            WINDOWS="$(cat <<'EOF'
+          ### Windows x64 Canary
+
+          Download `LLMSpace-*-windows-x64.zip`, extract it, and run the included `LLM Space-Setup-canary.exe`. This early Canary is **unsigned**, so Microsoft Defender SmartScreen may warn before launch.
+
+          Windows 10/11 x64 uses the system WebView2 runtime. There is no native ARM64 or Performance/CEF package yet, and Windows does not register the `llm-space://` URL scheme. To import a shared thread, copy its HTTPS viewer URL and choose **File → Import from Clipboard** in the app.
+          EOF
+          )"
+            INSTALL="$(printf '%s\n\n%s' "$INSTALL" "$WINDOWS")"
+          fi
           if [ -n "$CHANGES" ]; then
             NOTES="$(printf "## What's Changed\n\n%s\n\n%s\n\n**Full changelog:** https://github.com/%s/blob/%s/CHANGELOG.md\n" "$CHANGES" "$INSTALL" "$GITHUB_REPOSITORY" "$TAG")"
           else
@@ -390,5 +448,10 @@ jobs:
           # "LLMSpace-v4.0.1-macos-arm64.dmg" vs
           # "LLMSpace-performance-v4.0.1-macos-arm64.dmg"). Only update.json is
           # name-less, which is why the feeds above are kept apart.
-          gh release upload "$TAG" artifacts/regular/*.dmg artifacts/performance/*.dmg \
+          INSTALLERS=(artifacts/regular/*.dmg artifacts/performance/*.dmg)
+          if [ "$CHANNEL" = "canary" ]; then
+            shopt -s nullglob
+            INSTALLERS+=(artifacts/regular/*.zip)
+          fi
+          gh release upload "$TAG" "${INSTALLERS[@]}" \
             --repo "$GITHUB_REPOSITORY" --clobber

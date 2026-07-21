@@ -45,3 +45,28 @@ jobs:
       # the Pages workflow on `main`, so a change that breaks its Vite build would
       # otherwise stay invisible until it hit Pages. Build it on PRs too.
       - run: bun --filter @llm-space/web build
+
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - run: bun install --frozen-lockfile
+
+      - run: mise run test
+
+      - run: mise run lint
+
+      - run: mise run typecheck
+
+      # pack:win includes the production renderer build. Verification inspects
+      # the compressed tar without extracting into the checkout, then the smoke
+      # test installs and launches it under an isolated temporary LOCALAPPDATA.
+      - run: mise run pack:win
+
+      - run: mise run verify:pack:win
+
+      - run: mise run smoke:win
