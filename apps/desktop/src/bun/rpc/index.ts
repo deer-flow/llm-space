@@ -18,6 +18,7 @@ import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
   moveToTrash,
+  openPath,
   prepareGeneratorDir,
   removeProjectFile,
   revealInFileManager,
@@ -260,6 +261,15 @@ export function createMainWindowRPC({
             return { existed: false };
           }
           await revealInFileManager(abs);
+          return { existed: true };
+        },
+        openAbsolutePath: async ({ path: abs }) => {
+          try {
+            await stat(abs);
+          } catch {
+            return { existed: false };
+          }
+          openPath(abs);
           return { existed: true };
         },
         revealSkill: async ({ name }) => {

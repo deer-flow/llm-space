@@ -9,6 +9,7 @@ import { useMemo, type ReactNode } from "react";
 
 import {
   listBuiltInTools,
+  openAbsolutePath,
   revealAbsolutePath,
   revealSkill,
 } from "@/client/built-in-tools";
@@ -92,6 +93,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       builtinTools: {
         list: listBuiltInTools,
         revealAbsolutePath,
+        openAbsolutePath,
         revealSkill,
       },
       paths: { ensureRootDir },

@@ -30,6 +30,16 @@ export async function revealAbsolutePath(path: string): Promise<boolean> {
 }
 
 /**
+ * Open an arbitrary absolute path with the OS default handler — a folder opens
+ * in the file manager itself (not selected in its parent). Resolves to whether
+ * the path existed.
+ */
+export async function openAbsolutePath(path: string): Promise<boolean> {
+  const { existed } = await _rpc().request.openAbsolutePath({ path });
+  return existed;
+}
+
+/**
  * Reveal a skill's `SKILL.md` in the OS file manager, resolved by skill name.
  * Resolves to whether a matching skill file was found.
  */

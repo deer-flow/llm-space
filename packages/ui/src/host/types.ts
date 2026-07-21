@@ -48,6 +48,8 @@ export interface BuiltinToolsHost {
   list(): Promise<BuiltinTool[]>;
   /** Reveal an absolute path in the OS file manager; false if it was missing. */
   revealAbsolutePath(path: string): Promise<boolean>;
+  /** Open an absolute path with the OS default handler (a folder opens itself). */
+  openAbsolutePath(path: string): Promise<boolean>;
   /** Reveal a skill's SKILL.md by name; false if not found. */
   revealSkill(name: string): Promise<boolean>;
 }

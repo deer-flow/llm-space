@@ -245,6 +245,8 @@ export function GenerateProjectButton() {
         });
         if (outcome) {
           setResult(outcome);
+          // Open the finished project folder so the user lands right in it.
+          void builtinTools.openAbsolutePath(outcome.dir);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -262,6 +264,7 @@ export function GenerateProjectButton() {
       framework,
       providers,
       mcp,
+      builtinTools,
     ]
   );
 
@@ -531,7 +534,7 @@ export function GenerateProjectButton() {
                 {result ? (
                   <Button
                     variant="ghost"
-                    onClick={() => builtinTools.revealAbsolutePath(result.dir)}
+                    onClick={() => builtinTools.openAbsolutePath(result.dir)}
                   >
                     <FolderOpenIcon className="size-4" />
                     Open folder
@@ -911,19 +914,24 @@ function SuccessStep({
     ),
   });
 
-  if (hasFunctionTools) {
-    steps.push({
-      title: "Finish your custom tools",
-      body: (
-        <p className="text-muted-foreground text-xs/relaxed">
-          Open <code className="text-foreground font-mono">PLAN.md</code> in
-          your coding agent (Claude Code, Cursor, Codex…) and follow it to
-          implement your custom function tools — the agent won&apos;t run until
-          they&apos;re filled in.
-        </p>
-      ),
-    });
-  }
+  steps.push({
+    title: "Finish it in your coding agent",
+    body: (
+      <p className="text-muted-foreground text-xs/relaxed">
+        Open <code className="text-foreground font-mono">PLAN.md</code> in your
+        coding agent (Claude Code, Cursor, Codex…) and follow it
+        {hasFunctionTools ? (
+          <>
+            {" "}
+            to implement your custom function tools — the agent won&apos;t run
+            until they&apos;re filled in.
+          </>
+        ) : (
+          " to review the project and finish any remaining steps."
+        )}
+      </p>
+    ),
+  });
 
   steps.push({
     title: "Launch & explore",
@@ -1099,6 +1107,7 @@ function _resolveModelInfo(
     name: piModel?.name ?? model.id,
     baseUrl: group?.baseUrl || piModel?.baseUrl || undefined,
     apiKey: group?.apiKey,
+    anthropic: piModel?.api === "anthropic-messages",
     deepseekThinking:
       compat?.requiresReasoningContentOnAssistantMessages === true,
     supportsReasoning: piModel?.reasoning ?? false,

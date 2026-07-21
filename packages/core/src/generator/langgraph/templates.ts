@@ -62,6 +62,9 @@ export function apiKeyEnvName(
 
 /** The pip/uv package providing the chat-model class for this model. */
 export function modelDependency(info: GeneratorModelInfo): string {
+  if (info.anthropic) {
+    return "langchain-anthropic";
+  }
   return info.deepseekThinking ? "langchain-deepseek" : "langchain-openai";
 }
 
@@ -103,10 +106,16 @@ export function createModelPy(
   model: ModelConfig,
   info: GeneratorModelInfo
 ): string {
-  const cls = info.deepseekThinking ? "ChatDeepSeek" : "ChatOpenAI";
-  const importLine = info.deepseekThinking
-    ? "from langchain_deepseek import ChatDeepSeek"
-    : "from langchain_openai import ChatOpenAI";
+  const cls = info.anthropic
+    ? "ChatAnthropic"
+    : info.deepseekThinking
+      ? "ChatDeepSeek"
+      : "ChatOpenAI";
+  const importLine = info.anthropic
+    ? "from langchain_anthropic import ChatAnthropic"
+    : info.deepseekThinking
+      ? "from langchain_deepseek import ChatDeepSeek"
+      : "from langchain_openai import ChatOpenAI";
   const envName = apiKeyEnvName(model, info);
 
   // The API key is fetched into a variable and validated (below), so kwargs

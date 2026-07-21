@@ -188,6 +188,13 @@ export interface DesktopRPCType {
         params: { path: string };
         response: { existed: boolean };
       };
+      // Open an absolute path with the OS default handler (a folder opens in the
+      // file manager itself, not selected in its parent). Returns whether the
+      // path existed.
+      openAbsolutePath: {
+        params: { path: string };
+        response: { existed: boolean };
+      };
       // Reveal a skill's `SKILL.md` in the OS file manager, resolved by skill
       // name. Returns whether a matching skill file was found.
       revealSkill: {

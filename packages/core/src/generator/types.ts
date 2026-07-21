@@ -49,6 +49,8 @@ export interface GeneratorModelInfo {
   baseUrl?: string;
   /** Raw stored API key: `$ENV` references an env var; else a literal key. */
   apiKey?: string;
+  /** The model uses the Anthropic Messages API — emit `ChatAnthropic`. */
+  anthropic: boolean;
   /**
    * The model speaks the DeepSeek thinking format (served over an OpenAI-
    * compatible API) — emit `ChatDeepSeek` + `extra_body` rather than `ChatOpenAI`.
