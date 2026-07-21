@@ -188,6 +188,13 @@ export interface DesktopRPCType {
         params: { path: string };
         response: { existed: boolean };
       };
+      // Open an absolute path with the OS default handler (a folder opens in the
+      // file manager itself, not selected in its parent). Returns whether the
+      // path existed.
+      openAbsolutePath: {
+        params: { path: string };
+        response: { existed: boolean };
+      };
       // Reveal a skill's `SKILL.md` in the OS file manager, resolved by skill
       // name. Returns whether a matching skill file was found.
       revealSkill: {
@@ -205,6 +212,54 @@ export interface DesktopRPCType {
       fsPickFile: {
         params: Record<string, never>;
         response: { path: string | null };
+      };
+      // --- Code generator (export the thread as a runnable project) ---
+      // Open the native folder picker for the project's PARENT directory. The
+      // wizard combines it with the project name; `path` is null on cancel.
+      generatorPickDirectory: {
+        params: Record<string, never>;
+        response: { path: string | null };
+      };
+      // Resolve `parentDir/projectName`, validate it can hold a fresh project,
+      // create it, and authorize it (bun-side) for the generator's writes +
+      // `uv` runs. The wizard's "Next" gate on the directory step.
+      generatorPrepareDirectory: {
+        params: { parentDir: string; projectName: string };
+        response:
+          | { ok: true; dir: string }
+          | { ok: false; error: string };
+      };
+      // Whether `uv` is installed on the host (+ version), so the renderer can
+      // prompt to install it or fall back to instructions in PLAN.md.
+      generatorCheckUv: {
+        params: Record<string, never>;
+        response: { installed: boolean; version?: string };
+      };
+      // Run `uv <args>` with cwd = an authorized project directory. Only `uv`
+      // can ever be spawned; `rootDir` must have been authorized via
+      // `generatorPickDirectory`. Returns the raw exit code + output.
+      generatorRunUv: {
+        params: { rootDir: string; args: string[] };
+        response: { code: number; stdout: string; stderr: string };
+      };
+      // Write a UTF-8 file under an authorized project directory. Rejects path
+      // traversal outside `rootDir`.
+      generatorWriteFile: {
+        params: { rootDir: string; relativePath: string; contents: string };
+        response: null;
+      };
+      // Delete a file under an authorized project directory; no-op when missing.
+      generatorRemoveFile: {
+        params: { rootDir: string; relativePath: string };
+        response: null;
+      };
+      // Resolve real secret values for a generated `.env`: the model provider's
+      // resolved API key (following `$ENV` refs, codex login, etc.) plus the raw
+      // values of the named environment variables. Used only when the user opts
+      // in to materializing their keys to disk.
+      generatorResolveEnv: {
+        params: { providerId: string; envNames: string[] };
+        response: { modelApiKey: string; envValues: Record<string, string> };
       };
       mcpListServers: {
         params: Record<string, never>;

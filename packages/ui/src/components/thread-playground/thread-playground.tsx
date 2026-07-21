@@ -48,6 +48,7 @@ import {
 import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { GenerateProjectButton } from "./codegen/generate-project-button";
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
@@ -330,6 +331,7 @@ function ThreadPlaygroundContent({
                   <Share2Icon className="size-4" />
                 </Button>
               </Tooltip>
+              <GenerateProjectButton />
             </div>
             <div className="flex items-center gap-1 px-3">
               <ButtonGroup

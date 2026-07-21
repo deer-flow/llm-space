@@ -10,6 +10,8 @@
     "./storage": "./src/storage/index.ts",
     "./thread": "./src/thread/index.ts",
     "./types": "./src/types/index.ts",
+    "./workflow": "./src/workflow/index.ts",
+    "./generator": "./src/generator/index.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {

@@ -48,3 +48,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Loopany scheduled-agent workspace
 /loopany/
+
+# Python
+__pycache__

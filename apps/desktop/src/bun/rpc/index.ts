@@ -15,7 +15,16 @@ import type { DesktopRPCType } from "../../shared/rpc";
 import { buildWebShareUrl } from "../../shared/share";
 import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
-import { moveToTrash, revealInFileManager } from "../fs";
+import {
+  checkUv,
+  moveToTrash,
+  openPath,
+  prepareGeneratorDir,
+  removeProjectFile,
+  revealInFileManager,
+  runUv,
+  writeProjectFile,
+} from "../fs";
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
 import type { NetworkSettingsManager } from "../network";
@@ -257,6 +266,15 @@ export function createMainWindowRPC({
           await revealInFileManager(resolved);
           return { existed: true };
         },
+        openAbsolutePath: async ({ path: abs }) => {
+          try {
+            await stat(abs);
+          } catch {
+            return { existed: false };
+          }
+          openPath(abs);
+          return { existed: true };
+        },
         revealSkill: async ({ name }) => {
           const found = skillsManager.findSkill(name, { enabledOnly: false });
           if (!found) {
@@ -287,6 +305,37 @@ export function createMainWindowRPC({
           });
           const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
           return { path };
+        },
+        // --- Code generator ---
+        generatorPickDirectory: async () => {
+          const selected = await Utils.openFileDialog({
+            startingFolder: "~/",
+            canChooseFiles: false,
+            canChooseDirectory: true,
+            allowsMultipleSelection: false,
+          });
+          const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
+          return { path };
+        },
+        generatorPrepareDirectory: ({ parentDir, projectName }) =>
+          prepareGeneratorDir(parentDir, projectName),
+        generatorCheckUv: () => checkUv(),
+        generatorRunUv: ({ rootDir, args }) => runUv(rootDir, args),
+        generatorWriteFile: async ({ rootDir, relativePath, contents }) => {
+          await writeProjectFile(rootDir, relativePath, contents);
+          return null;
+        },
+        generatorRemoveFile: async ({ rootDir, relativePath }) => {
+          await removeProjectFile(rootDir, relativePath);
+          return null;
+        },
+        generatorResolveEnv: async ({ providerId, envNames }) => {
+          const modelApiKey = (await modelManager.getApiKey(providerId, true)) ?? "";
+          const envValues: Record<string, string> = {};
+          for (const name of envNames) {
+            envValues[name] = process.env[name] ?? "";
+          }
+          return { modelApiKey, envValues };
         },
         mcpListServers: () => mcpManager.listServers(),
         mcpAddServer: ({ server }) => {
