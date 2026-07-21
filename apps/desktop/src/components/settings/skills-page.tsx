@@ -18,6 +18,7 @@ import {
   Ban,
   CheckCheck,
   Folder,
+  FolderOpen,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -26,6 +27,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { revealAbsolutePath } from "@/client/built-in-tools";
 import {
   addSkillsPath,
   browseForSkillsPath,
@@ -38,6 +40,31 @@ import {
 
 
 import { SettingsPage } from "./settings-page";
+
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
+
+/**
+ * The OS file manager's name, for the "Reveal in …" menu label. Windows calls
+ * it Explorer; macOS (and our Linux fallback) say Finder.
+ */
+const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
+
+/** Reveal a discovery folder in the OS file manager, toasting if it's gone. */
+async function revealDiscoveryPath(path: string) {
+  try {
+    const existed = await revealAbsolutePath(path);
+    if (!existed) {
+      toast.error("Folder not found", {
+        description: `"${path}" no longer exists on disk.`,
+      });
+    }
+  } catch (error) {
+    toast.error("Failed to reveal folder", {
+      description: error instanceof Error ? error.message : "Please try again.",
+    });
+  }
+}
 
 export function SkillsPage() {
   const [settings, setSettings] = useState<SkillsSettings>({
@@ -252,6 +279,11 @@ function PathListItem({
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onSelect={() => void revealDiscoveryPath(path)}>
+            <FolderOpen />
+            {REVEAL_LABEL}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => onEnableAll()}>
             <CheckCheck />
             Enable all skills

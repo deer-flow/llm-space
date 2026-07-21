@@ -2,7 +2,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
-import { readUserTextFile } from "@llm-space/core/server";
+import { expandHomePath, readUserTextFile } from "@llm-space/core/server";
 import type { LocalFileSystem } from "@llm-space/core/server";
 import {
   GIST_CONNECTOR_ID,
@@ -246,12 +246,15 @@ export function createMainWindowRPC({
           return null;
         },
         revealAbsolutePath: async ({ path: abs }) => {
+          // Discovery-folder paths may be `~`-prefixed (e.g. `~/.claude/skills`),
+          // so expand a leading tilde before stat/reveal.
+          const resolved = expandHomePath(abs);
           try {
-            await stat(abs);
+            await stat(resolved);
           } catch {
             return { existed: false };
           }
-          await revealInFileManager(abs);
+          await revealInFileManager(resolved);
           return { existed: true };
         },
         revealSkill: async ({ name }) => {
