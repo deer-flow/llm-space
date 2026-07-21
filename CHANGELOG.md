@@ -4,6 +4,20 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-07-21
+
+Turn any thread into a runnable agent.
+
+### Added
+
+- **Generate a runnable agent (Beta).** Export a thread as a runnable LangGraph
+  (Python) project. A step-by-step wizard scaffolds a `uv` project with your
+  model factory, the rendered prompt (variables stay live at run time), your
+  built-in tools as real code, importable stubs for custom function tools, and
+  an MCP scaffold — then writes a short `PLAN.md` for your coding agent to finish
+  and opens the project. Ships with a local web UI and debugger via
+  `uv run langgraph dev`.
+
 ## [4.3.0] - 2026-07-20
 
 Prompt templates grow up: Jinja2 logic, richer variables, and in-app reminders
