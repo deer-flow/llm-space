@@ -36,6 +36,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
+        // Electrobun's Windows extractor cannot read GNU LongLink records. Keep
+        // every imported asset name short so the packaged tar stays within the
+        // portable tar header path limit regardless of the source file name.
+        assetFileNames: "assets/[hash][extname]",
         // Split the stable, heavy vendor libraries out of the app chunk. They
         // change far less often than app code, so isolating them means an
         // app-code update ships a small delta for the auto-updating desktop
