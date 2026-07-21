@@ -33,7 +33,7 @@
     },
     "apps/desktop": {
       "name": "@llm-space/desktop",
-      "version": "4.2.1",
+      "version": "4.3.0",
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@codemirror/autocomplete": "6.20.3",
@@ -92,6 +92,7 @@
         "autoprefixer": "^10.4.20",
         "concurrently": "^9.1.0",
         "postcss": "^8.5.3",
+        "rcedit": "^4.0.1",
         "react-scan": "^0.5.7",
         "tailwindcss": "^4.0.15",
         "typescript": "^5.7.2",

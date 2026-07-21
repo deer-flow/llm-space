@@ -88,6 +88,22 @@ dir = "apps/desktop"
 env = { LLM_SPACE_SKIP_SIGNING = "1" }
 run = "bun run build:canary"
 
+[tasks."pack:win"]
+description = "Build an unsigned Windows x64 regular Canary package"
+dir = "apps/desktop"
+env = { LLM_SPACE_SKIP_SIGNING = "1" }
+run = "bun run build:canary"
+
+[tasks."verify:pack:win"]
+description = "Verify Windows package paths, payload, and update metadata"
+dir = "apps/desktop"
+run = "bun run verify:pack:win"
+
+[tasks."smoke:win"]
+description = "Install and launch the Windows package in an isolated temp root"
+dir = "apps/desktop"
+run = "bun run smoke:win"
+
 [tasks."pack:perf"]
 description = "Unsigned Performance (CEF) canary build — the edition that embeds Chromium"
 dir = "apps/desktop"

@@ -87,14 +87,19 @@ export default {
       bundleCEF: false,
     },
     win: {
+      // Windows ships only the regular WebView2 edition for now.
       bundleCEF: false,
+      icon: "icon.ico",
     },
   },
   scripts: {
-    // Both run right before their respective codesign step. Workaround for
-    // electrobun#485 (x64-only, no-op elsewhere); see the script header.
-    postBuild: "scripts/fix-x64-headerpad.ts",
+    // The inner-app hook preserves the macOS x64 headerpad workaround and also
+    // embeds the Windows icon before the updater tarball is compressed. The
+    // wrapper hook remains macOS-only; Windows Setup.exe is finalized after
+    // packaging because Electrobun 1.18.1's compiled rcedit lookup is broken.
+    postBuild: "scripts/post-build.ts",
     postWrap: "scripts/fix-x64-headerpad.ts",
+    postPackage: "scripts/post-package.ts",
   },
   release: {
     // Burned into every shipped bundle — the updater fetches

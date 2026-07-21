@@ -9,7 +9,9 @@
     "hmr": "vite --port 5173",
     "build:view": "NODE_OPTIONS=--max-old-space-size=4096 vite build",
     "build:canary": "bun run build:view && electrobun build --env=canary",
-    "build:stable": "bun run build:view && electrobun build --env=stable"
+    "build:stable": "bun run build:view && electrobun build --env=stable",
+    "verify:pack:win": "bun scripts/verify-windows-package.ts",
+    "smoke:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test-windows.ps1"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -69,6 +71,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "postcss": "^8.5.3",
+    "rcedit": "^4.0.1",
     "react-scan": "^0.5.7",
     "tailwindcss": "^4.0.15",
     "typescript": "^5.7.2",
