@@ -169,6 +169,8 @@ const COMMAND_PALETTE_BLACKLIST = [
   "createConnectedTraceProject",
   "importLangfuseTraceFiles",
   "syncLangfuseTraceIds",
+  // Fullscreen remains a native-menu/window shortcut rather than a palette item.
+  "toggleFullScreen",
   // Only meaningful from the "ready to install" toast; a bare palette
   // invocation would silently no-op (or restart mid-work).
   "applyUpdateAndRestart",

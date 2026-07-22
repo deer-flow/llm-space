@@ -46,6 +46,58 @@ interface CommandContextValue {
 const CommandContext = createContext<CommandContextValue | null>(null);
 
 /**
+ * Resolve app-level Windows shortcuts after Electrobun's broken native menu
+ * accelerators have been disabled. Editing shortcuts are deliberately omitted
+ * so inputs and CodeMirror retain the WebView's standard behavior.
+ */
+function _getWindowsShortcutCommand(event: KeyboardEvent): Command | null {
+  if (!event.ctrlKey || event.metaKey || event.isComposing) return null;
+
+  if (event.altKey) {
+    if (event.shiftKey) return null;
+    if (event.code === "ArrowLeft") {
+      return { type: "selectPreviousTab", args: {} };
+    }
+    if (event.code === "ArrowRight") {
+      return { type: "selectNextTab", args: {} };
+    }
+    return null;
+  }
+
+  switch (event.code) {
+    case "KeyN":
+      return event.shiftKey
+        ? { type: "newFolder", args: {} }
+        : { type: "newFile", args: {} };
+    case "KeyW":
+      return event.shiftKey ? null : { type: "closeTab", args: {} };
+    case "KeyT":
+      return event.shiftKey ? { type: "reopenClosedTab", args: {} } : null;
+    case "Comma":
+      return event.shiftKey ? null : { type: "openSettings", args: {} };
+    case "KeyP":
+      return event.shiftKey ? { type: "openCommandPalette", args: {} } : null;
+    case "KeyB":
+      return event.shiftKey ? null : { type: "toggleSidebar", args: {} };
+    case "KeyR":
+      return event.shiftKey ? { type: "reload", args: {} } : null;
+    case "Equal":
+    case "NumpadAdd":
+      return { type: "zoomIn", args: {} };
+    case "Minus":
+    case "NumpadSubtract":
+      return event.shiftKey ? null : { type: "zoomOut", args: {} };
+    case "Digit0":
+    case "Numpad0":
+      return event.shiftKey ? null : { type: "resetZoom", args: {} };
+    case "KeyF":
+      return event.shiftKey ? { type: "toggleFullScreen", args: {} } : null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Holds the renderer command registry. Handlers live in a ref-based map keyed by
  * command type, so components that own the relevant state (tabs, file tree,
  * sidebar) register their handlers where that state lives.
@@ -77,6 +129,21 @@ export function CommandProvider({ children }: { children: ReactNode }) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!navigator.userAgent.includes("Windows")) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const command = _getWindowsShortcutCommand(event);
+      if (!command) return;
+      event.preventDefault();
+      event.stopPropagation();
+      executeCommand(command);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [executeCommand]);
 
   const value = useMemo(
     () => ({ executeCommand, registerCommandHandlers }),

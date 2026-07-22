@@ -257,6 +257,8 @@ export interface ZoomInCommand extends GenericCommand<"zoomIn"> {}
 export interface ZoomOutCommand extends GenericCommand<"zoomOut"> {}
 /** Reset the page zoom to 100%. */
 export interface ResetZoomCommand extends GenericCommand<"resetZoom"> {}
+/** Enter or leave OS-level fullscreen mode. */
+export interface ToggleFullScreenCommand extends GenericCommand<"toggleFullScreen"> {}
 /** Reload the webview. */
 export interface ReloadCommand extends GenericCommand<"reload"> {}
 
@@ -341,6 +343,7 @@ export type Command =
   | ZoomInCommand
   | ZoomOutCommand
   | ResetZoomCommand
+  | ToggleFullScreenCommand
   | ReloadCommand
   | OpenLinkCommand
   | OpenDocumentCommand
@@ -416,6 +419,7 @@ export const COMMAND_META: Record<
   zoomIn: { label: "Zoom In", target: "bun" },
   zoomOut: { label: "Zoom Out", target: "bun" },
   resetZoom: { label: "Reset Zoom", target: "bun" },
+  toggleFullScreen: { label: "Toggle Full Screen", target: "bun" },
   reload: { label: "Reload", target: "bun" },
   openLink: { label: "Open Link", target: "bun" },
   openDocument: { label: "Documents", target: "bun" },

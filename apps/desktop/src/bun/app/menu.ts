@@ -8,6 +8,58 @@ import type { Command } from "../../shared/commands";
 
 import { isChineseLocale } from "./locales";
 
+const IS_WINDOWS = process.platform === "win32";
+const WINDOWS_DISPLAY_ONLY_ACCELERATOR = "DisplayOnly";
+
+/**
+ * Electrobun 1.18.1 builds a Win32 accelerator table but translates key
+ * messages against the focused child WebView HWND. The keystroke is consumed,
+ * while the resulting WM_COMMAND never reaches the top-level app window. Keep
+ * the shortcut visible in Windows menus and let the renderer command bus handle
+ * it instead. Other platforms retain Electrobun's native accelerators.
+ */
+function _shortcut(label: string, accelerator: string) {
+  if (!IS_WINDOWS) return { label, accelerator };
+  const display = accelerator
+    .replace("CommandOrControl", "Ctrl")
+    .replace("Option", "Alt")
+    .replace(/Plus$/, "+");
+  return { label: `${label}\t${display}` };
+}
+
+/**
+ * Electrobun assigns accelerators to edit roles when none is provided. An
+ * intentionally unparseable value suppresses that Windows-only registration so
+ * standard editing keystrokes continue through to WebView; menu clicks still
+ * use the native role.
+ */
+function _editRole(
+  role: string,
+  label: string,
+  windowsAccelerator: string
+): ApplicationMenuItemConfig {
+  if (!IS_WINDOWS) return { role };
+  return {
+    role,
+    label: `${label}\t${windowsAccelerator}`,
+    accelerator: WINDOWS_DISPLAY_ONLY_ACCELERATOR,
+  };
+}
+
+function _roleShortcut(
+  role: string,
+  label: string,
+  accelerator: string
+): ApplicationMenuItemConfig {
+  if (!IS_WINDOWS) return { role, accelerator };
+  const { label: displayLabel } = _shortcut(label, accelerator);
+  return {
+    role,
+    label: displayLabel,
+    accelerator: WINDOWS_DISPLAY_ONLY_ACCELERATOR,
+  };
+}
+
 /**
  * The app (first) submenu. Its update item is the one dynamic piece: normally
  * "Check for Updates…"; once an update is downloaded it becomes
@@ -24,9 +76,8 @@ function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
       updateItem,
       { type: "divider" },
       {
-        label: "Settings...",
+        ..._shortcut("Settings...", "CommandOrControl+,"),
         action: "settings",
-        accelerator: "CommandOrControl+,",
       },
       { type: "divider" },
       { role: "hide", accelerator: "CommandOrControl+H" },
@@ -49,16 +100,14 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
       label: "File",
       submenu: [
         {
-          label: "New File",
+          ..._shortcut("New File", "CommandOrControl+N"),
           action: "newThread",
-          accelerator: "CommandOrControl+N",
         },
         { label: "New from Examples...", action: "newFromExamples" },
         { type: "divider" },
         {
-          label: "New Folder",
+          ..._shortcut("New Folder", "CommandOrControl+Shift+N"),
           action: "newFolder",
-          accelerator: "CommandOrControl+Shift+N",
         },
         { type: "divider" },
         { label: "Import from Files...", action: "importFiles" },
@@ -70,69 +119,65 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
         { label: "Reveal Workspace Folder", action: "revealWorkspaceFolder" },
         { type: "divider" },
         {
-          label: "Close Tab",
+          ..._shortcut("Close Tab", "CommandOrControl+W"),
           action: "closeTab",
-          accelerator: "CommandOrControl+W",
         },
         { label: "Close Others", action: "closeOtherTabs" },
         { label: "Close All Tabs", action: "closeAllTabs" },
         { type: "divider" },
         {
-          label: "Reopen Closed Tabs",
+          ..._shortcut("Reopen Closed Tabs", "CommandOrControl+Shift+T"),
           action: "reopenClosedTabs",
-          accelerator: "CommandOrControl+Shift+T",
         },
       ],
     },
     {
       label: "Edit",
       submenu: [
-        { role: "undo" },
-        { role: "redo" },
+        _editRole("undo", "Undo", "Ctrl+Z"),
+        _editRole("redo", "Redo", "Ctrl+Y"),
         { type: "divider" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "pasteAndMatchStyle" },
-        { role: "delete" },
-        { role: "selectAll" },
+        _editRole("cut", "Cut", "Ctrl+X"),
+        _editRole("copy", "Copy", "Ctrl+C"),
+        _editRole("paste", "Paste", "Ctrl+V"),
+        _editRole(
+          "pasteAndMatchStyle",
+          "Paste and Match Style",
+          "Ctrl+Shift+V"
+        ),
+        _editRole("delete", "Delete", "Del"),
+        _editRole("selectAll", "Select All", "Ctrl+A"),
       ],
     },
     {
       label: "View",
       submenu: [
         {
-          label: "Command Palette...",
+          ..._shortcut("Command Palette...", "CommandOrControl+Shift+P"),
           action: "commandPalette",
-          accelerator: "CommandOrControl+Shift+P",
         },
         { type: "divider" },
         {
-          label: "Toggle Sidebar",
+          ..._shortcut("Toggle Sidebar", "CommandOrControl+B"),
           action: "toggleSidebar",
-          accelerator: "CommandOrControl+B",
         },
         { type: "divider" },
         {
-          label: "Reload",
+          ..._shortcut("Reload", "CommandOrControl+Shift+R"),
           action: "reload",
-          accelerator: "CommandOrControl+Shift+R",
         },
         { type: "divider" },
         {
-          label: "Zoom In",
+          ..._shortcut("Zoom In", "CommandOrControl+Plus"),
           action: "zoomIn",
-          accelerator: "CommandOrControl+Plus",
         },
         {
-          label: "Zoom Out",
+          ..._shortcut("Zoom Out", "CommandOrControl+-"),
           action: "zoomOut",
-          accelerator: "CommandOrControl+-",
         },
         {
-          label: "Reset Zoom",
+          ..._shortcut("Reset Zoom", "CommandOrControl+0"),
           action: "resetZoom",
-          accelerator: "CommandOrControl+0",
         },
       ],
     },
@@ -144,17 +189,19 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
         { role: "bringAllToFront" },
         { type: "divider" },
         {
-          label: "Select Previous Tab",
+          ..._shortcut("Select Previous Tab", "CommandOrControl+Option+Left"),
           action: "selectPreviousTab",
-          accelerator: "CommandOrControl+Option+Left",
         },
         {
-          label: "Select Next Tab",
+          ..._shortcut("Select Next Tab", "CommandOrControl+Option+Right"),
           action: "selectNextTab",
-          accelerator: "CommandOrControl+Option+Right",
         },
         { type: "divider" },
-        { role: "toggleFullScreen", accelerator: "CommandOrControl+Shift+F" },
+        _roleShortcut(
+          "toggleFullScreen",
+          "Toggle Full Screen",
+          "CommandOrControl+Shift+F"
+        ),
       ],
     },
     {

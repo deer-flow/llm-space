@@ -94,6 +94,10 @@ export function executeCommandInBun(
       saveZoom(1);
       return;
     }
+    case "toggleFullScreen": {
+      window.setFullScreen(!window.isFullScreen());
+      return;
+    }
     case "reload": {
       window.webview?.executeJavascript("location.reload()");
       return;
