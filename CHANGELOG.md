@@ -4,6 +4,28 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.1] - 2026-07-22
+
+A maintenance release focused on carrying meta user prompts into generated
+LangGraph projects, plus fixes for live skills and project setup.
+
+### Added
+
+- **Generate meta user prompts.** When a thread starts with contextual user
+  content, generated LangGraph projects can preserve it as a rendered meta user
+  prompt and inject it into model calls at run time.
+
+### Fixed
+
+- Available skills now update live instead of remaining stuck on an earlier
+  resolved selection; generated projects also treat an empty skill selection as
+  all currently enabled skills.
+- Generated project dependency installation now has a bounded timeout, clearer
+  recovery guidance, and no longer leaves an orphaned `uv` process when it times
+  out.
+- Generated `pyproject.toml` files declare supported dependency versions
+  directly and include optional mainland China package-mirror guidance.
+
 ## [4.4.0] - 2026-07-21
 
 Turn any thread into a runnable agent.
