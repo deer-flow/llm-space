@@ -287,18 +287,25 @@ try {
   if (-not $mainWindow) {
     throw "The installed app did not create the LLM Space main window."
   }
-  $smallIcon = [LlmSpaceNativeWindow]::SendMessage(
-    $mainWindow.MainWindowHandle,
-    0x007F,
-    [IntPtr]::Zero,
-    [IntPtr]::Zero
-  )
-  $largeIcon = [LlmSpaceNativeWindow]::SendMessage(
-    $mainWindow.MainWindowHandle,
-    0x007F,
-    [IntPtr]::new(1),
-    [IntPtr]::Zero
-  )
+  $iconDeadline = [DateTime]::UtcNow.AddSeconds([Math]::Min($TimeoutSeconds, 10))
+  $smallIcon = [IntPtr]::Zero
+  $largeIcon = [IntPtr]::Zero
+  while ([DateTime]::UtcNow -lt $iconDeadline) {
+    $smallIcon = [LlmSpaceNativeWindow]::SendMessage(
+      $mainWindow.MainWindowHandle,
+      0x007F,
+      [IntPtr]::Zero,
+      [IntPtr]::Zero
+    )
+    $largeIcon = [LlmSpaceNativeWindow]::SendMessage(
+      $mainWindow.MainWindowHandle,
+      0x007F,
+      [IntPtr]::new(1),
+      [IntPtr]::Zero
+    )
+    if ($smallIcon -ne [IntPtr]::Zero -and $largeIcon -ne [IntPtr]::Zero) { break }
+    Start-Sleep -Milliseconds 250
+  }
   if ($smallIcon -eq [IntPtr]::Zero -or $largeIcon -eq [IntPtr]::Zero) {
     throw "The LLM Space window did not load its small and large application icons."
   }

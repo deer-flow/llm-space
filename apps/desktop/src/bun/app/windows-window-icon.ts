@@ -12,8 +12,8 @@ const ICON_BIG = 1;
 export function setWindowsWindowIcon(windowPtr: Pointer): void {
   if (process.platform !== "win32") return;
 
-  const iconPath = path.join(process.cwd(), "..", "Resources", "app.ico");
-  if (!existsSync(iconPath)) return;
+  const iconPath = _resolveWindowsWindowIconPath();
+  if (!iconPath) return;
 
   try {
     const user32 = dlopen("user32.dll", {
@@ -60,4 +60,16 @@ export function setWindowsWindowIcon(windowPtr: Pointer): void {
   } catch (error) {
     console.warn("Unable to set the Windows window icon:", error);
   }
+}
+
+function _resolveWindowsWindowIconPath(): string | null {
+  const mainScript = process.argv[1];
+  const candidates = [
+    ...(mainScript
+      ? [path.join(path.dirname(path.resolve(mainScript)), "app.ico")]
+      : []),
+    path.join(path.dirname(process.execPath), "..", "Resources", "app.ico"),
+    path.join(process.cwd(), "..", "Resources", "app.ico"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
