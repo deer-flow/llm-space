@@ -92,11 +92,21 @@ export interface GeneratorHost {
   ): Promise<{ ok: true; dir: string } | { ok: false; error: string }>;
   /** Whether `uv` is installed on the host, and its version when detectable. */
   checkUv(): Promise<{ installed: boolean; version?: string }>;
-  /** Run `uv <args>` with cwd = an authorized project directory. */
+  /**
+   * Run `uv <args>` with cwd = an authorized project directory. `opts.timeoutMs`
+   * kills the process after that long, returning `timedOut: true` instead of
+   * letting the RPC layer reject and orphan `uv`.
+   */
   runUv(
     rootDir: string,
-    args: string[]
-  ): Promise<{ code: number; stdout: string; stderr: string }>;
+    args: string[],
+    opts?: { timeoutMs?: number }
+  ): Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+    timedOut: boolean;
+  }>;
   /** Write a UTF-8 file under an authorized project directory. */
   writeFile(
     rootDir: string,

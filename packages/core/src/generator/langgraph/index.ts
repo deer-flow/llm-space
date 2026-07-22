@@ -6,6 +6,7 @@ import {
   type SearchSettings,
 } from "../../types";
 import type {
+  DepsInstallStatus,
   GeneratorDefinition,
   GeneratorResult,
   GeneratorModelInfo,
@@ -28,6 +29,7 @@ import {
   modelDependency,
   planMd,
   pyInit,
+  pyproject,
   readme,
   skillToolPy,
   toPyIdent,
@@ -43,17 +45,25 @@ import {
 } from "./tools";
 
 /**
- * uv install steps run in order after `uv init`. The chat-model package
- * (`langchain-openai` / `langchain-deepseek`) plus any per-tool extras
- * (`requests`, `langchain-mcp-adapters`) are appended.
+ * How long a single `uv sync` may run before we give up and tell the user to
+ * run it themselves. Kept under the RPC ceiling so the host returns a normal
+ * timed-out result instead of the RPC layer rejecting and orphaning `uv`.
  */
-function _uvSteps(modelPackage: string, extraDeps: string[]): string[][] {
-  return [
-    // Pin the interpreter — LangGraph + the deps below want a modern Python.
-    ["init", "--no-workspace", "--python", "3.12"],
-    ["add", "langchain", "langgraph", "jinja2", modelPackage, ...extraDeps],
-    ["add", "--dev", "langgraph-cli[inmem]"],
-  ];
+const UV_SYNC_TIMEOUT_MS = 3 * 60_000;
+
+/**
+ * The project's runtime dependencies (bare package names). The chat-model
+ * package is chosen from the model; per-tool extras (`requests`,
+ * `langchain-mcp-adapters`) are appended. Versions are pinned later, in
+ * `pyproject()`.
+ */
+function _runtimeDeps(modelPackage: string, extraDeps: string[]): string[] {
+  return ["langchain", "langgraph", "jinja2", modelPackage, ...extraDeps];
+}
+
+/** The project directory's base name (for `[project] name`), path-separator safe. */
+function _dirBaseName(dir: string): string {
+  return dir.split(/[/\\]/).filter(Boolean).pop() ?? "agent";
 }
 
 /** Source for a built-in tool generated (not copied) from the user's config. */
@@ -110,6 +120,9 @@ export const langgraphGenerator: GeneratorDefinition = {
     const write = async (path: string, contents: string): Promise<void> => {
       await caps.writeFile(dir, path, contents);
       written.push(path);
+      // Surface every file as its own step — fast, but the user should see the
+      // project taking shape file by file, not just phase headers.
+      workflow.log(`+ ${path}`);
     };
 
     // Partition the thread's tools by kind.
@@ -155,18 +168,37 @@ export const langgraphGenerator: GeneratorDefinition = {
       : undefined;
 
     workflow.phase("Scaffold");
+    // Write the project manifest directly rather than `uv init` + a chain of
+    // `uv add` calls — each is a network round-trip that can outlast the RPC
+    // timeout. Versions are pinned in `pyproject()`, so a later `uv sync`
+    // resolves them in one shot (and can be retried by hand if it's slow).
+    const extraDeps = [
+      ...builtinPipDeps(builtinIncluded.map((t) => t.name)),
+      ...(hasMcp ? ["langchain-mcp-adapters"] : []),
+    ];
+    const runtimeDeps = _runtimeDeps(modelDependency(modelInfo), extraDeps);
+    await write("pyproject.toml", pyproject(_dirBaseName(dir), runtimeDeps));
+    await write(".python-version", "3.12\n");
+
+    // Install once, best-effort. `uv sync` is network-bound and can outlast the
+    // timeout on slow links, so a timeout/failure is surfaced to the user (who
+    // reruns `uv sync` themselves) rather than failing the whole generation.
+    let depsInstall: DepsInstallStatus = "skipped";
     const uv = await caps.checkUv();
     if (uv.installed) {
-      const extraDeps = [
-        ...builtinPipDeps(builtinIncluded.map((t) => t.name)),
-        ...(hasMcp ? ["langchain-mcp-adapters"] : []),
-      ];
-      for (const args of _uvSteps(modelDependency(modelInfo), extraDeps)) {
-        workflow.log(`uv ${args.join(" ")}`);
-        await caps.runUv(dir, args);
+      workflow.log("uv sync");
+      const res = await caps.runUv(dir, ["sync"], {
+        timeoutMs: UV_SYNC_TIMEOUT_MS,
+      });
+      depsInstall = res.timedOut
+        ? "timeout"
+        : res.code === 0
+          ? "installed"
+          : "failed";
+      if (depsInstall !== "installed") {
+        const detail = (res.stderr || res.stdout || "").trim().slice(0, 300);
+        workflow.log(`uv sync ${depsInstall} — run \`uv sync\` yourself. ${detail}`);
       }
-      // `uv init` drops a placeholder `main.py`; our entrypoint is the agent.
-      await caps.removeFile(dir, "main.py");
     } else {
       workflow.log("uv not found — skipping dependency install");
     }
@@ -218,7 +250,6 @@ export const langgraphGenerator: GeneratorDefinition = {
     await write("src/agents/agent.py", agentPy(toolRefs, hasMcp));
 
     workflow.phase("Export context");
-    workflow.log("Writing rendered prompt, messages, variables, custom tools");
     for (const file of buildContextExports(context, rendered)) {
       await write(file.path, file.contents);
     }
@@ -226,6 +257,6 @@ export const langgraphGenerator: GeneratorDefinition = {
     await write("PLAN.md", planMd(functionTools, mcpTools));
 
     workflow.phase("Done");
-    return { dir, files: written };
+    return { dir, files: written, depsInstall };
   },
 };

@@ -37,6 +37,7 @@ LLM Space 是 [DeerFlow](https://github.com/bytedance/deer-flow) 的姊妹项目
 - **调试**：从运行历史中回放一次执行，并逐步排查问题。
 - **评估**：跨多次运行衡量你的 Agent 表现。
 - **管理**：把 threads 作为本机文件组织和管理。
+- **生成**：让 AI 帮你生成 prompt 和 tools，还能把任意 thread 生成为可运行的 [LangGraph](https://github.com/langchain-ai/langgraph) Agent 的 Python 代码。
 
 你的文件和 API keys 都保存在本机。LLM Space 会收集少量匿名使用数据来改进应用；具体收集内容和退出方式见 [TELEMETRY.md](./TELEMETRY.md)。
 

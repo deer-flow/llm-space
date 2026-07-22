@@ -11,6 +11,7 @@ import {
   envFile,
   getGenerator,
   mcpEnvEntries,
+  type DepsInstallStatus,
   type GeneratorCapabilities,
   type GeneratorMcpServer,
   type GeneratorModelInfo,
@@ -175,17 +176,10 @@ export function GenerateProjectButton() {
 
       const capabilities: GeneratorCapabilities = {
         checkUv: () => generator.checkUv(),
-        runUv: async (rootDir, args) => {
-          const res = await generator.runUv(rootDir, args);
-          if (res.code !== 0) {
-            throw new Error(
-              `uv ${args.join(" ")} failed (exit ${res.code}):\n${
-                res.stderr || res.stdout
-              }`
-            );
-          }
-          return res;
-        },
+        // Raw pass-through: the generator inspects the exit code / `timedOut`
+        // itself (a slow `uv sync` is reported, not thrown, so generation still
+        // finishes and the user can rerun it).
+        runUv: (rootDir, args, opts) => generator.runUv(rootDir, args, opts),
         writeFile: (rootDir, relativePath, contents) =>
           generator.writeFile(rootDir, relativePath, contents),
         removeFile: (rootDir, relativePath) =>
@@ -466,6 +460,7 @@ export function GenerateProjectButton() {
               <SuccessStep
                 dir={result.dir}
                 envWritten={result.files.includes(".env")}
+                depsInstall={result.depsInstall}
                 hasFunctionTools={(context?.tools ?? []).some(
                   (t) => t.type === "function"
                 )}
@@ -888,13 +883,41 @@ function RunStep({
 function SuccessStep({
   dir,
   envWritten,
+  depsInstall,
   hasFunctionTools,
 }: {
   dir: string;
   envWritten: boolean;
+  depsInstall: DepsInstallStatus;
   hasFunctionTools: boolean;
 }) {
   const steps: { title: string; body: React.ReactNode }[] = [];
+
+  // Dependencies weren't installed during generation (usually a slow uv
+  // download hit the timeout) — walk the user through finishing it by hand.
+  if (depsInstall !== "installed") {
+    steps.push({
+      title: "Install dependencies",
+      body: (
+        <>
+          <p className="text-muted-foreground text-xs/relaxed">
+            {depsInstall === "timeout"
+              ? "Installing took too long and was stopped — uv was probably still downloading. Finish it in this folder:"
+              : depsInstall === "skipped"
+                ? "uv wasn't available, so dependencies weren't installed. In this folder, run:"
+                : "Installing didn't finish. In this folder, run:"}
+          </p>
+          <CommandBlock command={`cd ${_shellQuote(dir)} && uv sync`} />
+          <p className="text-muted-foreground text-xs/relaxed">
+            uv downloads the project&apos;s Python packages; the first run can
+            take a few minutes. On a slow connection, uncomment a mirror in{" "}
+            <code className="text-foreground font-mono">pyproject.toml</code> to
+            speed it up.
+          </p>
+        </>
+      ),
+    });
+  }
 
   steps.push({
     title: "Set up your environment",

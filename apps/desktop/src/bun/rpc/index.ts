@@ -320,7 +320,8 @@ export function createMainWindowRPC({
         generatorPrepareDirectory: ({ parentDir, projectName }) =>
           prepareGeneratorDir(parentDir, projectName),
         generatorCheckUv: () => checkUv(),
-        generatorRunUv: ({ rootDir, args }) => runUv(rootDir, args),
+        generatorRunUv: ({ rootDir, args, timeoutMs }) =>
+          runUv(rootDir, args, { timeoutMs }),
         generatorWriteFile: async ({ rootDir, relativePath, contents }) => {
           await writeProjectFile(rootDir, relativePath, contents);
           return null;

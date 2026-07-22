@@ -124,11 +124,17 @@ export async function checkUv(): Promise<{ installed: boolean; version?: string 
   }
 }
 
-/** Run `uv <args>` with cwd = an authorized `rootDir`. Never runs another binary. */
+/**
+ * Run `uv <args>` with cwd = an authorized `rootDir`. Never runs another binary.
+ * When `timeoutMs` is set, the process is killed after that long and the result
+ * comes back with `timedOut: true` (rather than hanging until the RPC layer
+ * rejects, which would leave `uv` running as an orphan).
+ */
 export async function runUv(
   rootDir: string,
-  args: string[]
-): Promise<{ code: number; stdout: string; stderr: string }> {
+  args: string[],
+  opts?: { timeoutMs?: number }
+): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
   const resolved = _assertAuthorized(rootDir);
   const proc = Bun.spawn(["uv", ...args], {
     cwd: resolved,
@@ -136,12 +142,23 @@ export async function runUv(
     stderr: "pipe",
     env: process.env,
   });
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (opts?.timeoutMs && opts.timeoutMs > 0) {
+    timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill();
+    }, opts.timeoutMs);
+  }
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ]);
   const code = await proc.exited;
-  return { code, stdout, stderr };
+  if (timer) {
+    clearTimeout(timer);
+  }
+  return { code, stdout, stderr, timedOut };
 }
 
 /** Resolve `relativePath` under an authorized `rootDir`, rejecting traversal. */

@@ -239,8 +239,13 @@ export interface DesktopRPCType {
       // can ever be spawned; `rootDir` must have been authorized via
       // `generatorPickDirectory`. Returns the raw exit code + output.
       generatorRunUv: {
-        params: { rootDir: string; args: string[] };
-        response: { code: number; stdout: string; stderr: string };
+        params: { rootDir: string; args: string[]; timeoutMs?: number };
+        response: {
+          code: number;
+          stdout: string;
+          stderr: string;
+          timedOut: boolean;
+        };
       };
       // Write a UTF-8 file under an authorized project directory. Rejects path
       // traversal outside `rootDir`.

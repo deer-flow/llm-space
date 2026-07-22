@@ -17,6 +17,18 @@ export interface UvRunResult {
   code: number;
   stdout: string;
   stderr: string;
+  /** The run hit its `timeoutMs` and the process was killed before exiting. */
+  timedOut: boolean;
+}
+
+/** Options for a single `uv` run. */
+export interface UvRunOptions {
+  /**
+   * Kill the process and return `timedOut: true` after this many milliseconds.
+   * Keep it comfortably under the RPC ceiling so the request returns a normal
+   * (timed-out) result instead of the RPC layer rejecting and orphaning `uv`.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -28,8 +40,16 @@ export interface UvRunResult {
 export interface GeneratorCapabilities {
   /** Whether `uv` is installed, and its version. */
   checkUv(): Promise<UvStatus>;
-  /** Run `uv <args>` with cwd = `rootDir`. Rejects on a non-zero exit. */
-  runUv(rootDir: string, args: string[]): Promise<UvRunResult>;
+  /**
+   * Run `uv <args>` with cwd = `rootDir`. Returns the raw exit code + output;
+   * does NOT throw on a non-zero exit, so callers decide what a failure means.
+   * Honors `opts.timeoutMs`, killing the process and setting `timedOut`.
+   */
+  runUv(
+    rootDir: string,
+    args: string[],
+    opts?: UvRunOptions
+  ): Promise<UvRunResult>;
   /** Write a UTF-8 text file at `rootDir/relativePath`, creating parents. */
   writeFile(rootDir: string, relativePath: string, contents: string): Promise<void>;
   /** Delete `rootDir/relativePath` if it exists; a no-op when missing. */
@@ -139,12 +159,23 @@ export interface GeneratorRunInput {
   capabilities: GeneratorCapabilities;
 }
 
+/**
+ * How the dependency install went. `installed` = `uv sync` succeeded;
+ * `timeout` = it was killed after taking too long (usually a slow download);
+ * `failed` = `uv sync` exited non-zero; `skipped` = uv wasn't available so no
+ * attempt was made. Anything but `installed` means the user must run `uv sync`
+ * themselves, and the success page tells them so.
+ */
+export type DepsInstallStatus = "installed" | "timeout" | "failed" | "skipped";
+
 /** Outcome of a completed generator run. */
 export interface GeneratorResult {
   /** Absolute path of the generated project directory. */
   dir: string;
   /** Project-relative paths written. */
   files: string[];
+  /** Whether the project's dependencies were installed during generation. */
+  depsInstall: DepsInstallStatus;
 }
 
 /**

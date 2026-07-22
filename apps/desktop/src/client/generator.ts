@@ -34,9 +34,14 @@ export function checkUv(): Promise<{ installed: boolean; version?: string }> {
 /** Run `uv <args>` in an authorized project directory. */
 export function runUv(
   rootDir: string,
-  args: string[]
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return _rpc().request.generatorRunUv({ rootDir, args });
+  args: string[],
+  opts?: { timeoutMs?: number }
+): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
+  return _rpc().request.generatorRunUv({
+    rootDir,
+    args,
+    timeoutMs: opts?.timeoutMs,
+  });
 }
 
 /** Write a text file under an authorized project directory. */

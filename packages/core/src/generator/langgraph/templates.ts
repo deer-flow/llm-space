@@ -68,6 +68,89 @@ export function modelDependency(info: GeneratorModelInfo): string {
   return info.deepseekThinking ? "langchain-deepseek" : "langchain-openai";
 }
 
+/**
+ * Version constraints baked into the generated `pyproject.toml`. We pin the
+ * packages we ship code against so a fresh `uv sync` resolves the same major
+ * lines we generate for; anything not listed is emitted bare (uv picks the
+ * latest compatible release). Bump these when the templates target newer APIs.
+ */
+const _PINNED_VERSIONS: Record<string, string> = {
+  jinja2: ">=3.1.6",
+  langchain: ">=1.3.14",
+  langgraph: ">=1.2.9",
+  "langchain-anthropic": ">=1.4.8",
+  "langchain-deepseek": ">=1.1.0",
+  "langchain-openai": ">=1.4.0",
+};
+
+/** The dev-group dependency (the LangGraph CLI, for `uv run langgraph dev`). */
+const _DEV_DEPENDENCY = "langgraph-cli[inmem]>=0.4.31";
+
+/** Render `package` as a PEP 508 requirement, applying a pinned version if any. */
+function _requirement(pkg: string): string {
+  const version = _PINNED_VERSIONS[pkg];
+  return version ? `${pkg}${version}` : pkg;
+}
+
+/**
+ * A PEP 503-normalized distribution name for the project's `[project] name`
+ * (lowercase, non-alphanumeric runs collapsed to a single hyphen). Mirrors the
+ * name `uv init` would derive from the target directory.
+ */
+export function toProjectName(dirName: string): string {
+  const name = dirName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return name || "agent";
+}
+
+/**
+ * `pyproject.toml` — written directly instead of running `uv init` + a chain of
+ * `uv add` calls (each of which hits the network and can outlast the RPC
+ * timeout). Versions are pinned for the packages we ship code against; the
+ * chat-model package + any per-tool extras are passed in so only what's used is
+ * declared. A commented China-mainland mirror block is included so users on slow
+ * PyPI links can uncomment one line to speed `uv sync` up.
+ */
+export function pyproject(
+  projectDirName: string,
+  runtimeDeps: readonly string[]
+): string {
+  const deps = [...new Set(runtimeDeps)].sort().map(_requirement);
+  const depLines = deps.map((d) => `    ${_pyStr(d)},`).join("\n");
+  return `[project]
+name = ${_pyStr(toProjectName(projectDirName))}
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+${depLines}
+]
+
+[dependency-groups]
+dev = [
+    ${_pyStr(_DEV_DEPENDENCY)},
+]
+
+# 国内网络下载慢？取消下面某个镜像的注释，让 uv 从国内源拉包，加速 uv sync。
+# Slow downloads in mainland China? Uncomment one mirror below so uv pulls
+# packages from a domestic index — this speeds up \`uv sync\`.
+# [[tool.uv.index]]
+# url = "https://mirrors.volces.com/pypi/simple/"      # 火山引擎 Volcengine
+# # url = "https://mirrors.aliyun.com/pypi/simple/"    # 阿里云 Aliyun
+# # url = "https://pypi.tuna.tsinghua.edu.cn/simple"   # 清华 Tsinghua
+# default = true
+#
+# 注意：\`[tool.uv.pip]\` 仅对 \`uv pip\` 命令生效，对 \`uv sync\` 无效。
+# Note: \`[tool.uv.pip]\` only affects the \`uv pip\` CLI, not \`uv sync\`.
+# [tool.uv.pip]
+# index-url = "https://mirrors.volces.com/pypi/simple/"
+`;
+}
+
 /** The literal API key to write into `.env`, or `null` for a `$ENV` reference. */
 export function literalApiKey(info: GeneratorModelInfo): string | null {
   if (!info.apiKey || info.apiKey.startsWith("$")) {
