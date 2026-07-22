@@ -65,8 +65,18 @@ jobs:
       # pack:win includes the production renderer build. Verification inspects
       # the compressed tar without extracting into the checkout, then the smoke
       # test installs and launches it under an isolated temporary LOCALAPPDATA.
-      - run: mise run pack:win
+      - name: Build unsigned Windows x64 Canary
+        env:
+          LLM_SPACE_UPDATE_BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/updates
+        run: mise run pack:win
 
       - run: mise run verify:pack:win
 
       - run: mise run smoke:win
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-x64-canary
+          path: apps/desktop/artifacts/
+          if-no-files-found: error
+          retention-days: 7
