@@ -27,16 +27,89 @@ $oldEnvironment = @{
 }
 $launcherProcess = $null
 $ownedProcessIds = [Collections.Generic.HashSet[int]]::new()
-$shortcutRoots = @(
+$desktopShortcutRoots = @(
   [Environment]::GetFolderPath("Desktop"),
+  [Environment]::GetFolderPath("CommonDesktopDirectory")
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+$startMenuShortcutRoots = @(
   [Environment]::GetFolderPath("StartMenu"),
-  [Environment]::GetFolderPath("CommonDesktopDirectory"),
   [Environment]::GetFolderPath("CommonStartMenu")
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
-$existingShortcuts = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$shortcutRoots = @($desktopShortcutRoots) + @($startMenuShortcutRoots) | Select-Object -Unique
+$existingShortcutContents = @{}
 foreach ($root in $shortcutRoots) {
   Get-ChildItem -LiteralPath $root -Recurse -File -Filter "*LLM Space*.lnk" -ErrorAction SilentlyContinue |
-    ForEach-Object { [void]$existingShortcuts.Add($_.FullName) }
+    ForEach-Object { $existingShortcutContents[$_.FullName] = [IO.File]::ReadAllBytes($_.FullName) }
+}
+
+function Get-WindowsExecutableSubsystem([string]$Path) {
+  $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  $reader = [IO.BinaryReader]::new($stream)
+  try {
+    if ($stream.Length -lt 0x40 -or $reader.ReadUInt16() -ne 0x5A4D) {
+      throw "$Path is not a Windows PE image: missing DOS header."
+    }
+
+    $stream.Position = 0x3C
+    $peOffset = $reader.ReadUInt32()
+    if ($peOffset + 24 -gt $stream.Length) {
+      throw "$Path is not a Windows PE image: missing PE header."
+    }
+
+    $stream.Position = $peOffset
+    if ($reader.ReadUInt32() -ne 0x00004550) {
+      throw "$Path is not a Windows PE image: missing PE signature."
+    }
+
+    $stream.Position = $peOffset + 20
+    $optionalHeaderSize = $reader.ReadUInt16()
+    $optionalHeaderOffset = $peOffset + 24
+    if ($optionalHeaderSize -lt 70 -or $optionalHeaderOffset + $optionalHeaderSize -gt $stream.Length) {
+      throw "$Path has a truncated Windows PE optional header."
+    }
+
+    $stream.Position = $optionalHeaderOffset
+    $magic = $reader.ReadUInt16()
+    if ($magic -ne 0x10B -and $magic -ne 0x20B) {
+      throw ("{0} has unsupported Windows PE optional-header magic 0x{1:X}." -f $Path, $magic)
+    }
+
+    $stream.Position = $optionalHeaderOffset + 68
+    return $reader.ReadUInt16()
+  } finally {
+    $reader.Dispose()
+    $stream.Dispose()
+  }
+}
+
+function Assert-WindowsGuiExecutable([string]$Path, [string]$Description) {
+  $subsystem = Get-WindowsExecutableSubsystem $Path
+  if ($subsystem -ne 2) {
+    throw "$Description must use the Windows GUI subsystem (2), found $subsystem at $Path."
+  }
+  Write-Host "Verified Windows GUI subsystem: $Description"
+}
+
+function Get-Shortcuts([string[]]$Roots) {
+  @($Roots | ForEach-Object {
+    Get-ChildItem -LiteralPath $_ -Recurse -File -Filter "*LLM Space*.lnk" -ErrorAction SilentlyContinue
+  })
+}
+
+function Assert-Shortcuts([string[]]$Roots, [string]$Description, [string]$ExpectedTarget) {
+  $shell = New-Object -ComObject WScript.Shell
+  try {
+    $matching = @(Get-Shortcuts $Roots | Where-Object {
+      $shortcut = $shell.CreateShortcut($_.FullName)
+      $shortcut.TargetPath.Equals($ExpectedTarget, [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($matching.Count -lt 1) {
+      throw "The installer did not create an LLM Space $Description shortcut targeting $ExpectedTarget."
+    }
+  } finally {
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)
+  }
+  Write-Host "Verified $Description shortcut: $($matching[0].FullName)"
 }
 
 function Get-TestProcesses([string]$InstallRoot) {
@@ -45,6 +118,25 @@ function Get-TestProcesses([string]$InstallRoot) {
     ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) -or
     ($_.CommandLine -and $_.CommandLine.IndexOf($root, [StringComparison]::OrdinalIgnoreCase) -ge 0)
   }
+}
+
+function Get-DescendantProcesses([int]$RootProcessId) {
+  $allProcesses = @(Get-CimInstance Win32_Process)
+  $knownIds = [Collections.Generic.HashSet[int]]::new()
+  [void]$knownIds.Add($RootProcessId)
+  $descendants = [Collections.Generic.List[object]]::new()
+  $added = $true
+  while ($added) {
+    $added = $false
+    foreach ($process in $allProcesses) {
+      if (-not $knownIds.Contains([int]$process.ProcessId) -and $knownIds.Contains([int]$process.ParentProcessId)) {
+        [void]$knownIds.Add([int]$process.ProcessId)
+        [void]$descendants.Add($process)
+        $added = $true
+      }
+    }
+  }
+  $descendants
 }
 
 function Wait-ForPath([string]$Path, [int]$Seconds, [string]$Description) {
@@ -80,49 +172,81 @@ try {
     throw "Installer metadata must contain identifier and channel."
   }
 
+  Assert-WindowsGuiExecutable $setupFiles[0].FullName "Setup.exe"
   Write-Host "Installing $($installerZip[0].Name) into isolated LOCALAPPDATA..."
-  $setupProcess = Start-Process -FilePath $setupFiles[0].FullName -Wait -PassThru -WindowStyle Hidden
+  $setupProcess = Start-Process -FilePath $setupFiles[0].FullName -Wait -PassThru
   if ($setupProcess.ExitCode -ne 0) {
     throw "Setup.exe exited with code $($setupProcess.ExitCode)."
   }
 
   $installRoot = Join-Path $isolatedLocalAppData "$($metadata.identifier)\$($metadata.channel)\app"
   $launcher = Join-Path $installRoot "bin\launcher.exe"
+  $coreLauncher = Join-Path $installRoot "bin\launcher-core.exe"
   $bundledBun = Join-Path $installRoot "bin\bun.exe"
   $mainScript = Join-Path $installRoot "Resources\main.js"
   Wait-ForPath $mainScript $TimeoutSeconds "installed Resources/main.js"
-  foreach ($required in @($launcher, $bundledBun, $mainScript)) {
+  foreach ($required in @($launcher, $coreLauncher, $bundledBun, $mainScript)) {
     if (-not (Test-Path -LiteralPath $required)) {
       throw "Installed package is missing $required"
     }
   }
+  Assert-WindowsGuiExecutable $launcher "installed launcher.exe wrapper"
+  Assert-WindowsGuiExecutable $bundledBun "installed bun.exe"
+  $coreSubsystem = Get-WindowsExecutableSubsystem $coreLauncher
+  if ($coreSubsystem -ne 3) {
+    throw "installed launcher-core.exe must remain a console image behind the hidden wrapper; found subsystem $coreSubsystem."
+  }
+  Assert-Shortcuts $desktopShortcutRoots "desktop" $launcher
+  Assert-Shortcuts $startMenuShortcutRoots "Start Menu" $launcher
 
   Write-Host "Launching installed Windows app..."
-  $launcherProcess = Start-Process -FilePath $launcher -PassThru -WindowStyle Hidden
+  $launcherProcess = Start-Process -FilePath $launcher -PassThru
   [void]$ownedProcessIds.Add($launcherProcess.Id)
 
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  $coreProcess = $null
   $bunProcess = $null
   while ([DateTime]::UtcNow -lt $deadline) {
     Get-TestProcesses $installRoot | ForEach-Object { [void]$ownedProcessIds.Add([int]$_.ProcessId) }
-    $launcherAlive = Get-Process -Id $launcherProcess.Id -ErrorAction SilentlyContinue
+    $wrapperAlive = Get-Process -Id $launcherProcess.Id -ErrorAction SilentlyContinue
+    $coreProcess = Get-TestProcesses $installRoot | Where-Object {
+      $_.Name -ieq "launcher-core.exe"
+    } | Select-Object -First 1
     $bunProcess = Get-TestProcesses $installRoot | Where-Object {
       $_.Name -ieq "bun.exe" -and $_.CommandLine -and $_.CommandLine.IndexOf("Resources\main.js", [StringComparison]::OrdinalIgnoreCase) -ge 0
     } | Select-Object -First 1
-    if ($launcherAlive -and $bunProcess) { break }
+    if ($wrapperAlive -and $coreProcess -and $bunProcess) { break }
     Start-Sleep -Seconds 1
+  }
+  if (-not $coreProcess) {
+    throw "The console-free wrapper did not start launcher-core.exe."
   }
   if (-not $bunProcess) {
     throw "The installed app did not start bun.exe with Resources/main.js."
   }
   if (-not (Get-Process -Id $launcherProcess.Id -ErrorAction SilentlyContinue)) {
-    throw "launcher.exe exited before the Bun main process became ready."
+    throw "launcher.exe wrapper exited before the app became ready."
   }
 
-  Write-Host "Observing launcher and Bun process liveness for $ObservationSeconds seconds..."
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  $mainWindow = $null
+  while ([DateTime]::UtcNow -lt $deadline) {
+    $mainWindow = Get-Process -Id ([int]$bunProcess.ProcessId) -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq "LLM Space" }
+    if ($mainWindow) { break }
+    Start-Sleep -Milliseconds 500
+  }
+  if (-not $mainWindow) {
+    throw "The installed app did not create the LLM Space main window."
+  }
+
+  Write-Host "Observing the single app window and process liveness for $ObservationSeconds seconds..."
   for ($second = 0; $second -lt $ObservationSeconds; $second++) {
     if (-not (Get-Process -Id $launcherProcess.Id -ErrorAction SilentlyContinue)) {
-      throw "launcher.exe exited during the observation window."
+      throw "launcher.exe wrapper exited during the observation window."
+    }
+    if (-not (Get-Process -Id ([int]$coreProcess.ProcessId) -ErrorAction SilentlyContinue)) {
+      throw "launcher-core.exe exited during the observation window."
     }
     $bunAlive = Get-TestProcesses $installRoot | Where-Object {
       $_.Name -ieq "bun.exe" -and $_.CommandLine -and $_.CommandLine.IndexOf("Resources\main.js", [StringComparison]::OrdinalIgnoreCase) -ge 0
@@ -131,6 +255,17 @@ try {
       throw "bun.exe exited during the observation window."
     }
     [void]$ownedProcessIds.Add([int]$bunAlive.ProcessId)
+    $descendants = @(Get-DescendantProcesses $launcherProcess.Id)
+    $descendants | ForEach-Object { [void]$ownedProcessIds.Add([int]$_.ProcessId) }
+    $visibleAppProcesses = @($descendants | ForEach-Object {
+      Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue
+    } | Where-Object { $_.MainWindowHandle -ne 0 })
+    $unexpectedWindows = @($visibleAppProcesses | Where-Object { $_.MainWindowTitle -ne "LLM Space" })
+    $mainWindows = @($visibleAppProcesses | Where-Object { $_.MainWindowTitle -eq "LLM Space" })
+    if ($unexpectedWindows.Count -gt 0 -or $mainWindows.Count -ne 1) {
+      $titles = @($visibleAppProcesses | ForEach-Object { "$($_.ProcessName): $($_.MainWindowTitle)" }) -join "; "
+      throw "Expected only the LLM Space main window; visible related windows: $titles"
+    }
     Start-Sleep -Seconds 1
   }
 
@@ -145,8 +280,12 @@ try {
 
   foreach ($root in $shortcutRoots) {
     Get-ChildItem -LiteralPath $root -Recurse -File -Filter "*LLM Space*.lnk" -ErrorAction SilentlyContinue |
-      Where-Object { -not $existingShortcuts.Contains($_.FullName) } |
+      Where-Object { -not $existingShortcutContents.ContainsKey($_.FullName) } |
       Remove-Item -Force -ErrorAction SilentlyContinue
+  }
+
+  foreach ($entry in $existingShortcutContents.GetEnumerator()) {
+    [IO.File]::WriteAllBytes($entry.Key, $entry.Value)
   }
 
   foreach ($name in $oldEnvironment.Keys) {

@@ -4,6 +4,8 @@ import path from "node:path";
 
 import rcedit from "rcedit";
 
+import { patchWindowsExecutableFileToGui } from "./windows-executable";
+
 if (process.env.ELECTROBUN_OS === "win") {
   const artifactDirectory = _requiredEnv("ELECTROBUN_ARTIFACT_DIR");
   const [installerZip] = readdirSync(artifactDirectory).filter(
@@ -33,6 +35,7 @@ if (process.env.ELECTROBUN_OS === "win") {
     await rcedit(setup, {
       icon: path.resolve(import.meta.dir, "..", "icon.ico"),
     });
+    patchWindowsExecutableFileToGui(setup);
 
     const repacked = path.join(tempDirectory, "installer.zip");
     _runPowerShell(
@@ -51,20 +54,16 @@ if (process.env.ELECTROBUN_OS === "win") {
 
 function _runPowerShell(script: string, env: Record<string, string>): void {
   const result = Bun.spawnSync(
-    [
-      "powershell.exe",
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      script,
-    ],
+    ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
     {
       env: { ...process.env, ...env },
       stdio: ["ignore", "inherit", "inherit"],
     }
   );
   if (result.exitCode !== 0) {
-    throw new Error(`PowerShell archive command exited with ${result.exitCode}.`);
+    throw new Error(
+      `PowerShell archive command exited with ${result.exitCode}.`
+    );
   }
 }
 

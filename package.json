@@ -60,5 +60,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "typebox": "catalog:"
+  },
+  "patchedDependencies": {
+    "electrobun@1.18.1": "patches/electrobun@1.18.1.patch"
   }
 }

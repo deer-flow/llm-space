@@ -1,0 +1,6 @@
+diff --git a/dist/api/bun/core/Socket.ts b/dist/api/bun/core/Socket.ts
+index cdaa2bca0fabe577cb667056aa6f8f84211189c2..2d291f7dd7b97a644d40f2d105b0e7028387b0ce 100644
+--- a/dist/api/bun/core/Socket.ts
++++ b/dist/api/bun/core/Socket.ts
+@@ -67,0 +68 @@ const startRPCServer = () => {
++				hostname: "127.0.0.1",

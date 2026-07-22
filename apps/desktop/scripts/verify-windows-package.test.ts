@@ -13,6 +13,7 @@ interface FixtureEntry {
 
 const REQUIRED_ENTRIES: FixtureEntry[] = [
   { name: "LLMSpace-canary/bin/launcher.exe" },
+  { name: "LLMSpace-canary/bin/launcher-core.exe" },
   { name: "LLMSpace-canary/bin/bun.exe" },
   { name: "LLMSpace-canary/Resources/main.js" },
   { name: "LLMSpace-canary/Resources/app/views/mainview/index.html" },
@@ -27,19 +28,19 @@ function _tar(entries: FixtureEntry[]): Uint8Array {
     _writeString(header, 100, 8, "0000644\0");
     _writeString(header, 108, 8, "0000000\0");
     _writeString(header, 116, 8, "0000000\0");
-    _writeString(header, 124, 12, `${content.length.toString(8).padStart(11, "0")}\0`);
+    _writeString(
+      header,
+      124,
+      12,
+      `${content.length.toString(8).padStart(11, "0")}\0`
+    );
     _writeString(header, 136, 12, "00000000000\0");
     header.fill(0x20, 148, 156);
     header[156] = (entry.type ?? "0").charCodeAt(0);
     _writeString(header, 257, 6, "ustar\0");
     _writeString(header, 263, 2, "00");
     const checksum = header.reduce((sum, byte) => sum + byte, 0);
-    _writeString(
-      header,
-      148,
-      8,
-      `${checksum.toString(8).padStart(6, "0")}\0 `
-    );
+    _writeString(header, 148, 8, `${checksum.toString(8).padStart(6, "0")}\0 `);
     chunks.push(header, content);
     const padding = (512 - (content.length % 512)) % 512;
     if (padding) chunks.push(new Uint8Array(padding));
@@ -68,7 +69,7 @@ function _writeString(
 
 describe("verifyWindowsTar", () => {
   test("accepts a portable archive with the required Windows payload", () => {
-    expect(verifyWindowsTar(_tar(REQUIRED_ENTRIES))).toHaveLength(4);
+    expect(verifyWindowsTar(_tar(REQUIRED_ENTRIES))).toHaveLength(5);
   });
 
   test.each(["../outside.txt", "/absolute.txt", "C:/absolute.txt"])(
@@ -111,8 +112,8 @@ describe("verifyWindowsUpdateJson", () => {
     { platform: "macos", arch: "x64" },
     { platform: "win", arch: "arm64" },
   ])("rejects update identity $platform/$arch", (identity) => {
-    expect(() =>
-      verifyWindowsUpdateJson(JSON.stringify(identity))
-    ).toThrow("Windows x64");
+    expect(() => verifyWindowsUpdateJson(JSON.stringify(identity))).toThrow(
+      "Windows x64"
+    );
   });
 });

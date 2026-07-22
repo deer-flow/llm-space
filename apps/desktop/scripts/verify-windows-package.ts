@@ -11,6 +11,7 @@ export interface TarEntry {
 const TAR_BLOCK_SIZE = 512;
 const REQUIRED_WINDOWS_PATHS = [
   "bin/launcher.exe",
+  "bin/launcher-core.exe",
   "bin/bun.exe",
   "Resources/main.js",
   "Resources/app/views/mainview/index.html",
@@ -35,7 +36,9 @@ export function verifyWindowsTar(data: Uint8Array): TarEntry[] {
   return entries;
 }
 
-export function verifyWindowsUpdateJson(value: string): Record<string, unknown> {
+export function verifyWindowsUpdateJson(
+  value: string
+): Record<string, unknown> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
@@ -102,7 +105,7 @@ export function verifyWindowsPackage(artifactDirectory: string): {
 
 function _readTarEntries(data: Uint8Array): TarEntry[] {
   const entries: TarEntry[] = [];
-  for (let offset = 0; offset + TAR_BLOCK_SIZE <= data.length; ) {
+  for (let offset = 0; offset + TAR_BLOCK_SIZE <= data.length;) {
     const header = data.subarray(offset, offset + TAR_BLOCK_SIZE);
     if (header.every((byte) => byte === 0)) break;
 
@@ -121,9 +124,12 @@ function _readTarEntries(data: Uint8Array): TarEntry[] {
       type: typeByte === 0 ? "0" : String.fromCharCode(typeByte),
     });
 
-    offset += TAR_BLOCK_SIZE + Math.ceil(size / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
+    offset +=
+      TAR_BLOCK_SIZE + Math.ceil(size / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
     if (offset > data.length) {
-      throw new Error(`Windows package tar entry exceeds archive bounds: ${fullName}`);
+      throw new Error(
+        `Windows package tar entry exceeds archive bounds: ${fullName}`
+      );
     }
   }
   return entries;
