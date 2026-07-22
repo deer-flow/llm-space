@@ -1,15 +1,17 @@
 "use client";
 
-import type {
-  McpServerView,
-  ModelConfig,
-  ModelProviderGroup,
-  SearchSettings,
-  ThreadContext,
+import {
+  getMessageText,
+  type McpServerView,
+  type ModelConfig,
+  type ModelProviderGroup,
+  type SearchSettings,
+  type ThreadContext,
 } from "@llm-space/core";
 import {
   envFile,
   getGenerator,
+  isMetaUserMessage,
   mcpEnvEntries,
   type DepsInstallStatus,
   type GeneratorCapabilities,
@@ -39,6 +41,7 @@ import { toast } from "sonner";
 
 import { useHostServices } from "@llm-space/ui/host";
 import { Spinner } from "@llm-space/ui/ui/spinner";
+import { Switch } from "@llm-space/ui/ui/switch";
 
 import { cn } from "../../../lib/utils";
 import { Button } from "../../../ui/button";
@@ -64,7 +67,8 @@ const GENERATOR_ID = "langgraph";
 const DEFAULT_PARENT_DIR = "~/Desktop";
 
 /** Astral's uv installation guide, opened from the "uv required" gate. */
-const UV_INSTALL_URL = "https://docs.astral.sh/uv/getting-started/installation/";
+const UV_INSTALL_URL =
+  "https://docs.astral.sh/uv/getting-started/installation/";
 
 /** Selectable target frameworks. Only LangGraph is available in V1. */
 const FRAMEWORKS = [
@@ -114,6 +118,14 @@ export function GenerateProjectButton() {
   // Directory step.
   const [parentDir, setParentDir] = useState(DEFAULT_PARENT_DIR);
   const [projectName, setProjectName] = useState("");
+  const metaUserPromptSuggested = useMemo(
+    () => isMetaUserMessage(context),
+    [context]
+  );
+  const hasFirstUserMessage = context?.messages?.[0]?.role === "user";
+  const [useMetaUserPrompt, setUseMetaUserPrompt] = useState(
+    metaUserPromptSuggested
+  );
   const [preparing, setPreparing] = useState(false);
   const [targetError, setTargetError] = useState<string | null>(null);
 
@@ -146,6 +158,7 @@ export function GenerateProjectButton() {
     setFramework(GENERATOR_ID);
     setParentDir(DEFAULT_PARENT_DIR);
     setProjectName(_defaultProjectName(title));
+    setUseMetaUserPrompt(metaUserPromptSuggested);
     setTargetError(null);
     setPreparing(false);
     setUvMissing(false);
@@ -157,7 +170,7 @@ export function GenerateProjectButton() {
     setLastMcpServers([]);
     setEnvConfirmOpen(false);
     setWritingEnv(false);
-  }, [open, title]);
+  }, [open, title, metaUserPromptSuggested]);
 
   const targetPreview = useMemo(
     () => _joinPreview(parentDir, projectName),
@@ -201,6 +214,13 @@ export function GenerateProjectButton() {
           context?.systemPrompt ?? "",
           (path) => files.readText(path)
         );
+        const firstMessage = context?.messages?.[0];
+        const firstUserMessageTemplate =
+          useMetaUserPrompt && firstMessage?.role === "user"
+            ? await _expandIncludes(getMessageText(firstMessage), (path) =>
+                files.readText(path)
+              )
+            : undefined;
         const renderedVariableValues: Record<string, string> =
           Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
@@ -229,6 +249,8 @@ export function GenerateProjectButton() {
           context: context ?? {},
           rendered: rendered.context,
           systemPromptTemplate,
+          firstUserMessageTemplate,
+          useMetaUserPrompt,
           skills: skillList.map((s) => ({ name: s.name, path: s.path })),
           renderedVariableValues,
           model,
@@ -239,8 +261,6 @@ export function GenerateProjectButton() {
         });
         if (outcome) {
           setResult(outcome);
-          // Open the finished project folder so the user lands right in it.
-          void builtinTools.openAbsolutePath(outcome.dir);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -258,7 +278,7 @@ export function GenerateProjectButton() {
       framework,
       providers,
       mcp,
-      builtinTools,
+      useMetaUserPrompt,
     ]
   );
 
@@ -313,6 +333,18 @@ export function GenerateProjectButton() {
       setTargetError(null);
     }
   }, [generator]);
+
+  const openGeneratedProject = useCallback(() => {
+    if (result) {
+      void builtinTools.openAbsolutePath(result.dir);
+    }
+  }, [builtinTools, result]);
+
+  const skipEnvFile = useCallback(() => {
+    openGeneratedProject();
+    setEnvConfirmOpen(false);
+    setOpen(false);
+  }, [openGeneratedProject]);
 
   // Opt-in: write a real `.env` into the generated project, resolving the
   // model + search keys to their actual values (following `$ENV` references).
@@ -371,11 +403,21 @@ export function GenerateProjectButton() {
         description: e instanceof Error ? e.message : String(e),
       });
     } finally {
+      openGeneratedProject();
       setWritingEnv(false);
       setEnvConfirmOpen(false);
       setOpen(false);
     }
-  }, [generator, model, result, providers, context, lastSearch, lastMcpServers]);
+  }, [
+    generator,
+    model,
+    result,
+    providers,
+    context,
+    lastSearch,
+    lastMcpServers,
+    openGeneratedProject,
+  ]);
 
   if (presentational || !generator || !transport) {
     return null;
@@ -404,10 +446,7 @@ export function GenerateProjectButton() {
         </Button>
       </Tooltip>
 
-      <Dialog
-        open={open}
-        onOpenChange={busy ? undefined : setOpen}
-      >
+      <Dialog open={open} onOpenChange={busy ? undefined : setOpen}>
         <DialogContent className="flex h-[36rem] flex-col sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -419,7 +458,7 @@ export function GenerateProjectButton() {
               {step === "framework"
                 ? "Turn this thread into a runnable code project — its prompt, tools, variables, and messages, plus a PLAN.md for a coding agent to finish."
                 : step === "target"
-                  ? "Choose where the project is created."
+                  ? "Choose where the project is created and which thread context it uses."
                   : uvMissing
                     ? "uv is needed to scaffold the project."
                     : result
@@ -440,6 +479,9 @@ export function GenerateProjectButton() {
                 parentDir={parentDir}
                 projectName={projectName}
                 targetPreview={targetPreview}
+                hasFirstUserMessage={hasFirstUserMessage}
+                metaUserPromptSuggested={metaUserPromptSuggested}
+                useMetaUserPrompt={useMetaUserPrompt}
                 error={targetError}
                 disabled={preparing}
                 onParentChange={(next) => {
@@ -450,6 +492,7 @@ export function GenerateProjectButton() {
                   setProjectName(next);
                   setTargetError(null);
                 }}
+                onUseMetaUserPromptChange={setUseMetaUserPrompt}
                 onBrowse={browseParent}
               />
             ) : null}
@@ -571,6 +614,7 @@ export function GenerateProjectButton() {
         confirmLabel="Yes, create .env"
         confirmVariant="default"
         dimBackground={false}
+        onCancel={skipEnvFile}
         onConfirm={createEnvFile}
       />
     </>
@@ -580,7 +624,7 @@ export function GenerateProjectButton() {
 /** A small "Beta" pill marking this as an experimental feature. */
 function BetaBadge() {
   return (
-    <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide">
+    <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
       Beta
     </span>
   );
@@ -726,19 +770,27 @@ function TargetStep({
   parentDir,
   projectName,
   targetPreview,
+  hasFirstUserMessage,
+  metaUserPromptSuggested,
+  useMetaUserPrompt,
   error,
   disabled,
   onParentChange,
   onNameChange,
+  onUseMetaUserPromptChange,
   onBrowse,
 }: {
   parentDir: string;
   projectName: string;
   targetPreview: string;
+  hasFirstUserMessage: boolean;
+  metaUserPromptSuggested: boolean;
+  useMetaUserPrompt: boolean;
   error: string | null;
   disabled: boolean;
   onParentChange: (next: string) => void;
   onNameChange: (next: string) => void;
+  onUseMetaUserPromptChange: (next: boolean) => void;
   onBrowse: () => void;
 }) {
   return (
@@ -782,6 +834,46 @@ function TargetStep({
         </div>
       </Field>
 
+      <div className="border-border/60 bg-muted/15 flex items-start justify-between gap-5 rounded-lg border p-3.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="use-meta-user-prompt"
+              className="text-xs font-medium"
+            >
+              Use meta user prompt
+            </label>
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[0.625rem] font-medium",
+                hasFirstUserMessage && metaUserPromptSuggested
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {!hasFirstUserMessage
+                ? "Unavailable"
+                : metaUserPromptSuggested
+                  ? "Suggested on"
+                  : "Suggested off"}
+            </span>
+          </div>
+          <p className="text-muted-foreground max-w-xl text-xs/relaxed">
+            {hasFirstUserMessage
+              ? "A meta user prompt is first-turn runtime context—such as the current date, workspace, or available skills—rather than a question. Our suggested setting is based on this thread; you can change it. When enabled, the context is inserted before every model call."
+              : "A meta user prompt is first-turn runtime context—such as the current date, workspace, or available skills—rather than a question. This thread has no first user message that can be used as one."}
+          </p>
+        </div>
+        <Switch
+          id="use-meta-user-prompt"
+          className="mt-0.5"
+          checked={useMetaUserPrompt}
+          disabled={disabled || !hasFirstUserMessage}
+          onCheckedChange={onUseMetaUserPromptChange}
+          aria-label="Use meta user prompt in the generated agent"
+        />
+      </div>
+
       {error ? (
         <div className="text-destructive text-xs/relaxed">{error}</div>
       ) : null}
@@ -819,10 +911,9 @@ function UvMissingStep() {
         <span className="flex flex-col gap-1">
           <span className="text-sm font-medium">uv is required</span>
           <span className="text-muted-foreground text-xs/relaxed">
-            This generator uses{" "}
-            <span className="font-mono">uv</span> — Astral&apos;s Python package
-            manager — to scaffold the project and install dependencies. It
-            wasn&apos;t found on your PATH.
+            This generator uses <span className="font-mono">uv</span> —
+            Astral&apos;s Python package manager — to scaffold the project and
+            install dependencies. It wasn&apos;t found on your PATH.
           </span>
         </span>
       </div>
@@ -960,7 +1051,9 @@ function SuccessStep({
     title: "Launch & explore",
     body: (
       <>
-        <CommandBlock command={`cd ${_shellQuote(dir)} && uv run langgraph dev`} />
+        <CommandBlock
+          command={`cd ${_shellQuote(dir)} && uv run langgraph dev`}
+        />
         <p className="text-muted-foreground text-xs/relaxed">
           Then open LangGraph Studio in your browser to inspect, trace, and run
           your agent.
@@ -971,8 +1064,8 @@ function SuccessStep({
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col items-center gap-3 pb-7 pt-1 text-center">
-        <div className="ring-emerald-500/20 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400/20 to-primary/20 ring-1">
+      <div className="flex flex-col items-center gap-3 pt-1 pb-7 text-center">
+        <div className="to-primary/20 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400/20 ring-1 ring-emerald-500/20">
           <CheckIcon className="size-7 text-emerald-500" />
         </div>
         <div className="flex flex-col gap-1">
@@ -986,7 +1079,7 @@ function SuccessStep({
       </div>
 
       <div className="border-border/60 bg-muted/15 flex flex-col gap-5 rounded-xl border p-5">
-        <span className="text-muted-foreground text-[0.6875rem] font-medium uppercase tracking-wider">
+        <span className="text-muted-foreground text-[0.6875rem] font-medium tracking-wider uppercase">
           Next steps
         </span>
         {steps.map((s, index) => (
@@ -1047,7 +1140,9 @@ function CommandBlock({ command }: { command: string }) {
 
 /** Quote a path for a POSIX shell only when it needs it. */
 function _shellQuote(path: string): string {
-  return /^[A-Za-z0-9_./~-]+$/.test(path) ? path : `'${path.replace(/'/g, "'\\''")}'`;
+  return /^[A-Za-z0-9_./~-]+$/.test(path)
+    ? path
+    : `'${path.replace(/'/g, "'\\''")}'`;
 }
 
 /** `{{@include("path")}}` macro with a single quoted path argument. */
@@ -1124,8 +1219,7 @@ function _resolveModelInfo(
   // `compat.requiresReasoningContentOnAssistantMessages` marks DeepSeek-style
   // reasoning models served over an OpenAI-compatible API.
   const compat = piModel?.compat as
-    | { requiresReasoningContentOnAssistantMessages?: boolean }
-    | undefined;
+    { requiresReasoningContentOnAssistantMessages?: boolean } | undefined;
   return {
     name: piModel?.name ?? model.id,
     baseUrl: group?.baseUrl || piModel?.baseUrl || undefined,
@@ -1148,7 +1242,9 @@ async function _resolveMcpServers(
   mcp: { listServers(): Promise<McpServerView[]> }
 ): Promise<GeneratorMcpServer[]> {
   const usedServerIds = new Set(
-    (context?.tools ?? []).flatMap((t) => (t.type === "mcp" ? [t.serverId] : []))
+    (context?.tools ?? []).flatMap((t) =>
+      t.type === "mcp" ? [t.serverId] : []
+    )
   );
   if (usedServerIds.size === 0) {
     return [];

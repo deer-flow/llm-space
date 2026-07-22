@@ -133,6 +133,17 @@ export interface GeneratorRunInput {
    * project so `current_date`/`available_skills` stay live.
    */
   systemPromptTemplate: string;
+  /**
+   * The first user message as a template (variable placeholders left intact,
+   * `@include` macros already expanded). The generator uses it only when meta
+   * prompt injection is enabled by the user or its scoring recommendation.
+   */
+  firstUserMessageTemplate?: string;
+  /**
+   * Whether to inject the first user message as runtime context. When omitted,
+   * the generator falls back to its meta-prompt scoring recommendation.
+   */
+  useMetaUserPrompt?: boolean;
   /** Enabled skills (name → absolute path), for `skill.py` + `available_skills`. */
   skills: GeneratorSkill[];
   /**

@@ -13,7 +13,7 @@ import type {
   GeneratorSkill,
 } from "../types";
 
-import { buildContextExports } from "./context-export";
+import { buildContextExports, isMetaUserMessage } from "./context-export";
 import {
   agentPy,
   applyTemplatePy,
@@ -24,6 +24,7 @@ import {
   gitignore,
   langgraphJson,
   literalApiKey,
+  metaPromptMiddlewarePy,
   mcpEnvEntries,
   mcpModule,
   modelDependency,
@@ -110,6 +111,7 @@ export const langgraphGenerator: GeneratorDefinition = {
       rendered,
       model,
       modelInfo,
+      firstUserMessageTemplate,
       systemPromptTemplate,
       skills,
       renderedVariableValues,
@@ -152,6 +154,10 @@ export const langgraphGenerator: GeneratorDefinition = {
       }
     }
     const hasMcp = mcpTools.length > 0;
+    const useMetaUserPrompt =
+      input.useMetaUserPrompt ?? isMetaUserMessage(context);
+    const hasMeta =
+      useMetaUserPrompt && Boolean(firstUserMessageTemplate?.trim());
     if (hasMcp && mcpServers.length === 0) {
       workflow.log(
         "MCP tools present but no server configs resolved — src/tools/mcp.py will have an empty MCP_SERVERS"
@@ -224,6 +230,16 @@ export const langgraphGenerator: GeneratorDefinition = {
     );
     // The raw template (variables live at runtime), not the pre-rendered prompt.
     await write("src/prompting/system_prompt.md", `${systemPromptTemplate}\n`);
+    if (hasMeta) {
+      await write(
+        "src/prompting/meta_user_prompt.md",
+        `${firstUserMessageTemplate}\n`
+      );
+      await write(
+        "src/prompting/meta_prompt_middleware.py",
+        metaPromptMiddlewarePy()
+      );
+    }
 
     // Tools: real built-in sources, function-tool stubs, and an MCP scaffold.
     // A few built-ins are generated with the user's config baked in (skill).
@@ -247,7 +263,7 @@ export const langgraphGenerator: GeneratorDefinition = {
 
     // The assembled agent.
     await write("src/agents/__init__.py", pyInit());
-    await write("src/agents/agent.py", agentPy(toolRefs, hasMcp));
+    await write("src/agents/agent.py", agentPy(toolRefs, hasMcp, hasMeta));
 
     workflow.phase("Export context");
     for (const file of buildContextExports(context, rendered)) {

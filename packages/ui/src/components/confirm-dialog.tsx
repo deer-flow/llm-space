@@ -20,6 +20,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   confirmLabel,
   confirmVariant = "destructive",
+  onCancel,
   onConfirm,
   dimBackground = true,
 }: {
@@ -30,6 +31,7 @@ export function ConfirmDialog({
   cancelLabel?: string;
   confirmLabel: string;
   confirmVariant?: "default" | "destructive";
+  onCancel?: () => void;
   onConfirm: () => void;
   /**
    * Render the dimming/blur overlay behind the dialog. Set to `false` when the
@@ -49,7 +51,10 @@ export function ConfirmDialog({
           ) : null}
         </DialogHeader>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            onClick={() => (onCancel ? onCancel() : onOpenChange(false))}
+          >
             {cancelLabel}
           </Button>
           <Button variant={confirmVariant} onClick={onConfirm}>

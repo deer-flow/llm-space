@@ -397,7 +397,13 @@ export function applyTemplatePy(
       entries.push(`        ${_pyStr(name)}: current_date(${_pyStr(def.format)}),`);
     } else if (def.type === "skills") {
       usesVariablesModule = true;
-      const paths = def.skillNames
+      // Match the thread renderer: an empty selection means every enabled
+      // skill, so newly enabled skills are included without editing the variable.
+      const selectedNames =
+        def.skillNames.length === 0
+          ? skills.map((skill) => skill.name)
+          : def.skillNames;
+      const paths = selectedNames
         .map((n) => skillPath.get(n))
         .filter((p): p is string => Boolean(p));
       const pathList = paths.map(_pyStr).join(", ");
@@ -443,10 +449,10 @@ export function applyTemplatePy(
 
   // Skip Jinja2 entirely for a prompt with no variables, so stray braces in
   // prose can't trip the renderer.
-  const getBody =
+  const renderBody =
     entries.length > 0
-      ? `    template = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")\n    return apply_template(build_variables(), template)`
-      : `    return _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")`;
+      ? `    template = path.read_text(encoding="utf-8")\n    return apply_template(build_variables(), template)`
+      : `    return path.read_text(encoding="utf-8")`;
 
   return `"""Prompt assembly.
 
@@ -458,6 +464,7 @@ when the project was generated.
 ${imports.join("\n")}
 
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
+_META_USER_PROMPT_PATH = Path(__file__).parent / "meta_user_prompt.md"
 
 
 def build_variables() -> dict:
@@ -470,9 +477,67 @@ def apply_template(variables: dict, content: str) -> str:
     return Template(content).render(**variables)
 
 
+def _render_prompt(path: Path) -> str:
+    """Read and render one generated prompt template."""
+${renderBody}
+
+
 def get_system_prompt() -> str:
     """Return the rendered system prompt."""
-${getBody}
+    return _render_prompt(_SYSTEM_PROMPT_PATH)
+
+
+def get_meta_user_prompt() -> str:
+    """Return the rendered meta user prompt."""
+    return _render_prompt(_META_USER_PROMPT_PATH)
+`;
+}
+
+/** Middleware that injects generated runtime context into every model request. */
+export function metaPromptMiddlewarePy(): string {
+  return `"""Meta user prompt middleware."""
+
+from collections.abc import Awaitable, Callable
+
+from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
+from langchain.messages import HumanMessage
+
+
+def _request_with_meta_user_prompt(request: ModelRequest, text: str) -> ModelRequest:
+    """Return a model request with \`text\` before its first human message."""
+    messages = list(request.messages)
+    insert_at = next(
+        (index for index, message in enumerate(messages) if isinstance(message, HumanMessage)),
+        0,
+    )
+    messages.insert(insert_at, HumanMessage(content=text))
+    return request.override(messages=messages)
+
+
+class MetaUserPromptMiddleware(AgentMiddleware):
+    """Inject meta context for both synchronous and asynchronous agents."""
+
+    def __init__(self, text: str):
+        self.text = text
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelResponse:
+        return handler(_request_with_meta_user_prompt(request, self.text))
+
+    async def awrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
+    ) -> ModelResponse:
+        return await handler(_request_with_meta_user_prompt(request, self.text))
+
+
+def inject_meta_user_prompt(text: str) -> MetaUserPromptMiddleware:
+    """Create middleware that inserts \`text\` before every model call."""
+    return MetaUserPromptMiddleware(text)
 `;
 }
 
@@ -533,10 +598,20 @@ export interface AgentToolRef {
  * `await`s `get_mcp_tools()` (async MCP client setup) before building the agent;
  * `langgraph.json` points at it. Without MCP it's the plain `agent` object.
  */
-export function agentPy(tools: AgentToolRef[], hasMcp: boolean): string {
+export function agentPy(
+  tools: AgentToolRef[],
+  hasMcp: boolean,
+  hasMeta: boolean
+): string {
   const toolImports = tools
     .map((t) => `from src.tools.${t.module} import ${t.symbol}`)
     .join("\n");
+  const metaImports = hasMeta
+    ? `\nfrom src.prompting.apply_template import get_meta_user_prompt\nfrom src.prompting.meta_prompt_middleware import inject_meta_user_prompt`
+    : "";
+  const middlewareArg = hasMeta
+    ? `\n        middleware=[inject_meta_user_prompt(get_meta_user_prompt())],`
+    : "";
 
   if (hasMcp) {
     const mcpImport = "\nfrom src.tools.mcp import get_mcp_tools";
@@ -555,7 +630,7 @@ langgraph.json.
 from langchain.agents import create_agent
 
 from src.models.create_model import create_model
-from src.prompting.apply_template import get_system_prompt
+from src.prompting.apply_template import get_system_prompt${metaImports}
 ${toolImports}${mcpImport}
 
 
@@ -566,7 +641,7 @@ async def make_graph():
     return create_agent(
         create_model(),
         tools=tools,
-        system_prompt=get_system_prompt(),
+        system_prompt=get_system_prompt(),${middlewareArg}
     )
 `;
   }
@@ -581,7 +656,7 @@ prompt, exposed as \`agent\` for \`langgraph dev\`.
 from langchain.agents import create_agent
 
 from src.models.create_model import create_model
-from src.prompting.apply_template import get_system_prompt
+from src.prompting.apply_template import get_system_prompt${metaImports}
 ${toolImports}
 
 agent = create_agent(
@@ -590,7 +665,7 @@ agent = create_agent(
 ${items}
     ],
     system_prompt=get_system_prompt(),
-)
+${hasMeta ? "    middleware=[inject_meta_user_prompt(get_meta_user_prompt())],\n" : ""})
 `;
 }
 
