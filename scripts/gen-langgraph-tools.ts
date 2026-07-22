@@ -23,6 +23,10 @@ const BUILTIN_DIR = path.join(LANGGRAPH_DIR, "tools/built-in");
 const VARIABLES_PY = path.join(LANGGRAPH_DIR, "variables.py");
 const OUT_FILE = path.join(LANGGRAPH_DIR, "tools/built-in-sources.generated.ts");
 
+export function normalizeLineEndings(source: string): string {
+  return source.replace(/\r\n/g, "\n");
+}
+
 /** Read the `.py` tool files into a name→source map (sorted by name). */
 export async function readBuiltinToolSources(): Promise<Record<string, string>> {
   const entries = await readdir(BUILTIN_DIR);
@@ -30,14 +34,16 @@ export async function readBuiltinToolSources(): Promise<Record<string, string>> 
   const sources: Record<string, string> = {};
   for (const file of pyFiles) {
     const name = file.slice(0, -".py".length);
-    sources[name] = await readFile(path.join(BUILTIN_DIR, file), "utf8");
+    sources[name] = normalizeLineEndings(
+      await readFile(path.join(BUILTIN_DIR, file), "utf8")
+    );
   }
   return sources;
 }
 
 /** Read the shared `variables.py` (prompt-variable helpers) source. */
 export async function readVariablesSource(): Promise<string> {
-  return readFile(VARIABLES_PY, "utf8");
+  return normalizeLineEndings(await readFile(VARIABLES_PY, "utf8"));
 }
 
 /** Render the generated TS module from a name→source map + variables.py. */

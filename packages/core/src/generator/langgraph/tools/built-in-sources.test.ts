@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  normalizeLineEndings,
   readBuiltinToolSources,
   readVariablesSource,
   renderManifest,
@@ -30,7 +31,7 @@ describe("built-in tool sources manifest", () => {
     const committed = await Bun.file(
       new URL("./built-in-sources.generated.ts", import.meta.url)
     ).text();
-    expect(committed).toBe(rendered);
+    expect(normalizeLineEndings(committed)).toBe(rendered);
   });
 
   it("covers the expected built-in tools", () => {
