@@ -196,7 +196,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     label: "General Agent",
     fileStem: "general-agent",
     description:
-      "A [DeerFlow-like](https://github.com/bytedance/deer-flow) assistant for coding, deep-research and more.",
+      "A [DeerFlow-like](https://github.com/bytedance/deer-flow) assistant for **coding**, **deep-research** and more.",
     content: generalAgentPrompt,
     icon: BotIcon,
     tools: [
