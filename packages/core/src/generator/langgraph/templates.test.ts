@@ -196,6 +196,12 @@ describe("meta prompt templates", () => {
     expect(py).toContain("def get_meta_user_prompt() -> str:");
   });
 
+  test("apply-template exposes exists(path) when the prompt uses it", () => {
+    const py = applyTemplatePy({}, [], {}, true);
+    expect(py).toContain('"exists": _file_exists');
+    expect(py).toContain("path.is_file() and os.access(path, os.R_OK)");
+  });
+
   test("middleware overrides sync and async model requests without updating state", () => {
     const py = metaPromptMiddlewarePy();
     expect(py).toContain("class MetaUserPromptMiddleware(AgentMiddleware):");

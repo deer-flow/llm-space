@@ -207,6 +207,12 @@ export interface DesktopRPCType {
       // prompt `@include` macro. A leading `~` expands to the user's home.
       // Returns "" for a missing/unreadable path so includes degrade quietly.
       fsReadText: { params: { path: string }; response: { text: string } };
+      // Whether a path points to a readable regular file for template
+      // `exists(path)` conditions. A leading `~` expands to the user's home.
+      fsTextFileExists: {
+        params: { path: string };
+        response: { exists: boolean };
+      };
       // Open the native file picker (for a "file content" prompt variable).
       // `path` is null when the user cancels.
       fsPickFile: {

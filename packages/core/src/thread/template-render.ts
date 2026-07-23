@@ -7,10 +7,10 @@ import nunjucks from "nunjucks";
  * {@link TEMPLATE_MARKER_RE}) reaches this module; plain variable text keeps the
  * cheaper, literal-safe path.
  *
- * The first macro is `@include(path)`: `{{@include("~/notes/x.md")}}` inlines a
- * file's contents (read through an injected async `loadFile`), rendering the
- * result recursively so an included file can itself use variables, logic, and
- * nested includes. Missing files resolve to `""`.
+ * `@include(path)` inlines a file's contents (read through an injected async
+ * `loadFile`), rendering the result recursively so an included file can itself
+ * use variables, logic, and nested includes. `exists(path)` can guard optional
+ * readable files. Missing includes resolve to `""`.
  */
 
 /**
@@ -31,6 +31,9 @@ export const MAX_INCLUDE_COUNT = 100;
 
 /** `{{@include(<args>)}}` → `{{ (<args>) | __include }}` (a native async filter). */
 const INCLUDE_MACRO_RE = /\{\{\s*@include\(([\s\S]*?)\)\s*\}\}/g;
+
+/** Template tags in which `exists(path)` function sugar may be rewritten. */
+const TEMPLATE_TAG_RE = /\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g;
 
 /** Identifiers referenced inside a `{{…}}` output or `{%…%}` tag. */
 const EXPRESSION_RE = /\{\{([\s\S]*?)\}\}|\{%([\s\S]*?)%\}/g;
@@ -96,6 +99,8 @@ export interface RenderTemplateInput {
   knownVars: Record<string, unknown>;
   /** Reads a file's UTF-8 contents; returns `""` when missing. */
   loadFile: (path: string) => Promise<string>;
+  /** Whether a path points to a readable regular file. */
+  fileExists?: (path: string) => Promise<boolean>;
 }
 
 /**
@@ -104,10 +109,91 @@ export interface RenderTemplateInput {
  * identifier char, so this must happen before compilation.
  */
 function _rewriteMacros(text: string): string {
-  return text.replace(INCLUDE_MACRO_RE, (_match, args: string) => {
-    const expr = args.trim();
-    return expr.length === 0 ? "" : `{{ ${expr} | __include }}`;
-  });
+  const includesRewritten = text.replace(
+    INCLUDE_MACRO_RE,
+    (_match, args: string) => {
+      const expr = args.trim();
+      return expr.length === 0 ? "" : `{{ ${expr} | __include }}`;
+    }
+  );
+  return includesRewritten.replace(TEMPLATE_TAG_RE, _rewriteExistsCalls);
+}
+
+/** Rewrite balanced `exists(...)` calls while leaving quoted text untouched. */
+function _rewriteExistsCalls(tag: string): string {
+  let output = "";
+  let cursor = 0;
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  while (cursor < tag.length) {
+    const char = tag[cursor]!;
+    if (quote) {
+      output += char;
+      cursor++;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      output += char;
+      cursor++;
+      continue;
+    }
+    if (
+      tag.startsWith("exists", cursor) &&
+      !/[A-Za-z0-9_]/.test(tag[cursor - 1] ?? "") &&
+      !/[A-Za-z0-9_]/.test(tag[cursor + 6] ?? "")
+    ) {
+      let open = cursor + 6;
+      while (/\s/.test(tag[open] ?? "")) open++;
+      if (tag[open] === "(") {
+        const close = _findClosingParen(tag, open);
+        if (close !== -1) {
+          const expr = tag.slice(open + 1, close).trim();
+          output += expr.length === 0 ? "false" : `((${expr}) | __exists)`;
+          cursor = close + 1;
+          continue;
+        }
+      }
+    }
+    output += char;
+    cursor++;
+  }
+  return output;
+}
+
+function _findClosingParen(source: string, open: number): number {
+  let depth = 1;
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+  for (let index = open + 1; index < source.length; index++) {
+    const char = source[index]!;
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth++;
+    } else if (char === ")" && --depth === 0) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -150,6 +236,7 @@ export async function renderTemplateText({
   text,
   knownVars,
   loadFile,
+  fileExists = () => Promise.resolve(false),
 }: RenderTemplateInput): Promise<string> {
   const env = new nunjucks.Environment(null, {
     autoescape: false,
@@ -162,6 +249,7 @@ export async function renderTemplateText({
   // depth back at their parent level.
   let depth = 0;
   let includeCount = 0;
+  const existenceCache = new Map<string, Promise<boolean>>();
 
   const render = (source: string): Promise<string> => {
     const rewritten = _rewriteMacros(source);
@@ -195,18 +283,48 @@ export async function renderTemplateText({
           }
           depth++;
           try {
-            return await render(content);
+            try {
+              return await render(content);
+            } catch {
+              // The file was read successfully but is not itself a valid
+              // template (for example, documentation containing literal
+              // `{% if %}` snippets). Preserve the complete source instead of
+              // silently erasing a readable include.
+              return content;
+            }
           } finally {
             depth--;
           }
         } catch {
-          // A missing/broken include is localized to "" rather than failing the
-          // whole surrounding text.
+          // A missing/unreadable include is localized to "" rather than failing
+          // the whole surrounding text.
           return "";
         }
       })().then(
         (result) => callback(null, result),
         () => callback(null, "")
+      );
+    },
+    true
+  );
+
+  env.addFilter(
+    "__exists",
+    (pathArg: unknown, callback: (err: unknown, result: boolean) => void) => {
+      if (typeof pathArg !== "string" || pathArg.length === 0) {
+        callback(null, false);
+        return;
+      }
+      let pending = existenceCache.get(pathArg);
+      if (!pending) {
+        pending = Promise.resolve()
+          .then(() => fileExists(pathArg))
+          .catch(() => false);
+        existenceCache.set(pathArg, pending);
+      }
+      void pending.then(
+        (result) => callback(null, result),
+        () => callback(null, false)
       );
     },
     true

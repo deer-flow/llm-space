@@ -385,7 +385,8 @@ export function variablesPy(): string {
 export function applyTemplatePy(
   context: ThreadContext,
   skills: GeneratorSkill[],
-  renderedValues: Record<string, string>
+  renderedValues: Record<string, string>,
+  usesExists = false
 ): string {
   const skillPath = new Map(skills.map((s) => [s.name, s.path]));
   const entries: string[] = [];
@@ -436,10 +437,15 @@ export function applyTemplatePy(
     }
   }
 
+  if (usesExists) {
+    entries.push('        "exists": _file_exists,');
+  }
+
   const imports: string[] = [];
   if (needsJson) {
     imports.push("import json");
   }
+  imports.push("import os");
   imports.push("from pathlib import Path");
   imports.push("");
   imports.push("from jinja2 import Template");
@@ -473,6 +479,15 @@ ${imports.join("\n")}
 
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 _META_USER_PROMPT_PATH = Path(__file__).parent / "meta_user_prompt.md"
+
+
+def _file_exists(value: object) -> bool:
+    """Whether a template path points to a readable regular file."""
+    try:
+        path = Path(str(value)).expanduser()
+        return path.is_file() and os.access(path, os.R_OK)
+    except (OSError, ValueError):
+        return False
 
 
 def build_variables() -> dict:

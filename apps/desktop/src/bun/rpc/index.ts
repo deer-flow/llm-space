@@ -2,7 +2,11 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import { ModelProviderGroup } from "@llm-space/core";
-import { expandHomePath, readUserTextFile } from "@llm-space/core/server";
+import {
+  expandHomePath,
+  readUserTextFile,
+  userTextFileExists,
+} from "@llm-space/core/server";
 import type { LocalFileSystem } from "@llm-space/core/server";
 import {
   GIST_CONNECTOR_ID,
@@ -294,6 +298,9 @@ export function createMainWindowRPC({
         // Unconfined text read for the prompt `@include` macro (any path + `~`).
         fsReadText: async ({ path }) => ({
           text: await readUserTextFile(path),
+        }),
+        fsTextFileExists: async ({ path }) => ({
+          exists: await userTextFileExists(path),
         }),
         // Native file picker for a "file content" prompt variable.
         fsPickFile: async () => {

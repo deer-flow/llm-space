@@ -23,7 +23,12 @@ import {
   writeProjectFile,
 } from "@/client/generator";
 import { listMcpServers, listMcpTools } from "@/client/mcp";
-import { ensureRootDir, pickFile, readTextFile } from "@/client/paths";
+import {
+  ensureRootDir,
+  pickFile,
+  readTextFile,
+  textFileExists,
+} from "@/client/paths";
 import { createRpcTransport } from "@/client/rpc-transport";
 import { getSearchSettings } from "@/client/search";
 import { getSkillsSettings, listSkills } from "@/client/skills";
@@ -97,7 +102,11 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         revealSkill,
       },
       paths: { ensureRootDir },
-      files: { readText: readTextFile, pickFile },
+      files: {
+        readText: readTextFile,
+        exists: textFileExists,
+        pickFile,
+      },
       generator: {
         pickDirectory: pickGeneratorDirectory,
         prepareDirectory: prepareGeneratorDirectory,

@@ -150,13 +150,15 @@ function _FileSystemTreeView({
       fileStem: string,
       systemPrompt: string,
       tools?: Tool[],
-      messages?: Message[]
+      messages?: Message[],
+      textVariables?: Record<string, string>
     ) => {
       const path = await createFileFromPromptExample(parent, {
         fileStem,
         systemPrompt,
         tools,
         messages,
+        textVariables,
       });
       if (path) setPendingThread(path);
     },
@@ -184,17 +186,19 @@ function _FileSystemTreeView({
       // Resolve the seed fields (each may be a factory re-read at creation
       // time — e.g. the General Agent's live skills list) before seeding.
       void (async () => {
-        const [content, tools, messages] = await Promise.all([
+        const [content, tools, messages, textVariables] = await Promise.all([
           resolveSeed(example.content, seedHost),
           resolveSeed(example.tools, seedHost),
           resolveSeed(example.messages, seedHost),
+          resolveSeed(example.textVariables, seedHost),
         ]);
         await createThreadFromPromptExample(
           parent,
           example.fileStem,
           content ?? "",
           tools,
-          messages
+          messages,
+          textVariables
         );
       })();
     },

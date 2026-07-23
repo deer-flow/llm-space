@@ -207,6 +207,7 @@ export function GenerateProjectButton() {
           context: context ?? {},
           loadSkills: () => Promise.resolve(skillList),
           loadFile: (path) => files.readText(path),
+          fileExists: (path) => files.exists(path),
         });
         // Ship the raw prompt (variables live at runtime), with `@include`
         // macros expanded now since the generated project renders with Jinja2.

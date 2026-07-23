@@ -63,6 +63,8 @@ export interface PathsHost {
 export interface FilesHost {
   /** Read a file's UTF-8 contents (`~` expands to home); `""` when missing. */
   readText(path: string): Promise<string>;
+  /** Whether a path points to a readable regular file (`~` expands to home). */
+  exists(path: string): Promise<boolean>;
   /**
    * Open the native OS file picker; resolves to the chosen absolute path, or
    * `null` when cancelled / unavailable (e.g. the display-only web viewer).

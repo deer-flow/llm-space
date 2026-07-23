@@ -31,6 +31,12 @@ export async function readTextFile(path: string): Promise<string> {
   return text;
 }
 
+/** Whether a path points to a readable regular file (`~` expands to home). */
+export async function textFileExists(path: string): Promise<boolean> {
+  const { exists } = await _rpc().request.fsTextFileExists({ path });
+  return exists;
+}
+
 /** Open the native file picker; resolves to the chosen path or `null`. */
 export async function pickFile(): Promise<string | null> {
   const { path } = await _rpc().request.fsPickFile({});

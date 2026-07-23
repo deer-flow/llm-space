@@ -135,7 +135,8 @@ function _createThreadFromPromptExample(
   title: string,
   systemPrompt: string,
   tools?: Tool[],
-  messages?: Message[]
+  messages?: Message[],
+  textVariables?: Record<string, string>
 ): Thread {
   return {
     title,
@@ -145,6 +146,14 @@ function _createThreadFromPromptExample(
       messages: messages ?? [
         { id: uuid(), role: "user", content: [{ type: "text", text: "" }] },
       ],
+      ...(textVariables
+        ? {
+            variableVariants: {
+              active: "default",
+              variants: { default: textVariables },
+            },
+          }
+        : {}),
     },
   };
 }
@@ -183,6 +192,7 @@ export interface FileSystemTree {
       systemPrompt: string;
       tools?: Tool[];
       messages?: Message[];
+      textVariables?: Record<string, string>;
     }
   ) => Promise<string | null>;
   /** Delete a file or directory; resolves to whether it succeeded. */
@@ -351,6 +361,7 @@ export function useFileSystemTree(): FileSystemTree {
         systemPrompt: string;
         tools?: Tool[];
         messages?: Message[];
+        textVariables?: Record<string, string>;
       }
     ): Promise<string | null> => {
       let path: string;
@@ -365,7 +376,8 @@ export function useFileSystemTree(): FileSystemTree {
             title,
             example.systemPrompt,
             example.tools,
-            example.messages
+            example.messages,
+            example.textVariables
           )
         );
       } catch (err) {

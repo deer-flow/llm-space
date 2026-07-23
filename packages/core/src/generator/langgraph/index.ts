@@ -226,7 +226,13 @@ export const langgraphGenerator: GeneratorDefinition = {
     await write("src/prompting/variables.py", variablesPy());
     await write(
       "src/prompting/apply_template.py",
-      applyTemplatePy(context, skills, renderedVariableValues)
+      applyTemplatePy(
+        context,
+        skills,
+        renderedVariableValues,
+        /\bexists\s*\(/.test(systemPromptTemplate) ||
+          (hasMeta && /\bexists\s*\(/.test(firstUserMessageTemplate ?? ""))
+      )
     );
     // The raw template (variables live at runtime), not the pre-rendered prompt.
     await write("src/prompting/system_prompt.md", `${systemPromptTemplate}\n`);

@@ -39,6 +39,22 @@ describe("renderThreadPromptVariables — dispatcher", () => {
     expect(out.systemPrompt).toBe("Hi-INC");
   });
 
+  test("template path supports exists(path) conditions", async () => {
+    const { context: out } = await renderThreadPromptVariables({
+      context: context(
+        '{% if exists(root ~ "/AGENTS.md") %}{{ greeting }}{% endif %}',
+        {
+          variableVariants: {
+            active: "default",
+            variants: { default: { greeting: "Hi", root: "/workspace" } },
+          },
+        }
+      ),
+      fileExists: (path) => Promise.resolve(path === "/workspace/AGENTS.md"),
+    });
+    expect(out.systemPrompt).toBe("Hi");
+  });
+
   test("malformed template falls back to the original text (silent)", async () => {
     const src = "{% for x in y %}broken";
     const { context: out } = await renderThreadPromptVariables({
@@ -49,6 +65,22 @@ describe("renderThreadPromptVariables — dispatcher", () => {
 });
 
 describe("renderThreadPromptVariables — template output freeze", () => {
+  test("legacy @include snapshots re-render after the fallback fix", async () => {
+    const base = context('{{@include("f.md")}}');
+    const legacySnapshot = {
+      variables: {
+        [SYSTEM_PROMPT_PLACE_KEY]: {
+          "\0rendered": "",
+        },
+      },
+    };
+    const refreshed = await renderThreadPromptVariables({
+      context: { ...base, snapshot: legacySnapshot },
+      loadFile: file("NOW PRESENT"),
+    });
+    expect(refreshed.context.systemPrompt).toBe("NOW PRESENT");
+  });
+
   test("frozen output survives a changed file across re-runs", async () => {
     const base = context('{{@include("f.md")}}');
 

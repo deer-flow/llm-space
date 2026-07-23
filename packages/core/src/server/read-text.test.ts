@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 
 import { expandHomePath } from "./paths";
-import { readUserTextFile } from "./read-text";
+import { readUserTextFile, userTextFileExists } from "./read-text";
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), "llm-space-readtext-"));
 
@@ -42,5 +42,19 @@ describe("readUserTextFile", () => {
   test("returns '' for a directory or empty input", async () => {
     expect(await readUserTextFile(tmp)).toBe("");
     expect(await readUserTextFile("")).toBe("");
+  });
+});
+
+describe("userTextFileExists", () => {
+  test("returns true for readable regular files, including empty files", async () => {
+    const file = path.join(tmp, "empty.md");
+    writeFileSync(file, "", "utf8");
+    expect(await userTextFileExists(file)).toBe(true);
+  });
+
+  test("returns false for missing paths, directories, and empty input", async () => {
+    expect(await userTextFileExists(path.join(tmp, "missing.md"))).toBe(false);
+    expect(await userTextFileExists(tmp)).toBe(false);
+    expect(await userTextFileExists("")).toBe(false);
   });
 });

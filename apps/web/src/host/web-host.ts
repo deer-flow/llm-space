@@ -34,6 +34,7 @@ export const webHost: HostServices = {
   files: {
     // No filesystem in the display-only viewer; `@include` resolves to "".
     readText: () => Promise.resolve(""),
+    exists: () => Promise.resolve(false),
     pickFile: () => Promise.resolve(null),
   },
   // No code generation in the display-only viewer.

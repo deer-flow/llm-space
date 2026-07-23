@@ -159,6 +159,7 @@ function _ThreadPlayground({
       executeTool: executeTool ?? undefined,
       loadSkills: () => listEnabledPromptVariableSkills(skills),
       loadFile: (path) => files.readText(path),
+      fileExists: (path) => files.exists(path),
     })
   );
   useThreadPlaygroundEvents(store, {

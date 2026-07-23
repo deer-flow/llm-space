@@ -68,6 +68,63 @@ describe("renderTemplateText", () => {
     expect(out).toBe("ab");
   });
 
+  test("exists(path) guards a readable file, including an empty file", async () => {
+    const source =
+      '{% if exists(root ~ "/AGENTS.md") %}FOUND{% else %}MISSING{% endif %}';
+    const paths: string[] = [];
+    const out = await renderTemplateText({
+      text: source,
+      knownVars: { root: "/workspace" },
+      loadFile: noFile,
+      fileExists: (path) => {
+        paths.push(path);
+        return Promise.resolve(path === "/workspace/AGENTS.md");
+      },
+    });
+    expect(out).toBe("FOUND");
+    expect(paths).toEqual(["/workspace/AGENTS.md"]);
+  });
+
+  test("exists(path) renders the false branch when unavailable", async () => {
+    const out = await renderTemplateText({
+      text: '{% if exists("missing.md") %}FOUND{% else %}MISSING{% endif %}',
+      knownVars: {},
+      loadFile: noFile,
+      fileExists: () => Promise.resolve(false),
+    });
+    expect(out).toBe("MISSING");
+  });
+
+  test("exists(path) memoizes repeated checks within one render", async () => {
+    let checks = 0;
+    const out = await renderTemplateText({
+      text: '{% if exists("x") and exists("x") %}YES{% endif %}',
+      knownVars: {},
+      loadFile: noFile,
+      fileExists: () => {
+        checks++;
+        return Promise.resolve(true);
+      },
+    });
+    expect(out).toBe("YES");
+    expect(checks).toBe(1);
+  });
+
+  test("exists(path) supports nested expressions and ignores quoted text", async () => {
+    const paths: string[] = [];
+    const out = await renderTemplateText({
+      text: "{{ 'exists(fake)' }} {% if exists((root ~ '/a(b).md')) %}YES{% endif %}",
+      knownVars: { root: "/workspace" },
+      loadFile: noFile,
+      fileExists: (path) => {
+        paths.push(path);
+        return Promise.resolve(true);
+      },
+    });
+    expect(out).toBe("exists(fake) YES");
+    expect(paths).toEqual(["/workspace/a(b).md"]);
+  });
+
   test("@include renders included content recursively (vars + nested include)", async () => {
     const files: Record<string, string> = {
       "outer.md": 'Hi {{ name }} {{@include("inner.md")}}',
@@ -79,6 +136,17 @@ describe("renderTemplateText", () => {
       loadFile: (p) => Promise.resolve(files[p] ?? ""),
     });
     expect(out).toBe("Hi Ada [nested]");
+  });
+
+  test("@include preserves readable content that is not a valid template", async () => {
+    const content =
+      "Template examples: `{% if %}` / `{% for %}` and {{ literal }}.";
+    const out = await renderTemplateText({
+      text: '{{@include("AGENTS.md")}}',
+      knownVars: {},
+      loadFile: (path) => Promise.resolve(path === "AGENTS.md" ? content : ""),
+    });
+    expect(out).toBe(content);
   });
 
   test("self-including file terminates at the depth guard", async () => {
@@ -110,7 +178,7 @@ describe("renderTemplateText", () => {
 
   test("does not HTML-escape output (autoescape off)", async () => {
     const out = await renderTemplateText({
-      text: '{% if true %}{{ v }}{% endif %}',
+      text: "{% if true %}{{ v }}{% endif %}",
       knownVars: { v: '<a> & "b"' },
       loadFile: noFile,
     });

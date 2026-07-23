@@ -84,6 +84,7 @@ const _noSkills = (): Promise<SkillInfo[]> => Promise.resolve([]);
 
 /** Default `loadFile` for hosts with no filesystem (e.g. web display-only). */
 const _noFile = (): Promise<string> => Promise.resolve("");
+const _noFileExists = (): Promise<boolean> => Promise.resolve(false);
 
 /**
  * Upper bound on model turns in a single auto-call-tools run. Each turn is one
@@ -216,6 +217,8 @@ export function createThreadStore(
      * `loadSkills`; defaults to none (e.g. a display-only web host).
      */
     loadFile?: (path: string) => Promise<string>;
+    /** Test readable-file existence for template `exists(path)` conditions. */
+    fileExists?: (path: string) => Promise<boolean>;
   } = {}
 ): ThreadStore {
   const normalizedInputThread = ensureThreadVariableState(
@@ -936,6 +939,7 @@ export function createThreadStore(
               context: { ...get().thread.context, messages },
               loadSkills: options.loadSkills ?? _noSkills,
               loadFile: options.loadFile ?? _noFile,
+              fileExists: options.fileExists ?? _noFileExists,
             });
             preparedContext = rendered.context;
             promptSnapshot = rendered.snapshot;
@@ -1095,6 +1099,7 @@ export function createThreadStore(
                       },
                       loadSkills: options.loadSkills ?? _noSkills,
                       loadFile: options.loadFile ?? _noFile,
+                      fileExists: options.fileExists ?? _noFileExists,
                     })
                   ).context;
               preparedContext = null;

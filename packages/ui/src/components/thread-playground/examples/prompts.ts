@@ -60,6 +60,8 @@ export interface PromptExample {
   tools?: Resolvable<Tool[]>;
   /** Messages to seed the new thread with (only used by "Start from Example"). */
   messages?: Resolvable<Message[]>;
+  /** Text variables to seed the new thread with. */
+  textVariables?: Resolvable<Record<string, string>>;
 }
 
 export type PromptExampleItem = PromptExample | { type: "separator" };
@@ -140,18 +142,20 @@ async function listEnabledSkills(skills: SkillsHost): Promise<SkillInfo[]> {
  * creation via the {@link Resolvable} factory form.
  */
 async function generalAgentMessages(host: SeedHost): Promise<Message[]> {
-  const [, rootPath] = await Promise.all([
-    listEnabledSkills(host.skills),
-    host.paths.ensureRootDir("tmp/deep-research"),
-  ]);
+  await listEnabledSkills(host.skills);
   const reminder = `<system-reminder>
 <current-date>{{current_date}}</current_date>
-<workspace>
-<root path="${rootPath}" />
-</workspace>
 <available-skills>
 {{available_skills}}
 </available-skills>
+<workspace path="{{current_working_directory}}">
+{% set agents_path = current_working_directory ~ "/AGENTS.md" %}
+{% if exists(agents_path) %}
+<file path="AGENTS.md" preloaded="true">
+{{@include((agents_path))}}
+</file>
+{% endif %}
+</workspace>
 </system-reminder>`;
   return [
     {
@@ -170,6 +174,16 @@ async function generalAgentMessages(host: SeedHost): Promise<Message[]> {
       ],
     },
   ];
+}
+
+/** Resolve the General Agent's writable workspace when the example is created. */
+async function generalAgentTextVariables(
+  host: SeedHost
+): Promise<Record<string, string>> {
+  return {
+    current_working_directory:
+      await host.paths.ensureRootDir("tmp/deep-research"),
+  };
 }
 
 /**
@@ -218,6 +232,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
       ...pickTools(["agent"]),
     ],
     messages: generalAgentMessages,
+    textVariables: generalAgentTextVariables,
   },
   {
     type: "example",
