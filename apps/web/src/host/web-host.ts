@@ -36,6 +36,7 @@ export const webHost: HostServices = {
     readText: () => Promise.resolve(""),
     exists: () => Promise.resolve(false),
     pickFile: () => Promise.resolve(null),
+    pickDirectory: () => Promise.resolve(null),
   },
   // No code generation in the display-only viewer.
   generator: null,

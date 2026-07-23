@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import type { ThreadContext } from "../types";
 
 import {
+  createDefaultThreadVariables,
+  DEFAULT_WORKING_DIRECTORY,
   removePromptVariableSnapshotNames,
   renderThreadPromptVariables,
   SYSTEM_PROMPT_PLACE_KEY,
@@ -20,6 +22,42 @@ function context(systemPrompt: string, extra?: Partial<ThreadContext>) {
 }
 
 const file = (value: string) => () => Promise.resolve(value);
+
+describe("built-in working directory variable", () => {
+  test("is the third default variable with the project directory default", () => {
+    expect(createDefaultThreadVariables()).toEqual({
+      current_date: {
+        type: "currentDate",
+        format: "readable-date",
+      },
+      available_skills: {
+        type: "skills",
+        skillNames: [],
+        format: "markdown-list",
+        indent: 0,
+      },
+      current_working_directory: {
+        type: "workingDirectory",
+        value: DEFAULT_WORKING_DIRECTORY,
+      },
+    });
+    expect(DEFAULT_WORKING_DIRECTORY).toBe("~/Desktop/llm-space-project");
+  });
+
+  test("renders the stored path without checking whether it exists", async () => {
+    const { context: out } = await renderThreadPromptVariables({
+      context: context("Workspace: {{current_working_directory}}", {
+        variables: {
+          current_working_directory: {
+            type: "workingDirectory",
+            value: "/path/that/does/not/exist",
+          },
+        },
+      }),
+    });
+    expect(out.systemPrompt).toBe("Workspace: /path/that/does/not/exist");
+  });
+});
 
 describe("renderThreadPromptVariables — dispatcher", () => {
   test("simple path substitutes known vars and leaves unknown literal", async () => {

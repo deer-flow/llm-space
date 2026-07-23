@@ -176,16 +176,6 @@ async function generalAgentMessages(host: SeedHost): Promise<Message[]> {
   ];
 }
 
-/** Resolve the General Agent's writable workspace when the example is created. */
-async function generalAgentTextVariables(
-  host: SeedHost
-): Promise<Record<string, string>> {
-  return {
-    current_working_directory:
-      await host.paths.ensureRootDir("tmp/deep-research"),
-  };
-}
-
 /**
  * Built-in system prompt examples used by both the system-prompt menu and the
  * empty-workspace "Start from Example" flow. `fileStem` is stable by design so
@@ -232,7 +222,6 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
       ...pickTools(["agent"]),
     ],
     messages: generalAgentMessages,
-    textVariables: generalAgentTextVariables,
   },
   {
     type: "example",

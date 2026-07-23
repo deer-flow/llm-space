@@ -42,3 +42,9 @@ export async function pickFile(): Promise<string | null> {
   const { path } = await _rpc().request.fsPickFile({});
   return path;
 }
+
+/** Open the native directory picker; resolves to the chosen path or `null`. */
+export async function pickDirectory(): Promise<string | null> {
+  const { path } = await _rpc().request.fsPickDirectory({});
+  return path;
+}

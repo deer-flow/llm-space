@@ -6,6 +6,7 @@ import type {
   ThreadJsonVariable,
   ThreadSkillsVariable,
   ThreadVariable,
+  ThreadWorkingDirectoryVariable,
 } from "@llm-space/core";
 import type { SkillInfo } from "@llm-space/core";
 import {
@@ -176,6 +177,15 @@ function _PromptVariablesPanel({
           name,
           variable,
           status: _dateFormatLabel(variable.format),
+        });
+        continue;
+      }
+      if (variable.type === "workingDirectory") {
+        builtInItems.push({
+          kind: "builtIn",
+          name,
+          variable,
+          status: variable.value.trim() || "(empty)",
         });
         continue;
       }
@@ -705,6 +715,20 @@ function VariableDetail({
     );
   }
 
+  if (variable.type === "workingDirectory") {
+    return (
+      <WorkingDirectoryVariableDetail
+        name={selection.name}
+        variable={variable}
+        disabled={disabled}
+        variables={variables}
+        customNames={customNames}
+        onRename={onRenameBuiltIn}
+        onUpdate={(name, next) => onUpdateBuiltIn(name, next)}
+      />
+    );
+  }
+
   if (variable.type === "json") {
     return (
       <JsonVariableDetail
@@ -808,6 +832,77 @@ function CurrentDateVariableDetail({
       <Field label="Value">
         <PreviewBlock value={formatCurrentDateVariable(variable.format)} />
       </Field>
+    </DetailShell>
+  );
+}
+
+function WorkingDirectoryVariableDetail({
+  name,
+  variable,
+  disabled,
+  variables,
+  customNames,
+  onRename,
+  onUpdate,
+}: {
+  name: string;
+  variable: ThreadWorkingDirectoryVariable;
+  disabled?: boolean;
+  variables: Record<string, ThreadVariable>;
+  customNames: Set<string>;
+  onRename: (oldName: string, newName: string) => boolean;
+  onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
+}) {
+  const { files } = useHostServices();
+  const browse = useCallback(async () => {
+    const path = await files.pickDirectory();
+    if (path) {
+      onUpdate(name, { ...variable, value: path });
+    }
+  }, [files, name, onUpdate, variable]);
+
+  return (
+    <DetailShell
+      icon={<FolderOpenIcon className="text-muted-foreground size-4" />}
+      title="Current working directory"
+      disabled={disabled}
+    >
+      <Field label="Name">
+        <VariableNameInput
+          name={name}
+          disabled={disabled}
+          isAvailable={(next) =>
+            _isBuiltInNameAvailable(next, name, variables, customNames)
+          }
+          onCommit={(next) => onRename(name, next)}
+        />
+      </Field>
+      <Field label="Directory">
+        <div className="flex items-center gap-2">
+          <Input
+            className="h-7 font-mono text-xs"
+            value={variable.value}
+            disabled={disabled}
+            placeholder="~/Desktop/llm-space-project"
+            onChange={(event) =>
+              onUpdate(name, { ...variable, value: event.currentTarget.value })
+            }
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0"
+            disabled={disabled}
+            onClick={() => void browse()}
+          >
+            <FolderOpenIcon className="size-3.5" />
+            Browse…
+          </Button>
+        </div>
+      </Field>
+      <p className="text-muted-foreground text-xs">
+        This path is stored as entered and is not checked or created.
+      </p>
     </DetailShell>
   );
 }
@@ -1284,6 +1379,9 @@ function _variableIcon(item: VariableListItem): ReactNode {
   }
   if (item.variable.type === "currentDate") {
     return <CalendarDaysIcon className="size-3.5 shrink-0" />;
+  }
+  if (item.variable.type === "workingDirectory") {
+    return <FolderOpenIcon className="size-3.5 shrink-0" />;
   }
   if (item.variable.type === "json") {
     return <BracesIcon className="size-3.5 shrink-0" />;

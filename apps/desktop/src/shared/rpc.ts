@@ -219,6 +219,12 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { path: string | null };
       };
+      // Open the native directory picker for a working-directory variable.
+      // `path` is null when the user cancels.
+      fsPickDirectory: {
+        params: Record<string, never>;
+        response: { path: string | null };
+      };
       // --- Code generator (export the thread as a runnable project) ---
       // Open the native folder picker for the project's PARENT directory. The
       // wizard combines it with the project name; `path` is null on cancel.

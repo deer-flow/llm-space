@@ -36,6 +36,11 @@ export function resolvePromptVariableValueSync(
   if (builtIn?.type === "currentDate") {
     return { status: "ok", value: formatCurrentDateVariable(builtIn.format) };
   }
+  if (builtIn?.type === "workingDirectory") {
+    return builtIn.value.trim()
+      ? { status: "ok", value: builtIn.value }
+      : { status: "empty", name };
+  }
   if (builtIn?.type === "skills") {
     return { status: "needsSkills", variable: builtIn };
   }
@@ -112,6 +117,8 @@ export function listPromptVariableCompletions(
     let hint: string;
     if (variable.type === "currentDate") {
       hint = formatCurrentDateVariable(variable.format);
+    } else if (variable.type === "workingDirectory") {
+      hint = variable.value.trim() ? _singleLine(variable.value) : "(empty)";
     } else if (variable.type === "json") {
       const value = formatJsonVariable(variable.value);
       hint = value ? _singleLine(value) : "(empty)";

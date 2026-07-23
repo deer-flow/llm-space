@@ -219,6 +219,10 @@ describe("public headless thread workflow", () => {
           format: "xml",
           indent: 0,
         },
+        current_working_directory: {
+          type: "workingDirectory",
+          value: "~/Desktop/llm-space-project",
+        },
       },
       variableVariants: {
         active: "default",

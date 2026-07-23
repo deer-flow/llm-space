@@ -14,6 +14,7 @@ import {
   CalendarDaysIcon,
   CopyIcon,
   FileTextIcon,
+  FolderOpenIcon,
   PlusIcon,
   SparklesIcon,
   TypeIcon,
@@ -83,6 +84,14 @@ export function PromptVariablesListView({
           name,
           variable,
           status: _dateFormatLabel(variable.format),
+        };
+      }
+      if (variable.type === "workingDirectory") {
+        return {
+          kind: "builtIn" as const,
+          name,
+          variable,
+          status: variable.value.trim() || "(empty)",
         };
       }
       if (variable.type === "json") {
@@ -284,6 +293,9 @@ function _variableIcon(item: VariableListItem) {
   }
   if (item.variable.type === "currentDate") {
     return CalendarDaysIcon;
+  }
+  if (item.variable.type === "workingDirectory") {
+    return FolderOpenIcon;
   }
   if (item.variable.type === "json") {
     return BracesIcon;

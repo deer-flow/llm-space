@@ -70,6 +70,11 @@ export interface FilesHost {
    * `null` when cancelled / unavailable (e.g. the display-only web viewer).
    */
   pickFile(): Promise<string | null>;
+  /**
+   * Open the native OS directory picker; resolves to the chosen absolute path,
+   * or `null` when cancelled / unavailable. The path is not validated.
+   */
+  pickDirectory(): Promise<string | null>;
 }
 
 /**

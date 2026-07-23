@@ -29,6 +29,18 @@ export type ThreadCurrentDateVariable = Static<
   typeof ThreadCurrentDateVariable
 >;
 
+/**
+ * The thread's working directory. The value is user-editable and intentionally
+ * not validated or created; templates and tools decide how to use it.
+ */
+export const ThreadWorkingDirectoryVariable = Type.Object({
+  type: Type.Literal("workingDirectory"),
+  value: Type.String(),
+});
+export type ThreadWorkingDirectoryVariable = Static<
+  typeof ThreadWorkingDirectoryVariable
+>;
+
 export const ThreadSkillsVariable = Type.Object({
   type: Type.Literal("skills"),
   skillNames: Type.Array(Type.String()),
@@ -64,6 +76,7 @@ export type ThreadFileVariable = Static<typeof ThreadFileVariable>;
 
 export const ThreadVariable = Type.Union([
   ThreadCurrentDateVariable,
+  ThreadWorkingDirectoryVariable,
   ThreadSkillsVariable,
   ThreadJsonVariable,
   ThreadFileVariable,

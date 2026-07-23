@@ -313,6 +313,17 @@ export function createMainWindowRPC({
           const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
           return { path };
         },
+        // Native directory picker for the built-in working-directory variable.
+        fsPickDirectory: async () => {
+          const selected = await Utils.openFileDialog({
+            startingFolder: "~/",
+            canChooseFiles: false,
+            canChooseDirectory: true,
+            allowsMultipleSelection: false,
+          });
+          const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
+          return { path };
+        },
         // --- Code generator ---
         generatorPickDirectory: async () => {
           const selected = await Utils.openFileDialog({
