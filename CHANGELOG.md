@@ -4,6 +4,19 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.3] - 2026-07-23
+
+A focused fix for generated LangGraph projects using workspace-aware prompt
+templates.
+
+### Fixed
+
+- Generated Python prompt runtimes now expose the built-in
+  `current_working_directory` variable to system and meta user prompts.
+- Generated projects now support LLM Space's `@include(...)` macro, including
+  recursive rendering, missing files, invalid nested templates, and a depth
+  guard.
+
 ## [4.4.2] - 2026-07-23
 
 A prompt-template maintenance release focused on workspace-aware agents,
