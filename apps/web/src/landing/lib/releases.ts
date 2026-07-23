@@ -30,14 +30,14 @@ export interface Releases {
 // picks from the API. Keep in sync when a new stable ships.
 export const FALLBACK_RELEASES: Releases = {
   stable: {
-    version: "v4.1.1",
+    version: "v4.4.4",
     appleSilicon: {
-      url: `${RELEASES_URL}/download/v4.1.1/LLMSpace-performance-v4.1.1-macos-arm64.dmg`,
-      size: 132_880_112,
+      url: `${RELEASES_URL}/download/v4.4.4/LLMSpace-performance-v4.4.4-macos-arm64.dmg`,
+      size: 133_710_812,
     },
     intel: {
-      url: `${RELEASES_URL}/download/v4.1.1/LLMSpace-performance-v4.1.1-macos-x64.dmg`,
-      size: 143_772_165,
+      url: `${RELEASES_URL}/download/v4.4.4/LLMSpace-performance-v4.4.4-macos-x64.dmg`,
+      size: 143_486_440,
     },
   },
 };
