@@ -4,6 +4,23 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.4] - 2026-07-23
+
+A maintenance release that makes local lint validation match CI before a
+release is pushed.
+
+### Changed
+
+- Lint now fails on any warning, and the release checklist requires a clean
+  zero-warning, zero-error lint run.
+
+### Fixed
+
+- ESLint now consistently classifies `bun:test` as a built-in module under both
+  Bun and Node, preventing environment-dependent import ordering failures.
+- The ESLint configuration uses an explicit ESM extension, eliminating Node's
+  module-type warning.
+
 ## [4.4.3] - 2026-07-23
 
 A focused fix for generated LangGraph projects using workspace-aware prompt
