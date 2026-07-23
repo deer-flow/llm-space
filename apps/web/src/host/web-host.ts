@@ -24,9 +24,7 @@ export const webHost: HostServices = {
   },
   builtinTools: {
     list: () => Promise.resolve([]),
-    revealAbsolutePath: () => Promise.resolve(false),
-    openAbsolutePath: () => Promise.resolve(false),
-    revealSkill: () => Promise.resolve(false),
+    fsReveal: () => unavailable(),
   },
   paths: {
     ensureRootDir: (relativePath) => Promise.resolve(relativePath),

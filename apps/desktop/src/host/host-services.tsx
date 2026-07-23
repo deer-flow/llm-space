@@ -7,12 +7,7 @@ import {
 } from "@llm-space/ui/host";
 import { useMemo, type ReactNode } from "react";
 
-import {
-  listBuiltInTools,
-  openAbsolutePath,
-  revealAbsolutePath,
-  revealSkill,
-} from "@/client/built-in-tools";
+import { fsReveal, listBuiltInTools } from "@/client/built-in-tools";
 import {
   checkUv,
   pickGeneratorDirectory,
@@ -98,9 +93,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       mcp: { listServers: listMcpServers, listTools: listMcpTools },
       builtinTools: {
         list: listBuiltInTools,
-        revealAbsolutePath,
-        openAbsolutePath,
-        revealSkill,
+        fsReveal,
       },
       paths: { ensureRootDir },
       files: {

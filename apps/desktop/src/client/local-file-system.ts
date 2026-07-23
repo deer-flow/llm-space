@@ -44,7 +44,10 @@ export class LocalFileSystemClient implements FileSystem, ThreadStorage {
 
   /** Reveal a file/directory in the OS file manager (Finder/Explorer). */
   async reveal(path: string): Promise<void> {
-    await this._rpc().request.fsReveal({ path });
+    const { path: absolutePath } = await this._rpc().request.fsRealpath({
+      path,
+    });
+    await this._rpc().request.fsReveal({ path: absolutePath });
   }
 
   /** Resolve a workspace-relative path to its absolute on-disk path. */

@@ -1,9 +1,5 @@
-import { stat } from "node:fs/promises";
-import path from "node:path";
-
 import { ModelProviderGroup } from "@llm-space/core";
 import {
-  expandHomePath,
   readUserTextFile,
   userTextFileExists,
 } from "@llm-space/core/server";
@@ -22,10 +18,8 @@ import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
   moveToTrash,
-  openPath,
   prepareGeneratorDir,
   removeProjectFile,
-  revealInFileManager,
   runUv,
   writeProjectFile,
 } from "../fs";
@@ -46,6 +40,7 @@ import type { TraceManager } from "../traces";
 import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
+import { fsReveal } from "./fs-reveal";
 
 async function _getModelProviderGroups(modelManager: ModelManager) {
   const models = await modelManager.getAvailableModels();
@@ -255,43 +250,8 @@ export function createMainWindowRPC({
           };
         },
         fsReveal: async ({ path }) => {
-          await revealInFileManager(localFs.realpath(path));
+          await fsReveal(path, { skillsManager });
           return null;
-        },
-        revealAbsolutePath: async ({ path: abs }) => {
-          // Discovery-folder paths may be `~`-prefixed (e.g. `~/.claude/skills`),
-          // so expand a leading tilde before stat/reveal.
-          const resolved = expandHomePath(abs);
-          try {
-            await stat(resolved);
-          } catch {
-            return { existed: false };
-          }
-          await revealInFileManager(resolved);
-          return { existed: true };
-        },
-        openAbsolutePath: async ({ path: abs }) => {
-          try {
-            await stat(abs);
-          } catch {
-            return { existed: false };
-          }
-          openPath(abs);
-          return { existed: true };
-        },
-        revealSkill: async ({ name }) => {
-          const found = skillsManager.findSkill(name, { enabledOnly: false });
-          if (!found) {
-            return { existed: false };
-          }
-          const file = path.join(found.path, "SKILL.md");
-          try {
-            await stat(file);
-          } catch {
-            return { existed: false };
-          }
-          await revealInFileManager(file);
-          return { existed: true };
         },
         fsRealpath: ({ path }) =>
           Promise.resolve({ path: localFs.realpath(path) }),

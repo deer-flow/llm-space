@@ -179,28 +179,10 @@ export interface DesktopRPCType {
         params: { path: string; title?: string; description?: string };
         response: { shareUrl: string; gistId: string };
       };
-      // Reveal a file/directory in the OS file manager (Finder/Explorer).
+      // Open an absolute directory itself, or reveal an absolute file selected
+      // in Finder/Explorer. A leading `~` is expanded. Internal skills use
+      // `llm-space://internal/skills/<name>`. Missing/invalid targets reject.
       fsReveal: { params: { path: string }; response: null };
-      // Reveal an arbitrary absolute path (not confined to the workspace) in the
-      // OS file manager. Returns whether the path existed; a missing path is not
-      // revealed so the caller can surface a "not found" message.
-      revealAbsolutePath: {
-        params: { path: string };
-        response: { existed: boolean };
-      };
-      // Open an absolute path with the OS default handler (a folder opens in the
-      // file manager itself, not selected in its parent). Returns whether the
-      // path existed.
-      openAbsolutePath: {
-        params: { path: string };
-        response: { existed: boolean };
-      };
-      // Reveal a skill's `SKILL.md` in the OS file manager, resolved by skill
-      // name. Returns whether a matching skill file was found.
-      revealSkill: {
-        params: { name: string };
-        response: { existed: boolean };
-      };
       // Resolve a workspace-relative path to its absolute on-disk path.
       fsRealpath: { params: { path: string }; response: { path: string } };
       // Read an arbitrary text file (NOT confined to the workspace) for the

@@ -27,7 +27,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { openAbsolutePath, revealAbsolutePath } from "@/client/built-in-tools";
+import { fsReveal } from "@/client/built-in-tools";
 import {
   addSkillsPath,
   browseForSkillsPath,
@@ -52,12 +52,7 @@ const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
 /** Reveal a discovery folder in the OS file manager, toasting if it's gone. */
 async function revealDiscoveryPath(path: string) {
   try {
-    const existed = await revealAbsolutePath(path);
-    if (!existed) {
-      toast.error("Folder not found", {
-        description: `"${path}" no longer exists on disk.`,
-      });
-    }
+    await fsReveal(path);
   } catch (error) {
     toast.error("Failed to reveal folder", {
       description: error instanceof Error ? error.message : "Please try again.",
@@ -68,12 +63,7 @@ async function revealDiscoveryPath(path: string) {
 /** Open a skill directory in the OS file manager. */
 async function openSkillFolder(skill: SkillInfo) {
   try {
-    const existed = await openAbsolutePath(skill.path);
-    if (!existed) {
-      toast.error("Skill folder not found", {
-        description: `"${skill.path}" no longer exists on disk.`,
-      });
-    }
+    await fsReveal(skill.path);
   } catch (error) {
     toast.error("Failed to open skill folder", {
       description: error instanceof Error ? error.message : "Please try again.",

@@ -20,30 +20,7 @@ export async function callBuiltInTool(input: {
   return _rpc().request.builtInCallTool(input);
 }
 
-/**
- * Reveal an arbitrary absolute path in the OS file manager. Resolves to whether
- * the path existed — a missing path is left for the caller to report.
- */
-export async function revealAbsolutePath(path: string): Promise<boolean> {
-  const { existed } = await _rpc().request.revealAbsolutePath({ path });
-  return existed;
-}
-
-/**
- * Open an arbitrary absolute path with the OS default handler — a folder opens
- * in the file manager itself (not selected in its parent). Resolves to whether
- * the path existed.
- */
-export async function openAbsolutePath(path: string): Promise<boolean> {
-  const { existed } = await _rpc().request.openAbsolutePath({ path });
-  return existed;
-}
-
-/**
- * Reveal a skill's `SKILL.md` in the OS file manager, resolved by skill name.
- * Resolves to whether a matching skill file was found.
- */
-export async function revealSkill(name: string): Promise<boolean> {
-  const { existed } = await _rpc().request.revealSkill({ name });
-  return existed;
+/** Open a directory itself, or reveal a file selected in its parent folder. */
+export async function fsReveal(path: string): Promise<void> {
+  await _rpc().request.fsReveal({ path });
 }

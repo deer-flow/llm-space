@@ -335,14 +335,22 @@ export function GenerateProjectButton() {
     }
   }, [generator]);
 
-  const openGeneratedProject = useCallback(() => {
-    if (result) {
-      void builtinTools.openAbsolutePath(result.dir);
+  const openGeneratedProject = useCallback(async () => {
+    if (!result) {
+      return;
+    }
+    try {
+      await builtinTools.fsReveal(result.dir);
+    } catch (error) {
+      toast.error("Failed to open generated project", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
     }
   }, [builtinTools, result]);
 
   const skipEnvFile = useCallback(() => {
-    openGeneratedProject();
+    void openGeneratedProject();
     setEnvConfirmOpen(false);
     setOpen(false);
   }, [openGeneratedProject]);
@@ -404,7 +412,7 @@ export function GenerateProjectButton() {
         description: e instanceof Error ? e.message : String(e),
       });
     } finally {
-      openGeneratedProject();
+      void openGeneratedProject();
       setWritingEnv(false);
       setEnvConfirmOpen(false);
       setOpen(false);
@@ -573,7 +581,7 @@ export function GenerateProjectButton() {
                 {result ? (
                   <Button
                     variant="ghost"
-                    onClick={() => builtinTools.openAbsolutePath(result.dir)}
+                    onClick={() => void openGeneratedProject()}
                   >
                     <FolderOpenIcon className="size-4" />
                     Open folder

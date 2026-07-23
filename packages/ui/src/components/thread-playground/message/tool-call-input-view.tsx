@@ -1,4 +1,4 @@
-import { type ToolCallInput } from "@llm-space/core";
+import { formatSkillLocator, type ToolCallInput } from "@llm-space/core";
 import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -40,24 +40,19 @@ const FS_TOOLS_WITH_PATH = new Set([
  */
 type LinkKind = "path" | "skill" | "url";
 
-/** Reveal a path/skill value in the OS file manager, toasting on a miss/failure. */
+/** Reveal a path/skill value in the OS file manager, toasting on failure. */
 async function _reveal(
   builtinTools: BuiltinToolsHost,
   kind: "path" | "skill",
   value: string
 ): Promise<void> {
   try {
-    const existed =
-      kind === "skill"
-        ? await builtinTools.revealSkill(value)
-        : await builtinTools.revealAbsolutePath(value);
-    if (!existed) {
-      toast.error(
-        kind === "skill" ? `Skill not found: ${value}` : `Not found: ${value}`
-      );
-    }
-  } catch {
-    toast.error("Failed to reveal in file manager");
+    const target = kind === "skill" ? formatSkillLocator(value) : value;
+    await builtinTools.fsReveal(target);
+  } catch (error) {
+    toast.error("Failed to reveal in file manager", {
+      description: error instanceof Error ? error.message : "Please try again.",
+    });
   }
 }
 
