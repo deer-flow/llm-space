@@ -5,7 +5,11 @@ import path from "node:path";
 
 
 import { expandHomePath } from "./paths";
-import { readUserTextFile, userTextFileExists } from "./read-text";
+import {
+  readUserTextFile,
+  userDirectoryExists,
+  userTextFileExists,
+} from "./read-text";
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), "llm-space-readtext-"));
 
@@ -56,5 +60,19 @@ describe("userTextFileExists", () => {
     expect(await userTextFileExists(path.join(tmp, "missing.md"))).toBe(false);
     expect(await userTextFileExists(tmp)).toBe(false);
     expect(await userTextFileExists("")).toBe(false);
+  });
+});
+
+describe("userDirectoryExists", () => {
+  test("returns true for an existing directory", async () => {
+    expect(await userDirectoryExists(tmp)).toBe(true);
+  });
+
+  test("returns false for missing paths, regular files, and empty input", async () => {
+    const file = path.join(tmp, "not-a-directory.md");
+    writeFileSync(file, "", "utf8");
+    expect(await userDirectoryExists(path.join(tmp, "missing"))).toBe(false);
+    expect(await userDirectoryExists(file)).toBe(false);
+    expect(await userDirectoryExists("")).toBe(false);
   });
 });

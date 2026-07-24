@@ -93,7 +93,11 @@ type WizardStep = "framework" | "target" | "run";
  * PLAN.md a coding agent can finish. Hidden on hosts without generator support
  * (web).
  */
-export function GenerateProjectButton() {
+export function GenerateProjectButton({
+  disabled = false,
+}: {
+  disabled?: boolean;
+}) {
   const {
     generator,
     transport,
@@ -448,7 +452,7 @@ export function GenerateProjectButton() {
           variant="ghost"
           size="icon-lg"
           aria-label="Generate a runnable agent (Beta)"
-          disabled={running || !model}
+          disabled={disabled || running || !model}
           onClick={() => setOpen(true)}
         >
           <SparklesIcon className="size-4" />

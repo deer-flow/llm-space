@@ -195,6 +195,12 @@ export interface DesktopRPCType {
         params: { path: string };
         response: { exists: boolean };
       };
+      // Whether a path points to an existing directory. A leading `~` expands
+      // to the user's home.
+      fsDirectoryExists: {
+        params: { path: string };
+        response: { exists: boolean };
+      };
       // Open the native file picker (for a "file content" prompt variable).
       // `path` is null when the user cancels.
       fsPickFile: {

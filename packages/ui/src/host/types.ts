@@ -62,6 +62,11 @@ export interface FilesHost {
   /** Whether a path points to a readable regular file (`~` expands to home). */
   exists(path: string): Promise<boolean>;
   /**
+   * Whether a path points to an existing directory. `null` when the host cannot
+   * inspect the local filesystem (e.g. the display-only web viewer).
+   */
+  directoryExists(path: string): Promise<boolean | null>;
+  /**
    * Open the native OS file picker; resolves to the chosen absolute path, or
    * `null` when cancelled / unavailable (e.g. the display-only web viewer).
    */

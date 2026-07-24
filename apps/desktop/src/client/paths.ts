@@ -37,6 +37,12 @@ export async function textFileExists(path: string): Promise<boolean> {
   return exists;
 }
 
+/** Whether a path points to an existing directory (`~` expands to home). */
+export async function directoryExists(path: string): Promise<boolean> {
+  const { exists } = await _rpc().request.fsDirectoryExists({ path });
+  return exists;
+}
+
 /** Open the native file picker; resolves to the chosen path or `null`. */
 export async function pickFile(): Promise<string | null> {
   const { path } = await _rpc().request.fsPickFile({});

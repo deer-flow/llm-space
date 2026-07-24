@@ -317,6 +317,7 @@ function ThreadPlaygroundContent({
                     historyOpen ? "Hide run history" : "View run history"
                   }
                   aria-expanded={historyOpen}
+                  disabled={status === "running"}
                   onClick={toggleHistory}
                 >
                   <HistoryIcon className="size-4" />
@@ -327,12 +328,13 @@ function ThreadPlaygroundContent({
                   variant="ghost"
                   size="icon-lg"
                   aria-label="Share thread"
+                  disabled={status === "running"}
                   onClick={() => actions.shareThread(path)}
                 >
                   <Share2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <GenerateProjectButton />
+              <GenerateProjectButton disabled={status === "running"} />
             </div>
             <div className="flex items-center gap-1 px-3">
               <ButtonGroup
@@ -379,7 +381,9 @@ function ThreadPlaygroundContent({
                       className="border-none pr-1.5 pl-0.5 active:translate-y-0!"
                       aria-label="Run settings"
                       disabled={
-                        readonlyFromProps || (status !== "running" && !hasModel)
+                        readonlyFromProps ||
+                        status === "running" ||
+                        !hasModel
                       }
                     >
                       <ChevronDownIcon className="size-3" />

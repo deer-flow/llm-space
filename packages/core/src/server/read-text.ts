@@ -47,3 +47,20 @@ export async function userTextFileExists(inputPath: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Whether a user-authored path points to a directory. A leading `~` expands
+ * exactly as it does for {@link readUserTextFile}; every failure is reported as
+ * `false` so callers can present a simple missing-directory state.
+ */
+export async function userDirectoryExists(inputPath: string): Promise<boolean> {
+  try {
+    if (typeof inputPath !== "string" || inputPath.trim().length === 0) {
+      return false;
+    }
+    const resolved = path.resolve(expandHomePath(inputPath));
+    return (await stat(resolved)).isDirectory();
+  } catch {
+    return false;
+  }
+}

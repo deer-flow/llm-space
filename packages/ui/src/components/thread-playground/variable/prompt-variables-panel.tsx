@@ -27,6 +27,7 @@ import {
   PlusIcon,
   SparklesIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   TypeIcon,
 } from "lucide-react";
 import {
@@ -854,10 +855,54 @@ function WorkingDirectoryVariableDetail({
   onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
 }) {
   const { files } = useHostServices();
+  const [directoryExists, setDirectoryExists] = useState<boolean | null>(null);
+  const directoryCheckIdRef = useRef(0);
+
+  const commitAndCheckPath = useCallback(
+    async (rawValue: string) => {
+      const checkId = ++directoryCheckIdRef.current;
+      const value = _normalizeDirectoryPath(rawValue);
+      if (value !== variable.value) {
+        onUpdate(name, { ...variable, value });
+      }
+      if (!value) {
+        setDirectoryExists(null);
+        return;
+      }
+
+      setDirectoryExists(null);
+      try {
+        const exists = await files.directoryExists(value);
+        if (directoryCheckIdRef.current === checkId) {
+          setDirectoryExists(exists);
+        }
+      } catch {
+        if (directoryCheckIdRef.current === checkId) {
+          setDirectoryExists(null);
+        }
+      }
+    },
+    [files, name, onUpdate, variable]
+  );
+
+  const handlePathChange = useCallback(
+    (value: string) => {
+      ++directoryCheckIdRef.current;
+      setDirectoryExists(null);
+      onUpdate(name, { ...variable, value });
+    },
+    [name, onUpdate, variable]
+  );
+
   const browse = useCallback(async () => {
     const path = await files.pickDirectory();
     if (path) {
-      onUpdate(name, { ...variable, value: path });
+      ++directoryCheckIdRef.current;
+      setDirectoryExists(true);
+      onUpdate(name, {
+        ...variable,
+        value: _normalizeDirectoryPath(path),
+      });
     }
   }, [files, name, onUpdate, variable]);
 
@@ -885,7 +930,10 @@ function WorkingDirectoryVariableDetail({
             disabled={disabled}
             placeholder="~/Desktop/llm-space-project"
             onChange={(event) =>
-              onUpdate(name, { ...variable, value: event.currentTarget.value })
+              handlePathChange(event.currentTarget.value)
+            }
+            onBlur={(event) =>
+              void commitAndCheckPath(event.currentTarget.value)
             }
           />
           <Button
@@ -900,11 +948,35 @@ function WorkingDirectoryVariableDetail({
           </Button>
         </div>
       </Field>
-      <p className="text-muted-foreground text-xs">
-        This path is stored as entered and is not checked or created.
-      </p>
+      {directoryExists === false && (
+        <p
+          className="text-muted-foreground flex items-center gap-1.5 text-xs"
+          role="status"
+        >
+          <TriangleAlertIcon
+            className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
+            aria-hidden="true"
+          />
+          This folder hasn&apos;t been created yet, but it doesn&apos;t need to
+          exist before you continue.
+        </p>
+      )}
     </DetailShell>
   );
+}
+
+function _normalizeDirectoryPath(value: string): string {
+  const trimmed = value.trim();
+  if (/^\/+$/.test(trimmed)) {
+    return "/";
+  }
+  if (/^\\+$/.test(trimmed)) {
+    return "\\";
+  }
+  if (/^[A-Za-z]:[\\/]$/.test(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.replace(/[\\/]+$/, "");
 }
 
 function SkillsVariableDetail({

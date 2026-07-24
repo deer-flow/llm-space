@@ -1,6 +1,7 @@
 import { ModelProviderGroup } from "@llm-space/core";
 import {
   readUserTextFile,
+  userDirectoryExists,
   userTextFileExists,
 } from "@llm-space/core/server";
 import type { LocalFileSystem } from "@llm-space/core/server";
@@ -261,6 +262,9 @@ export function createMainWindowRPC({
         }),
         fsTextFileExists: async ({ path }) => ({
           exists: await userTextFileExists(path),
+        }),
+        fsDirectoryExists: async ({ path }) => ({
+          exists: await userDirectoryExists(path),
         }),
         // Native file picker for a "file content" prompt variable.
         fsPickFile: async () => {

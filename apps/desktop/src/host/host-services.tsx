@@ -19,6 +19,7 @@ import {
 } from "@/client/generator";
 import { listMcpServers, listMcpTools } from "@/client/mcp";
 import {
+  directoryExists,
   ensureRootDir,
   pickDirectory,
   pickFile,
@@ -99,6 +100,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       files: {
         readText: readTextFile,
         exists: textFileExists,
+        directoryExists,
         pickFile,
         pickDirectory,
       },
