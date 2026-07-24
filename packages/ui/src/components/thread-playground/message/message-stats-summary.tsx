@@ -50,43 +50,43 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
       <div className="bg-foreground/8 flex h-2 overflow-hidden rounded-full">
         {usage.input > 0 && (
           <div
-            className="bg-muted-foreground/50 h-full"
+            className="h-full bg-yellow-500 dark:bg-yellow-400"
             style={{
               flexBasis: 0,
               flexGrow: usage.input,
-              minWidth: "2px",
+              minWidth: "3px",
             }}
           />
         )}
         {usage.output > 0 && (
           <div
-            className="bg-primary/65 h-full"
+            className="h-full bg-blue-500 dark:bg-blue-400"
             style={{
               flexBasis: 0,
               flexGrow: usage.output,
-              minWidth: "2px",
+              minWidth: "3px",
             }}
           />
         )}
         {cached > 0 && (
           <div
-            className="h-full bg-emerald-400/65"
-            style={{ flexBasis: 0, flexGrow: cached, minWidth: "2px" }}
+            className="h-full bg-emerald-500 dark:bg-emerald-400"
+            style={{ flexBasis: 0, flexGrow: cached, minWidth: "3px" }}
           />
         )}
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.5625rem]">
         <span className="flex items-center gap-1">
-          <span className="bg-muted-foreground/50 size-1.5 rounded-full" />
+          <span className="size-1.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
           Input {formatTokens(usage.input)}
         </span>
         <span className="flex items-center gap-1">
-          <span className="bg-primary/65 size-1.5 rounded-full" />
+          <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
           Output {formatTokens(usage.output)}
         </span>
         {cached > 0 && (
           <span className="flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-emerald-400/65" />
+            <span className="size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
             Cached {formatTokens(cached)}
           </span>
         )}
@@ -138,21 +138,23 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
               style={{
                 flexBasis: 0,
                 flexGrow: firstTokenMs,
-                minWidth: "2px",
+                minWidth: "3px",
               }}
             />
           )}
           {generationMs !== null && generationMs > 0 && (
             <div
-              className="bg-primary/65 h-full"
+              className="h-full bg-blue-500 dark:bg-blue-400"
               style={{
                 flexBasis: 0,
                 flexGrow: generationMs,
-                minWidth: "2px",
+                minWidth: "3px",
               }}
             />
           )}
-          {!hasFirstToken && <div className="bg-primary/65 h-full w-full" />}
+          {!hasFirstToken && (
+            <div className="h-full w-full bg-blue-500 dark:bg-blue-400" />
+          )}
         </div>
         <div className="text-muted-foreground mt-0.5 flex justify-between text-[0.5625rem]">
           <span>Request sent</span>
@@ -167,7 +169,7 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
           </span>
         )}
         <span className="flex items-center gap-1">
-          <span className="bg-primary/65 size-1.5 rounded-full" />
+          <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
           {generationMs === null
             ? "Response"
             : `Generating ${_formatDuration(generationMs)}`}
