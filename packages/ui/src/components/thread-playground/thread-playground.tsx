@@ -381,9 +381,7 @@ function ThreadPlaygroundContent({
                       className="border-none pr-1.5 pl-0.5 active:translate-y-0!"
                       aria-label="Run settings"
                       disabled={
-                        readonlyFromProps ||
-                        status === "running" ||
-                        !hasModel
+                        readonlyFromProps || (status !== "running" && !hasModel)
                       }
                     >
                       <ChevronDownIcon className="size-3" />

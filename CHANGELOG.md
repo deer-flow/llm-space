@@ -4,6 +4,33 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.5] - 2026-07-24
+
+Response performance is now visible at a glance, with safer filesystem actions
+and more predictable controls while a thread is running.
+
+### Added
+
+- Assistant messages now report total response time, time to first token,
+  generation throughput, and a detailed token breakdown.
+- Prompt directory variables validate that their configured directory exists.
+
+### Changed
+
+- Message statistics can switch between timing and token summaries, with the
+  preferred view remembered across sessions.
+- Opening files, directories, generated projects, and skill locations now uses
+  one validated filesystem action with clearer failures.
+- Header actions that could mutate or export a thread are disabled while it is
+  running; run settings remain available next to the Stop button.
+- Updated the model runtime dependencies and aligned Ark's maximum output-token
+  setting with the provider's 128,000-token limit.
+
+### Fixed
+
+- `ask_user_question` always terminates the active agent turn, including for
+  older saved threads, so ReAct mode cannot continue before the user answers.
+
 ## [4.4.4] - 2026-07-23
 
 A maintenance release that makes local lint validation match CI before a
