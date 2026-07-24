@@ -26,8 +26,8 @@
     "*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}": "eslint --fix"
   },
   "catalog": {
-    "@earendil-works/pi-ai": "^0.80.10",
-    "@earendil-works/pi-agent-core": "^0.80.10",
+    "@earendil-works/pi-ai": "^0.81.1",
+    "@earendil-works/pi-agent-core": "^0.81.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typebox": "^1.2.8"

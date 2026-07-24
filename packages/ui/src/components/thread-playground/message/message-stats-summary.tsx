@@ -171,11 +171,6 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
             : `Generating ${_formatDuration(generationMs)}`}
         </span>
       </div>
-      {hasFirstToken && (
-        <p className="text-muted-foreground mt-1 text-[0.5625rem] leading-snug">
-          TPS counts output tokens only during the generating segment.
-        </p>
-      )}
     </div>
   );
 }
@@ -314,6 +309,11 @@ function _MessageStatsSummary({
                   </>
                 )}
               </div>
+              {timing.firstTokenMs !== undefined && (
+                <p className="text-muted-foreground mt-1.5 text-[0.5625rem] leading-snug">
+                  TPS counts output tokens only during the generating segment.
+                </p>
+              )}
             </section>
           )}
         </div>

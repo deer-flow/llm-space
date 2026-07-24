@@ -130,7 +130,7 @@ export const ARK_AGENT_PLAN_MODELS = {
     reasoning: true,
     input: ["text"],
     contextWindow: 1000000,
-    maxTokens: 131072,
+    maxTokens: 128000,
     compat: {
       supportsDeveloperRole: false,
       thinkingFormat: "deepseek",
