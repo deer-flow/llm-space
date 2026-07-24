@@ -110,11 +110,7 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
     : `Request sent. Completed after ${_formatDuration(timing.durationMs)}.`;
 
   return (
-    <div
-      role="img"
-      aria-label={ariaLabel}
-      className="mt-1.5 w-72 max-w-full"
-    >
+    <div role="img" aria-label={ariaLabel} className="mt-1.5 w-72 max-w-full">
       <div className="relative pt-4">
         {hasFirstToken && (
           <span
@@ -291,14 +287,16 @@ function _MessageStatsSummary({
               <div className="text-foreground mb-1 font-medium">Timing</div>
               <_TimingTimeline timing={timing} />
               <div className="mt-1.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 leading-tight">
-                <span className="text-muted-foreground">Duration</span>
+                <span className="text-muted-foreground">
+                  Total response time
+                </span>
                 <span className="text-right font-mono tabular-nums">
                   {_formatDuration(timing.durationMs)}
                 </span>
                 {timing?.firstTokenMs !== undefined && (
                   <>
                     <span className="text-muted-foreground">
-                      Time to first token
+                      Time to first token (TTFT)
                     </span>
                     <span className="text-right font-mono tabular-nums">
                       {_formatDuration(timing.firstTokenMs)}
@@ -324,7 +322,7 @@ function _MessageStatsSummary({
       {variant === "header" ? (
         <button
           type="button"
-          aria-label={`Showing ${mode === "timing" ? "duration" : "token usage"}: ${label}. Click to show ${mode === "timing" ? "token usage" : "duration"}.`}
+          aria-label={`Showing ${mode === "timing" ? "total response time" : "token usage"}: ${label}. Click to show ${mode === "timing" ? "token usage" : "total response time"}.`}
           className={cn(
             summaryClassName,
             "hover:text-foreground focus-visible:ring-ring cursor-pointer border-0 text-left outline-none focus-visible:ring-[3px]"
