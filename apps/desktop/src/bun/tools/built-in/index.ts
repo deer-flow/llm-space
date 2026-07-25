@@ -1,4 +1,2 @@
-export {
-  createBuiltInToolsModule,
-  type BuiltInToolsModuleDependencies,
-} from "./built-in-tools-module";
+export { createBuiltInToolsModule } from "@llm-space/runtime/tools/built-in";
+export type { BuiltInToolsModuleDependencies } from "@llm-space/runtime/tools/built-in";

@@ -13,9 +13,6 @@ import { getSettingsDir } from "@llm-space/core/server";
 import matter from "gray-matter";
 import { isValidSkillName, validateSkillFrontmatter } from "skills-handler";
 
-
-import { getManagedSkillsDir } from "./seed";
-
 /**
  * Owns `settings/skills.json`: the discovery folders backing the built-in Skill
  * tool and, per folder, the skills the user has hidden. Mirrors
@@ -26,10 +23,14 @@ import { getManagedSkillsDir } from "./seed";
  * reads (`readSkill`) parse `SKILL.md` frontmatter with gray-matter and validate
  * it against the Agent Skills spec via `skills-handler`.
  */
+export interface SkillsManagerOptions {
+  managedSkillsDir?: string;
+}
+
 export class SkillsManager {
   private _settings: SkillsSettings;
 
-  constructor() {
+  constructor(private readonly _options: SkillsManagerOptions = {}) {
     this._settings = this._loadConfig();
   }
 
@@ -228,8 +229,11 @@ export class SkillsManager {
    */
   private _defaultSettings(): SkillsSettings {
     const settings = this._clone(DEFAULT_SKILLS_SETTINGS);
-    const managed = getManagedSkillsDir();
-    if (!settings.discoveryPaths.some((entry) => entry.path === managed)) {
+    const managed = this._options.managedSkillsDir;
+    if (
+      managed &&
+      !settings.discoveryPaths.some((entry) => entry.path === managed)
+    ) {
       settings.discoveryPaths.push({ path: managed, hiddenSkills: [] });
     }
     return settings;

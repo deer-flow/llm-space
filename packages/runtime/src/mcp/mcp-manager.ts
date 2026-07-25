@@ -43,7 +43,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-
 const CONNECT_TIMEOUT_MS = 10_000;
 const LIST_TIMEOUT_MS = 10_000;
 const CALL_TIMEOUT_MS = 5 * 60_000;

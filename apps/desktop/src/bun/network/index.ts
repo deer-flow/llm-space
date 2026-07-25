@@ -1,1 +1,1 @@
-export { NetworkSettingsManager } from "./network-settings-manager";
+export { NetworkSettingsManager } from "@llm-space/runtime/network";

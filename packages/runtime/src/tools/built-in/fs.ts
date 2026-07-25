@@ -6,12 +6,13 @@ import path from "node:path";
 import type { BuiltinTool } from "@llm-space/core";
 import type { SkillContent } from "@llm-space/core";
 
-import { openPath, revealInFileManager } from "../../fs";
 import type { ToolEntry } from "../tool-registry";
 
 export interface FsBuiltInToolsDependencies {
   workspaceRoot: string;
   findSkill: (name: string) => SkillContent | null;
+  openPath?: (path: string) => Promise<void> | void;
+  revealPath?: (path: string) => Promise<void> | void;
 }
 
 /**
@@ -685,13 +686,19 @@ export const presentFilesTool: BuiltinTool = {
  * enclosing folder on Linux) — the same reveal used by the tree-view "Reveal in
  * Finder" action.
  */
-export async function present_files(paths: string[]): Promise<"OK"> {
+export async function present_files(
+  paths: string[],
+  dependencies: Pick<FsBuiltInToolsDependencies, "openPath" | "revealPath"> = {}
+): Promise<"OK"> {
   const reveals: Promise<void>[] = [];
   for (const p of paths) {
     if (_isHtmlFile(p)) {
-      openPath(p);
+      await dependencies.openPath?.(p);
     } else {
-      reveals.push(revealInFileManager(p));
+      const reveal = dependencies.revealPath?.(p);
+      if (reveal) {
+        reveals.push(Promise.resolve(reveal));
+      }
     }
   }
   await Promise.all(reveals);
@@ -705,10 +712,10 @@ function _isHtmlFile(filePath: string): boolean {
 
 // -- registry -----------------------------------------------------------------
 
-export function createFsBuiltInTools({
-  workspaceRoot,
-  findSkill,
-}: FsBuiltInToolsDependencies): ToolEntry[] {
+export function createFsBuiltInTools(
+  dependencies: FsBuiltInToolsDependencies
+): ToolEntry[] {
+  const { workspaceRoot, findSkill } = dependencies;
   return [
     {
       tool: readTool,
@@ -795,7 +802,7 @@ export function createFsBuiltInTools({
     {
       tool: presentFilesTool,
       async execute(args: Record<string, unknown>) {
-        return present_files(_requireStringArray(args, "paths"));
+        return present_files(_requireStringArray(args, "paths"), dependencies);
       },
     },
   ];

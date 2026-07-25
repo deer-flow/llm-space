@@ -11,7 +11,7 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import {
-  ModelProviderGroup,
+  type ModelProviderGroup,
   type CustomModel,
   type ModelConfig,
 } from "@llm-space/core";

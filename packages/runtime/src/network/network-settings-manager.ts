@@ -131,7 +131,8 @@ export class NetworkSettingsManager {
   private _seedFromEnv(): NetworkSettings {
     const httpProxy = this._readEnv(HTTP_PROXY_KEYS);
     const httpsProxy = this._readEnv(HTTPS_PROXY_KEYS);
-    const usableHttp = httpProxy && isSupportedProxyUrl(httpProxy) ? httpProxy : "";
+    const usableHttp =
+      httpProxy && isSupportedProxyUrl(httpProxy) ? httpProxy : "";
     const usableHttps =
       httpsProxy && isSupportedProxyUrl(httpsProxy) ? httpsProxy : "";
     if (!usableHttp && !usableHttps) {
@@ -142,8 +143,7 @@ export class NetworkSettingsManager {
       useSystemProxy: false,
       httpProxy: usableHttp,
       httpsProxy: usableHttps,
-      noProxy:
-        this._readEnv(NO_PROXY_KEYS) || DEFAULT_NETWORK_SETTINGS.noProxy,
+      noProxy: this._readEnv(NO_PROXY_KEYS) || DEFAULT_NETWORK_SETTINGS.noProxy,
     };
   }
 
