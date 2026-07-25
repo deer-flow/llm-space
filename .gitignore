@@ -54,3 +54,7 @@ __pycache__
 
 # Local Claude Code git worktrees
 .claude/worktrees/
+
+/docs/plans/
+/docs/superpowers/plans/active/
+/docs/superpowers/plans/proposal/
