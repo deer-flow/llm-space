@@ -31,6 +31,7 @@ function _McpToolImportDialog({
   initialToolName,
   onAdd,
   onRemove,
+  runtimeId,
   open,
   onOpenChange,
 }: {
@@ -39,6 +40,7 @@ function _McpToolImportDialog({
   initialToolName?: string | null;
   onAdd: (tool: McpTool) => boolean;
   onRemove: (toolName: string) => void;
+  runtimeId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -65,7 +67,7 @@ function _McpToolImportDialog({
   const refreshServers = useCallback(async () => {
     setLoadingServers(true);
     try {
-      const next = await mcp.listServers();
+      const next = await mcp.listServers({ runtimeId });
       setServers(next);
       setSelectedServerId((current) =>
         initialServerId && next.some((server) => server.id === initialServerId)
@@ -82,7 +84,7 @@ function _McpToolImportDialog({
     } finally {
       setLoadingServers(false);
     }
-  }, [initialServerId, mcp]);
+  }, [initialServerId, mcp, runtimeId]);
 
   const refreshTools = useCallback(
     async (serverId: string) => {
@@ -92,7 +94,7 @@ function _McpToolImportDialog({
       }
       setLoadingTools(true);
       try {
-        const response = await mcp.listTools(serverId);
+        const response = await mcp.listTools(serverId, { runtimeId });
         setTools(response.tools);
         setServers((current) =>
           current.map((server) =>
@@ -110,7 +112,7 @@ function _McpToolImportDialog({
         setLoadingTools(false);
       }
     },
-    [mcp, refreshServers]
+    [mcp, refreshServers, runtimeId]
   );
 
   useEffect(() => {

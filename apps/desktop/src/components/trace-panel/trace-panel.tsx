@@ -56,6 +56,7 @@ import { toast } from "sonner";
 
 import { traceClient } from "@/client";
 import { useCommands, useRegisterCommands } from "@/commands";
+import type { RuntimeId } from "@/shared/runtime";
 import type {
   TraceConnectedProjectInput,
   TraceImportFile,
@@ -69,6 +70,7 @@ interface TracePanelProps {
   className?: string;
   headerStart?: ReactNode;
   onOpenTrace: (trace: TraceRecord) => void;
+  runtimeId: RuntimeId;
 }
 
 type ConnectedTraceProject = TraceProject & {
@@ -118,7 +120,11 @@ const TRACE_SEARCH_ORDER_OPTIONS = [
 
 const TRACE_SEARCH_LIMIT_OPTIONS = ["25", "50", "100"];
 
-export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
+export function TracePanel({
+  className,
+  onOpenTrace,
+  runtimeId,
+}: TracePanelProps) {
   const { executeCommand } = useCommands();
   const qc = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -133,8 +139,8 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
   const [syncingProjectId, setSyncingProjectId] = useState<string | null>(null);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["trace", "projects"],
-    queryFn: () => traceClient.listProjects(),
+    queryKey: ["trace", runtimeId, "projects"],
+    queryFn: () => traceClient.listProjects(runtimeId),
   });
   const selectedProject = useMemo(
     () =>
@@ -172,11 +178,11 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
   const createProject = useCallback(
     async (name: string) => {
       try {
-        const project = await traceClient.createProject(name);
+        const project = await traceClient.createProject(name, runtimeId);
         setProjectName("");
         setProjectDialogOpen(false);
         setSelectedProjectId(project.id);
-        await qc.invalidateQueries({ queryKey: ["trace", "projects"] });
+        await qc.invalidateQueries({ queryKey: ["trace", runtimeId, "projects"] });
       } catch (error) {
         toast.error("Could not create trace project", {
           description:
@@ -184,17 +190,17 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         });
       }
     },
-    [qc]
+    [qc, runtimeId]
   );
 
   const createConnectedProject = useCallback(
     async (input: TraceConnectedProjectInput) => {
       setConnectionPending(true);
       try {
-        const project = await traceClient.createConnectedProject(input);
+        const project = await traceClient.createConnectedProject(input, runtimeId);
         setProjectDialogOpen(false);
         setSelectedProjectId(project.id);
-        await qc.invalidateQueries({ queryKey: ["trace", "projects"] });
+        await qc.invalidateQueries({ queryKey: ["trace", runtimeId, "projects"] });
         toast.success("Connected Langfuse project", {
           description: project.source.langfuseProjectName ?? project.name,
         });
@@ -207,18 +213,22 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         setConnectionPending(false);
       }
     },
-    [qc]
+    [qc, runtimeId]
   );
 
   const importLangfuseFiles = useCallback(
     async (projectId: string, files: TraceImportFile[]) => {
       setImporting(true);
       try {
-        const result = await traceClient.importLangfuseJson(projectId, files);
+        const result = await traceClient.importLangfuseJson(
+          projectId,
+          files,
+          runtimeId
+        );
         await Promise.all([
-          qc.invalidateQueries({ queryKey: ["trace", "projects"] }),
+          qc.invalidateQueries({ queryKey: ["trace", runtimeId, "projects"] }),
           qc.invalidateQueries({
-            queryKey: ["trace", "traces", projectId],
+            queryKey: ["trace", runtimeId, "traces", projectId],
           }),
         ]);
         if (result.imported.length > 0) {
@@ -247,7 +257,7 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         setImporting(false);
       }
     },
-    [qc]
+    [qc, runtimeId]
   );
 
   const syncLangfuseTraceIds = useCallback(
@@ -256,12 +266,13 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
       try {
         const result = await traceClient.syncLangfuseTraces(
           projectId,
-          traceIds
+          traceIds,
+          runtimeId
         );
         await Promise.all([
-          qc.invalidateQueries({ queryKey: ["trace", "projects"] }),
+          qc.invalidateQueries({ queryKey: ["trace", runtimeId, "projects"] }),
           qc.invalidateQueries({
-            queryKey: ["trace", "traces", projectId],
+            queryKey: ["trace", runtimeId, "traces", projectId],
           }),
         ]);
         if (result.imported.length > 0) {
@@ -281,9 +292,9 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         }
       } catch (error) {
         await Promise.all([
-          qc.invalidateQueries({ queryKey: ["trace", "projects"] }),
+          qc.invalidateQueries({ queryKey: ["trace", runtimeId, "projects"] }),
           qc.invalidateQueries({
-            queryKey: ["trace", "traces", projectId],
+            queryKey: ["trace", runtimeId, "traces", projectId],
           }),
         ]);
         toast.error("Sync failed", {
@@ -294,16 +305,26 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         setSyncingProjectId(null);
       }
     },
-    [qc]
+    [qc, runtimeId]
   );
 
   useRegisterCommands({
-    createTraceProject: ({ name }) => void createProject(name),
-    createConnectedTraceProject: (input) => void createConnectedProject(input),
-    importLangfuseTraceFiles: ({ projectId, files }) =>
-      void importLangfuseFiles(projectId, files),
-    syncLangfuseTraceIds: ({ projectId, traceIds }) =>
-      void syncLangfuseTraceIds(projectId, traceIds),
+    createTraceProject: ({ name, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void createProject(name);
+    },
+    createConnectedTraceProject: ({ runtimeId: commandRuntimeId, ...input }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void createConnectedProject(input);
+    },
+    importLangfuseTraceFiles: ({ projectId, files, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void importLangfuseFiles(projectId, files);
+    },
+    syncLangfuseTraceIds: ({ projectId, traceIds, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void syncLangfuseTraceIds(projectId, traceIds);
+    },
   });
 
   const requestCreateProject = useCallback(() => {
@@ -311,17 +332,20 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
     if (!name) {
       return;
     }
-    executeCommand({ type: "createTraceProject", args: { name } });
-  }, [executeCommand, projectName]);
+    executeCommand({
+      type: "createTraceProject",
+      args: { name, runtimeId },
+    });
+  }, [executeCommand, projectName, runtimeId]);
 
   const importFilesIntoProject = useCallback(
     (projectId: string, files: TraceImportFile[]) => {
       executeCommand({
         type: "importLangfuseTraceFiles",
-        args: { projectId, files },
+        args: { projectId, files, runtimeId },
       });
     },
-    [executeCommand]
+    [executeCommand, runtimeId]
   );
 
   const selectProject = useCallback((projectId: string) => {
@@ -344,20 +368,20 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
     (input: TraceConnectedProjectInput) => {
       executeCommand({
         type: "createConnectedTraceProject",
-        args: input,
+        args: { ...input, runtimeId },
       });
     },
-    [executeCommand]
+    [executeCommand, runtimeId]
   );
 
   const handleSyncTraceIds = useCallback(
     (projectId: string, traceIds: string[]) => {
       executeCommand({
         type: "syncLangfuseTraceIds",
-        args: { projectId, traceIds },
+        args: { projectId, traceIds, runtimeId },
       });
     },
-    [executeCommand]
+    [executeCommand, runtimeId]
   );
 
   const addTraceToProject = useCallback((project: TraceProject) => {
@@ -403,6 +427,7 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
                 onSelectProject={selectProject}
                 onAddTrace={addTraceToProject}
                 onOpenTrace={onOpenTrace}
+                runtimeId={runtimeId}
               />
             ))}
           </div>
@@ -439,6 +464,7 @@ export function TracePanel({ className, onOpenTrace }: TracePanelProps) {
         syncing={syncProject ? syncingProjectId === syncProject.id : false}
         onOpenChange={setSyncDialogOpen}
         onSyncTraceIds={handleSyncTraceIds}
+        runtimeId={runtimeId}
       />
     </div>
   );
@@ -707,6 +733,7 @@ function _TraceProjectGroup({
   onSelectProject,
   onAddTrace,
   onOpenTrace,
+  runtimeId,
 }: {
   project: TraceProject;
   selected: boolean;
@@ -714,10 +741,11 @@ function _TraceProjectGroup({
   onSelectProject: (projectId: string) => void;
   onAddTrace: (project: TraceProject) => void;
   onOpenTrace: (trace: TraceRecord) => void;
+  runtimeId: RuntimeId;
 }) {
   const { data: traces = [], isLoading } = useQuery({
-    queryKey: ["trace", "traces", project.id],
-    queryFn: () => traceClient.listTraces(project.id),
+    queryKey: ["trace", runtimeId, "traces", project.id],
+    queryFn: () => traceClient.listTraces(project.id, runtimeId),
     enabled: selected,
   });
   const addLabel =
@@ -940,12 +968,14 @@ function _SyncProjectDialog({
   syncing,
   onOpenChange,
   onSyncTraceIds,
+  runtimeId,
 }: {
   open: boolean;
   project: ConnectedTraceProject | null;
   syncing: boolean;
   onOpenChange: (open: boolean) => void;
   onSyncTraceIds: (projectId: string, traceIds: string[]) => void;
+  runtimeId: RuntimeId;
 }) {
   const [form, setForm] = useState<TraceSearchFormState>(
     DEFAULT_TRACE_SEARCH_FORM
@@ -986,7 +1016,8 @@ function _SyncProjectDialog({
     try {
       const rows = await traceClient.searchLangfuseTraces(
         project.id,
-        searchFilters
+        searchFilters,
+        runtimeId
       );
       setRemoteTraces(rows);
       setSelected(new Set());
@@ -998,7 +1029,7 @@ function _SyncProjectDialog({
     } finally {
       setSearching(false);
     }
-  }, [project, searchFilters]);
+  }, [project, runtimeId, searchFilters]);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {

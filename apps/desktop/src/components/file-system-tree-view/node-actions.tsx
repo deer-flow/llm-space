@@ -27,8 +27,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { localFs } from "@/client";
+import { createFileSystemClient } from "@/client";
 import { useCommands } from "@/commands";
+import type { RuntimeId } from "@/shared/runtime";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -123,10 +124,12 @@ function MoreActionsTrigger({ label }: { label: string }) {
  */
 export function NodeActions({
   node,
+  runtimeId,
   menuOpen,
   onMenuOpenChange,
 }: {
   node: FileNode;
+  runtimeId: RuntimeId;
   menuOpen?: boolean;
   onMenuOpenChange?: (open: boolean) => void;
 }) {
@@ -136,7 +139,7 @@ export function NodeActions({
   // takes an absolute path, so resolve the workspace-relative node path first.
   const copyToClipboard = async () => {
     try {
-      const path = await localFs.realpath(node.path);
+      const path = await createFileSystemClient(runtimeId).realpath(node.path);
       executeCommand({ type: "copyFile", args: { path } });
     } catch (err) {
       toast.error((err as Error).message);
@@ -151,7 +154,7 @@ export function NodeActions({
             onClick={() =>
               executeCommand({
                 type: "openStartFromExample",
-                args: { parent: node.path },
+                args: { parent: node.path, runtimeId },
               })
             }
           >
@@ -162,7 +165,7 @@ export function NodeActions({
             onClick={() =>
               executeCommand({
                 type: "newFolder",
-                args: { parent: node.path },
+                args: { parent: node.path, runtimeId },
               })
             }
           >
@@ -179,7 +182,10 @@ export function NodeActions({
         >
           <DropdownMenuItem
             onSelect={() =>
-              executeCommand({ type: "revealFile", args: { path: node.path } })
+              executeCommand({
+                type: "revealFile",
+                args: { path: node.path, runtimeId },
+              })
             }
           >
             <FolderOpen />
@@ -192,7 +198,7 @@ export function NodeActions({
                 onSelect={() =>
                   executeCommand({
                     type: "shareThread",
-                    args: { path: node.path },
+                    args: { path: node.path, runtimeId },
                   })
                 }
               >
@@ -207,7 +213,7 @@ export function NodeActions({
                 onSelect={() =>
                   executeCommand({
                     type: "importFiles",
-                    args: { parent: node.path },
+                    args: { parent: node.path, runtimeId },
                   })
                 }
               >
@@ -218,7 +224,7 @@ export function NodeActions({
                 onSelect={() =>
                   executeCommand({
                     type: "importFromClipboard",
-                    args: { parent: node.path },
+                    args: { parent: node.path, runtimeId },
                   })
                 }
               >
@@ -238,7 +244,7 @@ export function NodeActions({
             onSelect={() =>
               executeCommand({
                 type: "duplicateFile",
-                args: { path: node.path },
+                args: { path: node.path, runtimeId },
               })
             }
           >
@@ -247,7 +253,10 @@ export function NodeActions({
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
-              executeCommand({ type: "renameFile", args: { path: node.path } })
+              executeCommand({
+                type: "renameFile",
+                args: { path: node.path, runtimeId },
+              })
             }
           >
             <TextCursorInput />
@@ -257,7 +266,10 @@ export function NodeActions({
           <DropdownMenuItem
             variant="destructive"
             onSelect={() =>
-              executeCommand({ type: "deleteFile", args: { path: node.path } })
+              executeCommand({
+                type: "deleteFile",
+                args: { path: node.path, runtimeId },
+              })
             }
           >
             <Trash2 />
@@ -275,9 +287,11 @@ export function NodeActions({
  * via {@link useCommands}.
  */
 export function RootActions({
+  runtimeId,
   menuOpen,
   onMenuOpenChange,
 }: {
+  runtimeId: RuntimeId;
   menuOpen?: boolean;
   onMenuOpenChange?: (open: boolean) => void;
 }) {
@@ -289,7 +303,7 @@ export function RootActions({
         onClick={() =>
           executeCommand({
             type: "openStartFromExample",
-            args: { parent: "" },
+            args: { parent: "", runtimeId },
           })
         }
       >
@@ -298,7 +312,7 @@ export function RootActions({
       <IconAction
         label="New folder in workspace root"
         onClick={() =>
-          executeCommand({ type: "newFolder", args: { parent: "" } })
+          executeCommand({ type: "newFolder", args: { parent: "", runtimeId } })
         }
       >
         <FolderPlus className="size-4" />
@@ -314,7 +328,10 @@ export function RootActions({
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             onSelect={() =>
-              executeCommand({ type: "revealFile", args: { path: "" } })
+              executeCommand({
+                type: "revealFile",
+                args: { path: "", runtimeId },
+              })
             }
           >
             <FolderOpen />
@@ -322,7 +339,10 @@ export function RootActions({
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
-              executeCommand({ type: "importFiles", args: { parent: "" } })
+              executeCommand({
+                type: "importFiles",
+                args: { parent: "", runtimeId },
+              })
             }
           >
             <Import />
@@ -332,7 +352,7 @@ export function RootActions({
             onSelect={() =>
               executeCommand({
                 type: "importFromClipboard",
-                args: { parent: "" },
+                args: { parent: "", runtimeId },
               })
             }
           >
@@ -341,7 +361,9 @@ export function RootActions({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onSelect={() => executeCommand({ type: "refreshTree", args: {} })}
+            onSelect={() =>
+              executeCommand({ type: "refreshTree", args: { runtimeId } })
+            }
           >
             <RefreshCw />
             Refresh

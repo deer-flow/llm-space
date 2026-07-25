@@ -2,6 +2,9 @@ import { uuid, type AgentEvent, type AgentTransport } from "@llm-space/core";
 
 import { electrobun } from "@/lib/electrobun";
 import type { StreamThreadResponsePayload } from "@/shared/rpc";
+import type { RuntimeId } from "@/shared/runtime";
+
+import { runtimeScope } from "./runtime-scope";
 
 const ABORT_ERROR = () =>
   new DOMException("The operation was aborted.", "AbortError");
@@ -12,7 +15,7 @@ const EVENT_COMPACTION_THRESHOLD = 1024;
  * request as a `sendStreamThreadRequest` message and bridges the incoming
  * `receiveStreamThreadResponse` messages into an async iterator of events.
  */
-export function createRpcTransport(): AgentTransport {
+export function createRpcTransport(runtimeId?: RuntimeId): AgentTransport {
   return async function* rpcTransport(request, { signal }) {
     const rpc = electrobun.rpc;
     if (!rpc) {
@@ -47,7 +50,7 @@ export function createRpcTransport(): AgentTransport {
     };
 
     const onAbort = () => {
-      rpc.send.abortStreamThread({ streamId });
+      rpc.send.abortStreamThread({ ...runtimeScope(runtimeId), streamId });
       aborted = true;
       finished = true;
       notify();
@@ -61,7 +64,11 @@ export function createRpcTransport(): AgentTransport {
     signal?.addEventListener("abort", onAbort, { once: true });
 
     try {
-      rpc.send.sendStreamThreadRequest({ streamId, request });
+      rpc.send.sendStreamThreadRequest({
+        ...runtimeScope(runtimeId),
+        streamId,
+        request,
+      });
       while (true) {
         while (eventHead < events.length) {
           const event = events[eventHead];
@@ -99,7 +106,7 @@ export function createRpcTransport(): AgentTransport {
       // Consumer stopped early (break / downstream error) without an abort
       // signal — make sure the bun side tears the stream down too.
       if (!finished) {
-        rpc.send.abortStreamThread({ streamId });
+        rpc.send.abortStreamThread({ ...runtimeScope(runtimeId), streamId });
       }
     }
   };

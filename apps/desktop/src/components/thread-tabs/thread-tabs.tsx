@@ -28,6 +28,7 @@ import {
 } from "react";
 
 import { electrobun } from "@/lib/electrobun";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
@@ -66,17 +67,18 @@ interface ThreadTabsProps {
   close: (id: string) => void;
   closeOthers: (id: string) => void;
   closeAll: () => void;
-  reveal: (path: string) => void;
-  moveToTrash: (path: string) => void;
-  share: (path: string) => void;
+  reveal: (path: string, runtimeId: RuntimeId) => void;
+  moveToTrash: (path: string, runtimeId: RuntimeId) => void;
+  share: (path: string, runtimeId: RuntimeId) => void;
   reorder: (from: number, to: number) => void;
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
-  onMove?: (from: string, to: string) => void;
+  onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
   onTraceTitleChange?: (
     projectId: string,
     traceKey: string,
-    title: string
+    title: string,
+    runtimeId: RuntimeId
   ) => void;
   onToggleSidebar?: () => void;
   /** Extra content pinned at the right end of the tab strip, before "+". */
@@ -332,18 +334,28 @@ export function ThreadTabs({
               <>
                 <ContextMenuSeparator />
                 <ContextMenuGroup>
-                  <ContextMenuItem onSelect={() => share(contextMenuTab.path)}>
+                  <ContextMenuItem
+                    onSelect={() =>
+                      share(contextMenuTab.path, contextMenuTab.runtimeId)
+                    }
+                  >
                     Share...
                   </ContextMenuItem>
                 </ContextMenuGroup>
                 <ContextMenuSeparator />
                 <ContextMenuGroup>
-                  <ContextMenuItem onSelect={() => reveal(contextMenuTab.path)}>
+                  <ContextMenuItem
+                    onSelect={() =>
+                      reveal(contextMenuTab.path, contextMenuTab.runtimeId)
+                    }
+                  >
                     {REVEAL_LABEL}
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
-                    onSelect={() => moveToTrash(contextMenuTab.path)}
+                    onSelect={() =>
+                      moveToTrash(contextMenuTab.path, contextMenuTab.runtimeId)
+                    }
                   >
                     {MOVE_TO_TRASH_LABEL}
                   </ContextMenuItem>
@@ -360,10 +372,11 @@ export function ThreadTabs({
               key={tab.paneId}
               paneId={tab.paneId}
               path={tab.path}
+              runtimeId={tab.runtimeId}
               active={tab.id === activeId}
               refreshNonce={tab.refreshNonce ?? 0}
               onMove={onMove}
-              onClose={(path) => close(`thread:${path}`)}
+              onClose={() => close(tab.id)}
               consumeDiscardedPane={consumeDiscardedPane}
             />
           ) : (
@@ -371,6 +384,7 @@ export function ThreadTabs({
               key={tab.id}
               projectId={tab.projectId}
               traceKey={tab.traceKey}
+              runtimeId={tab.runtimeId}
               active={tab.id === activeId}
               refreshNonce={tab.refreshNonce ?? 0}
               onClose={close}

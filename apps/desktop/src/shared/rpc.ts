@@ -24,6 +24,12 @@ import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
 import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
 import type { FeatureReminder } from "./feature-reminders";
+import type {
+  RemoteServerDraft,
+  RemoteServerStatusChangedPayload,
+  RemoteServerView,
+} from "./remote-servers";
+import type { RuntimeId, RuntimeScopedParams, RuntimeView } from "./runtime";
 import type { SharedImportStatusPayload } from "./shared-import";
 import type {
   TraceConnectedProjectInput,
@@ -39,7 +45,7 @@ import type {
 import type { UpdateMode, UpdateStatusChangedPayload } from "./updates";
 
 /** A webview→bun request to start streaming an agent run. */
-export interface StreamThreadRequestPayload {
+export interface StreamThreadRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
 }
@@ -51,33 +57,82 @@ export type StreamThreadResponsePayload =
   | { streamId: string; type: "error"; message: string };
 
 /** A webview→bun request to abort an in-flight stream. */
-export interface AbortStreamThreadPayload {
+export interface AbortStreamThreadPayload extends RuntimeScopedParams {
   streamId: string;
 }
 
 export interface DesktopRPCType {
   bun: RPCSchema<{
     requests: {
-      availableModels: {
+      listRuntimes: {
         params: Record<string, never>;
+        response: RuntimeView[];
+      };
+      getDefaultRuntime: {
+        params: Record<string, never>;
+        response: { runtimeId: RuntimeId };
+      };
+      remoteListServers: {
+        params: Record<string, never>;
+        response: RemoteServerView[];
+      };
+      remoteAddServer: {
+        params: { server: RemoteServerDraft };
+        response: RemoteServerView[];
+      };
+      remoteUpdateServer: {
+        params: { serverId: string; server: RemoteServerDraft };
+        response: RemoteServerView[];
+      };
+      remoteRemoveServer: {
+        params: { serverId: string };
+        response: RemoteServerView[];
+      };
+      remoteConnectServer: {
+        params: { serverId: string };
+        response: RemoteServerView[];
+      };
+      remoteTrustServerHostKey: {
+        params: { serverId: string; requestId: string };
+        response: RemoteServerView[];
+      };
+      remoteRejectServerHostKey: {
+        params: { serverId: string; requestId: string };
+        response: RemoteServerView[];
+      };
+      remoteDisconnectServer: {
+        params: { serverId: string };
+        response: RemoteServerView[];
+      };
+      remoteSetDefaultRuntime: {
+        params: { runtimeId: RuntimeId };
+        response: RemoteServerView[];
+      };
+      remoteGetDefaultRuntime: {
+        params: Record<string, never>;
+        response: { runtimeId: RuntimeId };
+      };
+
+      availableModels: {
+        params: RuntimeScopedParams;
         response: ModelProviderGroup[];
       };
       removeProvider: {
-        params: { providerId: string };
+        params: RuntimeScopedParams & { providerId: string };
         response: ModelProviderGroup[];
       };
       // The builtin providers shipped with the app, each flagged with whether an
       // API key was auto-detected in the environment.
       builtinProviders: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: ModelProviderGroup[];
       };
       addProvider: {
-        params: { providerId: string };
+        params: RuntimeScopedParams & { providerId: string };
         response: ModelProviderGroup[];
       };
       addCustomProvider: {
-        params: {
+        params: RuntimeScopedParams & {
           id: string;
           name: string;
           baseUrl: string;
@@ -87,7 +142,7 @@ export interface DesktopRPCType {
         response: ModelProviderGroup[];
       };
       updateProvider: {
-        params: {
+        params: RuntimeScopedParams & {
           providerId: string;
           apiKey?: string | null;
           baseUrl?: string | null;
@@ -103,28 +158,32 @@ export interface DesktopRPCType {
         response: ModelProviderGroup[];
       };
       setModelEnabled: {
-        params: { providerId: string; modelId: string; enabled: boolean };
+        params: RuntimeScopedParams & {
+          providerId: string;
+          modelId: string;
+          enabled: boolean;
+        };
         response: ModelProviderGroup[];
       };
       setAllModelsEnabled: {
-        params: { providerId: string; enabled: boolean };
+        params: RuntimeScopedParams & { providerId: string; enabled: boolean };
         response: ModelProviderGroup[];
       };
       // The user's chosen default model, or `null` for automatic (first
       // available). Threads with no saved model — or a stale reference — resolve
       // through it.
       getDefaultModel: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: ModelConfig | null;
       };
       setDefaultModel: {
-        params: { model: ModelConfig | null };
+        params: RuntimeScopedParams & { model: ModelConfig | null };
         response: ModelConfig | null;
       };
       // `candidate` (from the editor dialog) tests an unsaved model config
       // as-is; its `id` overrides `modelId`.
       testModelConnection: {
-        params: {
+        params: RuntimeScopedParams & {
           providerId: string;
           modelId: string;
           candidate?: CustomModel;
@@ -132,13 +191,13 @@ export interface DesktopRPCType {
         response: null;
       };
       removeCustomModel: {
-        params: { providerId: string; modelId: string };
+        params: RuntimeScopedParams & { providerId: string; modelId: string };
         response: ModelProviderGroup[];
       };
       // Create or edit a custom model. `originalId` (present on edits) names the
       // model being replaced, supporting a rename.
       upsertCustomModel: {
-        params: {
+        params: RuntimeScopedParams & {
           providerId: string;
           model: CustomModel;
           originalId?: string;
@@ -162,13 +221,31 @@ export interface DesktopRPCType {
       };
       // Local filesystem / thread storage, mirroring the web `/api/fs/local/*`
       // routes. Void operations resolve to `null`.
-      fsLs: { params: { path: string }; response: FileNode[] };
-      fsMkdir: { params: { path: string }; response: null };
-      fsCp: { params: { src: string; dest: string }; response: null };
-      fsMv: { params: { src: string; dest: string }; response: null };
-      fsRm: { params: { path: string }; response: null };
-      fsRead: { params: { path: string }; response: Thread };
-      fsWrite: { params: { path: string; thread: Thread }; response: null };
+      fsLs: {
+        params: RuntimeScopedParams & { path: string };
+        response: FileNode[];
+      };
+      fsMkdir: {
+        params: RuntimeScopedParams & { path: string };
+        response: null;
+      };
+      fsCp: {
+        params: RuntimeScopedParams & { src: string; dest: string };
+        response: null;
+      };
+      fsMv: {
+        params: RuntimeScopedParams & { src: string; dest: string };
+        response: null;
+      };
+      fsRm: { params: RuntimeScopedParams & { path: string }; response: null };
+      fsRead: {
+        params: RuntimeScopedParams & { path: string };
+        response: Thread;
+      };
+      fsWrite: {
+        params: RuntimeScopedParams & { path: string; thread: Thread };
+        response: null;
+      };
       // Publish a workspace thread as a shareable link: read the thread from
       // disk, create a secret GitHub Gist (requires GitHub sign-in), and return
       // the web viewer URL + gist id. `title`/`description` override the shared
@@ -184,7 +261,10 @@ export interface DesktopRPCType {
       // `llm-space://internal/skills/<name>`. Missing/invalid targets reject.
       fsReveal: { params: { path: string }; response: null };
       // Resolve a workspace-relative path to its absolute on-disk path.
-      fsRealpath: { params: { path: string }; response: { path: string } };
+      fsRealpath: {
+        params: RuntimeScopedParams & { path: string };
+        response: { path: string };
+      };
       // Read an arbitrary text file (NOT confined to the workspace) for the
       // prompt `@include` macro. A leading `~` expands to the user's home.
       // Returns "" for a missing/unreadable path so includes degrade quietly.
@@ -258,40 +338,42 @@ export interface DesktopRPCType {
         params: { rootDir: string; relativePath: string };
         response: null;
       };
-      // Resolve real secret values for a generated `.env`: the model provider's
-      // resolved API key (following `$ENV` refs, codex login, etc.) plus the raw
-      // values of the named environment variables. Used only when the user opts
-      // in to materializing their keys to disk.
+      // Resolve real secret values for a generated `.env`: the runtime's model
+      // provider API key plus the raw values of named environment variables. Used
+      // only after explicit user opt-in to materialize secrets to disk.
       generatorResolveEnv: {
-        params: { providerId: string; envNames: string[] };
+        params: RuntimeScopedParams & { providerId: string; envNames: string[] };
         response: { modelApiKey: string; envValues: Record<string, string> };
       };
       mcpListServers: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: McpServerView[];
       };
       mcpAddServer: {
-        params: { server: McpServerDraft };
+        params: RuntimeScopedParams & { server: McpServerDraft };
         response: McpServerView[];
       };
       mcpUpdateServer: {
-        params: { serverId: string; server: McpServerDraft };
+        params: RuntimeScopedParams & {
+          serverId: string;
+          server: McpServerDraft;
+        };
         response: McpServerView[];
       };
       mcpRemoveServer: {
-        params: { serverId: string };
+        params: RuntimeScopedParams & { serverId: string };
         response: McpServerView[];
       };
       mcpDisconnectServer: {
-        params: { serverId: string };
+        params: RuntimeScopedParams & { serverId: string };
         response: McpServerView[];
       };
       mcpListTools: {
-        params: { serverId: string };
+        params: RuntimeScopedParams & { serverId: string };
         response: McpServerToolsResponse;
       };
       mcpCallTool: {
-        params: {
+        params: RuntimeScopedParams & {
           serverId: string;
           toolName: string;
           arguments: Record<string, unknown>;
@@ -299,11 +381,11 @@ export interface DesktopRPCType {
         response: McpCallToolResponse;
       };
       builtInListTools: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: BuiltinTool[];
       };
       builtInCallTool: {
-        params: {
+        params: RuntimeScopedParams & {
           name: string;
           arguments: Record<string, unknown>;
         };
@@ -321,29 +403,29 @@ export interface DesktopRPCType {
       };
       // The search provider + API keys backing the built-in web tools.
       getSearchSettings: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: SearchSettings;
       };
       setSearchSettings: {
-        params: { settings: SearchSettings };
+        params: RuntimeScopedParams & { settings: SearchSettings };
         response: SearchSettings;
       };
       // The proxy config governing the Bun process's outbound HTTP egress.
       getNetworkSettings: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: NetworkSettings;
       };
       setNetworkSettings: {
-        params: { settings: NetworkSettings };
+        params: RuntimeScopedParams & { settings: NetworkSettings };
         response: NetworkSettings;
       };
       detectSystemProxy: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: SystemProxyDetection;
       };
       // The discovery folders + hidden skills backing the built-in Skill tool.
       skillsGetSettings: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: SkillsSettings;
       };
       // Open the native folder picker; `path` is null when the user cancels.
@@ -352,85 +434,100 @@ export interface DesktopRPCType {
         response: { path: string | null };
       };
       skillsAddPath: {
-        params: { path: string };
+        params: RuntimeScopedParams & { path: string };
         response: SkillsSettings;
       };
       skillsRemovePath: {
-        params: { path: string };
+        params: RuntimeScopedParams & { path: string };
         response: SkillsSettings;
       };
       skillsSetSkillHidden: {
-        params: { path: string; skillName: string; hidden: boolean };
+        params: RuntimeScopedParams & {
+          path: string;
+          skillName: string;
+          hidden: boolean;
+        };
         response: SkillsSettings;
       };
       // Enable/disable every skill in one folder at once.
       skillsSetAllSkillsHidden: {
-        params: { path: string; hidden: boolean };
+        params: RuntimeScopedParams & { path: string; hidden: boolean };
         response: SkillsSettings;
       };
       // Discover the skills under one folder (name/description/path/enabled).
       skillsListSkills: {
-        params: { path: string };
+        params: RuntimeScopedParams & { path: string };
         response: SkillInfo[];
       };
       // Read one skill's full SKILL.md (frontmatters + body) by its directory.
       skillsReadSkill: {
-        params: { path: string };
+        params: RuntimeScopedParams & { path: string };
         response: SkillContent;
       };
       // List trace projects for the dedicated Trace Panel.
       traceListProjects: {
-        params: Record<string, never>;
+        params: RuntimeScopedParams;
         response: TraceProject[];
       };
       // Create a manual Langfuse trace project under `traces/projects`.
       traceCreateProject: {
-        params: { name: string };
+        params: RuntimeScopedParams & { name: string };
         response: TraceProject;
       };
       // Create a connected Langfuse project after validating credentials.
       traceCreateConnectedProject: {
-        params: TraceConnectedProjectInput;
+        params: RuntimeScopedParams & TraceConnectedProjectInput;
         response: TraceProject;
       };
       // List trace summaries for one trace project.
       traceListTraces: {
-        params: { projectId: string };
+        params: RuntimeScopedParams & { projectId: string };
         response: TraceRecord[];
       };
       // Import renderer-read Langfuse JSON files into one trace project.
       traceImportLangfuseJson: {
-        params: { projectId: string; files: TraceImportFile[] };
+        params: RuntimeScopedParams & { projectId: string; files: TraceImportFile[] };
         response: TraceImportResult;
       };
       // Search a bounded remote Langfuse trace list for explicit user sync.
       traceSearchLangfuseTraces: {
-        params: { projectId: string; filters?: TraceLangfuseSearchInput };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          filters?: TraceLangfuseSearchInput;
+        };
         response: TraceRemoteTraceSummary[];
       };
       // Sync selected remote Langfuse trace ids into local trace storage.
       traceSyncLangfuseTraces: {
-        params: { projectId: string; traceIds: string[] };
+        params: RuntimeScopedParams & { projectId: string; traceIds: string[] };
         response: TraceSyncResult;
       };
       // Read a trace summary by key without creating a workbench.
       traceReadTrace: {
-        params: { projectId: string; traceKey: string };
+        params: RuntimeScopedParams & { projectId: string; traceKey: string };
         response: TraceRecord;
       };
       // Read or lazily create the editable ThreadPlayground workbench.
       traceReadOrCreateWorkbench: {
-        params: { projectId: string; traceKey: string };
+        params: RuntimeScopedParams & { projectId: string; traceKey: string };
         response: TraceWorkbenchResponse;
       };
       // Rename a trace summary and keep its editable workbench title in sync.
       traceUpdateTraceTitle: {
-        params: { projectId: string; traceKey: string; title: string };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          traceKey: string;
+          title: string;
+        };
         response: TraceWorkbenchResponse;
       };
       // Persist a trace workbench thread; raw trace data remains immutable.
       traceWriteWorkbench: {
-        params: { projectId: string; traceKey: string; thread: Thread };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          traceKey: string;
+          thread: Thread;
+        };
         response: null;
       };
       // Update settings + the "we just updated" signal (pulled once on mount,
@@ -506,6 +603,8 @@ export interface DesktopRPCType {
       // Deep-link shared-thread import progress: drives the "importing…" modal
       // and, on success, opens the imported thread. See `bun/deep-link`.
       sharedImportStatusChanged: SharedImportStatusPayload;
+      // Remote SSH connection progress and status updates from the bun side.
+      remoteServerStatusChanged: RemoteServerStatusChangedPayload;
     };
   }>;
 }

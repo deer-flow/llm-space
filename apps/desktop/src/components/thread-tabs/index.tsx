@@ -1,4 +1,9 @@
 export { ThreadTabs } from "./thread-tabs";
+export {
+  chooseActiveTabForRuntime,
+  filterTabsForRuntime,
+  removeTabsForRuntime,
+} from "./tab-runtime-scope";
 export { useThreadTabs, tabLabel } from "./use-thread-tabs";
 export type {
   AppTab,

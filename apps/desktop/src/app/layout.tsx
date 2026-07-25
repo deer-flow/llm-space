@@ -1,31 +1,25 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
-import { ModelProvider } from "@llm-space/ui/components/model-provider";
 import { ThemeProvider, useTheme } from "@llm-space/ui/components/theme-provider";
 import "@llm-space/ui/styles/globals.css";
 import { Toaster } from "@llm-space/ui/ui/sonner";
 import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
-import { createElectrobunModelClient } from "@/host/host-services";
 
 import { QueryProvider } from "./query-provider";
-
-const modelClient = createElectrobunModelClient();
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <ExperimentalProvider>
         <QueryProvider>
-          <ModelProvider client={modelClient}>
-            <TooltipProvider delayDuration={1000}>
-              <div className="flex size-full flex-col">
-                <ThemedToaster />
-                {children}
-              </div>
-            </TooltipProvider>
-          </ModelProvider>
+          <TooltipProvider delayDuration={1000}>
+            <div className="flex size-full flex-col">
+              <ThemedToaster />
+              {children}
+            </div>
+          </TooltipProvider>
         </QueryProvider>
       </ExperimentalProvider>
     </ThemeProvider>

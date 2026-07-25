@@ -95,6 +95,8 @@ export interface ThreadPlaygroundProps {
   active?: boolean;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
+  /** Runtime that owns this playground. Used to route tool calls. */
+  runtimeId?: string;
 
   onChange?: (thread: Thread) => void;
   onRenameTitle?: (title: string) => Promise<boolean>;
@@ -130,6 +132,7 @@ export function ThreadPlayground({
 function _ThreadPlayground({
   initialValue,
   transport,
+  runtimeId,
   onChange,
   onStreamingStart,
   onStreamingEnd,
@@ -156,8 +159,11 @@ function _ThreadPlayground({
         ),
       getAutoRunTools,
       getReactLoop,
-      executeTool: executeTool ?? undefined,
-      loadSkills: () => listEnabledPromptVariableSkills(skills),
+      runtimeId,
+      executeTool: executeTool
+        ? (tool, args) => executeTool(tool, args, { runtimeId })
+        : undefined,
+      loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
       loadFile: (path) => files.readText(path),
       fileExists: (path) => files.exists(path),
     })
@@ -169,7 +175,7 @@ function _ThreadPlayground({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent {...props} />
+      <ThreadPlaygroundContent runtimeId={runtimeId} {...props} />
     </ThreadStoreContext.Provider>
   );
 }

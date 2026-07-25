@@ -25,27 +25,41 @@ export interface ToolCallResult {
   isError: boolean;
 }
 
+/** Options for invoking an executable tool. */
+export interface RuntimeScopedHostOptions {
+  runtimeId?: string;
+}
+
+export interface ExecuteToolOptions extends RuntimeScopedHostOptions {}
+
 /** Invoke an executable tool (built-in or MCP). */
 export type ExecuteTool = (
   tool: McpTool | BuiltinTool,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  options?: ExecuteToolOptions
 ) => Promise<ToolCallResult>;
 
 /** Read-only skills access used by prompt variables + examples. */
 export interface SkillsHost {
-  getSettings(): Promise<SkillsSettings>;
-  listSkills(path: string): Promise<SkillInfo[]>;
+  getSettings(options?: RuntimeScopedHostOptions): Promise<SkillsSettings>;
+  listSkills(
+    path: string,
+    options?: RuntimeScopedHostOptions
+  ): Promise<SkillInfo[]>;
 }
 
 /** Read-only MCP access used by the tool-import UI. */
 export interface McpHost {
-  listServers(): Promise<McpServerView[]>;
-  listTools(serverId: string): Promise<McpServerToolsResponse>;
+  listServers(options?: RuntimeScopedHostOptions): Promise<McpServerView[]>;
+  listTools(
+    serverId: string,
+    options?: RuntimeScopedHostOptions
+  ): Promise<McpServerToolsResponse>;
 }
 
 /** Built-in tool listing + OS filesystem reveal action. */
 export interface BuiltinToolsHost {
-  list(): Promise<BuiltinTool[]>;
+  list(options?: RuntimeScopedHostOptions): Promise<BuiltinTool[]>;
   /** Open a directory itself, or reveal a file selected in its parent folder. */
   fsReveal(path: string): Promise<void>;
 }
@@ -153,9 +167,7 @@ export interface HostActions {
   /** Request opening the variables dialog (handled within the playground). */
   openVariables(variableName?: string): void;
   /** Register the variables-dialog opener; returns a disposer. No-op on web. */
-  registerOpenVariables(
-    handler: (variableName?: string) => void
-  ): () => void;
+  registerOpenVariables(handler: (variableName?: string) => void): () => void;
   /** Register the run-thread action for the host palette/shortcut; disposer. */
   registerRunThread(run: () => void): () => void;
 }
@@ -205,10 +217,7 @@ export interface ModelClient {
       headers?: Record<string, string> | null;
       name?: string | null;
       api?:
-        | "anthropic-messages"
-        | "openai-completions"
-        | "openai-responses"
-        | null;
+        "anthropic-messages" | "openai-completions" | "openai-responses" | null;
       icon?: string | null;
     }
   ): Promise<ModelProviderGroup[]>;

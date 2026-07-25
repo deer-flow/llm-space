@@ -37,6 +37,7 @@ import {
   setAllSkillsHidden,
   setSkillHidden,
 } from "@/client/skills";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { SettingsPage } from "./settings-page";
 
@@ -71,7 +72,7 @@ async function openSkillFolder(skill: SkillInfo) {
   }
 }
 
-export function SkillsPage() {
+export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [settings, setSettings] = useState<SkillsSettings>({
     discoveryPaths: [],
   });
@@ -81,7 +82,7 @@ export function SkillsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void getSkillsSettings()
+    void getSkillsSettings(runtimeId)
       .then((loaded) => {
         if (!cancelled) {
           setSettings(loaded);
@@ -93,7 +94,7 @@ export function SkillsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [runtimeId]);
 
   const paths = settings.discoveryPaths;
   const firstPath = paths[0]?.path ?? null;
@@ -111,7 +112,7 @@ export function SkillsPage() {
       if (!path) {
         return;
       }
-      const next = await addSkillsPath(path);
+      const next = await addSkillsPath(path, runtimeId);
       setSettings(next);
       setSelectedPath(path);
     } catch (error) {
@@ -120,34 +121,40 @@ export function SkillsPage() {
           error instanceof Error ? error.message : "Please try again.",
       });
     }
-  }, []);
+  }, [runtimeId]);
 
-  const handleRemove = useCallback(async (path: string) => {
-    try {
-      setSettings(await removeSkillsPath(path));
-    } catch (error) {
-      toast.error("Failed to remove folder", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    }
-  }, []);
-
-  const handleSetAll = useCallback(async (path: string, hidden: boolean) => {
-    try {
-      setSettings(await setAllSkillsHidden(path, hidden));
-      // Refetch the skills pane so its switches reflect the bulk change.
-      setReloadToken((token) => token + 1);
-    } catch (error) {
-      toast.error(
-        hidden ? "Failed to disable skills" : "Failed to enable skills",
-        {
+  const handleRemove = useCallback(
+    async (path: string) => {
+      try {
+        setSettings(await removeSkillsPath(path, runtimeId));
+      } catch (error) {
+        toast.error("Failed to remove folder", {
           description:
             error instanceof Error ? error.message : "Please try again.",
-        }
-      );
-    }
-  }, []);
+        });
+      }
+    },
+    [runtimeId]
+  );
+
+  const handleSetAll = useCallback(
+    async (path: string, hidden: boolean) => {
+      try {
+        setSettings(await setAllSkillsHidden(path, hidden, runtimeId));
+        // Refetch the skills pane so its switches reflect the bulk change.
+        setReloadToken((token) => token + 1);
+      } catch (error) {
+        toast.error(
+          hidden ? "Failed to disable skills" : "Failed to enable skills",
+          {
+            description:
+              error instanceof Error ? error.message : "Please try again.",
+          }
+        );
+      }
+    },
+    [runtimeId]
+  );
 
   return (
     <SettingsPage
@@ -168,7 +175,11 @@ export function SkillsPage() {
         onEnableAll={(path) => void handleSetAll(path, false)}
         onDisableAll={(path) => void handleSetAll(path, true)}
       />
-      <PathSkills key={`${selectedPath}:${reloadToken}`} path={selectedPath} />
+      <PathSkills
+        key={`${runtimeId}:${selectedPath}:${reloadToken}`}
+        path={selectedPath}
+        runtimeId={runtimeId}
+      />
     </SettingsPage>
   );
 }
@@ -324,7 +335,13 @@ function PathListItem({
   );
 }
 
-function PathSkills({ path }: { path: string | null }) {
+function PathSkills({
+  path,
+  runtimeId,
+}: {
+  path: string | null;
+  runtimeId: RuntimeId;
+}) {
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
   const [listRef] = useAutoAnimation<HTMLDivElement>();
 
@@ -335,7 +352,7 @@ function PathSkills({ path }: { path: string | null }) {
     }
     let cancelled = false;
     setSkills(null);
-    void listSkills(path)
+    void listSkills(path, runtimeId)
       .then((loaded) => {
         if (!cancelled) {
           setSkills(loaded);
@@ -349,7 +366,7 @@ function PathSkills({ path }: { path: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, runtimeId]);
 
   const handleToggle = useCallback(
     async (name: string, enabled: boolean) => {
@@ -361,7 +378,7 @@ function PathSkills({ path }: { path: string | null }) {
         prev ? prev.map((s) => (s.name === name ? { ...s, enabled } : s)) : prev
       );
       try {
-        await setSkillHidden(path, name, !enabled);
+        await setSkillHidden(path, name, !enabled, runtimeId);
       } catch (error) {
         // Roll back on failure.
         setSkills((prev) =>
@@ -377,7 +394,7 @@ function PathSkills({ path }: { path: string | null }) {
         });
       }
     },
-    [path]
+    [path, runtimeId]
   );
 
   const content = useMemo(() => {
