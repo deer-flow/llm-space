@@ -50,6 +50,7 @@
         "@formkit/auto-animate": "^0.9.0",
         "@hello-pangea/dnd": "^18.0.1",
         "@llm-space/core": "workspace:*",
+        "@llm-space/runtime": "workspace:*",
         "@llm-space/ui": "workspace:*",
         "@lobehub/icons": "^5.10.1",
         "@modelcontextprotocol/sdk": "1.29.0",
@@ -98,6 +99,14 @@
         "vite": "^6.0.3",
       },
     },
+    "apps/server": {
+      "name": "@llm-space/server",
+      "version": "4.2.0",
+      "dependencies": {
+        "@llm-space/core": "workspace:*",
+        "@llm-space/runtime": "workspace:*",
+      },
+    },
     "apps/web": {
       "name": "@llm-space/web",
       "version": "4.0.1",
@@ -143,6 +152,19 @@
       },
       "devDependencies": {
         "@types/nunjucks": "^3.2.6",
+      },
+    },
+    "packages/runtime": {
+      "name": "@llm-space/runtime",
+      "version": "4.0.1",
+      "dependencies": {
+        "@earendil-works/pi-agent-core": "catalog:",
+        "@earendil-works/pi-ai": "catalog:",
+        "@llm-space/core": "workspace:*",
+        "@modelcontextprotocol/sdk": "1.29.0",
+        "gray-matter": "^4.0.3",
+        "skills-handler": "^0.1.2",
+        "zod": "^4.4.3",
       },
     },
     "packages/ui": {
@@ -628,6 +650,10 @@
     "@llm-space/core": ["@llm-space/core@workspace:packages/core"],
 
     "@llm-space/desktop": ["@llm-space/desktop@workspace:apps/desktop"],
+
+    "@llm-space/runtime": ["@llm-space/runtime@workspace:packages/runtime"],
+
+    "@llm-space/server": ["@llm-space/server@workspace:apps/server"],
 
     "@llm-space/ui": ["@llm-space/ui@workspace:packages/ui"],
 
