@@ -7,6 +7,7 @@ import type {
   ModelProviderGroup,
 } from "@llm-space/core";
 import { uuid } from "@llm-space/core";
+import { resolveModelConfig } from "@llm-space/core/thread";
 import {
   createContext,
   useCallback,
@@ -74,62 +75,11 @@ function buildModelIndex(providers: ModelProviderGroup[]) {
   return map;
 }
 
-/**
- * The first enabled model across the configured providers, or `null` when none
- * are available. Mirrors the model selector's ordering (providers sorted by
- * name, each group's `disabledModels` skipped) so the "default" the user sees
- * matches what runs. Used as the fallback for threads with no saved model.
- */
-export function firstAvailableModel(
-  providers: ModelProviderGroup[]
-): ModelConfig | null {
-  const sorted = [...providers].sort((a, b) => a.name.localeCompare(b.name));
-  for (const group of sorted) {
-    const disabled = new Set(group.disabledModels ?? []);
-    const model = group.models.find((m) => !disabled.has(m.id));
-    if (model) {
-      return { provider: model.provider, id: model.id };
-    }
-  }
-  return null;
-}
-
-/**
- * Whether a model reference is still configured and enabled — i.e. its provider
- * exists, lists the model, and hasn't disabled it. Used to detect stale thread
- * references and to validate the saved default model.
- */
-export function isModelAvailable(
-  providers: ModelProviderGroup[],
-  ref: { provider: string; id: string }
-): boolean {
-  const group = providers.find((g) => g.id === ref.provider);
-  if (!group?.models.some((m) => m.id === ref.id)) {
-    return false;
-  }
-  return !(group.disabledModels ?? []).includes(ref.id);
-}
-
-/**
- * Resolve the model a thread should actually use: the thread's own saved model
- * when it is still available, else the user's default model when set and
- * available, else the first available model. Returns `null` only when no models
- * are configured at all. The saved model's `params` are preserved; the fallback
- * paths return a bare `{ provider, id }`.
- */
-export function resolveModelConfig(
-  providers: ModelProviderGroup[],
-  saved: ModelConfig | null | undefined,
-  def: ModelConfig | null
-): ModelConfig | null {
-  if (saved && isModelAvailable(providers, saved)) {
-    return saved;
-  }
-  if (def && isModelAvailable(providers, def)) {
-    return def;
-  }
-  return firstAvailableModel(providers);
-}
+export {
+  firstAvailableModel,
+  isModelAvailable,
+  resolveModelConfig,
+} from "@llm-space/core/thread";
 
 export function ModelProvider({
   client,

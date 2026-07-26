@@ -35,6 +35,7 @@ import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
+import { buildSharedThread } from "./share-thread";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -212,7 +213,13 @@ export function createMainWindowRPC({
         // reuse), so a re-share yields a new link.
         shareThread: async ({ path, title, description }) => {
           const thread = await localFs.read(path);
-          const shared = title !== undefined ? { ...thread, title } : thread;
+          const localRuntime = getRuntime("local");
+          const shared = buildSharedThread(
+            thread,
+            await localRuntime.availableModels(),
+            await localRuntime.getDefaultModel(),
+            title
+          );
           const locator = await gistWriter.write(shared, undefined, {
             description,
           });

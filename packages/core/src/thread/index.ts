@@ -1,4 +1,5 @@
 export * from "./history";
+export * from "./model-config";
 export * from "./prompt-variables";
 export * from "./prompt-variable-display";
 export * from "./response-performance";

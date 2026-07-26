@@ -155,8 +155,8 @@ const THREAD_FIELDS = {
 
   /**
    * The model configuration of the thread. Optional — a thread may be created
-   * without a model; the UI resolves a fallback (first available model) for
-   * display/running and only persists a model once the user picks one.
+   * without a model; the UI resolves the configured default or first available
+   * model for display/running and only persists one when the user picks it.
    */
   model: Type.Optional(ModelConfig),
 
