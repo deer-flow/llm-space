@@ -54,6 +54,7 @@ import {
   removeMcpServer,
   updateMcpServer,
 } from "@/client/mcp";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { SettingsPage } from "./settings-page";
 
@@ -137,7 +138,7 @@ function _recordFromRows(rows: Row[]): Record<string, string> | undefined {
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-export function McpPage() {
+export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIdBeforeCreate, setSelectedIdBeforeCreate] = useState<
@@ -162,7 +163,7 @@ export function McpPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await listMcpServers();
+      const next = await listMcpServers(runtimeId);
       setServers(next);
       setSelectedId((current) => {
         if (creating) {
@@ -181,7 +182,7 @@ export function McpPage() {
     } finally {
       setLoading(false);
     }
-  }, [creating]);
+  }, [creating, runtimeId]);
 
   useEffect(() => {
     void refresh();
@@ -224,8 +225,8 @@ export function McpPage() {
       const draft = _draftFromForm(form);
       const next =
         creating || !selectedId
-          ? await addMcpServer(draft)
-          : await updateMcpServer(selectedId, draft);
+          ? await addMcpServer(draft, runtimeId)
+          : await updateMcpServer(selectedId, draft, runtimeId);
       setServers(next);
       const saved =
         creating || !selectedId
@@ -255,7 +256,7 @@ export function McpPage() {
     setFormError(null);
     setTesting(true);
     try {
-      const response = await listMcpTools(selectedServer.id);
+      const response = await listMcpTools(selectedServer.id, runtimeId);
       setTools(response.tools);
       setServers((current) =>
         current.map((server) =>
@@ -283,7 +284,7 @@ export function McpPage() {
     }
     setDisconnecting(true);
     try {
-      const next = await disconnectMcpServer(selectedServer.id);
+      const next = await disconnectMcpServer(selectedServer.id, runtimeId);
       setServers(next);
       setTools([]);
       toast.success("MCP server disconnected");
@@ -303,7 +304,7 @@ export function McpPage() {
     }
     setRemoveOpen(false);
     try {
-      const next = await removeMcpServer(selectedServer.id);
+      const next = await removeMcpServer(selectedServer.id, runtimeId);
       setServers(next);
       setSelectedId(next[0]?.id ?? null);
       toast.success("MCP server removed");

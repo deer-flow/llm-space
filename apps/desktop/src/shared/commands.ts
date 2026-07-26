@@ -7,6 +7,7 @@
  * one-RPC-method-per-action sprawl.
  */
 
+import type { RuntimeId } from "./runtime";
 import type { TraceConnectedProjectInput, TraceImportFile } from "./traces";
 
 /** Base shape for every command: a string `type` and typed `args`. */
@@ -25,7 +26,7 @@ export interface GenericCommand<T extends string, A = Record<string, never>> {
  */
 export interface NewFileCommand extends GenericCommand<
   "newFile",
-  { parent?: string; rename?: boolean }
+  { parent?: string; rename?: boolean; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -36,7 +37,7 @@ export interface NewFileCommand extends GenericCommand<
  */
 export interface NewFileFromPromptExampleCommand extends GenericCommand<
   "newFileFromPromptExample",
-  { parent?: string; exampleId: string }
+  { parent?: string; exampleId: string; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -45,37 +46,37 @@ export interface NewFileFromPromptExampleCommand extends GenericCommand<
  */
 export interface OpenStartFromExampleCommand extends GenericCommand<
   "openStartFromExample",
-  { parent?: string }
+  { parent?: string; runtimeId?: RuntimeId }
 > {}
 
 /** Create a new folder (with in-place rename). `parent` defaults to the root. */
 export interface NewFolderCommand extends GenericCommand<
   "newFolder",
-  { parent?: string }
+  { parent?: string; runtimeId?: RuntimeId }
 > {}
 
 /** Start an in-place rename of the node at `path`. */
 export interface RenameFileCommand extends GenericCommand<
   "renameFile",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 /** Duplicate the node at `path`. */
 export interface DuplicateFileCommand extends GenericCommand<
   "duplicateFile",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 /** Move the node at `path` to the OS trash (via a confirm dialog). */
 export interface DeleteFileCommand extends GenericCommand<
   "deleteFile",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 /** Reveal the node at `path` in the OS file manager (`""` = the root). */
 export interface RevealFileCommand extends GenericCommand<
   "revealFile",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -85,11 +86,14 @@ export interface RevealFileCommand extends GenericCommand<
  */
 export interface CopyFileCommand extends GenericCommand<
   "copyFile",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 /** Refresh (re-list) the file tree. */
-export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
+export interface RefreshTreeCommand extends GenericCommand<
+  "refreshTree",
+  { runtimeId?: RuntimeId }
+> {}
 
 /**
  * Reveal a workspace file in the tree: expand its ancestor folders, refresh the
@@ -98,7 +102,7 @@ export interface RefreshTreeCommand extends GenericCommand<"refreshTree"> {}
  */
 export interface RevealInTreeCommand extends GenericCommand<
   "revealInTree",
-  { path: string }
+  { path: string; runtimeId?: RuntimeId }
 > {}
 
 export interface ImportFilePayload {
@@ -113,7 +117,7 @@ export interface ImportFilePayload {
  */
 export interface ImportFilesCommand extends GenericCommand<
   "importFiles",
-  { parent?: string; files?: ImportFilePayload[] }
+  { parent?: string; files?: ImportFilePayload[]; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -123,7 +127,7 @@ export interface ImportFilesCommand extends GenericCommand<
  */
 export interface ImportFromClipboardCommand extends GenericCommand<
   "importFromClipboard",
-  { parent?: string }
+  { parent?: string; runtimeId?: RuntimeId }
 > {}
 
 // --- Traces ----------------------------------------------------------------
@@ -135,7 +139,7 @@ export interface ImportFromClipboardCommand extends GenericCommand<
  */
 export interface CreateTraceProjectCommand extends GenericCommand<
   "createTraceProject",
-  { name: string }
+  { name: string; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -144,7 +148,7 @@ export interface CreateTraceProjectCommand extends GenericCommand<
  */
 export interface CreateConnectedTraceProjectCommand extends GenericCommand<
   "createConnectedTraceProject",
-  TraceConnectedProjectInput
+  TraceConnectedProjectInput & { runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -154,13 +158,13 @@ export interface CreateConnectedTraceProjectCommand extends GenericCommand<
  */
 export interface ImportLangfuseTraceFilesCommand extends GenericCommand<
   "importLangfuseTraceFiles",
-  { projectId: string; files: TraceImportFile[] }
+  { projectId: string; files: TraceImportFile[]; runtimeId?: RuntimeId }
 > {}
 
 /** Sync selected remote Langfuse trace ids into a connected trace project. */
 export interface SyncLangfuseTraceIdsCommand extends GenericCommand<
   "syncLangfuseTraceIds",
-  { projectId: string; traceIds: string[] }
+  { projectId: string; traceIds: string[]; runtimeId?: RuntimeId }
 > {}
 
 // --- Tabs ------------------------------------------------------------------
@@ -171,7 +175,7 @@ export interface SyncLangfuseTraceIdsCommand extends GenericCommand<
  */
 export interface CloseTabCommand extends GenericCommand<
   "closeTab",
-  { id?: string; path?: string }
+  { id?: string; path?: string; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -180,7 +184,7 @@ export interface CloseTabCommand extends GenericCommand<
  */
 export interface CloseOtherTabsCommand extends GenericCommand<
   "closeOtherTabs",
-  { id?: string; path?: string }
+  { id?: string; path?: string; runtimeId?: RuntimeId }
 > {}
 
 /** Close every open tab. */
@@ -207,6 +211,7 @@ export type SettingsTab =
   | "models"
   | "mcp"
   | "network"
+  | "remote"
   | "search"
   | "skills"
   | "experimental";
@@ -236,7 +241,7 @@ export interface RunThreadCommand extends GenericCommand<"runThread"> {}
  */
 export interface ShareThreadCommand extends GenericCommand<
   "shareThread",
-  { path?: string }
+  { path?: string; runtimeId?: RuntimeId }
 > {}
 
 /**
@@ -272,7 +277,7 @@ export interface OpenLinkCommand extends GenericCommand<
  */
 export interface OpenDocumentCommand extends GenericCommand<
   "openDocument",
-  { path?: string }
+  { path?: string; runtimeId?: RuntimeId }
 > {}
 
 /** Open the GitHub issues page in the user's default browser to report a bug. */

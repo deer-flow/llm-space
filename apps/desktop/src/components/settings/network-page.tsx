@@ -17,6 +17,7 @@ import {
   getNetworkSettings,
   setNetworkSettings,
 } from "@/client/network";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { SettingsPage } from "./settings-page";
 
@@ -132,7 +133,7 @@ function DetectedProxy({
   );
 }
 
-export function NetworkPage() {
+export function NetworkPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [settings, setSettings] = useState<NetworkSettings>(
     DEFAULT_NETWORK_SETTINGS
   );
@@ -140,7 +141,7 @@ export function NetworkPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void getNetworkSettings()
+    void getNetworkSettings(runtimeId)
       .then((loaded) => {
         if (!cancelled) {
           setSettings(loaded);
@@ -149,7 +150,7 @@ export function NetworkPage() {
       .catch(() => {
         // Keep defaults; a load failure is non-fatal for the form.
       });
-    void detectSystemProxy()
+    void detectSystemProxy(runtimeId)
       .then((result) => {
         if (!cancelled) {
           setDetection(result);
@@ -161,20 +162,23 @@ export function NetworkPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [runtimeId]);
 
-  const persist = useCallback(async (next: NetworkSettings) => {
-    setSettings(next);
-    try {
-      const saved = await setNetworkSettings(next);
-      setSettings(saved);
-    } catch (error) {
-      toast.error("Failed to save network settings", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    }
-  }, []);
+  const persist = useCallback(
+    async (next: NetworkSettings) => {
+      setSettings(next);
+      try {
+        const saved = await setNetworkSettings(next, runtimeId);
+        setSettings(saved);
+      } catch (error) {
+        toast.error("Failed to save network settings", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      }
+    },
+    [runtimeId]
+  );
 
   return (
     <SettingsPage
@@ -187,7 +191,9 @@ export function NetworkPage() {
           title="Enable proxy"
           hint="Connect through a proxy for model requests and other network calls."
           checked={settings.enabled}
-          onCheckedChange={(next) => void persist({ ...settings, enabled: next })}
+          onCheckedChange={(next) =>
+            void persist({ ...settings, enabled: next })
+          }
         />
 
         {settings.enabled ? (

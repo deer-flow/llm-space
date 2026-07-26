@@ -1,1 +1,2 @@
-export { TraceManager } from "./trace-manager";
+export { TraceManager } from "@llm-space/runtime/traces";
+export type { TraceManagerOptions } from "@llm-space/runtime/traces";

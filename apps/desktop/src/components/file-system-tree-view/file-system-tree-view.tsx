@@ -39,6 +39,7 @@ import {
   type TreeRenderItemParams,
 } from "@/components/tree-view";
 import { useFullScreen } from "@/lib/use-full-screen";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
@@ -71,18 +72,20 @@ function _ancestorDirs(filePath: string): string[] {
 function _FileSystemTreeView({
   className,
   headerStart,
+  runtimeId,
   onSelectFile,
   onRemove,
   onMove,
 }: {
   className?: string;
+  runtimeId: RuntimeId;
   headerStart?: ReactNode;
   /** Fired with a file's path when it is selected (folders aren't selectable). */
-  onSelectFile?: (path: string) => void;
+  onSelectFile?: (path: string, runtimeId: RuntimeId) => void;
   /** Fired with a path after it (file or directory) is successfully deleted. */
-  onRemove?: (path: string) => void;
+  onRemove?: (path: string, runtimeId: RuntimeId) => void;
   /** Fired after a path changes via rename or move (`from` → `to`). */
-  onMove?: (from: string, to: string) => void;
+  onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
 }) {
   const fullScreen = useFullScreen();
   const seedHost = useHostServices();
@@ -102,7 +105,7 @@ function _FileSystemTreeView({
     reveal,
     move,
     rename,
-  } = useFileSystemTree();
+  } = useFileSystemTree(runtimeId);
 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -131,7 +134,7 @@ function _FileSystemTreeView({
   // Open a freshly created file in a tab and select its node in the tree.
   function revealCreatedFile(path: string) {
     setSelectedId(path);
-    onSelectFile?.(path);
+    onSelectFile?.(path, runtimeId);
   }
 
   // Quick thread flow (⌘N/menu/tab-bar/welcome): create an auto-named thread in
@@ -176,11 +179,17 @@ function _FileSystemTreeView({
   // auto-named flow; the tree/root "New file" icons pass `rename: true` for the
   // in-place rename flow.
   useRegisterCommands({
-    newFile: ({ parent = "", rename }) => {
+    newFile: ({ parent = "", rename, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
       if (rename) void create(parent, "file");
       else void createThread(parent);
     },
-    newFileFromPromptExample: ({ parent = "", exampleId }) => {
+    newFileFromPromptExample: ({
+      parent = "",
+      exampleId,
+      runtimeId: commandRuntimeId,
+    }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
       const example = getPromptExample(exampleId);
       if (!example) return;
       // Resolve the seed fields (each may be a factory re-read at creation
@@ -202,13 +211,29 @@ function _FileSystemTreeView({
         );
       })();
     },
-    newFolder: ({ parent = "" }) => void create(parent, "folder"),
-    renameFile: ({ path }) => startRenameByPath(path),
-    duplicateFile: ({ path }) => void duplicateNode(path),
-    deleteFile: ({ path }) => setDeleting(path),
-    revealFile: ({ path }) => void reveal(path),
+    newFolder: ({ parent = "", runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void create(parent, "folder");
+    },
+    renameFile: ({ path, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      startRenameByPath(path);
+    },
+    duplicateFile: ({ path, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void duplicateNode(path);
+    },
+    deleteFile: ({ path, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      setDeleting(path);
+    },
+    revealFile: ({ path, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
+      void reveal(path);
+    },
     refreshTree: () => refresh(),
-    revealInTree: ({ path }) => {
+    revealInTree: ({ path, runtimeId: commandRuntimeId }) => {
+      if (commandRuntimeId && commandRuntimeId !== runtimeId) return;
       // Expand every ancestor folder so the file's row can render, refresh so a
       // just-written file appears, then reuse the reveal flow (select + open +
       // scroll once its parent listing loads).
@@ -226,14 +251,14 @@ function _FileSystemTreeView({
     if (!siblings?.some((n) => n.path === pendingThread)) return;
     const path = pendingThread;
     setSelectedId(path);
-    onSelectFile?.(path);
+    onSelectFile?.(path, runtimeId);
     requestAnimationFrame(() => {
       document
         .querySelector(`[data-tree-id="${CSS.escape(path)}"]`)
         ?.scrollIntoView({ block: "nearest" });
     });
     setPendingThread(null);
-  }, [pendingThread, nodesByPath, onSelectFile]);
+  }, [pendingThread, nodesByPath, onSelectFile, runtimeId]);
 
   async function duplicateNode(path: string) {
     const dest = await duplicate(path);
@@ -286,6 +311,7 @@ function _FileSystemTreeView({
       const actions = (
         <NodeActions
           node={node}
+          runtimeId={runtimeId}
           menuOpen={openActionsPath === node.path}
           onMenuOpenChange={(open) => {
             setOpenActionsPath(open ? node.path : null);
@@ -351,6 +377,7 @@ function _FileSystemTreeView({
     renaming,
     openActionsPath,
     openNodeActionsMenu,
+    runtimeId,
   ]);
 
   // Start an in-place rename of the node at `path`. Only directories can be
@@ -371,7 +398,7 @@ function _FileSystemTreeView({
           setOverwriteConflict({ ...info, resolve });
         }),
     }).then((to) => {
-      if (to) onMove?.(source.id, to);
+      if (to) onMove?.(source.id, to, runtimeId);
     });
   }
 
@@ -417,7 +444,7 @@ function _FileSystemTreeView({
                   Icon ? threadFileNameFromTitle(base) : base
                 ).then((to) => {
                   if (to) {
-                    onMove?.(from, to);
+                    onMove?.(from, to, runtimeId);
                     if (openAfter) revealCreatedFile(to);
                   } else if (openAfter) {
                     // Rename was a no-op/failed; the file still lives at `from`.
@@ -458,7 +485,7 @@ function _FileSystemTreeView({
           </span>
         )}
         <span>
-          <RootActions />
+          <RootActions runtimeId={runtimeId} />
         </span>
       </header>
 
@@ -484,7 +511,7 @@ function _FileSystemTreeView({
             renderItem={renderItem}
             onDocumentDrag={onDocumentDrag}
             onSelectChange={(item) => {
-              if (item) onSelectFile?.(item.id);
+              if (item) onSelectFile?.(item.id, runtimeId);
             }}
           />
         )}
@@ -509,7 +536,7 @@ function _FileSystemTreeView({
           setDeleting(null);
           if (path) {
             void remove(path).then((ok) => {
-              if (ok) onRemove?.(path);
+              if (ok) onRemove?.(path, runtimeId);
             });
           }
         }}

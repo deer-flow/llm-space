@@ -1,4 +1,3 @@
-import { ModelProviderGroup } from "@llm-space/core";
 import {
   readUserTextFile,
   userDirectoryExists,
@@ -18,50 +17,24 @@ import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
-  moveToTrash,
   prepareGeneratorDir,
   removeProjectFile,
   runUv,
   writeProjectFile,
 } from "../fs";
-import type { McpManager } from "../mcp";
-import type { ModelManager } from "../models";
-import type { NetworkSettingsManager } from "../network";
 import {
   dismissGithubStarReminder,
   getNextFeatureReminder,
   markFeatureReminderSeen,
   resolveGithubStarReminder,
 } from "../reminders";
-import type { SearchSettingsManager } from "../search";
+import type { RemoteServerManager } from "../remote";
+import type { RuntimeRouter } from "../runtime";
 import type { SkillsManager } from "../skills";
-import type { StreamThreadController } from "../streaming";
-import type { ToolRegistry } from "../tools/tool-registry";
-import type { TraceManager } from "../traces";
 import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
-
-async function _getModelProviderGroups(modelManager: ModelManager) {
-  const models = await modelManager.getAvailableModels();
-  return Promise.all(
-    models.getProviders().map(async (provider) => ({
-      id: provider.id,
-      name: provider.name,
-      builtin: modelManager.isBuiltin(provider.id),
-      models: provider.getModels(),
-      apiKey: await modelManager.getApiKey(provider.id, false),
-      baseUrl: modelManager.getBaseUrl(provider.id),
-      headers: modelManager.getHeaders(provider.id),
-      api: modelManager.getApi(provider.id),
-      disabledModels: modelManager.getDisabledModels(provider.id),
-      customModels: modelManager.getCustomModels(provider.id),
-      websiteLink: modelManager.getWebsiteLink(provider.id),
-      icon: modelManager.getProviderIcon(provider.id),
-    }))
-  ) as Promise<ModelProviderGroup[]>;
-}
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -83,14 +56,9 @@ export interface MainWindowRPCDependencies {
   gistWriter: GistThreadWriter;
   homePath: string;
   localFs: LocalFileSystem;
-  mcpManager: McpManager;
-  modelManager: ModelManager;
-  networkSettings: NetworkSettingsManager;
-  searchSettings: SearchSettingsManager;
+  runtimeRouter: RuntimeRouter;
+  remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
-  streaming: StreamThreadController;
-  tools: ToolRegistry;
-  traceManager: TraceManager;
   updater: UpdaterService;
 }
 
@@ -105,89 +73,98 @@ export function createMainWindowRPC({
   gistWriter,
   homePath,
   localFs,
-  mcpManager,
-  modelManager,
-  networkSettings,
-  searchSettings,
+  runtimeRouter,
+  remoteServerManager,
   skillsManager,
-  streaming,
-  tools,
-  traceManager,
   updater,
 }: MainWindowRPCDependencies): MainWindowRPC {
-  const getModelProviderGroups = () => _getModelProviderGroups(modelManager);
+  const getRuntime = runtimeRouter.get.bind(runtimeRouter);
   const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
       requests: {
-        availableModels: async () => getModelProviderGroups(),
-        removeProvider: async ({ providerId }) => {
-          modelManager.removeProvider(providerId);
-          return getModelProviderGroups();
-        },
-        builtinProviders: async () => modelManager.getBuiltinProviders(),
-        addProvider: async ({ providerId }) => {
-          modelManager.addBuiltInProvider({ id: providerId });
+        listRuntimes: () => Promise.resolve(runtimeRouter.list()),
+        getDefaultRuntime: () =>
+          Promise.resolve({ runtimeId: runtimeRouter.getDefaultRuntimeId() }),
+        remoteListServers: () =>
+          Promise.resolve(remoteServerManager.listServers()),
+        remoteAddServer: ({ server }) =>
+          Promise.resolve(remoteServerManager.addServer(server)),
+        remoteUpdateServer: ({ serverId, server }) =>
+          Promise.resolve(remoteServerManager.updateServer(serverId, server)),
+        remoteRemoveServer: ({ serverId }) =>
+          remoteServerManager.removeServer(serverId),
+        remoteConnectServer: ({ serverId }) =>
+          remoteServerManager.connectServer(serverId),
+        remoteTrustServerHostKey: ({ serverId, requestId }) =>
+          remoteServerManager.trustServerHostKey(serverId, requestId),
+        remoteRejectServerHostKey: ({ serverId, requestId }) =>
+          remoteServerManager.rejectServerHostKey(serverId, requestId),
+        remoteDisconnectServer: ({ serverId }) =>
+          remoteServerManager.disconnectServer(serverId),
+        remoteSetDefaultRuntime: ({ runtimeId }) =>
+          Promise.resolve(remoteServerManager.setDefaultRuntime(runtimeId)),
+        remoteGetDefaultRuntime: () =>
+          Promise.resolve({
+            runtimeId: remoteServerManager.getDefaultRuntime(),
+          }),
+
+        availableModels: async ({ runtimeId }) =>
+          getRuntime(runtimeId).availableModels(),
+        removeProvider: async ({ runtimeId, providerId }) =>
+          getRuntime(runtimeId).removeProvider(providerId),
+        builtinProviders: ({ runtimeId }) =>
+          getRuntime(runtimeId).builtinProviders(),
+        addProvider: async ({ runtimeId, providerId }) => {
+          const groups = await getRuntime(runtimeId).addProvider(providerId);
           analytics.capture("provider_added", { providerId, kind: "builtin" });
-          return getModelProviderGroups();
+          return groups;
         },
-        addCustomProvider: async ({ id, name, baseUrl, api }) => {
-          modelManager.addCustomProvider({ id, name, baseUrl, api });
+        addCustomProvider: async ({ runtimeId, id, name, baseUrl, api }) => {
+          const groups = await getRuntime(runtimeId).addCustomProvider({
+            id,
+            name,
+            baseUrl,
+            api,
+          });
           // Only the provider id is recorded — never the base URL or name.
           analytics.capture("provider_added", {
             providerId: id,
             kind: "custom",
           });
-          return getModelProviderGroups();
+          return groups;
         },
-        updateProvider: async ({
+        updateProvider: (input) =>
+          getRuntime(input.runtimeId).updateProvider(input),
+        setModelEnabled: (input) =>
+          getRuntime(input.runtimeId).setModelEnabled(input),
+        setAllModelsEnabled: (input) =>
+          getRuntime(input.runtimeId).setAllModelsEnabled(input),
+        getDefaultModel: ({ runtimeId }) =>
+          getRuntime(runtimeId).getDefaultModel(),
+        setDefaultModel: ({ runtimeId, model }) =>
+          getRuntime(runtimeId).setDefaultModel(model),
+        testModelConnection: async ({
+          runtimeId,
           providerId,
-          apiKey,
-          baseUrl,
-          headers,
-          name,
-          api,
-          icon,
+          modelId,
+          candidate,
         }) => {
-          modelManager.updateProvider(providerId, {
-            apiKey,
-            baseUrl,
-            headers,
-            name,
-            api,
-            icon,
-          });
-          return getModelProviderGroups();
-        },
-        setModelEnabled: async ({ providerId, modelId, enabled }) => {
-          modelManager.setModelEnabled(providerId, modelId, enabled);
-          return getModelProviderGroups();
-        },
-        setAllModelsEnabled: async ({ providerId, enabled }) => {
-          modelManager.setAllModelsEnabled(providerId, enabled);
-          return getModelProviderGroups();
-        },
-        getDefaultModel: () => Promise.resolve(modelManager.getDefaultModel()),
-        setDefaultModel: ({ model }) => {
-          modelManager.setDefaultModel(model);
-          return Promise.resolve(modelManager.getDefaultModel());
-        },
-        testModelConnection: async ({ providerId, modelId, candidate }) => {
-          await streaming.testModelConnection({
+          await getRuntime(runtimeId).testModelConnection({
             providerId,
             modelId,
             candidate,
           });
           return null;
         },
-        removeCustomModel: async ({ providerId, modelId }) => {
-          modelManager.removeCustomModel(providerId, modelId);
-          return getModelProviderGroups();
-        },
-        upsertCustomModel: async ({ providerId, model, originalId }) => {
-          modelManager.upsertCustomModel(providerId, model, originalId);
-          return getModelProviderGroups();
-        },
+        removeCustomModel: ({ runtimeId, providerId, modelId }) =>
+          getRuntime(runtimeId).removeCustomModel({ providerId, modelId }),
+        upsertCustomModel: ({ runtimeId, providerId, model, originalId }) =>
+          getRuntime(runtimeId).upsertCustomModel({
+            providerId,
+            model,
+            originalId,
+          }),
         toggleMaximized: () => {
           const mainWindow = getMainWindow();
           if (mainWindow.isMaximized()) {
@@ -205,31 +182,26 @@ export function createMainWindowRPC({
           const dir = ensureRootDir(homePath, relativePath);
           return Promise.resolve({ path: dir });
         },
-        fsLs: ({ path }) => localFs.ls(path),
-        fsMkdir: async ({ path }) => {
-          await localFs.mkdir(path);
+        fsLs: ({ runtimeId, path }) => getRuntime(runtimeId).fsLs(path),
+        fsMkdir: async ({ runtimeId, path }) => {
+          await getRuntime(runtimeId).fsMkdir(path);
           return null;
         },
-        fsCp: async ({ src, dest }) => {
-          await localFs.cp(src, dest);
+        fsCp: async ({ runtimeId, src, dest }) => {
+          await getRuntime(runtimeId).fsCp(src, dest);
           return null;
         },
-        fsMv: async ({ src, dest }) => {
-          await localFs.mv(src, dest);
+        fsMv: async ({ runtimeId, src, dest }) => {
+          await getRuntime(runtimeId).fsMv(src, dest);
           return null;
         },
-        fsRm: async ({ path }) => {
-          // Recoverable delete: move to the OS trash rather than `rm`-ing.
-          const abs = localFs.realpath(path);
-          if (abs === localFs.realpath("")) {
-            throw new Error("Cannot delete the workspace root.");
-          }
-          await moveToTrash(abs);
+        fsRm: async ({ runtimeId, path }) => {
+          await getRuntime(runtimeId).fsRm(path);
           return null;
         },
-        fsRead: ({ path }) => localFs.read(path),
-        fsWrite: async ({ path, thread }) => {
-          await localFs.write(path, thread);
+        fsRead: ({ runtimeId, path }) => getRuntime(runtimeId).fsRead(path),
+        fsWrite: async ({ runtimeId, path, thread }) => {
+          await getRuntime(runtimeId).fsWrite(path, thread);
           return null;
         },
         // Publish a thread as a secret gist and return its web viewer link.
@@ -240,8 +212,7 @@ export function createMainWindowRPC({
         // reuse), so a re-share yields a new link.
         shareThread: async ({ path, title, description }) => {
           const thread = await localFs.read(path);
-          const shared =
-            title !== undefined ? { ...thread, title } : thread;
+          const shared = title !== undefined ? { ...thread, title } : thread;
           const locator = await gistWriter.write(shared, undefined, {
             description,
           });
@@ -254,8 +225,9 @@ export function createMainWindowRPC({
           await fsReveal(path, { skillsManager });
           return null;
         },
-        fsRealpath: ({ path }) =>
-          Promise.resolve({ path: localFs.realpath(path) }),
+        fsRealpath: async ({ runtimeId, path }) => ({
+          path: await getRuntime(runtimeId).fsRealpath(path),
+        }),
         // Unconfined text read for the prompt `@include` macro (any path + `~`).
         fsReadText: async ({ path }) => ({
           text: await readUserTextFile(path),
@@ -312,41 +284,48 @@ export function createMainWindowRPC({
           await removeProjectFile(rootDir, relativePath);
           return null;
         },
-        generatorResolveEnv: async ({ providerId, envNames }) => {
-          const modelApiKey = (await modelManager.getApiKey(providerId, true)) ?? "";
-          const envValues: Record<string, string> = {};
-          for (const name of envNames) {
-            envValues[name] = process.env[name] ?? "";
-          }
-          return { modelApiKey, envValues };
-        },
-        mcpListServers: () => mcpManager.listServers(),
-        mcpAddServer: ({ server }) => {
-          const servers = mcpManager.addServer(server);
+        generatorResolveEnv: ({ runtimeId, providerId, envNames }) =>
+          getRuntime(runtimeId).resolveGeneratorEnv({ providerId, envNames }),
+        mcpListServers: ({ runtimeId }) =>
+          getRuntime(runtimeId).mcpListServers(),
+        mcpAddServer: async ({ runtimeId, server }) => {
+          const servers = await getRuntime(runtimeId).mcpAddServer(server);
           analytics.capture("mcp_server_added", {});
           return servers;
         },
-        mcpUpdateServer: async ({ serverId, server }) =>
-          mcpManager.updateServer(serverId, server),
-        mcpRemoveServer: async ({ serverId }) =>
-          mcpManager.removeServer(serverId),
-        mcpDisconnectServer: async ({ serverId }) =>
-          mcpManager.disconnectServer(serverId),
-        mcpListTools: async ({ serverId }) => mcpManager.listTools(serverId),
-        mcpCallTool: async ({ serverId, toolName, arguments: args }) =>
-          mcpManager.callTool({ serverId, toolName, arguments: args }),
-        builtInListTools: () => tools.listTools(),
-        builtInCallTool: ({ name, arguments: args }) =>
-          tools.call({ name, arguments: args }),
+        mcpUpdateServer: ({ runtimeId, serverId, server }) =>
+          getRuntime(runtimeId).mcpUpdateServer(serverId, server),
+        mcpRemoveServer: ({ runtimeId, serverId }) =>
+          getRuntime(runtimeId).mcpRemoveServer(serverId),
+        mcpDisconnectServer: ({ runtimeId, serverId }) =>
+          getRuntime(runtimeId).mcpDisconnectServer(serverId),
+        mcpListTools: ({ runtimeId, serverId }) =>
+          getRuntime(runtimeId).mcpListTools(serverId),
+        mcpCallTool: ({ runtimeId, serverId, toolName, arguments: args }) =>
+          getRuntime(runtimeId).mcpCallTool({
+            serverId,
+            toolName,
+            arguments: args,
+          }),
+        builtInListTools: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).builtInListTools()),
+        builtInCallTool: ({ runtimeId, name, arguments: args }) =>
+          getRuntime(runtimeId).builtInCallTool({ name, arguments: args }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>
           Promise.resolve(analytics.setEnabled(enabled)),
-        getSearchSettings: () => searchSettings.get(),
-        setSearchSettings: ({ settings }) => searchSettings.set(settings),
-        getNetworkSettings: () => networkSettings.get(),
-        setNetworkSettings: ({ settings }) => networkSettings.set(settings),
-        detectSystemProxy: () => networkSettings.detectSystemProxy(),
-        skillsGetSettings: () => Promise.resolve(skillsManager.getConfig()),
+        getSearchSettings: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).getSearchSettings()),
+        setSearchSettings: ({ runtimeId, settings }) =>
+          Promise.resolve(getRuntime(runtimeId).setSearchSettings(settings)),
+        getNetworkSettings: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).getNetworkSettings()),
+        setNetworkSettings: ({ runtimeId, settings }) =>
+          Promise.resolve(getRuntime(runtimeId).setNetworkSettings(settings)),
+        detectSystemProxy: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).detectSystemProxy()),
+        skillsGetSettings: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsGetSettings()),
         skillsBrowseForPath: async () => {
           const selected = await Utils.openFileDialog({
             startingFolder: "~/",
@@ -357,39 +336,79 @@ export function createMainWindowRPC({
           const path = selected.map((p) => p.trim()).find(Boolean) ?? null;
           return { path };
         },
-        skillsAddPath: ({ path }) =>
-          Promise.resolve(skillsManager.addPath(path)),
-        skillsRemovePath: ({ path }) =>
-          Promise.resolve(skillsManager.removePath(path)),
-        skillsSetSkillHidden: ({ path, skillName, hidden }) =>
+        skillsAddPath: ({ runtimeId, path }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsAddPath(path)),
+        skillsRemovePath: ({ runtimeId, path }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsRemovePath(path)),
+        skillsSetSkillHidden: ({ runtimeId, path, skillName, hidden }) =>
           Promise.resolve(
-            skillsManager.setSkillHidden(path, skillName, hidden)
+            getRuntime(runtimeId).skillsSetSkillHidden({
+              path,
+              skillName,
+              hidden,
+            })
           ),
-        skillsSetAllSkillsHidden: ({ path, hidden }) =>
-          Promise.resolve(skillsManager.setAllSkillsHidden(path, hidden)),
-        skillsListSkills: ({ path }) =>
-          Promise.resolve(skillsManager.listSkills(path)),
-        skillsReadSkill: ({ path }) =>
-          Promise.resolve(skillsManager.readSkill(path)),
-        traceListProjects: () => traceManager.listProjects(),
-        traceCreateProject: ({ name }) => traceManager.createProject(name),
-        traceCreateConnectedProject: (input) =>
-          traceManager.createConnectedProject(input),
-        traceListTraces: ({ projectId }) => traceManager.listTraces(projectId),
-        traceImportLangfuseJson: ({ projectId, files }) =>
-          traceManager.importLangfuseJson(projectId, files),
-        traceSearchLangfuseTraces: ({ projectId, filters }) =>
-          traceManager.searchLangfuseTraces({ projectId, filters }),
-        traceSyncLangfuseTraces: ({ projectId, traceIds }) =>
-          traceManager.syncLangfuseTraces({ projectId, traceIds }),
-        traceReadTrace: ({ projectId, traceKey }) =>
-          traceManager.readTrace(projectId, traceKey),
-        traceReadOrCreateWorkbench: ({ projectId, traceKey }) =>
-          traceManager.readOrCreateWorkbench(projectId, traceKey),
-        traceUpdateTraceTitle: ({ projectId, traceKey, title }) =>
-          traceManager.updateTraceTitle(projectId, traceKey, title),
-        traceWriteWorkbench: async ({ projectId, traceKey, thread }) => {
-          await traceManager.writeWorkbench(projectId, traceKey, thread);
+        skillsSetAllSkillsHidden: ({ runtimeId, path, hidden }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).skillsSetAllSkillsHidden({ path, hidden })
+          ),
+        skillsListSkills: ({ runtimeId, path }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsListSkills(path)),
+        skillsReadSkill: ({ runtimeId, path }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsReadSkill(path)),
+        traceListProjects: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).traceListProjects()),
+        traceCreateProject: ({ runtimeId, name }) =>
+          Promise.resolve(getRuntime(runtimeId).traceCreateProject(name)),
+        traceCreateConnectedProject: ({ runtimeId, ...input }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceCreateConnectedProject(input)
+          ),
+        traceListTraces: ({ runtimeId, projectId }) =>
+          Promise.resolve(getRuntime(runtimeId).traceListTraces(projectId)),
+        traceImportLangfuseJson: ({ runtimeId, projectId, files }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceImportLangfuseJson(projectId, files)
+          ),
+        traceSearchLangfuseTraces: ({ runtimeId, projectId, filters }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceSearchLangfuseTraces({
+              projectId,
+              filters,
+            })
+          ),
+        traceSyncLangfuseTraces: ({ runtimeId, projectId, traceIds }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceSyncLangfuseTraces({
+              projectId,
+              traceIds,
+            })
+          ),
+        traceReadTrace: ({ runtimeId, projectId, traceKey }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceReadTrace(projectId, traceKey)
+          ),
+        traceReadOrCreateWorkbench: ({ runtimeId, projectId, traceKey }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceReadOrCreateWorkbench(
+              projectId,
+              traceKey
+            )
+          ),
+        traceUpdateTraceTitle: ({ runtimeId, projectId, traceKey, title }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).traceUpdateTraceTitle(
+              projectId,
+              traceKey,
+              title
+            )
+          ),
+        traceWriteWorkbench: async ({ runtimeId, projectId, traceKey, thread }) => {
+          await getRuntime(runtimeId).traceWriteWorkbench(
+            projectId,
+            traceKey,
+            thread
+          );
           return null;
         },
         updateMode: () => updater.getUpdateModeSetting(),
@@ -414,11 +433,12 @@ export function createMainWindowRPC({
         sendStreamThreadRequest: (payload) => {
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
           // messages. `rpc` is initialized by the time this handler runs.
-          void streaming.run(payload, (message) =>
+          void getRuntime(payload.runtimeId).streamThread(payload, (message) =>
             rpc.send.receiveStreamThreadResponse(message)
           );
         },
-        abortStreamThread: (payload) => streaming.abort(payload),
+        abortStreamThread: (payload) =>
+          getRuntime(payload.runtimeId).abortStream(payload),
         captureAnalyticsEvent: ({ event, properties }) =>
           analytics.capture(event, properties),
         executeCommand: (command) => executeCommand(command),

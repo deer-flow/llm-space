@@ -33,6 +33,7 @@ import { executeTool } from "@/client/tool-execution";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
 import type { SettingsTab } from "@/shared/commands";
+import type { RuntimeId } from "@/shared/runtime";
 
 // One transport for the app: stream agent runs over Electrobun RPC to the bun
 // process. It multiplexes concurrent runs by internal `streamId`, so a single
@@ -47,33 +48,50 @@ function _rpc() {
 }
 
 /** The desktop {@link ModelClient}, backed by Electrobun RPC. */
-export function createElectrobunModelClient(): ModelClient {
+export function createElectrobunModelClient(
+  runtimeId?: RuntimeId
+): ModelClient {
+  const scope = () => (runtimeId ? { runtimeId } : {});
   return {
-    availableModels: () => _rpc().request.availableModels({}),
-    builtinProviders: () => _rpc().request.builtinProviders({}),
-    getDefaultModel: () => _rpc().request.getDefaultModel({}),
-    setDefaultModel: (model) => _rpc().request.setDefaultModel({ model }),
+    availableModels: () => _rpc().request.availableModels(scope()),
+    builtinProviders: () => _rpc().request.builtinProviders(scope()),
+    getDefaultModel: () => _rpc().request.getDefaultModel(scope()),
+    setDefaultModel: (model) =>
+      _rpc().request.setDefaultModel({ ...scope(), model }),
     removeProvider: (providerId) =>
-      _rpc().request.removeProvider({ providerId }),
-    addProvider: (providerId) => _rpc().request.addProvider({ providerId }),
-    addCustomProvider: (input) => _rpc().request.addCustomProvider(input),
+      _rpc().request.removeProvider({ ...scope(), providerId }),
+    addProvider: (providerId) =>
+      _rpc().request.addProvider({ ...scope(), providerId }),
+    addCustomProvider: (input) =>
+      _rpc().request.addCustomProvider({ ...scope(), ...input }),
     updateProvider: (providerId, fields) =>
-      _rpc().request.updateProvider({ providerId, ...fields }),
+      _rpc().request.updateProvider({ ...scope(), providerId, ...fields }),
     setModelEnabled: (providerId, modelId, enabled) =>
-      _rpc().request.setModelEnabled({ providerId, modelId, enabled }),
+      _rpc().request.setModelEnabled({
+        ...scope(),
+        providerId,
+        modelId,
+        enabled,
+      }),
     setAllModelsEnabled: (providerId, enabled) =>
-      _rpc().request.setAllModelsEnabled({ providerId, enabled }),
+      _rpc().request.setAllModelsEnabled({ ...scope(), providerId, enabled }),
     testModelConnection: async (providerId, modelId, candidate) => {
       await _rpc().request.testModelConnection({
+        ...scope(),
         providerId,
         modelId,
         candidate,
       });
     },
     removeCustomModel: (providerId, modelId) =>
-      _rpc().request.removeCustomModel({ providerId, modelId }),
+      _rpc().request.removeCustomModel({ ...scope(), providerId, modelId }),
     upsertCustomModel: (providerId, model, originalId) =>
-      _rpc().request.upsertCustomModel({ providerId, model, originalId }),
+      _rpc().request.upsertCustomModel({
+        ...scope(),
+        providerId,
+        model,
+        originalId,
+      }),
   };
 }
 
@@ -90,10 +108,21 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       presentational: false,
       transport,
       executeTool,
-      skills: { getSettings: getSkillsSettings, listSkills },
-      mcp: { listServers: listMcpServers, listTools: listMcpTools },
+      skills: {
+        getSettings: (options) =>
+          getSkillsSettings(options?.runtimeId as RuntimeId | undefined),
+        listSkills: (path, options) =>
+          listSkills(path, options?.runtimeId as RuntimeId | undefined),
+      },
+      mcp: {
+        listServers: (options) =>
+          listMcpServers(options?.runtimeId as RuntimeId | undefined),
+        listTools: (serverId, options) =>
+          listMcpTools(serverId, options?.runtimeId as RuntimeId | undefined),
+      },
       builtinTools: {
-        list: listBuiltInTools,
+        list: (options) =>
+          listBuiltInTools(options?.runtimeId as RuntimeId | undefined),
         fsReveal,
       },
       paths: { ensureRootDir },

@@ -1,13 +1,12 @@
 import type { CustomModel } from "@llm-space/core";
 import { streamAgent } from "@llm-space/core/server";
 
-import type {
-  AbortStreamThreadPayload,
-  StreamThreadRequestPayload,
-  StreamThreadResponsePayload,
-} from "../../shared/rpc";
-import type { Analytics } from "../analytics";
 import type { ModelManager } from "../models";
+import type {
+  RuntimeAbortStreamPayload,
+  RuntimeStreamRequestPayload,
+  RuntimeStreamResponsePayload,
+} from "../runtime";
 
 /** Process-scoped agent streaming and model-connection controller. */
 export class StreamThreadController {
@@ -15,13 +14,15 @@ export class StreamThreadController {
 
   constructor(
     private readonly _modelManager: ModelManager,
-    private readonly _analytics: Analytics
+    private readonly _analytics?: {
+      capture(event: "thread_run", properties: Record<string, unknown>): void;
+    }
   ) {}
 
   /** Run an agent stream and push each event back through the caller's sender. */
   async run(
-    payload: StreamThreadRequestPayload,
-    send: (message: StreamThreadResponsePayload) => void
+    payload: RuntimeStreamRequestPayload,
+    send: (message: RuntimeStreamResponsePayload) => void
   ): Promise<void> {
     const { streamId, request } = payload;
     const abortController = new AbortController();
@@ -52,7 +53,7 @@ export class StreamThreadController {
       });
     } finally {
       this._activeStreams.delete(streamId);
-      this._analytics.capture("thread_run", {
+      this._analytics?.capture("thread_run", {
         ...this._scrubModelForTelemetry(request.model),
         outcome,
         durationMs: Date.now() - startedAt,
@@ -64,7 +65,7 @@ export class StreamThreadController {
   }
 
   /** Abort one in-flight stream. */
-  abort({ streamId }: AbortStreamThreadPayload): void {
+  abort({ streamId }: RuntimeAbortStreamPayload): void {
     this._activeStreams.get(streamId)?.abort();
   }
 

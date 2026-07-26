@@ -1,15 +1,16 @@
 import type { SkillInfo } from "@llm-space/core";
 
-import type { SkillsHost } from "@llm-space/ui/host";
+import type { RuntimeScopedHostOptions, SkillsHost } from "@llm-space/ui/host";
 
 /** Return enabled local skills in stable name order for core prompt rendering. */
 export async function listEnabledPromptVariableSkills(
-  skills: SkillsHost
+  skills: SkillsHost,
+  options?: RuntimeScopedHostOptions
 ): Promise<SkillInfo[]> {
-  const { discoveryPaths } = await skills.getSettings();
+  const { discoveryPaths } = await skills.getSettings(options);
   const perPath = await Promise.all(
     discoveryPaths.map((entry) =>
-      skills.listSkills(entry.path).catch((): SkillInfo[] => [])
+      skills.listSkills(entry.path, options).catch((): SkillInfo[] => [])
     )
   );
   const byName = new Map<string, SkillInfo>();

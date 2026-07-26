@@ -65,6 +65,7 @@ function _BuiltInToolImportDialog({
   initialToolName,
   onAdd,
   onRemove,
+  runtimeId,
   open,
   onOpenChange,
 }: {
@@ -72,6 +73,7 @@ function _BuiltInToolImportDialog({
   initialToolName?: string | null;
   onAdd: (tool: BuiltinTool) => boolean;
   onRemove: (toolName: string) => void;
+  runtimeId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -87,14 +89,14 @@ function _BuiltInToolImportDialog({
 
   const loadTools = useCallback(async () => {
     try {
-      setTools(await builtinTools.list());
+      setTools(await builtinTools.list({ runtimeId }));
     } catch (error) {
       toast.error("Failed to load built-in tools", {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     }
-  }, [builtinTools]);
+  }, [builtinTools, runtimeId]);
 
   useEffect(() => {
     if (!open) {

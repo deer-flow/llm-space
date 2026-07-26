@@ -1,5 +1,8 @@
 import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
-import { useModels } from "@llm-space/ui/components/model-provider";
+import {
+  ModelProvider,
+  useModels,
+} from "@llm-space/ui/components/model-provider";
 import {
   LOCAL_STORAGE_KEYS,
   readLocalStorage,
@@ -11,19 +14,25 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@llm-space/ui/ui/resizable";
+import { useQueryClient } from "@tanstack/react-query";
 import { FileTextIcon, GitBranchIcon } from "lucide-react";
 import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  type Dispatch,
+  type MutableRefObject,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
+import { getDefaultRuntime, listRuntimes } from "@/client/remote-servers";
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
 import { useExperimental } from "@/components/experimental-provider";
@@ -32,12 +41,21 @@ import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
+import { RemoteStatus } from "@/components/remote-status";
 import { SharedImportProvider } from "@/components/shared-import-provider";
-import { ThreadTabs, useThreadTabs } from "@/components/thread-tabs";
+import {
+  chooseActiveTabForRuntime,
+  filterTabsForRuntime,
+  ThreadTabs,
+  useThreadTabs,
+} from "@/components/thread-tabs";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
-import { DesktopHostProvider } from "@/host/host-services";
+import {
+  createElectrobunModelClient,
+  DesktopHostProvider,
+} from "@/host/host-services";
 import { track } from "@/lib/analytics";
 import { electrobun } from "@/lib/electrobun";
 import {
@@ -47,6 +65,7 @@ import {
 } from "@/lib/import-threads";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
+import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
@@ -92,13 +111,7 @@ const LazyTracePanel = lazy(() =>
  * so the lazy `import()` starts in the same render that opens the overlay,
  * without a wasted extra render of the page tree.
  */
-function LazyMount({
-  open,
-  children,
-}: {
-  open: boolean;
-  children: ReactNode;
-}) {
+function LazyMount({ open, children }: { open: boolean; children: ReactNode }) {
   const mounted = useRef(false);
   if (open) mounted.current = true;
   if (!mounted.current) return null;
@@ -203,28 +216,128 @@ function writeSidebarSize(sizeInPixels: number): void {
   );
 }
 
+function clearRuntimeQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  runtimeId: RuntimeId
+): void {
+  void queryClient.removeQueries({ queryKey: ["thread", runtimeId] });
+  void queryClient.removeQueries({ queryKey: ["fs", runtimeId] });
+  void queryClient.removeQueries({ queryKey: ["trace", runtimeId] });
+}
+
+function threadTabId(path: string, runtimeId: RuntimeId): string {
+  return `thread:${runtimeId}:${path}`;
+}
+
 function PageInner() {
+  const [workspaceRuntimeId, setWorkspaceRuntimeId] =
+    useState<RuntimeId>("local");
+  const workspaceRuntimeIdRef = useRef<RuntimeId>("local");
+  useEffect(() => {
+    workspaceRuntimeIdRef.current = workspaceRuntimeId;
+  }, [workspaceRuntimeId]);
+
+  return (
+    <WorkspaceModelScope runtimeId={workspaceRuntimeId}>
+      <PageWorkspace
+        workspaceRuntimeId={workspaceRuntimeId}
+        setWorkspaceRuntimeId={setWorkspaceRuntimeId}
+        workspaceRuntimeIdRef={workspaceRuntimeIdRef}
+      />
+    </WorkspaceModelScope>
+  );
+}
+
+function WorkspaceModelScope({
+  runtimeId,
+  children,
+}: {
+  runtimeId: RuntimeId;
+  children: ReactNode;
+}) {
+  const client = useMemo(
+    () => createElectrobunModelClient(runtimeId),
+    [runtimeId]
+  );
+  return (
+    <ModelProvider key={runtimeId} client={client}>
+      {children}
+    </ModelProvider>
+  );
+}
+
+function PageWorkspace({
+  workspaceRuntimeId,
+  setWorkspaceRuntimeId,
+  workspaceRuntimeIdRef,
+}: {
+  workspaceRuntimeId: RuntimeId;
+  setWorkspaceRuntimeId: Dispatch<SetStateAction<RuntimeId>>;
+  workspaceRuntimeIdRef: MutableRefObject<RuntimeId>;
+}) {
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
   const models = useModels();
+  const queryClient = useQueryClient();
   const { tracingEnabled } = useExperimental();
 
-  // The active tab is read through a ref so command handlers never go stale.
-  // The ref is read only inside post-commit command handlers, so the sync
-  // lives in a passive effect rather than the render body.
-  const activeTabIdRef = useRef(tabs.activeId);
-  useEffect(() => {
-    activeTabIdRef.current = tabs.activeId;
-  });
   const {
     close,
-    closeOthers,
-    closeAll,
+    closeAllInRuntime,
+    discardRuntime,
+    closeOthersInRuntime,
     openTrace,
     reopenClosed,
-    activateNext,
-    activatePrevious,
   } = tabs;
+  const visibleTabs = useMemo(
+    () => filterTabsForRuntime(tabs.tabs, workspaceRuntimeId),
+    [tabs.tabs, workspaceRuntimeId]
+  );
+  const visibleActiveId = useMemo(
+    () =>
+      chooseActiveTabForRuntime(tabs.tabs, tabs.activeId, workspaceRuntimeId),
+    [tabs.activeId, tabs.tabs, workspaceRuntimeId]
+  );
+  // The visible active tab is read through a ref so command handlers never go
+  // stale or accidentally target a tab from another runtime.
+  const activeTabIdRef = useRef(visibleActiveId);
+  useEffect(() => {
+    activeTabIdRef.current = visibleActiveId;
+  }, [visibleActiveId]);
+  const activateVisibleTab = useCallback(
+    (id: string) => {
+      if (visibleTabs.some((tab) => tab.id === id)) tabs.activate(id);
+    },
+    [tabs, visibleTabs]
+  );
+  const reorderVisibleTabs = useCallback(
+    (from: number, to: number) =>
+      tabs.reorderInRuntime(from, to, workspaceRuntimeId),
+    [tabs, workspaceRuntimeId]
+  );
+  const activateVisibleSibling = useCallback(
+    (offset: 1 | -1) => {
+      if (visibleTabs.length === 0) return;
+      const index = visibleTabs.findIndex((tab) => tab.id === visibleActiveId);
+      const next =
+        index === -1
+          ? offset === 1
+            ? visibleTabs[0]
+            : visibleTabs[visibleTabs.length - 1]
+          : visibleTabs[
+              (index + offset + visibleTabs.length) % visibleTabs.length
+            ];
+      if (next) tabs.activate(next.id);
+    },
+    [tabs, visibleActiveId, visibleTabs]
+  );
+  const discardRuntimeWorkspace = useCallback(
+    (runtimeId: RuntimeId) => {
+      discardRuntime(runtimeId);
+      clearRuntimeQueries(queryClient, runtimeId);
+    },
+    [discardRuntime, queryClient]
+  );
 
   // Collapse / expand the left side panel. The initial width is recovered from
   // localStorage once (lazy ref init) and fed straight into `defaultSize`, so
@@ -255,56 +368,120 @@ function PageInner() {
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
 
+  const switchWorkspaceRuntime = useCallback(
+    (nextRuntimeId: RuntimeId) => {
+      workspaceRuntimeIdRef.current = nextRuntimeId;
+      setWorkspaceRuntimeId(nextRuntimeId);
+      setSidebarMode("files");
+      void queryClient.invalidateQueries({ queryKey: ["fs"] });
+      void queryClient.invalidateQueries({ queryKey: ["thread"] });
+    },
+    [queryClient, setWorkspaceRuntimeId, workspaceRuntimeIdRef]
+  );
+
+  const refreshRuntimes = useCallback(
+    async ({ syncDefault }: { syncDefault: boolean }) => {
+      const [next, defaultRuntimeId] = await Promise.all([
+        listRuntimes(),
+        getDefaultRuntime(),
+      ]);
+      const current = workspaceRuntimeIdRef.current;
+      const nextRuntimeId =
+        syncDefault && next.some((runtime) => runtime.id === defaultRuntimeId)
+          ? defaultRuntimeId
+          : next.some((runtime) => runtime.id === current)
+            ? current
+            : "local";
+      if (nextRuntimeId !== current) {
+        switchWorkspaceRuntime(nextRuntimeId);
+      } else {
+        workspaceRuntimeIdRef.current = nextRuntimeId;
+        setWorkspaceRuntimeId(nextRuntimeId);
+      }
+    },
+    [setWorkspaceRuntimeId, switchWorkspaceRuntime, workspaceRuntimeIdRef]
+  );
+
+  const transitionWorkspaceRuntime = useCallback(
+    (nextRuntimeId: RuntimeId) => {
+      setSettingsOpen(false);
+      switchWorkspaceRuntime(nextRuntimeId);
+      void refreshRuntimes({ syncDefault: false });
+    },
+    [refreshRuntimes, switchWorkspaceRuntime]
+  );
+
+  useEffect(() => {
+    void refreshRuntimes({ syncDefault: true }).catch(() => undefined);
+  }, [refreshRuntimes]);
+
+  useEffect(() => {
+    if (settingsOpen) return;
+    void refreshRuntimes({ syncDefault: true }).catch(() => undefined);
+  }, [refreshRuntimes, settingsOpen]);
+
   // File import: a hidden picker (opened by the `importFiles` command), the
   // parent directory it should import into, and page-wide drag-and-drop state.
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingParentRef = useRef("");
+  const pendingImportRuntimeIdRef = useRef<RuntimeId>("local");
   const dragDepthRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const { open: openTab } = tabs;
   const handleImportFiles = useCallback(
-    async (files: FileList | File[] | ThreadImportFile[], parent: string) => {
+    async (
+      files: FileList | File[] | ThreadImportFile[],
+      parent: string,
+      runtimeId: RuntimeId = workspaceRuntimeIdRef.current
+    ) => {
       const list = [...files];
       if (list.length === 0) return;
       const { created, total } =
         list[0] instanceof File
-          ? await importThreadFiles(parent, list as File[], models)
+          ? await importThreadFiles(parent, list as File[], models, runtimeId)
           : await importThreadFileRecords(
               parent,
               list as ThreadImportFile[],
-              models
+              models,
+              runtimeId
             );
       if (created.length === 0) {
         toast.error("No threads could be imported from the selected files.");
         return;
       }
-      executeCommand({ type: "refreshTree", args: {} });
-      for (const path of created) openTab(path);
+      executeCommand({ type: "refreshTree", args: { runtimeId } });
+      for (const path of created) openTab(path, runtimeId);
       const skipped = total - created.length;
       toast.success(
         `Imported ${created.length} thread${created.length === 1 ? "" : "s"}`,
         skipped > 0 ? { description: `${skipped} file(s) skipped` } : undefined
       );
     },
-    [models, executeCommand, openTab]
+    [models, executeCommand, openTab, workspaceRuntimeIdRef]
   );
 
   // Register the command handlers backed by page-level state (tabs, sidebar,
   // settings). `newFile` / `newFolder` / the tree ops are registered by the
   // file tree, which owns that state.
   useRegisterCommands({
-    closeTab: ({ id, path }) => {
-      const target = id ?? (path ? `thread:${path}` : activeTabIdRef.current);
+    closeTab: ({ id, path, runtimeId }) => {
+      const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
+      const target =
+        id ??
+        (path ? threadTabId(path, targetRuntimeId) : activeTabIdRef.current);
       if (target) close(target);
     },
-    closeOtherTabs: ({ id, path }) => {
-      const target = id ?? (path ? `thread:${path}` : activeTabIdRef.current);
-      if (target) closeOthers(target);
+    closeOtherTabs: ({ id, path, runtimeId }) => {
+      const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
+      const target =
+        id ??
+        (path ? threadTabId(path, targetRuntimeId) : activeTabIdRef.current);
+      if (target) closeOthersInRuntime(target, targetRuntimeId);
     },
-    closeAllTabs: () => closeAll(),
+    closeAllTabs: () => closeAllInRuntime(workspaceRuntimeIdRef.current),
     reopenClosedTab: () => void reopenClosed(),
-    selectNextTab: () => activateNext(),
-    selectPreviousTab: () => activatePrevious(),
+    selectNextTab: () => activateVisibleSibling(1),
+    selectPreviousTab: () => activateVisibleSibling(-1),
     toggleSidebar: () => toggleSidebar(),
     openSettings: ({ tab }) => {
       if (tab) setSettingsTab(tab);
@@ -316,29 +493,36 @@ function PageInner() {
     },
     openCommandPalette: () => setCommandPaletteOpen(true),
     openOnboard: () => setOnboardOpen(true),
-    openStartFromExample: ({ parent = "" }) => {
+    openStartFromExample: ({ parent = "", runtimeId }) => {
+      if (runtimeId && runtimeId !== workspaceRuntimeId) return;
       examplesParentRef.current = parent;
       setExamplesOpen(true);
     },
     // Share a specific thread, or the active thread when no path is given (the
-    // header button / native menu / palette). The active tab id is `thread:{path}`.
-    shareThread: ({ path }) => {
-      const activeId = activeTabIdRef.current;
+    // header button / native menu / palette). Thread tab ids are
+    // `thread:{runtimeId}:{path}`.
+    shareThread: ({ path, runtimeId }) => {
+      const targetRuntimeId = runtimeId ?? workspaceRuntimeId;
+      if (targetRuntimeId !== workspaceRuntimeId) return;
+      const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
       const target =
         path ??
-        (activeId?.startsWith("thread:")
-          ? activeId.slice("thread:".length)
+        (activeTab?.type === "thread" && activeTab.runtimeId === targetRuntimeId
+          ? activeTab.path
           : undefined);
       if (!target) return;
       shareTargetRef.current = target;
       setShareOpen(true);
     },
-    importFiles: ({ parent = "", files }) => {
+    importFiles: ({ parent = "", files, runtimeId }) => {
+      const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
+      if (targetRuntimeId !== workspaceRuntimeIdRef.current) return;
       if (files) {
-        void handleImportFiles(files, parent);
+        void handleImportFiles(files, parent, targetRuntimeId);
         return;
       }
       pendingParentRef.current = parent;
+      pendingImportRuntimeIdRef.current = targetRuntimeId;
       fileInputRef.current?.click();
     },
   });
@@ -367,9 +551,10 @@ function PageInner() {
         projectId: trace.projectId,
         traceKey: trace.key,
         title: trace.title,
+        runtimeId: workspaceRuntimeId,
       });
     },
-    [openTrace]
+    [openTrace, workspaceRuntimeId]
   );
   const handleCloseTab = useCallback(
     (id: string) => executeCommand({ type: "closeTab", args: { id } }),
@@ -384,20 +569,27 @@ function PageInner() {
     [executeCommand]
   );
   const handleRevealFile = useCallback(
-    (path: string) => executeCommand({ type: "revealFile", args: { path } }),
+    (path: string, runtimeId: RuntimeId) =>
+      executeCommand({ type: "revealFile", args: { path, runtimeId } }),
     [executeCommand]
   );
   const handleMoveToTrash = useCallback(
-    (path: string) => executeCommand({ type: "deleteFile", args: { path } }),
+    (path: string, runtimeId: RuntimeId) =>
+      executeCommand({ type: "deleteFile", args: { path, runtimeId } }),
     [executeCommand]
   );
   const handleShareThread = useCallback(
-    (path: string) => executeCommand({ type: "shareThread", args: { path } }),
+    (path: string, runtimeId: RuntimeId) =>
+      executeCommand({ type: "shareThread", args: { path, runtimeId } }),
     [executeCommand]
   );
   const handleNewFile = useCallback(
-    () => executeCommand({ type: "newFile", args: {} }),
-    [executeCommand]
+    () =>
+      executeCommand({
+        type: "newFile",
+        args: { runtimeId: workspaceRuntimeId },
+      }),
+    [executeCommand, workspaceRuntimeId]
   );
   const handleToggleSidebar = useCallback(
     () => executeCommand({ type: "toggleSidebar", args: {} }),
@@ -434,7 +626,11 @@ function PageInner() {
         e.preventDefault();
         dragDepthRef.current = 0;
         setIsDraggingFiles(false);
-        void handleImportFiles(e.dataTransfer.files, "");
+        void handleImportFiles(
+          e.dataTransfer.files,
+          "",
+          workspaceRuntimeIdRef.current
+        );
       }}
     >
       <SharedImportProvider />
@@ -448,7 +644,11 @@ function PageInner() {
         onChange={(e) => {
           const files = e.target.files;
           if (files?.length) {
-            void handleImportFiles(files, pendingParentRef.current);
+            void handleImportFiles(
+              files,
+              pendingParentRef.current,
+              pendingImportRuntimeIdRef.current
+            );
           }
           e.target.value = "";
         }}
@@ -470,6 +670,7 @@ function PageInner() {
             }}
           >
             <FileSystemTreeView
+              runtimeId={workspaceRuntimeId}
               className={
                 effectiveSidebarMode === "files" ? "min-h-0 flex-1" : "hidden"
               }
@@ -486,6 +687,7 @@ function PageInner() {
                       : "hidden"
                   }
                   onOpenTrace={handleOpenTrace}
+                  runtimeId={workspaceRuntimeId}
                 />
               </LazyMount>
             )}
@@ -497,17 +699,26 @@ function PageInner() {
                 />
               </div>
             )}
+            <RemoteStatus
+              runtimeId={workspaceRuntimeId}
+              onDisconnecting={discardRuntimeWorkspace}
+              onDisconnected={(runtimeId) => {
+                discardRuntimeWorkspace(runtimeId);
+                if (workspaceRuntimeIdRef.current !== runtimeId) return;
+                transitionWorkspaceRuntime("local");
+              }}
+            />
             <AccountStatus />
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel minSize={640}>
-            {tabs.tabs.length === 0 ? (
+            {visibleTabs.length === 0 ? (
               <Welcome
                 onNewStarter={() => setExamplesOpen(true)}
                 onNewFile={() =>
                   executeCommand({
                     type: "newFile",
-                    args: {},
+                    args: { runtimeId: workspaceRuntimeId },
                   })
                 }
                 onModels={() =>
@@ -519,9 +730,9 @@ function PageInner() {
               />
             ) : (
               <ThreadTabs
-                tabs={tabs.tabs}
-                activeId={tabs.activeId}
-                activate={tabs.activate}
+                tabs={visibleTabs}
+                activeId={visibleActiveId}
+                activate={activateVisibleTab}
                 refresh={tabs.refresh}
                 consumeDiscardedPane={tabs.consumeDiscardedPane}
                 sidebarOpen={sidebarOpen}
@@ -532,7 +743,7 @@ function PageInner() {
                 reveal={handleRevealFile}
                 moveToTrash={handleMoveToTrash}
                 share={handleShareThread}
-                reorder={tabs.reorder}
+                reorder={reorderVisibleTabs}
                 onNewFile={handleNewFile}
                 onMove={tabs.handleMove}
                 onTraceTitleChange={tabs.handleTraceTitleChange}
@@ -553,6 +764,17 @@ function PageInner() {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           onTabChange={setSettingsTab}
+          onRemoteConnected={(runtimeId) => {
+            transitionWorkspaceRuntime(runtimeId);
+          }}
+          onRemoteDisconnected={(runtimeId) => {
+            discardRuntimeWorkspace(runtimeId);
+            if (workspaceRuntimeIdRef.current === runtimeId) {
+              transitionWorkspaceRuntime("local");
+            } else if (runtimeId.startsWith("remote:")) {
+              setSettingsOpen(false);
+            }
+          }}
         />
       </LazyMount>
       <LazyMount open={commandPaletteOpen}>
@@ -582,6 +804,7 @@ function PageInner() {
               args: {
                 exampleId: example.id,
                 parent: examplesParentRef.current,
+                runtimeId: workspaceRuntimeId,
               },
             })
           }

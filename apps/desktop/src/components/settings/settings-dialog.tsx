@@ -1,20 +1,30 @@
 "use client";
 
-
+import { ModelProvider } from "@llm-space/ui/components/model-provider";
 import { Dialog, DialogContent } from "@llm-space/ui/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@llm-space/ui/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@llm-space/ui/ui/tabs";
 import {
   Boxes,
   Cable,
   CircleUser,
   FlaskConical,
   Network,
+  Server,
   Search,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { getDefaultRuntime } from "@/client/remote-servers";
+import { createElectrobunModelClient } from "@/host/host-services";
 import type { SettingsTab } from "@/shared/commands";
+import type { RuntimeId } from "@/shared/runtime";
 
 import { AccountPage } from "./account-page";
 import { ExperimentalPage } from "./experimental-page";
@@ -22,6 +32,7 @@ import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
 import { ModelsPage } from "./models-page";
 import { NetworkPage } from "./network-page";
+import { RemoteServersPage } from "./remote-servers-page";
 import { SearchPage } from "./search-page";
 import { SkillsPage } from "./skills-page";
 
@@ -30,19 +41,78 @@ const PAGES = [
     value: "general",
     label: "General",
     icon: SlidersHorizontal,
-    Page: GeneralPage,
+    Page: () => <GeneralPage />,
   },
-  { value: "account", label: "Account", icon: CircleUser, Page: AccountPage },
-  { value: "models", label: "Models", icon: Boxes, Page: ModelsPage },
-  { value: "mcp", label: "MCP", icon: Cable, Page: McpPage },
-  { value: "network", label: "Network", icon: Network, Page: NetworkPage },
-  { value: "search", label: "Search", icon: Search, Page: SearchPage },
-  { value: "skills", label: "Skills", icon: Sparkles, Page: SkillsPage },
+  {
+    value: "account",
+    label: "Account",
+    icon: CircleUser,
+    Page: () => <AccountPage />,
+  },
+  {
+    value: "remote",
+    label: "Remote",
+    icon: Server,
+    Page: ({
+      onConnected,
+      onDisconnected,
+    }: {
+      onConnected?: (runtimeId: RuntimeId) => void;
+      onDisconnected?: (runtimeId: RuntimeId) => void;
+    }) => (
+      <RemoteServersPage
+        onConnected={onConnected}
+        onDisconnected={onDisconnected}
+      />
+    ),
+  },
+  {
+    value: "models",
+    label: "Models",
+    icon: Boxes,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <ModelProvider client={createElectrobunModelClient(runtimeId)}>
+        <ModelsPage />
+      </ModelProvider>
+    ),
+  },
+  {
+    value: "mcp",
+    label: "MCP",
+    icon: Cable,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <McpPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    value: "network",
+    label: "Network",
+    icon: Network,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <NetworkPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    value: "search",
+    label: "Search",
+    icon: Search,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <SearchPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    value: "skills",
+    label: "Skills",
+    icon: Sparkles,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <SkillsPage runtimeId={runtimeId} />
+    ),
+  },
   {
     value: "experimental",
     label: "Experimental",
     icon: FlaskConical,
-    Page: ExperimentalPage,
+    Page: () => <ExperimentalPage />,
   },
 ] as const;
 
@@ -51,12 +121,33 @@ export function SettingsDialog({
   onOpenChange,
   tab,
   onTabChange,
+  onRemoteConnected,
+  onRemoteDisconnected,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
+  onRemoteConnected?: (runtimeId: RuntimeId) => void;
+  onRemoteDisconnected?: (runtimeId: RuntimeId) => void;
 }) {
+  const [runtimeId, setRuntimeId] = useState<RuntimeId>("local");
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void getDefaultRuntime()
+      .then((defaultRuntimeId) => {
+        if (!cancelled) setRuntimeId(defaultRuntimeId);
+      })
+      .catch(() => {
+        if (!cancelled) setRuntimeId("local");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -90,7 +181,11 @@ export function SettingsDialog({
           <div className="min-w-0 grow">
             {PAGES.map(({ value, Page }) => (
               <TabsContent key={value} value={value} className="size-full">
-                <Page />
+                <Page
+                  runtimeId={runtimeId}
+                  onConnected={onRemoteConnected}
+                  onDisconnected={onRemoteDisconnected}
+                />
               </TabsContent>
             ))}
           </div>

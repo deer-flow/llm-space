@@ -1,9 +1,7 @@
 import type { CustomModel, ModelConfig } from "@llm-space/core";
 
 export type CustomProviderApi =
-  | "anthropic-messages"
-  | "openai-completions"
-  | "openai-responses";
+  "anthropic-messages" | "openai-completions" | "openai-responses";
 
 export const DEFAULT_CUSTOM_PROVIDER_API: CustomProviderApi =
   "openai-completions";

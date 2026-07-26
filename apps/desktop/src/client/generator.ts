@@ -1,4 +1,5 @@
 import { electrobun } from "@/lib/electrobun";
+import type { RuntimeId } from "@/shared/runtime";
 
 function _rpc() {
   if (!electrobun.rpc) {
@@ -64,7 +65,8 @@ export async function removeProjectFile(
 /** Resolve the model's real API key + named environment variable values. */
 export function resolveGeneratorEnv(
   providerId: string,
-  envNames: string[]
+  envNames: string[],
+  runtimeId?: RuntimeId
 ): Promise<{ modelApiKey: string; envValues: Record<string, string> }> {
-  return _rpc().request.generatorResolveEnv({ providerId, envNames });
+  return _rpc().request.generatorResolveEnv({ runtimeId, providerId, envNames });
 }

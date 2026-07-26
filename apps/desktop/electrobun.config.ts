@@ -27,8 +27,7 @@ const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT;
 //   LLM_SPACE_UPDATE_BASE_URL → point the update feed at a local static
 //                               server to exercise the auto-update loop
 const skipSigning = Boolean(Bun.env.LLM_SPACE_SKIP_SIGNING);
-const skipNotarize =
-  skipSigning || Boolean(Bun.env.LLM_SPACE_SKIP_NOTARIZE);
+const skipNotarize = skipSigning || Boolean(Bun.env.LLM_SPACE_SKIP_NOTARIZE);
 
 // Each edition needs its own feed. update.json is named `{channel}-{os}-{arch}`
 // and carries no app name, so both editions would otherwise fight over

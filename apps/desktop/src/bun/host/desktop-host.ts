@@ -1,12 +1,7 @@
-import { ToolRegistry } from "../tools/tool-registry";
+import { ToolRegistry, type RuntimeModule } from "@llm-space/runtime/tools";
 
 export type DesktopModuleCleanup = () => Promise<void> | void;
-
-export interface DesktopModule {
-  id: string;
-  register(tools: ToolRegistry): void;
-  start?(): Promise<DesktopModuleCleanup | void> | DesktopModuleCleanup | void;
-}
+export type DesktopModule = RuntimeModule;
 
 export class DesktopHost {
   readonly tools: ToolRegistry;

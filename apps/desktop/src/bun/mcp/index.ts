@@ -1,1 +1,1 @@
-export { McpManager } from "./mcp-manager";
+export { McpManager } from "@llm-space/runtime/mcp";

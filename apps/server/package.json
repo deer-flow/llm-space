@@ -1,0 +1,16 @@
+{
+  "name": "@llm-space/server",
+  "version": "4.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "start": "bun src/index.ts",
+    "pack": "bun scripts/pack-server.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@llm-space/core": "workspace:*",
+    "@llm-space/runtime": "workspace:*"
+  }
+}

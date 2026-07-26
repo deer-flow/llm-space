@@ -5,25 +5,23 @@ import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { createRpcTransport, localFs } from "@/client";
-
-// One transport for the app: stream agent runs over Electrobun RPC to the bun
-// process (there is no HTTP server in the desktop app).
-const rpcTransport = createRpcTransport();
+import { createFileSystemClient, createRpcTransport } from "@/client";
+import type { RuntimeId } from "@/shared/runtime";
 
 interface ThreadTabPaneProps {
   paneId: string;
   path: string;
+  runtimeId: RuntimeId;
   active: boolean;
   /**
    * Bumped by the tab "Refresh" action to reload this thread from disk,
    * discarding any un-saved in-memory edits.
    */
   refreshNonce?: number;
-  onMove?: (from: string, to: string) => void;
+  onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
   /** Close this pane's tab, e.g. after its thread fails to load. */
   onClose?: (path: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
@@ -38,6 +36,7 @@ interface ThreadTabPaneProps {
 export function ThreadTabPane({
   paneId,
   path,
+  runtimeId,
   active,
   refreshNonce = 0,
   onMove,
@@ -45,14 +44,19 @@ export function ThreadTabPane({
   consumeDiscardedPane,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
+  const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
+  const rpcTransport = useMemo(
+    () => createRpcTransport(runtimeId),
+    [runtimeId]
+  );
   const {
     data: thread,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ["thread", path],
-    queryFn: () => localFs.read(path),
+    queryKey: ["thread", runtimeId, path],
+    queryFn: () => fs.read(path),
     // A workspace file can change on disk outside the app, so never serve a
     // cached copy: read fresh on every open, and drop the entry the moment its
     // tab closes. (The global 30s staleTime still covers models / directory ls.)
@@ -60,18 +64,19 @@ export function ThreadTabPane({
     gcTime: 0,
     retry: false,
   });
+  const loadError = isError || (!isLoading && !thread);
 
   // The tab is opened optimistically (see `useThreadTabs.open`) without
   // pre-checking the file exists, so a since-deleted (or otherwise unreadable)
   // file surfaces here instead: report it and close the tab it was given.
   useEffect(() => {
-    if (!isError) return;
+    if (!loadError) return;
     toast.error("Error", {
       description:
         error instanceof Error ? error.message : `File not found: ${path}`,
     });
     onClose?.(path);
-  }, [isError, error, path, onClose]);
+  }, [loadError, error, path, onClose]);
 
   // Persist edits back to the same path, debounced so we don't write per keystroke.
   // `pending` holds the latest unsaved thread so we can flush it on unmount.
@@ -93,9 +98,9 @@ export function ThreadTabPane({
     const thread = pending.current;
     pending.current = null;
     if (thread !== null) {
-      await localFs.write(pathRef.current, thread);
+      await fs.write(pathRef.current, { ...thread, runtimeId });
     }
-  }, []);
+  }, [fs, runtimeId]);
 
   const handleChange = useCallback(
     (next: Thread) => {
@@ -142,7 +147,7 @@ export function ThreadTabPane({
     void (async () => {
       try {
         await qc.refetchQueries({
-          queryKey: ["thread", pathRef.current],
+          queryKey: ["thread", runtimeId, pathRef.current],
           exact: true,
         });
         setReloadKey((key) => key + 1);
@@ -153,7 +158,7 @@ export function ThreadTabPane({
         });
       }
     })();
-  }, [refreshNonce, qc]);
+  }, [refreshNonce, qc, runtimeId]);
 
   const handleRenameTitle = useCallback(
     async (title: string): Promise<boolean> => {
@@ -164,22 +169,35 @@ export function ThreadTabPane({
       }
 
       await flushPending();
-      await localFs.mv(from, to);
-      const moved = await localFs.read(to);
-      await localFs.write(to, moved);
-      qc.setQueryData(["thread", to], moved);
-      void qc.invalidateQueries({ queryKey: ["fs", "local", "ls"] });
-      void qc.invalidateQueries({ queryKey: ["thread", from] });
+      await fs.mv(from, to);
+      const moved = await fs.read(to);
+      await fs.write(to, { ...moved, runtimeId });
+      qc.setQueryData(["thread", runtimeId, to], moved);
+      void qc.invalidateQueries({ queryKey: ["fs", runtimeId, "ls"] });
+      void qc.invalidateQueries({ queryKey: ["thread", runtimeId, from] });
       if (parentOf(from) !== parentOf(to)) {
         void qc.invalidateQueries({
-          queryKey: ["fs", "local", "ls", parentOf(from)],
+          queryKey: ["fs", runtimeId, "ls", parentOf(from)],
         });
       }
-      onMove?.(from, to);
+      onMove?.(from, to, runtimeId);
       return true;
     },
-    [flushPending, onMove, qc]
+    [flushPending, fs, onMove, qc, runtimeId]
   );
+
+  if (loadError) {
+    return (
+      <div
+        className={cn(
+          "bg-background text-muted-foreground flex size-full items-center justify-center text-sm",
+          !active && "hidden"
+        )}
+      >
+        Failed to load thread.
+      </div>
+    );
+  }
 
   return (
     <div className={cn("size-full", !active && "hidden")}>
@@ -191,6 +209,7 @@ export function ThreadTabPane({
         initialValue={thread}
         active={active}
         transport={rpcTransport}
+        runtimeId={runtimeId}
         onChange={handleChange}
         onRenameTitle={handleRenameTitle}
       />

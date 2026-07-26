@@ -15,13 +15,19 @@ import { GitHubAuthManager } from "../auth";
 import { executeCommandInBun } from "../commands";
 import { createDeepLinkHandler, type DeepLinkHandler } from "../deep-link";
 import { setDeepLinkHandler } from "../deep-link/launch";
+import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
 import { ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
+import {
+  RemoteServerManager,
+  registerConfiguredRemoteRuntime,
+} from "../remote";
 import { createMainWindowRPC, type MainWindowRPC } from "../rpc";
+import { LocalRuntimeClient, RuntimeRouter } from "../runtime";
 import { SearchSettingsManager } from "../search";
-import { SkillsManager } from "../skills";
+import { getManagedSkillsDir, SkillsManager } from "../skills";
 import { createLocalFileSystem } from "../storage";
 import { StreamThreadController } from "../streaming";
 import { createBuiltInToolsModule } from "../tools/built-in";
@@ -46,7 +52,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
   const searchSettings = new SearchSettingsManager();
-  const skillsManager = new SkillsManager();
+  const skillsManager = new SkillsManager({
+    managedSkillsDir: getManagedSkillsDir(),
+  });
   const githubAuth = new GitHubAuthManager({
     onChange: (state) => getRpc().send.githubAuthChanged(state),
   });
@@ -56,7 +64,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const gistWriter = new GistThreadWriter({
     getToken: () => githubAuth.getAccessToken(),
   });
-  const traceManager = new TraceManager();
+  const traceManager = new TraceManager({ homePath });
   const streaming = new StreamThreadController(modelManager, analytics);
   const host = new DesktopHost({
     modules: [
@@ -65,10 +73,36 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
         findSkill: skillsManager.findSkill.bind(skillsManager),
         getSearchSettings: searchSettings.get.bind(searchSettings),
         workspaceRoot: workspacePath,
+        openPath,
+        revealPath: revealInFileManager,
       }),
     ],
   });
   await host.start();
+  const localRuntime = new LocalRuntimeClient({
+    localFs,
+    mcpManager,
+    modelManager,
+    networkSettings,
+    searchSettings,
+    skillsManager,
+    streaming,
+    tools: host.tools,
+    traceManager,
+    rmPath: async (workspacePath) => {
+      const abs = localFs.realpath(workspacePath);
+      if (abs === localFs.realpath("")) {
+        throw new Error("Cannot delete the workspace root.");
+      }
+      await moveToTrash(abs);
+    },
+  });
+  const runtimeRouter = new RuntimeRouter(localRuntime);
+  const remoteServerManager = new RemoteServerManager(runtimeRouter);
+  const remoteRuntime = await registerConfiguredRemoteRuntime({
+    env: process.env,
+    runtimeRouter,
+  });
 
   let mainWindow: BrowserWindow | null = null;
   let rpc: MainWindowRPC | null = null;
@@ -103,6 +137,8 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     stop() {
       stopPromise ??= _stopDesktopApp([
         ["updater", () => updater.stop()],
+        ["remote runtime", () => remoteRuntime?.stop()],
+        ["remote servers", () => remoteServerManager.shutdown()],
         ["streaming", () => streaming.shutdown()],
         ["desktop host", () => host.stop()],
         ["MCP manager", () => mcpManager.shutdown()],
@@ -123,16 +159,14 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       gistWriter,
       homePath,
       localFs,
-      mcpManager,
-      modelManager,
-      networkSettings,
-      searchSettings,
+      runtimeRouter,
+      remoteServerManager,
       skillsManager,
-      streaming,
-      tools: host.tools,
-      traceManager,
       updater,
     });
+    remoteServerManager.setStatusListener((payload) =>
+      getRpc().send.remoteServerStatusChanged(payload)
+    );
     mainWindow = await createMainWindow({ rpc, executeCommand });
 
     // The window + rpc are ready — wire the importer and flush any deep links

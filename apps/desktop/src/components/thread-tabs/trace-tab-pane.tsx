@@ -11,32 +11,40 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
+import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
-
-const rpcTransport = createRpcTransport();
 
 interface TraceTabPaneProps {
   projectId: string;
   traceKey: string;
+  runtimeId: RuntimeId;
   active: boolean;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
-  onRenameTitle?: (projectId: string, traceKey: string, title: string) => void;
+  onRenameTitle?: (
+    projectId: string,
+    traceKey: string,
+    title: string,
+    runtimeId: RuntimeId
+  ) => void;
 }
 
 function _TraceTabPane({
   projectId,
   traceKey,
+  runtimeId,
   active,
   refreshNonce = 0,
   onClose,
   onRenameTitle,
 }: TraceTabPaneProps) {
-  const tabId = `trace:${projectId}:${traceKey}`;
+  const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
+  const rpcTransport = createRpcTransport(runtimeId);
   const qc = useQueryClient();
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["trace", "workbench", projectId, traceKey],
-    queryFn: () => traceClient.readOrCreateWorkbench(projectId, traceKey),
+    queryKey: ["trace", runtimeId, "workbench", projectId, traceKey],
+    queryFn: () =>
+      traceClient.readOrCreateWorkbench(projectId, traceKey, runtimeId),
     staleTime: 0,
     gcTime: 0,
     retry: false,
@@ -64,9 +72,9 @@ function _TraceTabPane({
     const thread = pending.current;
     pending.current = null;
     if (thread !== null) {
-      await traceClient.writeWorkbench(projectId, traceKey, thread);
+      await traceClient.writeWorkbench(projectId, traceKey, thread, runtimeId);
     }
-  }, [projectId, traceKey]);
+  }, [projectId, runtimeId, traceKey]);
 
   const handleChange = useCallback(
     (next: Thread) => {
@@ -87,14 +95,20 @@ function _TraceTabPane({
       const next = await traceClient.updateTraceTitle(
         projectId,
         traceKey,
-        title
+        title,
+        runtimeId
       );
-      qc.setQueryData(["trace", "workbench", projectId, traceKey], next);
-      void qc.invalidateQueries({ queryKey: ["trace", "traces", projectId] });
-      onRenameTitle?.(projectId, traceKey, next.trace.title);
+      qc.setQueryData(
+        ["trace", runtimeId, "workbench", projectId, traceKey],
+        next
+      );
+      void qc.invalidateQueries({
+        queryKey: ["trace", runtimeId, "traces", projectId],
+      });
+      onRenameTitle?.(projectId, traceKey, next.trace.title, runtimeId);
       return true;
     },
-    [flushPending, onRenameTitle, projectId, qc, traceKey]
+    [flushPending, onRenameTitle, projectId, qc, runtimeId, traceKey]
   );
 
   useEffect(() => {
@@ -118,7 +132,7 @@ function _TraceTabPane({
     void (async () => {
       try {
         await qc.refetchQueries({
-          queryKey: ["trace", "workbench", projectId, traceKey],
+          queryKey: ["trace", runtimeId, "workbench", projectId, traceKey],
           exact: true,
         });
         setReloadKey((key) => key + 1);
@@ -129,7 +143,7 @@ function _TraceTabPane({
         });
       }
     })();
-  }, [projectId, qc, refreshNonce, traceKey]);
+  }, [projectId, qc, refreshNonce, runtimeId, traceKey]);
 
   const trace = data?.trace;
 
@@ -145,6 +159,7 @@ function _TraceTabPane({
         initialValue={data?.thread}
         active={active}
         transport={rpcTransport}
+        runtimeId={runtimeId}
         onChange={handleChange}
         onRenameTitle={handleRenameTitle}
         validateTitle={_validateTraceTitle}

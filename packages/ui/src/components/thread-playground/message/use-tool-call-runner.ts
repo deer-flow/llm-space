@@ -20,6 +20,7 @@ export interface ToolCallOutcome {
 export function useToolCallRunner(messageId: string) {
   const { executeTool } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
+  const runtimeId = useThreadStore((state) => state.runtimeId);
   const { updateToolCallOutputText } = useThreadStoreActions();
 
   const toolsByName = useMemo(
@@ -40,7 +41,8 @@ export function useToolCallRunner(messageId: string) {
       try {
         const { contentText, isError } = await executeTool(
           tool,
-          toolCall.input.arguments
+          toolCall.input.arguments,
+          { runtimeId }
         );
         updateToolCallOutputText(messageId, toolCall.id, contentText, isError);
         return {
@@ -48,12 +50,13 @@ export function useToolCallRunner(messageId: string) {
           isFirecrawlLimit: isError && isFirecrawlLimitError(contentText),
         };
       } catch (error) {
-        const text = error instanceof Error ? error.message : "Tool call failed";
+        const text =
+          error instanceof Error ? error.message : "Tool call failed";
         updateToolCallOutputText(messageId, toolCall.id, text, true);
         return { isError: true, isFirecrawlLimit: isFirecrawlLimitError(text) };
       }
     },
-    [executeTool, messageId, resolveTool, updateToolCallOutputText]
+    [executeTool, messageId, resolveTool, runtimeId, updateToolCallOutputText]
   );
 
   return { resolveTool, runToolCall };

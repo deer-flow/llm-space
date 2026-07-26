@@ -67,7 +67,6 @@ import { useShallow } from "zustand/shallow";
 
 import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 
-
 import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
 
 import {
@@ -98,6 +97,7 @@ const MAX_AUTO_TOOL_TURNS = 50;
 export type ThreadStoreStatus = "idle" | "running";
 export interface ThreadState {
   thread: Thread;
+  runtimeId?: string;
   streamingMessage: AssistantMessage | null;
   status: ThreadStoreStatus;
   abortController: AbortController | null;
@@ -175,6 +175,7 @@ export function createThreadStore(
   initialThread: Thread,
   options: {
     transport?: AgentTransport;
+    runtimeId?: string;
     /**
      * Resolve the model a run/edit should use given the thread's saved model:
      * the saved model when still available, else the user's default, else the
@@ -1000,14 +1001,12 @@ export function createThreadStore(
           // PREVIEW_THROTTLE_MS) — see createFrameThrottle for why per-event
           // set() calls are unsafe and re-rendering the growing document per
           // frame is too expensive.
-          const {
-            schedule: schedulePreview,
-            cancel: cancelPreview,
-          } = createFrameThrottle(() => {
-            if (isActiveRun()) {
-              set({ streamingMessage });
-            }
-          }, PREVIEW_THROTTLE_MS);
+          const { schedule: schedulePreview, cancel: cancelPreview } =
+            createFrameThrottle(() => {
+              if (isActiveRun()) {
+                set({ streamingMessage });
+              }
+            }, PREVIEW_THROTTLE_MS);
 
           const finalizeActiveRun = () => {
             if (!isActiveRun()) {

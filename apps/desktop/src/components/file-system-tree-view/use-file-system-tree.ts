@@ -9,8 +9,6 @@ import {
 } from "@llm-space/core";
 import {
   LOCAL_STORAGE_KEYS,
-  readLocalStorage,
-  writeLocalStorage,
 } from "@llm-space/ui/lib/local-storage";
 import {
   basename,
@@ -24,11 +22,13 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { localFs } from "@/client";
+import { createFileSystemClient } from "@/client";
+import type { RuntimeId } from "@/shared/runtime";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {
-  ls: (path: string) => ["fs", "local", "ls", path] as const,
+  ls: (runtimeId: RuntimeId, path: string) =>
+    ["fs", runtimeId, "ls", path] as const,
 };
 
 /**
@@ -47,9 +47,14 @@ function _depth(path: string): number {
  * is always restored (and its listing loaded) before its descendants. Returns
  * `[]` when storage is unavailable or malformed.
  */
-function _loadPersistedExpanded(): string[] {
+function _persistedExpandedKey(runtimeId: RuntimeId): string {
+  return `${LOCAL_STORAGE_KEYS.fileTreeExpanded}:${runtimeId}`;
+}
+
+function _loadPersistedExpanded(runtimeId: RuntimeId): string[] {
+  if (typeof window === "undefined") return [];
   try {
-    const raw = readLocalStorage(LOCAL_STORAGE_KEYS.fileTreeExpanded);
+    const raw = window.localStorage.getItem(_persistedExpandedKey(runtimeId));
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -62,11 +67,16 @@ function _loadPersistedExpanded(): string[] {
 }
 
 /** Persist the expanded paths, ignoring any storage failure. */
-function _savePersistedExpanded(paths: string[]): void {
-  writeLocalStorage(
-    LOCAL_STORAGE_KEYS.fileTreeExpanded,
-    JSON.stringify(paths)
-  );
+function _savePersistedExpanded(runtimeId: RuntimeId, paths: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      _persistedExpandedKey(runtimeId),
+      JSON.stringify(paths)
+    );
+  } catch {
+    // Storage unavailable (private mode, quota) => persistence is best-effort.
+  }
 }
 
 /**
@@ -221,21 +231,26 @@ export interface FileSystemTree {
  * `ls` query per expanded directory (root always loaded), plus mutations that
  * invalidate the affected directories. `move` is optimistic with rollback.
  */
-export function useFileSystemTree(): FileSystemTree {
+export function useFileSystemTree(runtimeId: RuntimeId): FileSystemTree {
   const qc = useQueryClient();
+  const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
   // Restore the directories that were open last session (shallowest-first, so
   // each parent loads before its children); entries whose directory no longer
   // exists are pruned once their parent's listing loads.
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(_loadPersistedExpanded())
+    () => new Set(_loadPersistedExpanded(runtimeId))
   );
+
+  useEffect(() => {
+    setExpanded(new Set(_loadPersistedExpanded(runtimeId)));
+  }, [runtimeId]);
 
   // Root ("") is always queried; each expanded directory adds one query.
   const paths = useMemo(() => ["", ...expanded], [expanded]);
   const results = useQueries({
     queries: paths.map((path) => ({
-      queryKey: fsKeys.ls(path),
-      queryFn: () => localFs.ls(path),
+      queryKey: fsKeys.ls(runtimeId, path),
+      queryFn: () => fs.ls(path),
     })),
   });
 
@@ -260,11 +275,12 @@ export function useFileSystemTree(): FileSystemTree {
   // the restore order opens ancestors before descendants.
   useEffect(() => {
     _savePersistedExpanded(
+      runtimeId,
       [...expanded]
         .filter((p) => _depth(p) <= MAX_PERSISTED_DEPTH)
         .sort((a, b) => _depth(a) - _depth(b))
     );
-  }, [expanded]);
+  }, [expanded, runtimeId]);
 
   // Prune restored directories that no longer exist. A directory is dropped when
   // either its parent fell away (ancestor pruned/collapsed) or its parent's
@@ -311,45 +327,45 @@ export function useFileSystemTree(): FileSystemTree {
   }, []);
 
   const refresh = useCallback(() => {
-    void qc.invalidateQueries({ queryKey: ["fs", "local", "ls"] });
-  }, [qc]);
+    void qc.invalidateQueries({ queryKey: ["fs", runtimeId, "ls"] });
+  }, [qc, runtimeId]);
 
   const createFolder = useCallback(
     async (parent: string): Promise<string | null> => {
       let path: string;
       try {
-        const names = new Set((await localFs.ls(parent)).map((n) => n.name));
+        const names = new Set((await fs.ls(parent)).map((n) => n.name));
         const { name } = uniqueUntitled(names, "");
         path = joinPath(parent, name);
-        await localFs.mkdir(path);
+        await fs.mkdir(path);
       } catch (err) {
         toast.error((err as Error).message);
         return null;
       }
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
+      void qc.invalidateQueries({ queryKey: fsKeys.ls(runtimeId, parent) });
       return path;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   const createFile = useCallback(
     async (parent: string): Promise<string | null> => {
       let path: string;
       try {
-        const names = new Set((await localFs.ls(parent)).map((n) => n.name));
+        const names = new Set((await fs.ls(parent)).map((n) => n.name));
         const name = uniqueUntitled(names, ".json").name;
         path = joinPath(parent, name);
         const title = threadTitleFromPath(path);
         // Model-less by default; the UI resolves a fallback model at run time.
-        await localFs.write(path, _createBlankThread(title));
+        await fs.write(path, { ..._createBlankThread(title), runtimeId });
       } catch (err) {
         toast.error((err as Error).message);
         return null;
       }
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
+      void qc.invalidateQueries({ queryKey: fsKeys.ls(runtimeId, parent) });
       return path;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   const createFileFromPromptExample = useCallback(
@@ -365,40 +381,42 @@ export function useFileSystemTree(): FileSystemTree {
     ): Promise<string | null> => {
       let path: string;
       try {
-        const names = new Set((await localFs.ls(parent)).map((n) => n.name));
+        const names = new Set((await fs.ls(parent)).map((n) => n.name));
         const name = uniqueThreadFileName(names, example.fileStem);
         path = joinPath(parent, name);
         const title = threadTitleFromPath(path);
-        await localFs.write(
-          path,
-          _createThreadFromPromptExample(
+        await fs.write(path, {
+          ..._createThreadFromPromptExample(
             title,
             example.systemPrompt,
             example.tools,
             example.messages,
             example.textVariables
-          )
-        );
+          ),
+          runtimeId,
+        });
       } catch (err) {
         toast.error((err as Error).message);
         return null;
       }
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
+      void qc.invalidateQueries({ queryKey: fsKeys.ls(runtimeId, parent) });
       return path;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   const remove = useCallback(
     async (path: string): Promise<boolean> => {
       try {
-        await localFs.rm(path);
+        await fs.rm(path);
       } catch (err) {
         toast.error((err as Error).message);
         // The delete may still have landed even though it reported failure
         // (e.g. the RPC timed out while the OS waited on a permission
         // prompt), so re-fetch rather than leaving a stale entry in the tree.
-        void qc.invalidateQueries({ queryKey: fsKeys.ls(parentOf(path)) });
+        void qc.invalidateQueries({
+          queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+        });
         return false;
       }
       // Prune the removed subtree from the expanded set.
@@ -409,10 +427,12 @@ export function useFileSystemTree(): FileSystemTree {
         }
         return next;
       });
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parentOf(path)) });
+      void qc.invalidateQueries({
+        queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+      });
       return true;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   const duplicate = useCallback(
@@ -420,26 +440,29 @@ export function useFileSystemTree(): FileSystemTree {
       const parent = parentOf(path);
       let dest: string;
       try {
-        const names = new Set((await localFs.ls(parent)).map((n) => n.name));
+        const names = new Set((await fs.ls(parent)).map((n) => n.name));
         dest = joinPath(parent, uniqueCopyName(names, basename(path)));
-        await localFs.cp(path, dest);
+        await fs.cp(path, dest);
       } catch (err) {
         toast.error((err as Error).message);
         return null;
       }
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parent) });
+      void qc.invalidateQueries({ queryKey: fsKeys.ls(runtimeId, parent) });
       return dest;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
-  const reveal = useCallback(async (path: string): Promise<void> => {
-    try {
-      await localFs.reveal(path);
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  }, []);
+  const reveal = useCallback(
+    async (path: string): Promise<void> => {
+      try {
+        await fs.reveal(path);
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    },
+    [fs]
+  );
 
   const move = useCallback(
     async (
@@ -457,15 +480,15 @@ export function useFileSystemTree(): FileSystemTree {
 
       const name = basename(src);
       const dest = joinPath(destDir, name);
-      const srcKey = fsKeys.ls(srcParent);
-      const destKey = fsKeys.ls(destDir);
+      const srcKey = fsKeys.ls(runtimeId, srcParent);
+      const destKey = fsKeys.ls(runtimeId, destDir);
 
       // Detect a name collision up front (from a fresh listing, not the possibly
       // stale cache) and confirm the overwrite before touching anything — an
       // unconfirmed clash would otherwise silently replace the existing entry.
       let overwrite = false;
       try {
-        const destNodes = await localFs.ls(destDir);
+        const destNodes = await fs.ls(destDir);
         const clash = destNodes.find((n) => n.name === name);
         if (clash) {
           const confirmed = await opts?.confirmOverwrite?.({
@@ -511,9 +534,9 @@ export function useFileSystemTree(): FileSystemTree {
         // Replacing an existing entry: send it to the trash first, so the move
         // succeeds for directories too (rename onto a non-empty dir fails).
         if (overwrite) {
-          await localFs.rm(dest);
+          await fs.rm(dest);
         }
-        await localFs.mv(src, dest);
+        await fs.mv(src, dest);
       } catch (err) {
         // Roll back.
         if (prevSrc) qc.setQueryData(srcKey, prevSrc);
@@ -536,7 +559,7 @@ export function useFileSystemTree(): FileSystemTree {
       }
       return ok ? dest : null;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   const rename = useCallback(
@@ -544,10 +567,10 @@ export function useFileSystemTree(): FileSystemTree {
       const dest = joinPath(parentOf(path), newBase);
       if (dest === path) return null;
       try {
-        await localFs.mv(path, dest);
+        await fs.mv(path, dest);
         if (dest.endsWith(".json")) {
-          const thread = await localFs.read(dest);
-          await localFs.write(dest, normalizeThreadForPath(thread, dest));
+          const thread = await fs.read(dest);
+          await fs.write(dest, normalizeThreadForPath(thread, dest));
         }
       } catch (err) {
         toast.error((err as Error).message);
@@ -562,10 +585,12 @@ export function useFileSystemTree(): FileSystemTree {
         }
         return next;
       });
-      void qc.invalidateQueries({ queryKey: fsKeys.ls(parentOf(path)) });
+      void qc.invalidateQueries({
+        queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+      });
       return dest;
     },
-    [qc]
+    [qc, fs, runtimeId]
   );
 
   return {

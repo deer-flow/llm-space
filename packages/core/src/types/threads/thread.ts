@@ -366,6 +366,12 @@ export const Thread = Type.Object({
   modelName: Type.Optional(Type.String()),
 
   /**
+   * Runtime that owns this thread's workspace file. Absent means local, keeping
+   * older thread files compatible.
+   */
+  runtimeId: Type.Optional(Type.String()),
+
+  /**
    * Provenance pointer for an imported thread — typically the
    * `llm-space://shared/{connectorId}/threads/{threadId}` deep link it was
    * imported from. Set on import; absent for locally-authored threads.
