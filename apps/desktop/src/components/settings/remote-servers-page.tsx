@@ -227,7 +227,7 @@ export function RemoteServersPage({
   return (
     <SettingsPage
       title="Remote Servers"
-      description="Connect LLM Space to a prepared SSH server. Passwords and passphrases are not stored."
+      description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
       className="p-0"
     >
       <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] border-t">
