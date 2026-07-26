@@ -1,5 +1,11 @@
 English | [中文](./README.zh-CN.md)
 
+[![CI](https://github.com/deer-flow/llm-space/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/deer-flow/llm-space/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/release/deer-flow/llm-space?label=version)](https://github.com/deer-flow/llm-space/releases)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white)](./package.json)
+[![Bun](https://img.shields.io/badge/Bun-1.3+-000000?logo=bun&logoColor=white)](./mise.toml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 ---
 
 # LLM Space 4
