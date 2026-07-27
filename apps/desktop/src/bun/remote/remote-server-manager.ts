@@ -121,14 +121,16 @@ export class RemoteServerManager {
   }
 
   async removeServer(id: string): Promise<RemoteServerView[]> {
-    return this._enqueue(async () => {
-      await this._disconnectServer(id);
+    return this._enqueue(() => {
       const next = this._servers.filter((server) => server.id !== id);
       if (next.length === this._servers.length) {
         throw new Error(`Remote server not found: ${id}`);
       }
+      this._assertNotConnected(id, "remove");
+      this._connections.delete(id);
       this._servers = next;
       this._save();
+      this._emitStatusChanged();
       return this.listServers();
     });
   }

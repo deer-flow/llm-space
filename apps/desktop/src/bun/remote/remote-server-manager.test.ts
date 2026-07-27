@@ -462,6 +462,121 @@ describe("RemoteServerManager", () => {
     expect(statuses.at(-1)).toBe("disconnected");
   });
 
+  test("does not allow removing a connected server", async () => {
+    const stopped: string[] = [];
+    const manager = _manager((config) =>
+      Promise.resolve({
+        client: _remoteRuntime(config.id),
+        stop: () => {
+          stopped.push(config.id);
+          return Promise.resolve();
+        },
+      })
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    await manager.connectServer(server.id);
+
+    try {
+      await manager.removeServer(server.id);
+      throw new Error("remove should fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        "Disconnect remote server before remove: " + server.id
+      );
+    }
+
+    const [view] = manager.listServers();
+    expect(stopped).toEqual([]);
+    expect(view?.id).toBe(server.id);
+    expect(view?.status).toBe("connected");
+    expect(view?.defaultRuntime).toBe(true);
+  });
+
+  test("removes a disconnected server without stopping a runtime", async () => {
+    const stopped: string[] = [];
+    const manager = _manager((config) =>
+      Promise.resolve({
+        client: _remoteRuntime(config.id),
+        stop: () => {
+          stopped.push(config.id);
+          return Promise.resolve();
+        },
+      })
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    const next = await manager.removeServer(server.id);
+
+    expect(next).toEqual([]);
+    expect(manager.listServers()).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+
+  test("removes a failed server configuration", async () => {
+    const statuses: string[] = [];
+    const manager = _manager(
+      () => Promise.reject(new Error("connect failed")),
+      undefined,
+      ({ servers }) => statuses.push(servers[0]?.status ?? "missing")
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    try {
+      await manager.connectServer(server.id);
+      throw new Error("connect should fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("connect failed");
+    }
+
+    expect(manager.listServers()[0]?.status).toBe("error");
+
+    const next = await manager.removeServer(server.id);
+
+    expect(next).toEqual([]);
+    expect(manager.listServers()).toEqual([]);
+    expect(statuses.at(-1)).toBe("missing");
+  });
+
+  test("allows removing a server after it is disconnected", async () => {
+    const stopped: string[] = [];
+    const manager = _manager((config) =>
+      Promise.resolve({
+        client: _remoteRuntime(config.id),
+        stop: () => {
+          stopped.push(config.id);
+          return Promise.resolve();
+        },
+      })
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    await manager.connectServer(server.id);
+    await manager.disconnectServer(server.id);
+    const next = await manager.removeServer(server.id);
+
+    expect(next).toEqual([]);
+    expect(stopped).toEqual([server.runtimeId]);
+  });
+
+  test("does not allow editing a connected server", async () => {
+    const manager = _manager((config) =>
+      Promise.resolve({
+        client: _remoteRuntime(config.id),
+        stop: () => Promise.resolve(),
+      })
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    await manager.connectServer(server.id);
+
+    expect(() =>
+      manager.updateServer(server.id, { name: "changed", host: "other" })
+    ).toThrow("Disconnect remote server before update");
+  });
+
   test("publishes connection progress stages", async () => {
     const stages: string[] = [];
     let lastSteps: string[] = [];
@@ -684,5 +799,47 @@ describe("RemoteServerManager", () => {
     expect(() =>
       manager.updateServer(server.id, { name: "changed", host: "other" })
     ).toThrow("Disconnect remote server before update");
+  });
+
+  test("does not allow removing while waiting for host key trust", async () => {
+    const manager = _manager(
+      (config) =>
+        Promise.resolve({
+          client: _remoteRuntime(config.id),
+          stop: () => Promise.resolve(),
+        }),
+      undefined,
+      undefined,
+      {
+        check: () =>
+          Promise.resolve({
+            status: "first-time",
+            request: {
+              requestId: "trust-1",
+              kind: "first-time",
+              target: "host",
+              host: "host",
+              keyType: "ssh-ed25519",
+              fingerprint: "SHA256:test",
+              publicKeyLine: "host ssh-ed25519 AAAA",
+            },
+          }),
+        trust: () => Promise.resolve(),
+      }
+    );
+
+    const [server] = manager.addServer({ name: "host", host: "host" });
+    await manager.connectServer(server.id);
+
+    try {
+      await manager.removeServer(server.id);
+      throw new Error("remove should fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        "Disconnect remote server before remove: " + server.id
+      );
+    }
+    expect(manager.listServers()[0]?.status).toBe("trust-required");
   });
 });
