@@ -121,22 +121,63 @@ def _load_skill(path: str) -> dict:
 
 def _parse_frontmatter(text: str, fallback_name: str) -> tuple[str, str]:
     """Pull ``name`` and ``description`` from a leading ``---`` YAML frontmatter
-    block. Values may be quoted; missing keys fall back to sensible defaults."""
-    name = fallback_name
-    description = ""
+    block. Missing or invalid fields fall back to sensible defaults."""
     match = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
     if not match:
-        return name, description
-    for line in match.group(1).splitlines():
-        field = re.match(r"\s*(name|description)\s*:\s*(.*)$", line)
+        return fallback_name, ""
+
+    name = fallback_name
+    description = ""
+    lines = match.group(1).splitlines()
+    index = 0
+    while index < len(lines):
+        field = re.match(r"^(\s*)(name|description)\s*:\s*(.*)$", lines[index])
         if not field:
+            index += 1
             continue
-        value = field.group(2).strip().strip("'\"")
-        if field.group(1) == "name" and value:
+        key = field.group(2)
+        raw_value = field.group(3).strip()
+        if key == "description" and re.fullmatch(r"\|[+-]?", raw_value):
+            block, index = _literal_block(
+                lines, index + 1, len(field.group(1)), raw_value[-1:]
+            )
+            description = block
+            continue
+
+        value = raw_value.strip("'\"")
+        if key == "name" and value:
             name = value
-        elif field.group(1) == "description":
+        elif key == "description":
             description = value
+        index += 1
     return name, description
+
+
+def _literal_block(
+    lines: list[str], start: int, parent_indent: int, chomping: str
+) -> tuple[str, int]:
+    """Read a YAML literal block scalar and return its value and next line."""
+    end = start
+    while end < len(lines):
+        line = lines[end]
+        indent = len(line) - len(line.lstrip())
+        if line.strip() and indent <= parent_indent:
+            break
+        end += 1
+
+    raw_block = lines[start:end]
+    content_indents = [
+        len(line) - len(line.lstrip()) for line in raw_block if line.strip()
+    ]
+    content_indent = min(content_indents, default=parent_indent + 1)
+    value = "\n".join(
+        line[content_indent:] if line.strip() else "" for line in raw_block
+    )
+    if chomping == "-":
+        return value.rstrip("\n"), end
+    if chomping == "+":
+        return f"{value}\n", end
+    return f"{value.rstrip(chr(10))}\n", end
 
 
 def _format_skills_xml(skills: list[dict]) -> str:
