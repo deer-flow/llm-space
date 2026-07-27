@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
+import type { ManagedProcess } from "./process-utils";
 import { currentDesktopVersion } from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
+import { startSshRemoteRuntime } from "./ssh-remote-runtime";
 
 let scenario:
   | "missing-runtime-binary"
@@ -16,25 +18,33 @@ let stopCalls = 0;
 let diagnosticCalls = 0;
 let remoteExecCalls: string[] = [];
 
-await mock.module("./port", () => ({
-  findFreePort: () => Promise.resolve(40000),
-}));
+const CONFIG: SshRemoteRuntimeConfig = {
+  id: "remote:test",
+  name: "test",
+  host: "host",
+  extraArgs: [],
+  remoteRepo: "",
+  remoteInstallDir: "~/.llm-space/remote-runtime",
+  remoteHome: "~/.llm-space-server",
+  remoteServerPort: 39123,
+  makeDefault: false,
+};
 
-await mock.module("./remote-server-installer", () => ({
-  RemoteServerInstallError: class RemoteServerInstallError extends Error {
-    readonly stage = "server-install";
-  },
+const TEST_DEPENDENCIES = {
+  findFreePort: () => Promise.resolve(40000),
   installRemoteServerPackage: () => {
     installCalls += 1;
     return Promise.resolve({
       entrypoint: `/opt/runtime/versions/test-${installCalls}/bin/llm-space-server`,
       version: "test",
-      platform: { os: "linux", arch: "x64" },
+      platform: { os: "linux" as const, arch: "x64" as const },
     });
   },
-}));
-
-await mock.module("./remote-exec", () => ({
+  getOrDownloadServerPackage: () =>
+    Promise.resolve({
+      path: "/tmp/llm-space-server-test.tar.gz",
+    }),
+  uploadRemoteFile: () => Promise.resolve(),
   execRemoteCommand: (_config: SshRemoteRuntimeConfig, command: string) => {
     remoteExecCalls.push(command);
     if (command.includes("PIDS")) {
@@ -56,9 +66,6 @@ await mock.module("./remote-exec", () => ({
       stderr: "",
     });
   },
-}));
-
-await mock.module("./process-utils", () => ({
   spawnManagedProcess: (label: string) => {
     const attempt = installCalls;
     if (label === "remote server") {
@@ -96,22 +103,8 @@ await mock.module("./process-utils", () => ({
         stopCalls += 1;
         return Promise.resolve();
       },
-    };
+    } as unknown as ManagedProcess;
   },
-}));
-
-const { startSshRemoteRuntime } = await import("./ssh-remote-runtime");
-
-const CONFIG: SshRemoteRuntimeConfig = {
-  id: "remote:test",
-  name: "test",
-  host: "host",
-  extraArgs: [],
-  remoteRepo: "",
-  remoteInstallDir: "~/.llm-space/remote-runtime",
-  remoteHome: "~/.llm-space-server",
-  remoteServerPort: 39123,
-  makeDefault: false,
 };
 
 beforeEach(() => {
@@ -125,7 +118,7 @@ beforeEach(() => {
 
 describe("startSshRemoteRuntime", () => {
   test("does not reinstall when the runtime binary is missing", async () => {
-    await startSshRemoteRuntime(CONFIG).then(
+    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -148,7 +141,7 @@ describe("startSshRemoteRuntime", () => {
   test("does not reinstall for non-runtime startup failures", async () => {
     scenario = "non-runtime-failure";
 
-    await startSshRemoteRuntime(CONFIG).then(
+    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -168,7 +161,9 @@ describe("startSshRemoteRuntime", () => {
     scenario = "port-in-use";
 
     await _withFetch(async () => {
-      const handle = await startSshRemoteRuntime(CONFIG);
+      const handle = await startSshRemoteRuntime(CONFIG, {
+        dependencies: TEST_DEPENDENCIES,
+      });
       await handle.stop();
     });
 
@@ -186,7 +181,7 @@ describe("startSshRemoteRuntime", () => {
   test("does not stop unknown remote port owners", async () => {
     scenario = "port-in-use-unknown-owner";
 
-    await startSshRemoteRuntime(CONFIG).then(
+    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -209,7 +204,7 @@ describe("startSshRemoteRuntime", () => {
   test("retries remote port recovery only once", async () => {
     scenario = "port-in-use-retry-fails";
 
-    await startSshRemoteRuntime(CONFIG).then(
+    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
       () => {
         throw new Error("connect should fail");
       },
