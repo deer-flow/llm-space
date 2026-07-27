@@ -51,24 +51,46 @@ export interface SshRemoteRuntimeProgress {
 
 export interface SshRemoteRuntimeOptions {
   onProgress?: (progress: SshRemoteRuntimeProgress) => void;
+  /** @internal Test seam. Production callers should use the default deps. */
+  dependencies?: Partial<SshRemoteRuntimeDependencies>;
 }
+
+interface SshRemoteRuntimeDependencies {
+  findFreePort: typeof findFreePort;
+  installRemoteServerPackage: typeof installRemoteServerPackage;
+  getOrDownloadServerPackage: typeof getOrDownloadServerPackage;
+  uploadRemoteFile: typeof uploadRemoteFile;
+  spawnManagedProcess: typeof spawnManagedProcess;
+  execRemoteCommand: typeof execRemoteCommand;
+}
+
+const DEFAULT_DEPENDENCIES: SshRemoteRuntimeDependencies = {
+  findFreePort,
+  installRemoteServerPackage,
+  getOrDownloadServerPackage,
+  uploadRemoteFile,
+  spawnManagedProcess,
+  execRemoteCommand,
+};
 
 export async function startSshRemoteRuntime(
   config: SshRemoteRuntimeConfig,
   options: SshRemoteRuntimeOptions = {}
 ): Promise<SshRemoteRuntimeHandle> {
   const token = _generateToken();
-  const localPort = config.localPort ?? (await findFreePort());
+  const dependencies = { ...DEFAULT_DEPENDENCIES, ...options.dependencies };
+  const localPort = config.localPort ?? (await dependencies.findFreePort());
   const allProcesses: ManagedProcess[] = [];
 
   try {
-    const install = await _installRemoteServer(config, options);
+    const install = await _installRemoteServer(config, options, dependencies);
     const started = await _startInstalledRuntime({
       config,
       install,
       token,
       localPort,
       options,
+      dependencies,
     });
     allProcesses.push(...started.processes);
     return _handle(started.client, allProcesses);
@@ -80,10 +102,11 @@ export async function startSshRemoteRuntime(
 
 async function _installRemoteServer(
   config: SshRemoteRuntimeConfig,
-  options: SshRemoteRuntimeOptions
+  options: SshRemoteRuntimeOptions,
+  dependencies: SshRemoteRuntimeDependencies
 ): Promise<RemoteServerInstallResult> {
   try {
-    return await installRemoteServerPackage(config, undefined, {
+    return await dependencies.installRemoteServerPackage(config, undefined, {
       onProgress: options.onProgress,
       packageUploader: {
         upload: async ({
@@ -93,7 +116,7 @@ async function _installRemoteServer(
           checksumUrl,
           remoteArchivePath,
         }) => {
-          const localPackage = await getOrDownloadServerPackage({
+          const localPackage = await dependencies.getOrDownloadServerPackage({
             assetName,
             assetUrl,
             checksumUrl,
@@ -102,7 +125,7 @@ async function _installRemoteServer(
             stage: "server-install",
             message: "Uploading remote runtime package over SSH",
           });
-          await uploadRemoteFile({
+          await dependencies.uploadRemoteFile({
             config: sshConfig,
             localPath: localPackage.path,
             remotePath: remoteArchivePath,
@@ -132,6 +155,7 @@ async function _startInstalledRuntime(input: {
   token: string;
   localPort: number;
   options: SshRemoteRuntimeOptions;
+  dependencies: SshRemoteRuntimeDependencies;
 }): Promise<{ client: RemoteRuntimeClient; processes: ManagedProcess[] }> {
   let retriedPortRecovery = false;
   while (true) {
@@ -141,7 +165,12 @@ async function _startInstalledRuntime(input: {
       const portFailure = parseRemotePortInUseFailure(_errorMessage(error));
       if (portFailure && !retriedPortRecovery) {
         retriedPortRecovery = true;
-        await _recoverRemotePortInUse(input.config, input.options, portFailure.port);
+        await _recoverRemotePortInUse(
+          input.config,
+          input.options,
+          input.dependencies,
+          portFailure.port
+        );
         continue;
       }
       throw await _appendRemoteRuntimeDiagnostics(error, input);
@@ -155,6 +184,7 @@ async function _startInstalledRuntimeOnce(input: {
   token: string;
   localPort: number;
   options: SshRemoteRuntimeOptions;
+  dependencies: SshRemoteRuntimeDependencies;
 }): Promise<{ client: RemoteRuntimeClient; processes: ManagedProcess[] }> {
   const processes: ManagedProcess[] = [];
   try {
@@ -162,7 +192,7 @@ async function _startInstalledRuntimeOnce(input: {
       stage: "server-start",
       message: "Starting remote runtime",
     });
-    const serverProcess = spawnManagedProcess(
+    const serverProcess = input.dependencies.spawnManagedProcess(
       "remote server",
       "ssh",
       process.env.LLM_SPACE_REMOTE_SERVER_MODE === "source"
@@ -190,7 +220,7 @@ async function _startInstalledRuntimeOnce(input: {
       stage: "tunnel-start",
       message: "Opening SSH tunnel",
     });
-    const tunnelProcess = spawnManagedProcess(
+    const tunnelProcess = input.dependencies.spawnManagedProcess(
       "ssh tunnel",
       "ssh",
       buildTunnelArgs({ config: input.config, localPort: input.localPort })
@@ -219,6 +249,7 @@ async function _startInstalledRuntimeOnce(input: {
 async function _recoverRemotePortInUse(
   config: SshRemoteRuntimeConfig,
   options: SshRemoteRuntimeOptions,
+  dependencies: SshRemoteRuntimeDependencies,
   port: number
 ): Promise<void> {
   if (port !== config.remoteServerPort) {
@@ -230,7 +261,7 @@ async function _recoverRemotePortInUse(
     stage: "server-start",
     message: "Checking stale remote runtime port owner",
   });
-  const probe = await execRemoteCommand(
+  const probe = await dependencies.execRemoteCommand(
     config,
     buildRemotePortOwnerProbeCommand(config),
     10_000
@@ -252,7 +283,7 @@ async function _recoverRemotePortInUse(
     stage: "server-start",
     message: "Restarting stale remote runtime server",
   });
-  await execRemoteCommand(
+  await dependencies.execRemoteCommand(
     config,
     buildStopRemotePortOwnerCommand(owner.pid),
     10_000
@@ -264,6 +295,7 @@ async function _appendRemoteRuntimeDiagnostics(
   input: {
     config: SshRemoteRuntimeConfig;
     install: RemoteServerInstallResult;
+    dependencies: SshRemoteRuntimeDependencies;
   }
 ): Promise<Error> {
   const message = _errorMessage(error);
@@ -282,6 +314,7 @@ async function _appendRemoteRuntimeDiagnostics(
 async function _collectRemoteRuntimeDiagnostics(input: {
   config: SshRemoteRuntimeConfig;
   install: RemoteServerInstallResult;
+  dependencies: SshRemoteRuntimeDependencies;
 }): Promise<string> {
   const installDir = input.config.remoteInstallDir;
   const packageDir = joinRemotePath(installDir, "versions", input.install.version);
@@ -311,7 +344,11 @@ async function _collectRemoteRuntimeDiagnostics(input: {
     'ls -ld "$PWD/~" "$PWD/~/.llm-space" "$PWD/~/.llm-space/remote-runtime" 2>&1',
     "true",
   ].join("; ");
-  const result = await execRemoteCommand(input.config, command, 10_000);
+  const result = await input.dependencies.execRemoteCommand(
+    input.config,
+    command,
+    10_000
+  );
   return [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n");
 }
 

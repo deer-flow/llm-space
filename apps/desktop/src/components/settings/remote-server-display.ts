@@ -33,11 +33,31 @@ export function remoteConnectionDisabled(
   server: RemoteServerView,
   busy: boolean
 ): boolean {
+  return !canConnectRemoteServer(server, busy);
+}
+
+export function canConnectRemoteServer(
+  server: RemoteServerView,
+  busy: boolean
+): boolean {
   return (
-    busy ||
-    server.status === "connecting" ||
-    server.status === "trust-required"
+    !busy &&
+    (server.status === "disconnected" || server.status === "error")
   );
+}
+
+export function canEditRemoteServer(
+  server: RemoteServerView,
+  busy: boolean
+): boolean {
+  return _canMutateRemoteServerConfig(server, busy);
+}
+
+export function canRemoveRemoteServer(
+  server: RemoteServerView,
+  busy: boolean
+): boolean {
+  return _canMutateRemoteServerConfig(server, busy);
 }
 
 export function remoteConnectionFlow(
@@ -45,4 +65,14 @@ export function remoteConnectionFlow(
 ): RemoteConnectionStepView[] {
   if (server.status === "connected") return [];
   return server.steps ?? [];
+}
+
+function _canMutateRemoteServerConfig(
+  server: RemoteServerView,
+  busy: boolean
+): boolean {
+  return (
+    !busy &&
+    (server.status === "disconnected" || server.status === "error")
+  );
 }

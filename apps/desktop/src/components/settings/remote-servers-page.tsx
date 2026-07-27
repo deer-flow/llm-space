@@ -44,7 +44,12 @@ import type {
 } from "@/shared/remote-servers";
 import type { RuntimeId } from "@/shared/runtime";
 
-import { remoteConnectionFlow } from "./remote-server-display";
+import {
+  canConnectRemoteServer,
+  canEditRemoteServer,
+  canRemoveRemoteServer,
+  remoteConnectionFlow,
+} from "./remote-server-display";
 import { SettingsPage } from "./settings-page";
 
 interface FormState {
@@ -141,7 +146,11 @@ export function RemoteServersPage({
   const run = async (
     id: string,
     action: (id: string) => Promise<RemoteServerView[]>,
-    options: { closeOnConnected?: boolean; notifyDisconnected?: boolean } = {}
+    options: {
+      closeOnConnected?: boolean;
+      notifyDisconnected?: boolean;
+      selectFallback?: boolean;
+    } = {}
   ) => {
     setBusyId(id);
     try {
@@ -150,7 +159,11 @@ export function RemoteServersPage({
       )?.runtimeId;
       const next = await action(id);
       updateServers(next);
-      setSelectedId(id);
+      setSelectedId(
+        options.selectFallback && !next.some((server) => server.id === id)
+          ? (next[0]?.id ?? null)
+          : id
+      );
       if (options.closeOnConnected) {
         const connected = next.find((server) => server.id === id);
         if (connected?.status === "connected") onConnected?.(connected.runtimeId);
@@ -332,7 +345,7 @@ export function RemoteServersPage({
               onEdit={() => startEdit(selected)}
               onRemove={() =>
                 void run(selected.id, removeRemoteServer, {
-                  notifyDisconnected: true,
+                  selectFallback: true,
                 })
               }
               onTrustHostKey={(request) => void trustHostKey(selected, request)}
@@ -404,11 +417,7 @@ function RemoteServerDetails({
         ) : (
           <Button
             size="sm"
-            disabled={
-              busy ||
-              server.status === "connecting" ||
-              server.status === "trust-required"
-            }
+            disabled={!canConnectRemoteServer(server, busy)}
             onClick={onConnect}
           >
             {server.status === "connecting" ? (
@@ -420,12 +429,17 @@ function RemoteServerDetails({
         <Button
           size="sm"
           variant="secondary"
-          disabled={server.status === "connected"}
+          disabled={!canEditRemoteServer(server, busy)}
           onClick={onEdit}
         >
           Edit
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onRemove}>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!canRemoveRemoteServer(server, busy)}
+          onClick={onRemove}
+        >
           <Trash2 className="size-4" />
           Remove
         </Button>

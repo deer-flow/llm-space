@@ -6,6 +6,9 @@ import type {
 } from "@/shared/remote-servers";
 
 import {
+  canConnectRemoteServer,
+  canEditRemoteServer,
+  canRemoveRemoteServer,
   remoteConnectionChecked,
   remoteConnectionDisabled,
   remoteConnectionFlow,
@@ -79,6 +82,34 @@ describe("remote server display helpers", () => {
     expect(remoteConnectionDisabled(server({ status: "error" }), false)).toBe(
       false
     );
+  });
+
+  test("allows actions only for stable disconnected states", () => {
+    const cases: [
+      RemoteServerView["status"],
+      { connect: boolean; edit: boolean; remove: boolean },
+    ][] = [
+      ["connected", { connect: false, edit: false, remove: false }],
+      ["connecting", { connect: false, edit: false, remove: false }],
+      ["trust-required", { connect: false, edit: false, remove: false }],
+      ["disconnected", { connect: true, edit: true, remove: true }],
+      ["error", { connect: true, edit: true, remove: true }],
+    ];
+
+    for (const [status, expected] of cases) {
+      const view = server({ status });
+      expect(canConnectRemoteServer(view, false)).toBe(expected.connect);
+      expect(canEditRemoteServer(view, false)).toBe(expected.edit);
+      expect(canRemoveRemoteServer(view, false)).toBe(expected.remove);
+    }
+  });
+
+  test("disables server actions while the selected server is busy", () => {
+    const view = server({ status: "disconnected" });
+
+    expect(canConnectRemoteServer(view, true)).toBe(false);
+    expect(canEditRemoteServer(view, true)).toBe(false);
+    expect(canRemoveRemoteServer(view, true)).toBe(false);
   });
 
   test("exposes connection flow steps from the server view", () => {

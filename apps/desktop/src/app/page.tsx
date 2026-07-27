@@ -771,8 +771,6 @@ function PageWorkspace({
             discardRuntimeWorkspace(runtimeId);
             if (workspaceRuntimeIdRef.current === runtimeId) {
               transitionWorkspaceRuntime("local");
-            } else if (runtimeId.startsWith("remote:")) {
-              setSettingsOpen(false);
             }
           }}
         />
