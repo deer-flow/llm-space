@@ -4,6 +4,35 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-07-27
+
+Run LLM Space agents and manage their workspaces on remote machines over SSH,
+while keeping the desktop experience local.
+
+### Added
+
+- **SSH remote runtimes.** Connect to a remote server from Settings, install and
+  start the matching headless LLM Space runtime, and work with remote threads,
+  files, models, tools, skills, traces, and generated projects from the desktop
+  app.
+- Remote runtime status, host-key verification, connection progress, package
+  transfer fallback, stale-process recovery, and runtime-scoped tabs keep
+  remote sessions visible and isolated.
+- Release builds now publish signed remote runtime server artifacts alongside
+  the desktop installers.
+
+### Changed
+
+- Shared runtime services now live in a reusable `@llm-space/runtime` package,
+  used by both the desktop app and the new headless server.
+- Shared threads preserve a resolvable model configuration so viewers can use
+  the saved model when available and fall back predictably when it is not.
+
+### Fixed
+
+- Skill discovery and reading now support multiline YAML literal descriptions;
+  generated Python agents preserve the same frontmatter behavior.
+
 ## [4.4.5] - 2026-07-24
 
 Response performance is now visible at a glance, with safer filesystem actions
