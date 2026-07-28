@@ -4,6 +4,19 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.1] - 2026-07-28
+
+A patch release that makes remote server configuration changes safer and more
+predictable.
+
+### Fixed
+
+- Connected servers and servers waiting for host-key trust can no longer be
+  edited or removed until they are disconnected, preventing an active remote
+  workspace from being torn down unexpectedly.
+- Removing a disconnected or failed server now updates connection state and
+  selects an available fallback server cleanly.
+
 ## [4.6.0] - 2026-07-27
 
 Run LLM Space agents and manage their workspaces on remote machines over SSH,
