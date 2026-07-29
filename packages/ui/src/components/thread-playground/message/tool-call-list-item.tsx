@@ -67,6 +67,7 @@ function _ToolCallListItem({
   const executable = tool !== undefined && isExecutableTool(tool);
   const [calling, setCalling] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [argsPreviewOpen, setArgsPreviewOpen] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
   const isError = toolCall.output?.isError ?? false;
   const handleOutputChange = useCallback(
@@ -137,6 +138,16 @@ function _ToolCallListItem({
       <div className="relative flex min-w-0 items-start">
         <ToolCallInputView input={toolCall.input} />
         <div className="absolute top-0 right-0 flex items-center">
+          <Tooltip content="Preview arguments">
+            <Button
+              className="invisible shrink-0 group-hover/message:visible"
+              size="icon"
+              variant="secondary"
+              onClick={() => setArgsPreviewOpen(true)}
+            >
+              <EyeIcon className="size-3" />
+            </Button>
+          </Tooltip>
           <Tooltip content="Copy arguments">
             <Button
               className="invisible shrink-0 group-hover/message:visible"
@@ -200,6 +211,13 @@ function _ToolCallListItem({
             </div>
           )}
         </div>
+        <PreviewDialog
+          open={argsPreviewOpen}
+          title={`Arguments of ${toolCall.input.name}()`}
+          type="json"
+          value={formatJson(toolCall.input.arguments)}
+          onOpenChange={setArgsPreviewOpen}
+        />
         <PreviewDialog
           open={previewOpen}
           title={`Response of ${toolCall.input.name}()`}

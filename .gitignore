@@ -3,6 +3,7 @@ node_modules
 
 # local home for testing
 .llm-space
+.omc
 
 # output
 out
