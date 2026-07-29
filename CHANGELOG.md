@@ -4,6 +4,16 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.2] - 2026-07-29
+
+A small quality-of-life release for inspecting tool calls.
+
+### Added
+
+- A preview button on tool call items opens all tool call arguments as
+  formatted JSON in a single view, alongside the existing "Copy arguments"
+  action.
+
 ## [4.6.1] - 2026-07-28
 
 A patch release that makes remote server configuration changes safer and more
