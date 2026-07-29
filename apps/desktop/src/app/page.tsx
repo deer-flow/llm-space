@@ -32,6 +32,7 @@ import {
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
+import { createFileSystemClient } from "@/client";
 import { getDefaultRuntime, listRuntimes } from "@/client/remote-servers";
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
@@ -583,6 +584,19 @@ function PageWorkspace({
       executeCommand({ type: "shareThread", args: { path, runtimeId } }),
     [executeCommand]
   );
+  // Copy the thread file to the OS clipboard as a file reference. The bun-side
+  // command takes an absolute path, so resolve the tab's path first.
+  const handleCopyFile = useCallback(
+    async (path: string, runtimeId: RuntimeId) => {
+      try {
+        const absolute = await createFileSystemClient(runtimeId).realpath(path);
+        executeCommand({ type: "copyFile", args: { path: absolute } });
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    },
+    [executeCommand]
+  );
   const handleNewFile = useCallback(
     () =>
       executeCommand({
@@ -743,6 +757,7 @@ function PageWorkspace({
                 reveal={handleRevealFile}
                 moveToTrash={handleMoveToTrash}
                 share={handleShareThread}
+                copyFile={handleCopyFile}
                 reorder={reorderVisibleTabs}
                 onNewFile={handleNewFile}
                 onMove={tabs.handleMove}

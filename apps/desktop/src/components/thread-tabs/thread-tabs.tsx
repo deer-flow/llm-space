@@ -12,7 +12,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@llm-space/ui/ui/context-menu";
-import { Kbd, KbdGroup } from "@llm-space/ui/ui/kbd";
 import { Tabs } from "@sinm/react-chrome-tabs";
 import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
 import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
@@ -70,6 +69,7 @@ interface ThreadTabsProps {
   reveal: (path: string, runtimeId: RuntimeId) => void;
   moveToTrash: (path: string, runtimeId: RuntimeId) => void;
   share: (path: string, runtimeId: RuntimeId) => void;
+  copyFile: (path: string, runtimeId: RuntimeId) => void;
   reorder: (from: number, to: number) => void;
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
@@ -100,6 +100,7 @@ export function ThreadTabs({
   reveal,
   moveToTrash,
   share,
+  copyFile,
   reorder,
   onNewFile,
   onMove,
@@ -253,16 +254,7 @@ export function ThreadTabs({
                     : "w-23 pl-18"
               )}
             >
-              <Tooltip
-                content={
-                  <>
-                    {sidebarOpen ? "Hide sidebar" : "Show sidebar"}{" "}
-                    <KbdGroup>
-                      <Kbd className="text-foreground!">⌘ B</Kbd>
-                    </KbdGroup>
-                  </>
-                }
-              >
+              <Tooltip content={sidebarOpen ? "Hide sidebar" : "Show sidebar"}>
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -333,6 +325,13 @@ export function ThreadTabs({
             {contextMenuTab?.type === "thread" && (
               <>
                 <ContextMenuSeparator />
+                <ContextMenuItem
+                  onSelect={() =>
+                    copyFile(contextMenuTab.path, contextMenuTab.runtimeId)
+                  }
+                >
+                  Copy file
+                </ContextMenuItem>
                 <ContextMenuGroup>
                   <ContextMenuItem
                     onSelect={() =>

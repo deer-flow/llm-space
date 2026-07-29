@@ -39,7 +39,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
-import { Kbd, KbdGroup } from "@llm-space/ui/ui/kbd";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -355,9 +354,6 @@ function ThreadPlaygroundContent({
                       {status === "running"
                         ? "Stop running"
                         : "Run this thread"}
-                      <KbdGroup>
-                        <Kbd className="text-foreground!">⌘ Enter</Kbd>
-                      </KbdGroup>
                     </div>
                   }
                 >
