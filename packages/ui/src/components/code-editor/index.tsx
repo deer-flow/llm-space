@@ -179,9 +179,12 @@ const PlainTextCodeEditor = forwardRef<
     [commit, insertText]
   );
 
-  const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
-    draftRef.current = event.currentTarget.value;
-  }, []);
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      draftRef.current = event.currentTarget.value;
+    },
+    []
+  );
 
   return (
     <div
@@ -213,7 +216,7 @@ const PlainTextCodeEditor = forwardRef<
           focusedRef.current = true;
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && event.metaKey) {
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
             commit();
           }
           onKeyDown?.(event);
