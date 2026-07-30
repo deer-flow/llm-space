@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { env } from "node:process";
 
@@ -22,6 +21,7 @@ import {
   BUILTIN_PROVIDERS,
 } from "./providers/builtin-providers";
 import { createCustomProvider } from "./providers/custom-provider";
+import { getCodexCredentials } from "./providers/openai-codex";
 import {
   DEFAULT_CUSTOM_PROVIDER_API,
   type CustomModelConfig,
@@ -666,18 +666,6 @@ export class ModelManager {
   }
 
   private _getCodexApiKey(): string | undefined {
-    const authPath = path.join(os.homedir(), ".codex", "auth.json");
-    if (!existsSync(authPath)) {
-      return undefined;
-    }
-    try {
-      const parsed = JSON.parse(readFileSync(authPath, "utf8")) as {
-        tokens?: { access_token?: unknown };
-      };
-      const accessToken = parsed?.tokens?.access_token;
-      return typeof accessToken === "string" ? accessToken : undefined;
-    } catch {
-      return undefined;
-    }
+    return getCodexCredentials()?.apiKey;
   }
 }
