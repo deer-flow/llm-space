@@ -5,5 +5,5 @@
     "lib": ["ESNext", "DOM"],
     "noUncheckedIndexedAccess": false
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

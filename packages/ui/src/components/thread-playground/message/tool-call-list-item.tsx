@@ -19,7 +19,10 @@ import {
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { CodeEditor, type CodeEditorProps } from "@llm-space/ui/components/code-editor";
+import {
+  CodeEditor,
+  type CodeEditorProps,
+} from "@llm-space/ui/components/code-editor";
 import { openFirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
 import { PreviewDialog } from "@llm-space/ui/components/preview-dialog-lazy";
 import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
@@ -94,7 +97,7 @@ function _ToolCallListItem({
   ]);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         e.stopPropagation();
         if (canContinue) {

@@ -12,8 +12,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
+import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 
-import { useThreadStore, useThreadStoreActions } from "../stores";
+import {
+  type RunValidationIssue,
+  useThreadStore,
+  useThreadStoreActions,
+} from "../stores";
 
 import {
   ImageDisplayProvider,
@@ -39,8 +44,10 @@ export function MessageListView({
   const status = useThreadStore((s) => s.status);
   const collapsedMessageIds = useThreadStore((s) => s.collapsedMessageIds);
   const autoFocusMessageId = useThreadStore((s) => s.autoFocusMessageId);
+  const runValidationIssue = useThreadStore((s) => s.runValidationIssue);
   const storeMessages = useThreadStore((s) => s.thread.context?.messages);
-  const { appendMessage, moveMessage } = useThreadStoreActions();
+  const { appendMessage, moveMessage, resolveRunValidationIssue } =
+    useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
   const messages = useMemo(
     () => messagesFromProps ?? storeMessages ?? [],
@@ -49,6 +56,8 @@ export function MessageListView({
   const readonly = useMemo(() => {
     return readonlyFromProps || dragging || isSnapshotView;
   }, [dragging, isSnapshotView, readonlyFromProps]);
+  const addMessageSuggested =
+    runValidationIssue?.resolution?.type === "appendUserMessage";
 
   // Number every image attachment sequentially across the thread so the compact
   // placeholder can label it `[Image #N]`.
@@ -104,51 +113,71 @@ export function MessageListView({
   return (
     <ScrollArea type="auto" className={cn("size-full", className)}>
       <ImageDisplayProvider value={imageDisplay}>
-      <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
-        {isSnapshotView ? (
-          <StaticMessageList
-            context={contextFromProps}
-            messages={messages}
-            readonly={readonly}
-          />
-        ) : (
-          <DragDropContext
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <Droppable droppableId="message-list">
-              {(droppableProvided) => (
-                <DroppableMessageList
-                  droppableProvided={droppableProvided}
-                  messages={messages}
-                  readonly={readonly}
-                  autoFocusMessageId={autoFocusMessageId}
-                  collapsedMessageIds={collapsedMessageIds}
-                />
-              )}
-            </Droppable>
-          </DragDropContext>
-        )}
-        {!isSnapshotView && (
-          <StreamingMessageListItem streaming={status === "running"} />
-        )}
-        <Button
-          // No top margin: the preceding message / streaming item (or, in the
-          // empty state, the list's own top padding) already provides the gap.
-          className={cn(
-            "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5",
-            dragging && "invisible",
-            readonly && "hidden"
+        <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
+          {isSnapshotView ? (
+            <StaticMessageList
+              context={contextFromProps}
+              messages={messages}
+              readonly={readonly}
+            />
+          ) : (
+            <DragDropContext
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <Droppable droppableId="message-list">
+                {(droppableProvided) => (
+                  <DroppableMessageList
+                    droppableProvided={droppableProvided}
+                    messages={messages}
+                    readonly={readonly}
+                    autoFocusMessageId={autoFocusMessageId}
+                    collapsedMessageIds={collapsedMessageIds}
+                    runValidationIssue={runValidationIssue}
+                  />
+                )}
+              </Droppable>
+            </DragDropContext>
           )}
-          disabled={readonly}
-          variant="secondary"
-          size="lg"
-          onClick={appendMessage}
-        >
-          <PlusIcon className="size-4" />
-          Add message
-        </Button>
-      </div>
+          {!isSnapshotView && (
+            <StreamingMessageListItem streaming={status === "running"} />
+          )}
+          <div className="relative rounded-lg">
+            <Button
+              // No top margin: the preceding message / streaming item (or, in the
+              // empty state, the list's own top padding) already provides the gap.
+              className={cn(
+                "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5",
+                dragging && "invisible",
+                readonly && "hidden"
+              )}
+              disabled={readonly}
+              variant="secondary"
+              size="lg"
+              onClick={
+                addMessageSuggested ? resolveRunValidationIssue : appendMessage
+              }
+            >
+              <PlusIcon className="size-4" />
+              Add message
+            </Button>
+            {addMessageSuggested && !dragging && !readonly ? (
+              <>
+                <ShineBorder
+                  borderWidth={1}
+                  duration={14}
+                  shineColor="var(--primary)"
+                />
+                <ShineBorder
+                  borderWidth={1}
+                  duration={14}
+                  shineColor="var(--primary)"
+                  style={{ animationDelay: "-7s" }}
+                />
+              </>
+            ) : null}
+          </div>
+        </div>
       </ImageDisplayProvider>
     </ScrollArea>
   );
@@ -184,12 +213,14 @@ function DroppableMessageList({
   readonly,
   autoFocusMessageId,
   collapsedMessageIds,
+  runValidationIssue,
 }: {
   droppableProvided: DroppableProvided;
   messages: Message[];
   readonly: boolean;
   autoFocusMessageId: string | null;
   collapsedMessageIds: string[];
+  runValidationIssue: RunValidationIssue | null;
 }) {
   return (
     <div
@@ -205,6 +236,11 @@ function DroppableMessageList({
           readonly={readonly}
           autoFocus={message.id === autoFocusMessageId}
           collapsed={collapsedMessageIds.includes(message.id)}
+          runValidationIssue={
+            message.id === runValidationIssue?.messageId
+              ? runValidationIssue
+              : null
+          }
         />
       ))}
       {droppableProvided.placeholder}
@@ -226,12 +262,14 @@ const _DraggableMessageRow = function DraggableMessageRow({
   readonly,
   autoFocus,
   collapsed,
+  runValidationIssue,
 }: {
   message: Message;
   index: number;
   readonly: boolean;
   autoFocus: boolean;
   collapsed: boolean;
+  runValidationIssue: RunValidationIssue | null;
 }) {
   return (
     <Draggable draggableId={message.id} index={index} isDragDisabled={readonly}>
@@ -253,6 +291,7 @@ const _DraggableMessageRow = function DraggableMessageRow({
               readonly={readonly}
               autoFocus={autoFocus}
               collapsed={collapsed}
+              runValidationIssue={runValidationIssue}
               dragHandleProps={draggableProvided.dragHandleProps}
             />
           </div>

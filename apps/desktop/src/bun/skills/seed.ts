@@ -35,7 +35,3 @@ export function seedSkills(): void {
     writeFileSync(path.join(dir, "SKILL.md"), content, "utf8");
   }
 }
-
-// Run on import so the managed skills folder exists before the SkillsManager
-// (and the Skill tool) read it.
-seedSkills();

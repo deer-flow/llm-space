@@ -4,11 +4,9 @@ import {
   getMessageText,
   isDangerousBashCommand,
   isExecutableTool,
-  isRunnableConversation,
   Message,
   normalizeThread,
   reduceMessages,
-  RUN_LAST_MESSAGE_ERROR,
   streamThread,
   Tool as ToolSchema,
   uuid,
@@ -69,6 +67,8 @@ import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 
 import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
 
+import { getRunValidationIssue } from "./run-validation";
+import type { RunValidationIssue } from "./run-validation-issue";
 import {
   createInitialHistory,
   recordSnapshot,
@@ -103,6 +103,7 @@ export interface ThreadState {
   abortController: AbortController | null;
   activeRunId: string | null;
   collapsedMessageIds: string[];
+  runValidationIssue: RunValidationIssue | null;
   /**
    * Id of the message whose editor should grab focus on mount — set only by
    * append/insert. Every other editor mounts with autoFocus off so opening a
@@ -119,6 +120,7 @@ export interface ThreadState {
   evaluationRubrics: EvaluationRubricRecord[];
 
   run(fromMessageId?: string): Promise<void>;
+  resolveRunValidationIssue(): void;
   undo(): void;
   redo(): void;
   restoreThread(thread: Thread): void;
@@ -338,8 +340,23 @@ export function createThreadStore(
         });
       };
 
+      const reconcileRunValidationIssue = (messages: Message[]) => {
+        const current = get().runValidationIssue;
+        if (!current) {
+          return;
+        }
+        const next = getRunValidationIssue(messages);
+        if (
+          next?.messageId !== current.messageId ||
+          next?.code !== current.code
+        ) {
+          set({ runValidationIssue: null });
+        }
+      };
+
       const setMessages = (messages: Message[]) => {
         patchContext({ messages });
+        reconcileRunValidationIssue(messages);
       };
 
       /** Replace the messages array; skips the update if nothing changed. */
@@ -512,6 +529,7 @@ export function createThreadStore(
         abortController: null,
         activeRunId: null,
         collapsedMessageIds: [],
+        runValidationIssue: null,
         autoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
         runHistory: initialRunHistory,
@@ -523,6 +541,12 @@ export function createThreadStore(
           updateMessages((messages) => [...messages, message]);
           set({ autoFocusMessageId: message.id });
           return message.id;
+        },
+        resolveRunValidationIssue() {
+          const resolution = get().runValidationIssue?.resolution;
+          if (resolution?.type === "appendUserMessage") {
+            get().appendMessage();
+          }
         },
         insertMessageBefore(beforeMessageId: string) {
           const messages = get().thread.context?.messages ?? [];
@@ -931,10 +955,12 @@ export function createThreadStore(
               truncated = true;
             }
           }
-          if (!isRunnableConversation(messages)) {
-            toast.error("Error", { description: RUN_LAST_MESSAGE_ERROR });
+          const runValidationIssue = getRunValidationIssue(messages);
+          if (runValidationIssue) {
+            set({ runValidationIssue });
             return;
           }
+          set({ runValidationIssue: null });
           let promptSnapshot: ThreadContext["snapshot"] =
             get().thread.context?.snapshot;
           let preparedContext: ThreadContext | null = null;
@@ -1124,10 +1150,7 @@ export function createThreadStore(
                   return "aborted";
                 }
                 const receivedAt = now();
-                if (
-                  firstTokenAt === null &&
-                  _isNonEmptyAssistantDelta(chunk)
-                ) {
+                if (firstTokenAt === null && _isNonEmptyAssistantDelta(chunk)) {
                   firstTokenAt = receivedAt;
                 }
                 sawEvent = true;
@@ -1261,6 +1284,7 @@ export function createThreadStore(
           });
           set({
             thread,
+            runValidationIssue: null,
             changeHistory: {
               ...result.history,
               snapshots: result.history.snapshots.map((snapshot, index) =>
@@ -1284,6 +1308,7 @@ export function createThreadStore(
           });
           set({
             thread,
+            runValidationIssue: null,
             changeHistory: {
               ...result.history,
               snapshots: result.history.snapshots.map((snapshot, index) =>
@@ -1307,6 +1332,7 @@ export function createThreadStore(
           // Replace the whole thread; recorded as a single undoable step.
           set({
             thread: next,
+            runValidationIssue: null,
             changeHistory: recordSnapshot(get().changeHistory, next),
           });
         },
@@ -1499,6 +1525,7 @@ export function useThreadStore<T>(selector: (s: ThreadState) => T): T {
 
 const selectActions = (s: ThreadState) => ({
   run: s.run,
+  resolveRunValidationIssue: s.resolveRunValidationIssue,
   abort: s.abort,
   undo: s.undo,
   redo: s.redo,

@@ -16,6 +16,3 @@ export function seedWorkspace(): void {
   }
   mkdirSync(workspace, { recursive: true });
 }
-
-// Run on import so the workspace is seeded before storage/RPC touch it.
-seedWorkspace();

@@ -11,8 +11,8 @@ import {
   createMessagePromptVariablePlaceKey,
   summarizeToolCalls,
 } from "@llm-space/core/thread";
-import { PlusIcon } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { CircleAlertIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
@@ -27,8 +27,11 @@ import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 import { Skeleton } from "@llm-space/ui/ui/skeleton";
 
-
-import { useThreadStore, useThreadStoreActions } from "../stores";
+import {
+  type RunValidationIssue,
+  useThreadStore,
+  useThreadStoreActions,
+} from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ImageContentList } from "./image-content-view";
@@ -43,6 +46,7 @@ function _MessageListItem({
   message,
   placeholder,
   readonly = false,
+  runValidationIssue = null,
   streaming,
   collapsed,
   autoFocus = false,
@@ -53,12 +57,14 @@ function _MessageListItem({
   message: Message;
   placeholder?: string;
   readonly?: boolean;
+  runValidationIssue?: RunValidationIssue | null;
   streaming?: boolean;
   collapsed?: boolean;
   /** Focus this message's editor on mount. Set only for a freshly-added message. */
   autoFocus?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const { fidelity } = useRenderingFidelity();
   const variableExtension = usePromptVariableExtensionForContext(
     createMessagePromptVariablePlaceKey(message.id),
@@ -149,21 +155,44 @@ function _MessageListItem({
   );
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && e.metaKey) {
+      if (
+        message.role === "user" &&
+        e.key === "Enter" &&
+        (e.metaKey || e.ctrlKey)
+      ) {
         void handleRun();
         e.preventDefault();
         e.stopPropagation();
       }
     },
-    [handleRun]
+    [handleRun, message.role]
   );
+  const validationErrorId = `message-${message.id}-run-error`;
+  useEffect(() => {
+    if (!runValidationIssue) {
+      return;
+    }
+    containerRef.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "nearest",
+    });
+  }, [runValidationIssue]);
   return (
     <div
+      aria-describedby={runValidationIssue ? validationErrorId : undefined}
+      aria-invalid={Boolean(runValidationIssue) || undefined}
       className={cn(
-        "hover:border-accent-foreground/20 focus-within:border-ring! group group/message relative flex size-full flex-col items-center rounded-lg border bg-(--textarea) transition-[padding-bottom,border-color]",
-        collapsed && "pb-2.5",
+        "hover:border-accent-foreground/20 focus-within:border-ring! group group/message relative flex size-full flex-col items-center rounded-lg border bg-(--textarea) transition-[padding-bottom,border-color,box-shadow]",
+        runValidationIssue?.level === "warning" &&
+          "border-amber-400/30! focus-within:border-amber-400/40! hover:border-amber-400/40!",
+        runValidationIssue?.level === "error" &&
+          "border-destructive/40! hover:border-destructive/50! focus-within:border-destructive/50!",
+        collapsed && !runValidationIssue && "pb-2.5",
         className
       )}
+      ref={containerRef}
     >
       <div
         className={cn(
@@ -261,6 +290,26 @@ function _MessageListItem({
             )}
         </main>
       </CollapsibleContent>
+      {runValidationIssue ? (
+        <div
+          className={cn(
+            "text-foreground/75 mx-2 mb-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2.5 py-1.5 text-xs motion-safe:transition-[margin-top] motion-safe:duration-200 motion-safe:ease-in-out",
+            collapsed && "mt-2",
+            runValidationIssue.level === "warning"
+              ? "bg-amber-400/8"
+              : "bg-destructive/8"
+          )}
+          id={validationErrorId}
+          role="alert"
+        >
+          {runValidationIssue.level === "warning" ? (
+            <TriangleAlertIcon className="size-3.5 shrink-0 text-amber-400/80" />
+          ) : (
+            <CircleAlertIcon className="text-destructive/70 size-3.5 shrink-0" />
+          )}
+          <span className="min-w-0 grow">{runValidationIssue.message}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
