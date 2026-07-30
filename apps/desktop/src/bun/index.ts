@@ -1,17 +1,23 @@
-/* eslint-disable import-x/order -- load order is load-bearing: `./env/hydrate`
-   must resolve the real login-shell environment (API keys, PATH) before any
-   other module reads `process.env`. GUI launches don't inherit it. */
-import "./env/hydrate";
-// Attach the deep-link (`open-url`) listener at the earliest possible point so a
-// cold-start launch URL isn't dropped before the composition root is ready.
-import "./deep-link/launch";
-// Seed a fresh workspace (before `./app` pulls in storage/RPC).
-import "./workspace/seed";
-// Seed the managed skills folder (before `./app` pulls in the SkillsManager).
-import "./skills/seed";
-/* eslint-enable import-x/order */
+import { hydrateShellEnv } from "./env/hydrate";
 
-// Dynamic import is intentional: environment hydration and seeding must finish
-// before the composition root evaluates manager modules and reads configuration.
-const { startDesktopApp } = await import("./app");
-await startDesktopApp();
+/**
+ * Initialize process state before loading the desktop composition root.
+ */
+async function _bootstrapDesktopApp(): Promise<void> {
+  hydrateShellEnv();
+
+  // Attach the listener immediately after hydration so cold-start deep links
+  // are buffered before the longer bootstrap imports evaluate.
+  await import("./deep-link/launch");
+
+  const { seedWorkspace } = await import("./workspace/seed");
+  seedWorkspace();
+
+  const { seedSkills } = await import("./skills/seed");
+  seedSkills();
+
+  const { startDesktopApp } = await import("./app");
+  await startDesktopApp();
+}
+
+await _bootstrapDesktopApp();

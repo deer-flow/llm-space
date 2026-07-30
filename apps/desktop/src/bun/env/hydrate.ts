@@ -139,7 +139,3 @@ function _parseEnvBlock(
   }
   return env;
 }
-
-// Run on import so the environment is fixed before any other module reads
-// `process.env`. `bun/index.ts` imports this first for that reason.
-hydrateShellEnv();
