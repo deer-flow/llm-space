@@ -50,6 +50,7 @@ function _ToolCallListItem({
   canContinue,
   onContinue,
   readonly = false,
+  streaming,
 }: {
   context?: ThreadContext;
   messageId: string;
@@ -57,6 +58,7 @@ function _ToolCallListItem({
   canContinue: boolean;
   onContinue: () => void;
   readonly?: boolean;
+  streaming: boolean;
 }) {
   const { fidelity } = useRenderingFidelity();
   const { presentational } = useHostServices();
@@ -139,7 +141,10 @@ function _ToolCallListItem({
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <div className="relative flex min-w-0 items-start">
-        <ToolCallInputView input={toolCall.input} />
+        <ToolCallInputView
+          input={toolCall.input}
+          streaming={streaming && toolCall.output === undefined}
+        />
         <div className="absolute top-0 right-0 flex items-center">
           <Tooltip content="Preview arguments">
             <Button

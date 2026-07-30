@@ -17,7 +17,8 @@ import {
 } from "@llm-space/ui/ui/dropdown-menu";
 
 
-import { parseTodoWriteInput, TodoWriteView } from "./todo-write-view";
+import { parseTodoWriteInput } from "./todo-write-input";
+import { TodoWriteView } from "./todo-write-view";
 
 /**
  * Built-in `fs` tools whose `path` argument is an absolute on-disk path worth
@@ -88,10 +89,16 @@ function _linkKindFor(
   return undefined;
 }
 
-function _ToolCallInputView({ input }: { input: ToolCallInput }) {
-  const todos = parseTodoWriteInput(input);
-  if (todos) {
-    return <TodoWriteView todos={todos} input={input} />;
+function _ToolCallInputView({
+  input,
+  streaming,
+}: {
+  input: ToolCallInput;
+  streaming: boolean;
+}) {
+  const todos = parseTodoWriteInput(input, streaming);
+  if (todos !== null) {
+    return <TodoWriteView todos={todos} />;
   }
 
   const args = input.arguments as Record<string, unknown>;
