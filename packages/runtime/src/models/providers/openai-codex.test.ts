@@ -46,4 +46,22 @@ describe("openaiCodexProvider", () => {
       source: "Codex CLI API key",
     });
   });
+
+  test("prefers a per-run API-key override over CLI credentials", async () => {
+    const provider = openaiCodexProvider({
+      api: "openai-responses",
+      apiKey: "codex-cli-api-key",
+      baseUrl: "https://proxy.example.com",
+      mode: "apiKey",
+    });
+    const model = provider.getModels()[0];
+    const models = createModels();
+    models.setProvider(provider);
+
+    const auth = await models.getAuth(model, {
+      apiKey: "per-run-api-key",
+    });
+
+    expect(auth?.auth.apiKey).toBe("per-run-api-key");
+  });
 });

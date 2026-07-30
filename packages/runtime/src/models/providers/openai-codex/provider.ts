@@ -58,7 +58,14 @@ export function openaiCodexProvider(
 function _getCodexApiKeyAuth(credentials: CodexCredentials | null): ApiKeyAuth {
   return {
     name: "Codex CLI credentials",
-    resolve(): Promise<AuthResult | undefined> {
+    resolve({ credential }): Promise<AuthResult | undefined> {
+      if (credential?.key) {
+        return Promise.resolve({
+          auth: { apiKey: credential.key },
+          env: credential.env,
+          source: "stored credential",
+        });
+      }
       return Promise.resolve(
         credentials
           ? {
