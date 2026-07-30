@@ -278,6 +278,7 @@ function _MessageListItem({
                     canContinue={toolCallSummary?.canContinue ?? false}
                     onContinue={handleContinue}
                     readonly={readonly}
+                    streaming={streaming === true}
                     toolCall={toolCall}
                   />
                 ))}
