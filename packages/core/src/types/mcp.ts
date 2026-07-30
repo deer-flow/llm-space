@@ -1,3 +1,4 @@
+import type { ToolCallOutput } from "./messages";
 import type { JSONSchema } from "./shared";
 
 export type McpTransportType = "stdio" | "streamableHttp" | "sse";
@@ -105,7 +106,7 @@ export interface McpServerToolsResponse {
 }
 
 export interface McpCallToolResponse {
-  contentText: string;
+  content: ToolCallOutput["content"];
   isError?: boolean;
 }
 

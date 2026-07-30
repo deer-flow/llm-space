@@ -31,11 +31,18 @@ export function canRedo(history: ChangeHistory): boolean {
 function _imageContents(thread: Thread): { data: string }[] {
   const result: { data: string }[] = [];
   for (const message of thread.context?.messages ?? []) {
-    if (message.role !== "user") {
+    if (message.role === "assistant") {
+      for (const toolCall of message.toolCalls ?? []) {
+        for (const content of toolCall.output?.content ?? []) {
+          if (content.type === "image") {
+            result.push(content);
+          }
+        }
+      }
       continue;
     }
     for (const content of message.content) {
-      if (content.type === "image_data") {
+      if (content.type === "image") {
         result.push(content);
       }
     }

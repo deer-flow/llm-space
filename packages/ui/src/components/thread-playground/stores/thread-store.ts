@@ -26,6 +26,7 @@ import {
   type ThreadVariables,
   type Tool,
   type ToolCall,
+  type ToolCallOutput,
   type UserMessage,
 } from "@llm-space/core";
 import {
@@ -34,6 +35,8 @@ import {
   createToolResultPromptVariablePlaceKey,
   DEFAULT_VARIABLE_VARIANT_NAME,
   ensureThreadVariableState,
+  getToolCallOutputText,
+  getToolResultText,
   normalizeEvaluationRubrics,
   normalizeEvaluations,
   normalizePromptVariableState,
@@ -157,10 +160,18 @@ export interface ThreadState {
   updateMessageTextContent(id: string, text: string): void;
   addMessageImageContent(id: string, mimeType: string, data: string): void;
   removeMessageImageContent(id: string, contentIndex: number): void;
+  /** Replace editable tool-result text while retaining structured images. */
   updateToolCallOutputTextContent(
     messageId: string,
     toolCallId: string,
     text: string,
+    isError?: boolean
+  ): void;
+  /** Replace the complete model-facing output produced by a tool execution. */
+  updateToolCallOutputContent(
+    messageId: string,
+    toolCallId: string,
+    content: ToolCallOutput["content"],
     isError?: boolean
   ): void;
   addTool(tool: Tool): boolean;
@@ -202,14 +213,18 @@ export function createThreadStore(
      */
     getReactLoop?: () => boolean;
     /**
-     * Execute an MCP or built-in tool call, returning its textual result. Only
-     * used by the auto-run-tools path; manual tool runs go through the UI's own
-     * runner. Injected so the store stays decoupled from the RPC layer.
+     * Execute an MCP or built-in tool call, returning structured model-facing
+     * content. Only used by the auto-run-tools path; manual tool runs go through
+     * the UI's own runner. Injected so the store stays decoupled from the RPC
+     * layer.
      */
     executeTool?: (
       tool: McpTool | BuiltinTool,
       args: Record<string, unknown>
-    ) => Promise<{ contentText: string; isError: boolean }>;
+    ) => Promise<{
+      content: ToolCallOutput["content"];
+      isError: boolean;
+    }>;
     /**
      * Load the enabled local skills used when rendering prompt variables.
      * Injected so the store stays decoupled from the skills/RPC layer; defaults
@@ -391,6 +406,56 @@ export function createThreadStore(
         });
       };
 
+      /**
+       * Replace one tool result while preserving copy-on-write message updates
+       * and invalidating only the rendered text snapshot affected by the edit.
+       */
+      const setToolCallOutput = (
+        messageId: string,
+        toolCallId: string,
+        createOutput: (toolCall: ToolCall) => ToolCallOutput | undefined
+      ) => {
+        const context = get().thread.context ?? {};
+        const messages = context.messages ?? [];
+        let changed = false;
+        let textChanged = false;
+        const nextMessages = messages.map((message) => {
+          if (message.id !== messageId || message.role !== "assistant") {
+            return message;
+          }
+          let messageChanged = false;
+          const toolCalls = message.toolCalls?.map((toolCall) => {
+            if (toolCall.id !== toolCallId) {
+              return toolCall;
+            }
+            const output = createOutput(toolCall);
+            if (!output) {
+              return toolCall;
+            }
+            changed = true;
+            messageChanged = true;
+            textChanged ||=
+              getToolCallOutputText(toolCall) !==
+              getToolResultText(output.content);
+            return { ...toolCall, output };
+          });
+          return messageChanged ? { ...message, toolCalls } : message;
+        });
+        if (!changed) {
+          return;
+        }
+        patchContext({
+          messages: nextMessages,
+          ...(textChanged
+            ? {
+                snapshot: removePromptVariableSnapshotPlaces(context.snapshot, [
+                  createToolResultPromptVariablePlaceKey(messageId, toolCallId),
+                ]),
+              }
+            : {}),
+        });
+      };
+
       const createUserMessage = (): UserMessage => ({
         id: uuid(),
         role: "user",
@@ -412,8 +477,8 @@ export function createThreadStore(
 
       /** Keep image contents before any other content, preserving order. */
       const partitionImagesFirst = (content: UserMessage["content"]) => [
-        ...content.filter((c) => c.type === "image_data"),
-        ...content.filter((c) => c.type !== "image_data"),
+        ...content.filter((c) => c.type === "image"),
+        ...content.filter((c) => c.type !== "image"),
       ];
 
       const hasContent = (message: AssistantMessage): boolean =>
@@ -484,15 +549,23 @@ export function createThreadStore(
         const results = await Promise.all(
           executable.map(async ({ toolCall, tool }) => {
             try {
-              const { contentText, isError } = await execute(
+              const { content, isError } = await execute(
                 tool,
                 toolCall.input.arguments
               );
-              return { id: toolCall.id, text: contentText, isError };
+              return {
+                id: toolCall.id,
+                content,
+                isError,
+              };
             } catch (error) {
               const text =
                 error instanceof Error ? error.message : "Tool call failed";
-              return { id: toolCall.id, text, isError: true };
+              return {
+                id: toolCall.id,
+                content: [{ type: "text" as const, text }],
+                isError: true,
+              };
             }
           })
         );
@@ -509,7 +582,7 @@ export function createThreadStore(
             return {
               ...toolCall,
               output: {
-                content: [{ type: "text", text: result.text }],
+                content: result.content,
                 isError: result.isError,
               },
             };
@@ -790,7 +863,7 @@ export function createThreadStore(
               ...user,
               content: partitionImagesFirst([
                 ...user.content,
-                { type: "image_data", mimeType, data },
+                { type: "image", mimeType, data },
               ]),
             };
           });
@@ -800,7 +873,7 @@ export function createThreadStore(
           if (message?.role !== "user") {
             return;
           }
-          if (message.content[contentIndex]?.type !== "image_data") {
+          if (message.content[contentIndex]?.type !== "image") {
             return;
           }
           updateMessage(id, (m) => {
@@ -853,63 +926,36 @@ export function createThreadStore(
           });
         },
         updateToolCallOutputTextContent(messageId, toolCallId, text, isError) {
-          const context = get().thread.context ?? {};
-          const messages = context.messages ?? [];
-          let changed = false;
-          let textChanged = false;
-          const nextMessages = messages.map((message) => {
-            if (message.id !== messageId || message.role !== "assistant") {
-              return message;
+          setToolCallOutput(messageId, toolCallId, (toolCall) => {
+            const currentText = getToolCallOutputText(toolCall);
+            const nextIsError = isError ?? toolCall.output?.isError;
+            if (
+              currentText === text &&
+              toolCall.output?.isError === nextIsError
+            ) {
+              return undefined;
             }
-            let toolCallChanged = false;
-            const toolCalls = message.toolCalls?.map((toolCall) => {
-              if (toolCall.id !== toolCallId) {
-                return toolCall;
-              }
-              const currentText =
-                toolCall.output?.content.map((item) => item.text).join("\n") ??
-                "";
-              const nextIsError = isError ?? toolCall.output?.isError;
-              if (
-                currentText === text &&
-                toolCall.output?.isError === nextIsError
-              ) {
-                return toolCall;
-              }
-              toolCallChanged = true;
-              textChanged ||= currentText !== text;
-              return {
-                ...toolCall,
-                output: {
-                  content: [{ type: "text" as const, text }],
-                  isError: nextIsError,
-                },
-              };
-            });
-            if (!toolCallChanged) {
-              return message;
-            }
-            changed = true;
-            return { ...message, toolCalls };
+            return {
+              content: [
+                { type: "text", text },
+                ...(toolCall.output?.content.filter(
+                  (item) => item.type === "image"
+                ) ?? []),
+              ],
+              isError: nextIsError,
+            };
           });
-          if (!changed) {
-            return;
-          }
-          patchContext({
-            messages: nextMessages,
-            ...(textChanged
-              ? {
-                  snapshot: removePromptVariableSnapshotPlaces(
-                    context.snapshot,
-                    [
-                      createToolResultPromptVariablePlaceKey(
-                        messageId,
-                        toolCallId
-                      ),
-                    ]
-                  ),
-                }
-              : {}),
+        },
+        updateToolCallOutputContent(messageId, toolCallId, content, isError) {
+          setToolCallOutput(messageId, toolCallId, (toolCall) => {
+            const nextIsError = isError ?? toolCall.output?.isError;
+            if (
+              toolCall.output?.content === content &&
+              toolCall.output?.isError === nextIsError
+            ) {
+              return undefined;
+            }
+            return { content, isError: nextIsError };
           });
         },
         toggleMessageRole(id: string) {
@@ -1555,6 +1601,7 @@ const selectActions = (s: ThreadState) => ({
   updateMessageTextContent: s.updateMessageTextContent,
   addMessageImageContent: s.addMessageImageContent,
   removeMessageImageContent: s.removeMessageImageContent,
+  updateToolCallOutput: s.updateToolCallOutputContent,
   updateToolCallOutputText: s.updateToolCallOutputTextContent,
   addTool: s.addTool,
   updateTool: s.updateTool,

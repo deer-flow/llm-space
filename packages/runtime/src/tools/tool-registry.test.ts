@@ -34,7 +34,9 @@ describe("ToolRegistry", () => {
     expect(registry.listTools()).toEqual([tool]);
     expect(
       await registry.call({ name: "fixture_echo", arguments: { value: "hi" } })
-    ).toEqual({ contentText: '{\n  "echoed": "hi"\n}' });
+    ).toEqual({
+      content: [{ type: "text", text: '{\n  "echoed": "hi"\n}' }],
+    });
   });
 
   test("rejects registration after freeze", () => {
@@ -47,6 +49,35 @@ describe("ToolRegistry", () => {
         entries: [],
       })
     ).toThrow('Tool contribution "fixture.late" registered after freeze.');
+  });
+
+  test("serializes ordinary JSON with a content array as text", async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      id: "fixture.content-json",
+      entries: [
+        {
+          tool: {
+            type: "builtin",
+            name: "fixture_content_json",
+            description: "Return business data with a content field.",
+            parameters: { type: "object", properties: {} },
+          },
+          execute: () => Promise.resolve({ content: ["article"] }),
+        },
+      ],
+    });
+
+    expect(
+      await registry.call({ name: "fixture_content_json", arguments: {} })
+    ).toEqual({
+      content: [
+        {
+          type: "text",
+          text: '{\n  "content": [\n    "article"\n  ]\n}',
+        },
+      ],
+    });
   });
 
   test("rejects duplicate tool names with contribution context", () => {
@@ -148,7 +179,7 @@ describe("ToolRegistry", () => {
     ).toEqual([{ name: "fixture_echo", description: "Original description." }]);
     expect(
       await registry.call({ name: "fixture_echo", arguments: {} })
-    ).toEqual({ contentText: "original" });
+    ).toEqual({ content: [{ type: "text", text: "original" }] });
     expect(() =>
       registry.call({ name: "fixture_mutated", arguments: {} })
     ).toThrow("Built-in tool not found: fixture_mutated");

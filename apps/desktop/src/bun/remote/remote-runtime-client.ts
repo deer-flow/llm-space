@@ -323,7 +323,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
     return this._rpc<McpCallToolResponse>("mcp.callTool", input);
   }
   builtInCallTool(input: { name: string; arguments: Record<string, unknown> }) {
-    return this._rpc<{ contentText: string }>("builtinTools.call", input);
+    return this._rpc<Awaited<ReturnType<RuntimeClient["builtInCallTool"]>>>(
+      "builtinTools.call",
+      input
+    );
   }
   setSearchSettings(settings: SearchSettings) {
     return this._rpc<SearchSettings>("search.set", { settings });

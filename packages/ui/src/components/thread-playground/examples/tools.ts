@@ -100,7 +100,7 @@ const BASH_TOOL: FunctionTool = _functionTool({
 const READ_FILE_TOOL: FunctionTool = _functionTool({
   name: "read",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a text placeholder with the file's size rather than the image itself. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, text, or an image. Returns text files with line numbers and supported images up to 20 MiB as image content. Reads the whole text file by default; pass offset/limit to read a specific line range. Text output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files.",
   strict: true,
   parameters: {
     type: "object",

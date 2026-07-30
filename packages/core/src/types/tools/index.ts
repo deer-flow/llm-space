@@ -1,5 +1,6 @@
 import { Type, type Static } from "typebox";
 
+import type { ToolCallOutput } from "../messages";
 import { JSONSchema } from "../shared";
 
 const ToolBase = Type.Object({
@@ -78,6 +79,12 @@ const BuiltinTool = Type.Intersect([
   }),
 ]);
 export type BuiltinTool = Static<typeof BuiltinTool>;
+
+/** Result returned by a built-in runtime tool across local or remote RPC. */
+export interface BuiltinToolCallResponse {
+  /** Structured content persisted in the thread and forwarded to the model. */
+  content: ToolCallOutput["content"];
+}
 
 export interface LegacyMcpToolSource {
   /**

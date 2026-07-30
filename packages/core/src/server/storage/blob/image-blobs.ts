@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
-import type { ImageDataContent, Thread } from "../../../types";
+import type { Thread } from "../../../types";
 
 /**
- * Sentinel prefix marking an `image_data.data` string as a reference into the
+ * Sentinel prefix marking an image `data` string as a reference into the
  * file's own blob table rather than inline base64. The colon guarantees it can
  * never collide with real base64 (whose alphabet excludes `:`), so the two are
  * unambiguous.
@@ -30,11 +30,17 @@ interface PackedThread extends Thread {
   blobs?: Record<string, string>;
 }
 
-function _isImageData(value: unknown): value is ImageDataContent {
+interface StoredImageContent {
+  type: "image";
+  data: string;
+}
+
+/** Match image content while packing or unpacking persisted threads. */
+function _isImageContent(value: unknown): value is StoredImageContent {
   return (
     !!value &&
     typeof value === "object" &&
-    (value as { type?: unknown }).type === "image_data" &&
+    (value as { type?: unknown }).type === "image" &&
     typeof (value as { data?: unknown }).data === "string"
   );
 }
@@ -51,7 +57,7 @@ function _parseRef(data: string): string | null {
 }
 
 /**
- * Return a copy of `value` with every `image_data.data` string mapped through
+ * Return a copy of `value` with every image `data` string mapped through
  * `fn`. Structurally shares (copy-on-write) any subtree that didn't change, so
  * an untouched thread is returned by reference.
  */
@@ -67,7 +73,7 @@ function _map(value: unknown, fn: (data: string) => string): unknown {
     return changed ? next : value;
   }
   if (value && typeof value === "object") {
-    if (_isImageData(value)) {
+    if (_isImageContent(value)) {
       const nextData = fn(value.data);
       return nextData === value.data ? value : { ...value, data: nextData };
     }

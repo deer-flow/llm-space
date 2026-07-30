@@ -8,6 +8,7 @@
 import type {
   AgentTransport,
   BuiltinTool,
+  BuiltinToolCallResponse,
   CustomModel,
   McpServerToolsResponse,
   McpServerView,
@@ -20,8 +21,7 @@ import type {
 } from "@llm-space/core";
 
 /** A tool call's result, normalized across the built-in and MCP backends. */
-export interface ToolCallResult {
-  contentText: string;
+export interface ToolCallResult extends BuiltinToolCallResponse {
   isError: boolean;
 }
 

@@ -5,6 +5,8 @@ import {
   type ThreadSnapshot,
 } from "../types";
 
+import { getToolResultText } from "./tool-call-status";
+
 /**
  * A short summary of a run's resulting thread, derived from its last message.
  */
@@ -19,7 +21,7 @@ export function summarizeRun(thread: ThreadSnapshot): string {
       .map((toolCall) => `${toolCall.input.name}()`)
       .join(", ");
   }
-  const imageCount = last.content.filter((c) => c.type === "image_data").length;
+  const imageCount = last.content.filter((c) => c.type === "image").length;
   if (imageCount > 0) {
     return `[${imageCount} image${imageCount > 1 ? "s" : ""}]`;
   }
@@ -62,7 +64,7 @@ export function runLastUserText(thread: ThreadSnapshot): string {
     return "No user message";
   }
   const text = getMessageText(message).trim();
-  const imageCount = message.content.filter((c) => c.type === "image_data")
+  const imageCount = message.content.filter((c) => c.type === "image")
     .length;
   if (text && imageCount > 0) {
     return `${text}\n[${imageCount} image${imageCount > 1 ? "s" : ""}]`;
@@ -93,10 +95,7 @@ function _toolResultText(message: AssistantMessage): string {
   }
   return message.toolCalls
     .map((toolCall) => {
-      const output = toolCall.output?.content
-        ?.map((content) => content.text)
-        .join("\n")
-        .trim();
+      const output = getToolResultText(toolCall.output?.content).trim();
       const args = JSON.stringify(toolCall.input.arguments);
       return output
         ? `${toolCall.input.name}(${args})\n${output}`

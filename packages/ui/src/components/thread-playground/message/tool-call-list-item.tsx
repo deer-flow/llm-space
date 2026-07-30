@@ -1,5 +1,6 @@
 import {
   isExecutableTool,
+  type ImageContent,
   type ThreadContext,
   type ToolCall,
   type ToolCallInput,
@@ -36,6 +37,7 @@ import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 import { useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
+import { ImageContentView } from "./image-content-view";
 import { ToolCallInputView } from "./tool-call-input-view";
 import { useToolCallRunner } from "./use-tool-call-runner";
 import {
@@ -74,6 +76,15 @@ function _ToolCallListItem({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [argsPreviewOpen, setArgsPreviewOpen] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
+  const outputImages = useMemo(() => {
+    const images: { content: ImageContent; contentIndex: number }[] = [];
+    toolCall.output?.content.forEach((content, contentIndex) => {
+      if (content.type === "image") {
+        images.push({ content, contentIndex });
+      }
+    });
+    return images;
+  }, [toolCall.output?.content]);
   const isError = toolCall.output?.isError ?? false;
   const handleOutputChange = useCallback(
     (value: string) => {
@@ -241,6 +252,18 @@ function _ToolCallListItem({
           onChange={handleOutputChange}
           onKeyDown={handleKeyDown}
         />
+        {outputImages.length > 0 ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {outputImages.map(({ content, contentIndex }) => (
+              <ImageContentView
+                key={`${content.mimeType}-${contentIndex}`}
+                image={content}
+                readonly
+                className="size-24 shadow-sm"
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

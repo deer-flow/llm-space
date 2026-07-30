@@ -138,7 +138,7 @@ Messages are the conversation history of a Thread. LLM Space currently uses two 
 User message content can be:
 
 - Text: `{ "type": "text", "text": "..." }`
-- Image data: `{ "type": "image_data", "mimeType": "image/png", "data": "..." }`
+- Image data: `{ "type": "image", "mimeType": "image/png", "data": "..." }`
 
 Assistant message content is mainly text, and may also include:
 

@@ -66,7 +66,7 @@ export function MessageListView({
     let count = 0;
     for (const message of messages) {
       message.content.forEach((content, contentIndex) => {
-        if (content.type === "image_data") {
+        if (content.type === "image") {
           count += 1;
           numbers.set(`${message.id}:${contentIndex}`, count);
         }

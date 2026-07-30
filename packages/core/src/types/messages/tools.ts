@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 
-import { TextContent } from "./contents";
+import { ImageContent, TextContent } from "./contents";
 
 /**
  * The input of a tool call.
@@ -24,7 +24,7 @@ export type ToolCallInput = Static<typeof ToolCallInput>;
  * The output of a tool call.
  */
 export const ToolCallOutput = Type.Object({
-  content: Type.Array(TextContent),
+  content: Type.Array(Type.Union([TextContent, ImageContent])),
   /**
    * Whether the tool runtime reported a failed call. This is forwarded back to
    * model providers that distinguish failed tool results from observations.

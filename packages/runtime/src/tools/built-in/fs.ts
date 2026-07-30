@@ -6,7 +6,11 @@ import path from "node:path";
 import type { BuiltinTool } from "@llm-space/core";
 import type { SkillContent } from "@llm-space/core";
 
-import type { ToolEntry } from "../tool-registry";
+import {
+  createToolCallResponse,
+  type ToolCallResponse,
+  type ToolEntry,
+} from "../tool-registry";
 
 export interface FsBuiltInToolsDependencies {
   workspaceRoot: string;
@@ -60,30 +64,45 @@ function _hasIgnoredSegment(relativePath: string): boolean {
 
 // -- read ---------------------------------------------------------------------
 
-const IMAGE_EXTENSIONS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
+const IMAGE_MIME_TYPES: Readonly<Record<string, string>> = {
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+};
+
+/** Formats pi providers consistently accept as model-facing image content. */
+const MODEL_IMAGE_EXTENSIONS = new Set([
   ".gif",
+  ".jpeg",
+  ".jpg",
+  ".png",
   ".webp",
-  ".bmp",
-  ".svg",
-  ".ico",
 ]);
 
 /**
- * Upper bound on the bytes a single `read` returns. An unbounded read (no
- * `limit`) still stops here so a huge file can't blow past the model's context —
- * the output is truncated with a notice pointing at `offset`/`limit`.
+ * Upper bound on text bytes a single `read` returns. An unbounded text read (no
+ * `limit`) still stops here and points at `offset`/`limit`. Model-supported
+ * images are returned whole because truncating base64 would corrupt the image.
  */
 const READ_MAX_SIZE_BYTES = 256 * 1024;
+
+/**
+ * Upper bound on raw image bytes sent through RPC and persisted in a thread.
+ * Base64 expands the payload further, so reject oversized images before readFile.
+ */
+const READ_MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 
 export const readTool: BuiltinTool = {
   type: "builtin",
   name: "read",
   icon: "file-text",
   description:
-    "Reads a file from the local filesystem. Use when you need to inspect source code, config, or any text file. Returns file contents with line numbers; for images, returns a text placeholder with the file's size rather than the image itself. Reads the whole file by default; pass offset/limit to read a specific line range. Output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files. Do NOT use read to load a skill's SKILL.md — use the skill tool instead, unless you specifically need to edit that skill.",
+    "Reads a file from the local filesystem. Use when you need to inspect source code, config, text, or an image. Returns text files with line numbers and supported images up to 20 MiB as image content. Reads the whole text file by default; pass offset/limit to read a specific line range. Text output is capped at 256KB and truncated beyond that. Prefer this over bash for reading files. Do NOT use read to load a skill's SKILL.md — use the skill tool instead, unless you specifically need to edit that skill.",
   strict: true,
   parameters: {
     type: "object",
@@ -113,17 +132,40 @@ export const readTool: BuiltinTool = {
   },
 };
 
+/**
+ * Read a UTF-8 file with line numbers, or return image bytes as model-facing
+ * base64 content while retaining a compact text placeholder for the UI.
+ */
 export async function read(
   filePath: string,
   offset?: number,
   limit?: number
-): Promise<string> {
+): Promise<string | ToolCallResponse> {
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
     throw new Error(`${filePath} is a directory, not a file.`);
   }
-  if (IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
-    return `[image file: ${filePath} (${stat.size} bytes)]`;
+  const extension = path.extname(filePath).toLowerCase();
+  const mimeType = IMAGE_MIME_TYPES[extension];
+  if (mimeType) {
+    const description = `[image file: ${filePath} (${stat.size} bytes)]`;
+    if (!MODEL_IMAGE_EXTENSIONS.has(extension)) {
+      return description;
+    }
+    if (stat.size > READ_MAX_IMAGE_SIZE_BYTES) {
+      throw new Error(
+        `${filePath} is too large to send as image content (${stat.size} bytes; maximum ${READ_MAX_IMAGE_SIZE_BYTES} bytes / 20 MiB).`
+      );
+    }
+    const buffer = await fs.readFile(filePath);
+    return createToolCallResponse([
+      { type: "text", text: description },
+      {
+        type: "image",
+        data: buffer.toString("base64"),
+        mimeType,
+      },
+    ]);
   }
   const content = await fs.readFile(filePath, "utf8");
   const lines = content.split("\n");

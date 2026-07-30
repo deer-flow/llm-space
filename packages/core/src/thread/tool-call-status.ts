@@ -1,4 +1,4 @@
-import type { ToolCall } from "../types";
+import type { ToolCall, ToolCallOutput } from "../types";
 
 export type ToolCallStatus = "needsResponse" | "ready" | "error";
 
@@ -10,13 +10,21 @@ export interface ToolCallSummary {
   canContinue: boolean;
 }
 
-/**
- * Read the persisted text that will be sent back as the tool result.
- */
-export function getToolCallOutputText(toolCall: ToolCall): string {
+/** Join the text parts of structured tool output; image parts stay untouched. */
+export function getToolResultText(
+  content: ToolCallOutput["content"] | undefined
+): string {
   return (
-    toolCall.output?.content?.map((content) => content.text).join("\n") ?? ""
+    content
+      ?.filter((content) => content.type === "text")
+      .map((content) => content.text)
+      .join("\n") ?? ""
   );
+}
+
+/** Read the persisted text that will be sent back as the tool result. */
+export function getToolCallOutputText(toolCall: ToolCall): string {
+  return getToolResultText(toolCall.output?.content);
 }
 
 /**

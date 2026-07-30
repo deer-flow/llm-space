@@ -116,12 +116,12 @@ describe("LocalFileSystem.write", () => {
             role: "user",
             content: [
               {
-                type: "image_data",
+                type: "image",
                 data: imageData,
                 mimeType: "image/png",
               },
               {
-                type: "image_data",
+                type: "image",
                 data: imageData,
                 mimeType: "image/png",
               },
