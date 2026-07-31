@@ -29,6 +29,8 @@ import {
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { RuntimePaneHost } from "./runtime-pane-host";
+import type { PaneStreamingChange } from "./runtime-run-tracker";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
@@ -56,7 +58,9 @@ function _tabIdFromEventTarget(target: EventTarget | null): string | null {
 
 interface ThreadTabsProps {
   className?: string;
+  emptyState?: ReactNode;
   tabs: AppTab[];
+  paneTabs: AppTab[];
   activeId: string | null;
   sidebarOpen?: boolean;
   fullScreen?: boolean;
@@ -81,13 +85,16 @@ interface ThreadTabsProps {
     runtimeId: RuntimeId
   ) => void;
   onToggleSidebar?: () => void;
+  onStreamingChange?: PaneStreamingChange;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
 }
 
 export function ThreadTabs({
   className,
+  emptyState,
   tabs,
+  paneTabs,
   activeId,
   sidebarOpen = true,
   fullScreen = false,
@@ -106,6 +113,7 @@ export function ThreadTabs({
   onMove,
   onTraceTitleChange,
   onToggleSidebar,
+  onStreamingChange,
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -236,7 +244,10 @@ export function ThreadTabs({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className="bg-tabs relative flex w-full"
+            className={cn(
+              "bg-tabs relative flex w-full",
+              tabs.length === 0 && "hidden"
+            )}
             onContextMenu={handleContextMenu}
             onMouseDownCapture={handleMouseDownCapture}
             onMouseUp={handleMouseUp}
@@ -364,33 +375,43 @@ export function ThreadTabs({
           </ContextMenuContent>
         ) : null}
       </ContextMenu>
-      <div className="relative min-h-0 flex-1">
-        {tabs.map((tab) =>
-          tab.type === "thread" ? (
-            <ThreadTabPane
-              key={tab.paneId}
-              paneId={tab.paneId}
-              path={tab.path}
-              runtimeId={tab.runtimeId}
-              active={tab.id === activeId}
-              refreshNonce={tab.refreshNonce ?? 0}
-              onMove={onMove}
-              onClose={() => close(tab.id)}
-              consumeDiscardedPane={consumeDiscardedPane}
-            />
-          ) : (
-            <TraceTabPane
-              key={tab.id}
-              projectId={tab.projectId}
-              traceKey={tab.traceKey}
-              runtimeId={tab.runtimeId}
-              active={tab.id === activeId}
-              refreshNonce={tab.refreshNonce ?? 0}
-              onClose={close}
-              onRenameTitle={onTraceTitleChange}
-            />
-          )
-        )}
+      {tabs.length === 0 ? (
+        <div className="min-h-0 flex-1">{emptyState}</div>
+      ) : null}
+      <div
+        className={cn("relative min-h-0 flex-1", tabs.length === 0 && "hidden")}
+      >
+        <RuntimePaneHost
+          tabs={paneTabs}
+          activeId={activeId}
+          getPaneKey={(tab) => (tab.type === "thread" ? tab.paneId : tab.id)}
+          renderPane={(tab, active) =>
+            tab.type === "thread" ? (
+              <ThreadTabPane
+                paneId={tab.paneId}
+                path={tab.path}
+                runtimeId={tab.runtimeId}
+                active={active}
+                refreshNonce={tab.refreshNonce ?? 0}
+                onMove={onMove}
+                onClose={() => close(tab.id)}
+                consumeDiscardedPane={consumeDiscardedPane}
+                onStreamingChange={onStreamingChange}
+              />
+            ) : (
+              <TraceTabPane
+                projectId={tab.projectId}
+                traceKey={tab.traceKey}
+                runtimeId={tab.runtimeId}
+                active={active}
+                refreshNonce={tab.refreshNonce ?? 0}
+                onClose={close}
+                onStreamingChange={onStreamingChange}
+                onRenameTitle={onTraceTitleChange}
+              />
+            )
+          }
+        />
       </div>
     </div>
   );

@@ -54,13 +54,19 @@ const PAGES = [
     label: "Remote",
     icon: Server,
     Page: ({
+      canConnect,
+      canDisconnect,
       onConnected,
       onDisconnected,
     }: {
+      canConnect?: () => boolean;
+      canDisconnect?: (runtimeId: RuntimeId) => boolean;
       onConnected?: (runtimeId: RuntimeId) => void;
       onDisconnected?: (runtimeId: RuntimeId) => void;
     }) => (
       <RemoteServersPage
+        canConnect={canConnect}
+        canDisconnect={canDisconnect}
         onConnected={onConnected}
         onDisconnected={onDisconnected}
       />
@@ -121,6 +127,8 @@ export function SettingsDialog({
   onOpenChange,
   tab,
   onTabChange,
+  canConnectRemote,
+  canDisconnectRemote,
   onRemoteConnected,
   onRemoteDisconnected,
 }: {
@@ -128,6 +136,8 @@ export function SettingsDialog({
   onOpenChange: (open: boolean) => void;
   tab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
+  canConnectRemote?: () => boolean;
+  canDisconnectRemote?: (runtimeId: RuntimeId) => boolean;
   onRemoteConnected?: (runtimeId: RuntimeId) => void;
   onRemoteDisconnected?: (runtimeId: RuntimeId) => void;
 }) {
@@ -183,6 +193,8 @@ export function SettingsDialog({
               <TabsContent key={value} value={value} className="size-full">
                 <Page
                   runtimeId={runtimeId}
+                  canConnect={canConnectRemote}
+                  canDisconnect={canDisconnectRemote}
                   onConnected={onRemoteConnected}
                   onDisconnected={onRemoteDisconnected}
                 />

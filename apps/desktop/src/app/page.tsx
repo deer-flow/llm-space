@@ -1,8 +1,5 @@
 import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
-import {
-  ModelProvider,
-  useModels,
-} from "@llm-space/ui/components/model-provider";
+import { useModels } from "@llm-space/ui/components/model-provider";
 import {
   LOCAL_STORAGE_KEYS,
   readLocalStorage,
@@ -50,6 +47,8 @@ import {
   ThreadTabs,
   useThreadTabs,
 } from "@/components/thread-tabs";
+import { RuntimeRunTracker } from "@/components/thread-tabs/runtime-run-tracker";
+import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { UpdateStatusProvider } from "@/components/update-status-provider";
 import { Welcome } from "@/components/welcome";
@@ -68,6 +67,8 @@ import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
+
+import { WorkspaceModelScope } from "./workspace-model-scope";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
 // palette, onboarding, and examples. Loaded lazily so their code (and heavy
@@ -239,31 +240,16 @@ function PageInner() {
   }, [workspaceRuntimeId]);
 
   return (
-    <WorkspaceModelScope runtimeId={workspaceRuntimeId}>
+    <WorkspaceModelScope
+      runtimeId={workspaceRuntimeId}
+      createClient={createElectrobunModelClient}
+    >
       <PageWorkspace
         workspaceRuntimeId={workspaceRuntimeId}
         setWorkspaceRuntimeId={setWorkspaceRuntimeId}
         workspaceRuntimeIdRef={workspaceRuntimeIdRef}
       />
     </WorkspaceModelScope>
-  );
-}
-
-function WorkspaceModelScope({
-  runtimeId,
-  children,
-}: {
-  runtimeId: RuntimeId;
-  children: ReactNode;
-}) {
-  const client = useMemo(
-    () => createElectrobunModelClient(runtimeId),
-    [runtimeId]
-  );
-  return (
-    <ModelProvider key={runtimeId} client={client}>
-      {children}
-    </ModelProvider>
   );
 }
 
@@ -332,6 +318,31 @@ function PageWorkspace({
     },
     [tabs, visibleActiveId, visibleTabs]
   );
+  const runtimeRunTrackerRef = useRef(new RuntimeRunTracker());
+  const showRuntimeRunBlocked = useCallback((action: string) => {
+    toast.info("Wait for active runs to finish", {
+      description: `Completed output will be saved before ${action}.`,
+    });
+  }, []);
+  const canDisconnectRuntime = useCallback(
+    (runtimeId: RuntimeId) => {
+      if (runtimeRunTrackerRef.current.canDisconnect(runtimeId)) return true;
+      showRuntimeRunBlocked("disconnecting this runtime");
+      return false;
+    },
+    [showRuntimeRunBlocked]
+  );
+  const canConnectRemote = useCallback(() => {
+    if (!runtimeRunTrackerRef.current.hasAnyRunning()) return true;
+    showRuntimeRunBlocked("changing remote connections");
+    return false;
+  }, [showRuntimeRunBlocked]);
+  const handlePaneStreamingChange = useCallback(
+    (paneId: string, runtimeId: RuntimeId, running: boolean) => {
+      runtimeRunTrackerRef.current.setRunning(paneId, runtimeId, running);
+    },
+    []
+  );
   const discardRuntimeWorkspace = useCallback(
     (runtimeId: RuntimeId) => {
       discardRuntime(runtimeId);
@@ -371,13 +382,27 @@ function PageWorkspace({
 
   const switchWorkspaceRuntime = useCallback(
     (nextRuntimeId: RuntimeId) => {
-      workspaceRuntimeIdRef.current = nextRuntimeId;
-      setWorkspaceRuntimeId(nextRuntimeId);
-      setSidebarMode("files");
-      void queryClient.invalidateQueries({ queryKey: ["fs"] });
-      void queryClient.invalidateQueries({ queryKey: ["thread"] });
+      const currentRuntimeId = workspaceRuntimeIdRef.current;
+      return switchWorkspaceRuntimeIfAllowed({
+        tracker: runtimeRunTrackerRef.current,
+        currentRuntimeId,
+        nextRuntimeId,
+        onBlocked: () => showRuntimeRunBlocked("switching runtimes"),
+        onSwitch: () => {
+          workspaceRuntimeIdRef.current = nextRuntimeId;
+          setWorkspaceRuntimeId(nextRuntimeId);
+          setSidebarMode("files");
+          void queryClient.invalidateQueries({ queryKey: ["fs"] });
+          void queryClient.invalidateQueries({ queryKey: ["thread"] });
+        },
+      });
     },
-    [queryClient, setWorkspaceRuntimeId, workspaceRuntimeIdRef]
+    [
+      queryClient,
+      setWorkspaceRuntimeId,
+      showRuntimeRunBlocked,
+      workspaceRuntimeIdRef,
+    ]
   );
 
   const refreshRuntimes = useCallback(
@@ -405,8 +430,8 @@ function PageWorkspace({
 
   const transitionWorkspaceRuntime = useCallback(
     (nextRuntimeId: RuntimeId) => {
+      if (!switchWorkspaceRuntime(nextRuntimeId)) return;
       setSettingsOpen(false);
-      switchWorkspaceRuntime(nextRuntimeId);
       void refreshRuntimes({ syncDefault: false });
     },
     [refreshRuntimes, switchWorkspaceRuntime]
@@ -729,6 +754,7 @@ function PageWorkspace({
             )}
             <RemoteStatus
               runtimeId={workspaceRuntimeId}
+              canDisconnect={canDisconnectRuntime}
               onDisconnecting={discardRuntimeWorkspace}
               onDisconnected={(runtimeId) => {
                 discardRuntimeWorkspace(runtimeId);
@@ -740,46 +766,47 @@ function PageWorkspace({
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel minSize={640}>
-            {visibleTabs.length === 0 ? (
-              <Welcome
-                onNewStarter={() => setExamplesOpen(true)}
-                onNewFile={() =>
-                  executeCommand({
-                    type: "newFile",
-                    args: { runtimeId: workspaceRuntimeId },
-                  })
-                }
-                onModels={() =>
-                  executeCommand({
-                    type: "openSettings",
-                    args: { tab: "models" },
-                  })
-                }
-              />
-            ) : (
-              <ThreadTabs
-                tabs={visibleTabs}
-                activeId={visibleActiveId}
-                activate={activateVisibleTab}
-                refresh={tabs.refresh}
-                consumeDiscardedPane={tabs.consumeDiscardedPane}
-                sidebarOpen={sidebarOpen}
-                fullScreen={fullScreen}
-                close={handleCloseTab}
-                closeOthers={handleCloseOtherTabs}
-                closeAll={handleCloseAllTabs}
-                reveal={handleRevealFile}
-                moveToTrash={handleMoveToTrash}
-                share={handleShareThread}
-                copyFile={handleCopyFile}
-                reorder={reorderVisibleTabs}
-                onNewFile={handleNewFile}
-                onMove={tabs.handleMove}
-                onTraceTitleChange={tabs.handleTraceTitleChange}
-                onToggleSidebar={handleToggleSidebar}
-                toolbarSlot={<UpdateIndicator />}
-              />
-            )}
+            <ThreadTabs
+              tabs={visibleTabs}
+              paneTabs={tabs.tabs}
+              emptyState={
+                <Welcome
+                  onNewStarter={() => setExamplesOpen(true)}
+                  onNewFile={() =>
+                    executeCommand({
+                      type: "newFile",
+                      args: { runtimeId: workspaceRuntimeId },
+                    })
+                  }
+                  onModels={() =>
+                    executeCommand({
+                      type: "openSettings",
+                      args: { tab: "models" },
+                    })
+                  }
+                />
+              }
+              activeId={visibleActiveId}
+              activate={activateVisibleTab}
+              refresh={tabs.refresh}
+              consumeDiscardedPane={tabs.consumeDiscardedPane}
+              sidebarOpen={sidebarOpen}
+              fullScreen={fullScreen}
+              close={handleCloseTab}
+              closeOthers={handleCloseOtherTabs}
+              closeAll={handleCloseAllTabs}
+              reveal={handleRevealFile}
+              moveToTrash={handleMoveToTrash}
+              share={handleShareThread}
+              copyFile={handleCopyFile}
+              reorder={reorderVisibleTabs}
+              onNewFile={handleNewFile}
+              onMove={tabs.handleMove}
+              onTraceTitleChange={tabs.handleTraceTitleChange}
+              onToggleSidebar={handleToggleSidebar}
+              onStreamingChange={handlePaneStreamingChange}
+              toolbarSlot={<UpdateIndicator />}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
@@ -793,6 +820,8 @@ function PageWorkspace({
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           onTabChange={setSettingsTab}
+          canConnectRemote={canConnectRemote}
+          canDisconnectRemote={canDisconnectRuntime}
           onRemoteConnected={(runtimeId) => {
             transitionWorkspaceRuntime(runtimeId);
           }}

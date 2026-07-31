@@ -36,9 +36,12 @@ export function useThreadPlaygroundEvents(
       }
 
       if (status === "idle" && prevStatus === "running") {
-        onStreamingEndRef.current?.();
         // Flush thread changes that were suppressed while streaming.
         onChangeRef.current?.(state.thread);
+        // The store may synchronously attach terminal run metadata immediately
+        // after setting idle. Let those updates reach onChange before a host
+        // treats the pane as settled and tears down its runtime.
+        queueMicrotask(() => onStreamingEndRef.current?.());
         return;
       }
 

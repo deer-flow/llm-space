@@ -44,6 +44,8 @@ import type {
 } from "@/shared/remote-servers";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { runRemoteRuntimeActionIfAllowed } from "../remote-runtime-actions";
+
 import {
   canConnectRemoteServer,
   canEditRemoteServer,
@@ -68,9 +70,13 @@ function _emptyForm(): FormState {
 }
 
 export function RemoteServersPage({
+  canConnect,
+  canDisconnect,
   onConnected,
   onDisconnected,
 }: {
+  canConnect?: () => boolean;
+  canDisconnect?: (runtimeId: RuntimeId) => boolean;
   onConnected?: (runtimeId: RuntimeId) => void;
   onDisconnected?: (runtimeId: RuntimeId) => void;
 }) {
@@ -166,7 +172,8 @@ export function RemoteServersPage({
       );
       if (options.closeOnConnected) {
         const connected = next.find((server) => server.id === id);
-        if (connected?.status === "connected") onConnected?.(connected.runtimeId);
+        if (connected?.status === "connected")
+          onConnected?.(connected.runtimeId);
       }
       if (options.notifyDisconnected && previousRuntimeId) {
         onDisconnected?.(previousRuntimeId);
@@ -215,7 +222,10 @@ export function RemoteServersPage({
   ) => {
     setTrustBusy(true);
     try {
-      const next = await rejectRemoteServerHostKey(server.id, request.requestId);
+      const next = await rejectRemoteServerHostKey(
+        server.id,
+        request.requestId
+      );
       updateServers(next);
     } catch (error) {
       toast.error("Failed to cancel SSH host trust", {
@@ -333,13 +343,21 @@ export function RemoteServersPage({
               server={selected}
               busy={busyId === selected.id}
               onConnect={() =>
-                void run(selected.id, connectRemoteServer, {
-                  closeOnConnected: true,
+                void runRemoteRuntimeActionIfAllowed({
+                  allowed: () => canConnect?.() ?? true,
+                  action: () =>
+                    run(selected.id, connectRemoteServer, {
+                      closeOnConnected: true,
+                    }),
                 })
               }
               onDisconnect={() =>
-                void run(selected.id, disconnectRemoteServer, {
-                  notifyDisconnected: true,
+                void runRemoteRuntimeActionIfAllowed({
+                  allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
+                  action: () =>
+                    run(selected.id, disconnectRemoteServer, {
+                      notifyDisconnected: true,
+                    }),
                 })
               }
               onEdit={() => startEdit(selected)}
@@ -349,7 +367,9 @@ export function RemoteServersPage({
                 })
               }
               onTrustHostKey={(request) => void trustHostKey(selected, request)}
-              onRejectHostKey={(request) => void rejectHostKey(selected, request)}
+              onRejectHostKey={(request) =>
+                void rejectHostKey(selected, request)
+              }
               trustBusy={trustBusy}
             />
           ) : (
@@ -548,7 +568,10 @@ function SshHostKeyDialog({
             <Info label="known_hosts" value={request.knownHostsFile} />
           ) : null}
           {request.knownHostsLine ? (
-            <Info label="Offending line" value={String(request.knownHostsLine)} />
+            <Info
+              label="Offending line"
+              value={String(request.knownHostsLine)}
+            />
           ) : null}
         </div>
         {changed ? (

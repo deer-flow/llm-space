@@ -14,6 +14,11 @@ import { createRpcTransport, traceClient } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
 
+import {
+  settleStreamingPane,
+  type PaneStreamingChange,
+} from "./runtime-run-tracker";
+
 interface TraceTabPaneProps {
   projectId: string;
   traceKey: string;
@@ -21,6 +26,7 @@ interface TraceTabPaneProps {
   active: boolean;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
+  onStreamingChange?: PaneStreamingChange;
   onRenameTitle?: (
     projectId: string,
     traceKey: string,
@@ -36,6 +42,7 @@ function _TraceTabPane({
   active,
   refreshNonce = 0,
   onClose,
+  onStreamingChange,
   onRenameTitle,
 }: TraceTabPaneProps) {
   const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
@@ -88,6 +95,20 @@ function _TraceTabPane({
     },
     [flushPending]
   );
+
+  const handleStreamingStart = useCallback(() => {
+    onStreamingChange?.(tabId, runtimeId, true);
+  }, [onStreamingChange, runtimeId, tabId]);
+  const handleStreamingEnd = useCallback(() => {
+    void settleStreamingPane(flushPending, () => {
+      onStreamingChange?.(tabId, runtimeId, false);
+    }).catch((error) => {
+      toast.error("Failed to save completed run", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  }, [flushPending, onStreamingChange, runtimeId, tabId]);
 
   const handleRenameTitle = useCallback(
     async (title: string): Promise<boolean> => {
@@ -161,6 +182,8 @@ function _TraceTabPane({
         transport={rpcTransport}
         runtimeId={runtimeId}
         onChange={handleChange}
+        onStreamingStart={handleStreamingStart}
+        onStreamingEnd={handleStreamingEnd}
         onRenameTitle={handleRenameTitle}
         validateTitle={_validateTraceTitle}
       />

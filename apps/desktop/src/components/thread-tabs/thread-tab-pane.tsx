@@ -11,6 +11,11 @@ import { toast } from "sonner";
 import { createFileSystemClient, createRpcTransport } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 
+import {
+  settleStreamingPane,
+  type PaneStreamingChange,
+} from "./runtime-run-tracker";
+
 interface ThreadTabPaneProps {
   paneId: string;
   path: string;
@@ -26,6 +31,7 @@ interface ThreadTabPaneProps {
   onClose?: (path: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
   consumeDiscardedPane?: (paneId: string) => boolean;
+  onStreamingChange?: PaneStreamingChange;
 }
 
 /**
@@ -42,6 +48,7 @@ export function ThreadTabPane({
   onMove,
   onClose,
   consumeDiscardedPane,
+  onStreamingChange,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
@@ -112,6 +119,20 @@ export function ThreadTabPane({
     },
     [flushPending]
   );
+
+  const handleStreamingStart = useCallback(() => {
+    onStreamingChange?.(paneId, runtimeId, true);
+  }, [onStreamingChange, paneId, runtimeId]);
+  const handleStreamingEnd = useCallback(() => {
+    void settleStreamingPane(flushPending, () => {
+      onStreamingChange?.(paneId, runtimeId, false);
+    }).catch((error) => {
+      toast.error("Failed to save completed run", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  }, [flushPending, onStreamingChange, paneId, runtimeId]);
 
   // Flush pending edits on a normal close. An editor displaced by an overwrite
   // instead drops them so stale destination content cannot replace the moved file.
@@ -211,6 +232,8 @@ export function ThreadTabPane({
         transport={rpcTransport}
         runtimeId={runtimeId}
         onChange={handleChange}
+        onStreamingStart={handleStreamingStart}
+        onStreamingEnd={handleStreamingEnd}
         onRenameTitle={handleRenameTitle}
       />
     </div>

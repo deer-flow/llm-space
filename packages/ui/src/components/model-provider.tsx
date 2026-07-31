@@ -13,7 +13,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -64,6 +66,13 @@ interface ModelContextValue {
 }
 
 const ModelContext = createContext<ModelContextValue | null>(null);
+const EMPTY_MODEL_PROVIDERS: ModelProviderGroup[] = [];
+
+interface ModelSnapshot {
+  client: ModelClient;
+  defaultModel: ModelConfig | null;
+  providers: ModelProviderGroup[] | null;
+}
 
 function buildModelIndex(providers: ModelProviderGroup[]) {
   const map = new Map<string, pi.Model<pi.Api>>();
@@ -90,39 +99,75 @@ export function ModelProvider({
   children: ReactNode;
   fallback?: ReactNode;
 }) {
-  const [providers, setProviders] = useState<ModelProviderGroup[] | null>(null);
-  const [defaultModel, setDefaultModelState] = useState<ModelConfig | null>(
-    null
+  const [snapshot, setSnapshot] = useState<ModelSnapshot>(() => ({
+    client,
+    defaultModel: null,
+    providers: null,
+  }));
+  const activeClientRef = useRef(client);
+  useLayoutEffect(() => {
+    activeClientRef.current = client;
+  }, [client]);
+
+  const commitProviders = useCallback(
+    (source: ModelClient, providers: ModelProviderGroup[]) => {
+      setSnapshot((current) =>
+        activeClientRef.current === source
+          ? {
+              client: source,
+              defaultModel:
+                current.client === source ? current.defaultModel : null,
+              providers,
+            }
+          : current
+      );
+    },
+    []
   );
 
   const setDefaultModel = useCallback(
     async (model: ModelConfig | null) => {
-      setDefaultModelState(await client.setDefaultModel(model));
+      const defaultModel = await client.setDefaultModel(model);
+      setSnapshot((current) =>
+        activeClientRef.current === client
+          ? {
+              client,
+              defaultModel,
+              providers:
+                current.client === client
+                  ? current.providers
+                  : EMPTY_MODEL_PROVIDERS,
+            }
+          : current
+      );
     },
     [client]
   );
 
   const removeProvider = useCallback(
     async (providerId: string) => {
-      setProviders(await client.removeProvider(providerId));
+      commitProviders(client, await client.removeProvider(providerId));
     },
-    [client]
+    [client, commitProviders]
   );
 
   const addProvider = useCallback(
     async (providerId: string) => {
-      setProviders(await client.addProvider(providerId));
+      commitProviders(client, await client.addProvider(providerId));
     },
-    [client]
+    [client, commitProviders]
   );
 
   const addCustomProvider = useCallback(
     async (name: string, baseUrl: string) => {
       const id = uuid();
-      setProviders(await client.addCustomProvider({ id, name, baseUrl }));
+      commitProviders(
+        client,
+        await client.addCustomProvider({ id, name, baseUrl })
+      );
       return id;
     },
-    [client]
+    [client, commitProviders]
   );
 
   const updateProvider = useCallback(
@@ -141,23 +186,29 @@ export function ModelProvider({
         icon?: string | null;
       }
     ) => {
-      setProviders(await client.updateProvider(providerId, fields));
+      commitProviders(client, await client.updateProvider(providerId, fields));
     },
-    [client]
+    [client, commitProviders]
   );
 
   const setModelEnabled = useCallback(
     async (providerId: string, modelId: string, enabled: boolean) => {
-      setProviders(await client.setModelEnabled(providerId, modelId, enabled));
+      commitProviders(
+        client,
+        await client.setModelEnabled(providerId, modelId, enabled)
+      );
     },
-    [client]
+    [client, commitProviders]
   );
 
   const setAllModelsEnabled = useCallback(
     async (providerId: string, enabled: boolean) => {
-      setProviders(await client.setAllModelsEnabled(providerId, enabled));
+      commitProviders(
+        client,
+        await client.setAllModelsEnabled(providerId, enabled)
+      );
     },
-    [client]
+    [client, commitProviders]
   );
 
   const testModelConnection = useCallback(
@@ -169,18 +220,22 @@ export function ModelProvider({
 
   const removeCustomModel = useCallback(
     async (providerId: string, modelId: string) => {
-      setProviders(await client.removeCustomModel(providerId, modelId));
+      commitProviders(
+        client,
+        await client.removeCustomModel(providerId, modelId)
+      );
     },
-    [client]
+    [client, commitProviders]
   );
 
   const upsertCustomModel = useCallback(
     async (providerId: string, model: CustomModel, originalId?: string) => {
-      setProviders(
+      commitProviders(
+        client,
         await client.upsertCustomModel(providerId, model, originalId)
       );
     },
-    [client]
+    [client, commitProviders]
   );
 
   const builtinProviders = useCallback(
@@ -197,8 +252,15 @@ export function ModelProvider({
         client.availableModels(),
         client.getDefaultModel(),
       ]);
-      setProviders(nextProviders);
-      setDefaultModelState(nextDefault ?? null);
+      setSnapshot((current) =>
+        activeClientRef.current === client
+          ? {
+              client,
+              defaultModel: nextDefault ?? null,
+              providers: nextProviders,
+            }
+          : current
+      );
     } catch (error) {
       console.error("Failed to fetch models", error);
     }
@@ -207,6 +269,18 @@ export function ModelProvider({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // A client change represents a runtime switch. Keep the already-mounted
+  // workspace alive, but expose an empty model view until that runtime's fetch
+  // completes so consumers can never observe the previous runtime's models.
+  const providers =
+    snapshot.client === client
+      ? snapshot.providers
+      : snapshot.providers === null
+        ? null
+        : EMPTY_MODEL_PROVIDERS;
+  const defaultModel =
+    snapshot.client === client ? snapshot.defaultModel : null;
 
   const contextValue = useMemo((): ModelContextValue | null => {
     if (!providers) {
