@@ -76,7 +76,7 @@ async function _withLiveSseServer(
   run: (server: LiveSseServer) => Promise<void>
 ): Promise<void> {
   let closeStream = () => undefined;
-  let markStreamStarted = () => undefined;
+  let markStreamStarted: () => void = () => undefined;
   const streamStarted = new Promise<void>((resolve) => {
     markStreamStarted = resolve;
   });
