@@ -58,7 +58,11 @@ import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
 import { useThreadStore } from "../stores/thread-store";
-import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
+
+import {
+  bindProjectGenerationRuntime,
+  type ProjectGenerationRuntime,
+} from "./project-generation-runtime";
 
 /** The generator to run. V1 ships only LangGraph. */
 const GENERATOR_ID = "langgraph";
@@ -136,6 +140,7 @@ export function GenerateProjectButton({
 
   // Run step.
   const abortRef = useRef<AbortController | null>(null);
+  const generationRuntimeRef = useRef<ProjectGenerationRuntime | null>(null);
   const [uvMissing, setUvMissing] = useState(false);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
@@ -175,6 +180,7 @@ export function GenerateProjectButton({
     setLastMcpServers([]);
     setEnvConfirmOpen(false);
     setWritingEnv(false);
+    generationRuntimeRef.current = null;
   }, [open, title, metaUserPromptSuggested]);
 
   const targetPreview = useMemo(
@@ -187,10 +193,17 @@ export function GenerateProjectButton({
       if (!generator || !runtimeId || !model) {
         return;
       }
-      const transport = createTransport(runtimeId);
-      if (!transport) {
+      const generationRuntime = bindProjectGenerationRuntime({
+        runtimeId,
+        createTransport,
+        skills,
+        mcp,
+        generator,
+      });
+      if (!generationRuntime) {
         return;
       }
+      generationRuntimeRef.current = generationRuntime;
       setRunning(true);
       setEvents([]);
       setError(null);
@@ -211,9 +224,7 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const skillList = await listEnabledPromptVariableSkills(skills, {
-          runtimeId,
-        });
+        const skillList = await generationRuntime.listEnabledSkills();
         const rendered = await renderThreadPromptVariables({
           context: context ?? {},
           loadSkills: () => Promise.resolve(skillList),
@@ -236,7 +247,9 @@ export function GenerateProjectButton({
         const renderedVariableValues: Record<string, string> =
           Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
-          runOneShot: createOneShotRunner({ transport }),
+          runOneShot: createOneShotRunner({
+            transport: generationRuntime.transport,
+          }),
           defaultModel: model,
           signal: controller.signal,
           report: (event) => setEvents((prev) => [...prev, event]),
@@ -247,14 +260,17 @@ export function GenerateProjectButton({
         }
         // Best-effort: the user's search settings seed the project's .env when
         // it ships web tools. A failure here shouldn't abort generation.
-        const searchInfo = await generator
-          .getSearchSettings({ runtimeId })
+        const searchInfo = await generationRuntime
+          .getSearchSettings()
           .catch(() => undefined);
         setLastSearch(searchInfo);
         // Resolve the thread's MCP tools to their server configs (transport,
         // command/URL) from settings so the generated project connects for real.
         // Best-effort — a failure here shouldn't abort generation.
-        const mcpServers = await _resolveMcpServers(context, mcp, runtimeId);
+        const mcpServers = await _resolveMcpServers(
+          context,
+          () => generationRuntime.listMcpServers()
+        );
         setLastMcpServers(mcpServers);
         const outcome = await definition.run(workflow, {
           targetDir,
@@ -370,7 +386,8 @@ export function GenerateProjectButton({
   // Opt-in: write a real `.env` into the generated project, resolving the
   // model + search keys to their actual values (following `$ENV` references).
   const createEnvFile = useCallback(async () => {
-    if (!generator || !runtimeId || !model || !result) {
+    const generationRuntime = generationRuntimeRef.current;
+    if (!generator || !generationRuntime || !model || !result) {
       return;
     }
     setWritingEnv(true);
@@ -396,10 +413,9 @@ export function GenerateProjectButton({
           }
         }
       }
-      const { modelApiKey, envValues } = await generator.resolveEnv(
+      const { modelApiKey, envValues } = await generationRuntime.resolveEnv(
         model.provider,
-        envNames,
-        { runtimeId }
+        envNames
       );
       const resolveKey = (raw: string | undefined) =>
         !raw ? "" : raw.startsWith("$") ? (envValues[raw.slice(1)] ?? "") : raw;
@@ -432,7 +448,6 @@ export function GenerateProjectButton({
     }
   }, [
     generator,
-    runtimeId,
     model,
     result,
     providers,
@@ -1262,10 +1277,7 @@ function _resolveModelInfo(
  */
 async function _resolveMcpServers(
   context: ThreadContext | undefined,
-  mcp: {
-    listServers(options?: { runtimeId?: string }): Promise<McpServerView[]>;
-  },
-  runtimeId: string
+  listServers: () => Promise<McpServerView[]>
 ): Promise<GeneratorMcpServer[]> {
   const usedServerIds = new Set(
     (context?.tools ?? []).flatMap((t) =>
@@ -1276,7 +1288,7 @@ async function _resolveMcpServers(
     return [];
   }
   try {
-    const servers = await mcp.listServers({ runtimeId });
+    const servers = await listServers();
     return servers
       .filter((s) => usedServerIds.has(s.id))
       .map((s) => ({

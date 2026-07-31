@@ -49,6 +49,8 @@ export interface UseStreamTextResult {
    * without waiting for a re-render (e.g. a prompt captured at click time).
    */
   run: (overrides?: Partial<UseStreamTextArgs>) => Promise<void>;
+  /** Abort the currently active run, if any. */
+  abort: () => void;
 }
 
 /**
@@ -95,9 +97,10 @@ export function useStreamText({
   });
 
   const controllerRef = useRef<AbortController | null>(null);
+  const abort = useCallback(() => controllerRef.current?.abort(), []);
 
   // Abort any in-flight run on unmount.
-  useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(() => abort, [abort]);
 
   const run = useCallback(async (overrides?: Partial<UseStreamTextArgs>) => {
     const { systemPrompt, messages, userPrompt, reasoning, model } = {
@@ -112,7 +115,7 @@ export function useStreamText({
     }
 
     // Supersede any in-flight run.
-    controllerRef.current?.abort();
+    abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
@@ -199,7 +202,21 @@ export function useStreamText({
         controllerRef.current = null;
       }
     }
-  }, []);
+  }, [abort]);
 
-  return { text, error, streaming, run };
+  return { text, error, streaming, run, abort };
+}
+
+/** System-prompt generation adapter used by {@link SystemPromptEditor}. */
+export function useSystemPromptGeneration(
+  args: UseStreamTextArgs
+): UseStreamTextResult {
+  return useStreamText(args);
+}
+
+/** Function-tool generation adapter used by {@link ToolEditorDialog}. */
+export function useToolDefinitionGeneration(
+  args: UseStreamTextArgs
+): UseStreamTextResult {
+  return useStreamText(args);
 }

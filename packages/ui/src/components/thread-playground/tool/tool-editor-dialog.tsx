@@ -29,7 +29,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "../stores/thread-store";
-import { useStreamText } from "../use-stream-text";
+import { useToolDefinitionGeneration } from "../use-stream-text";
 
 
 export function ToolEditorDialog({
@@ -67,7 +67,7 @@ export function ToolEditorDialog({
     text: generated,
     streaming,
     run: generate,
-  } = useStreamText({
+  } = useToolDefinitionGeneration({
     systemPrompt: metaToolPrompt,
     reasoning: "off",
     // Use the thread's own model (id/provider only) when it has one.
