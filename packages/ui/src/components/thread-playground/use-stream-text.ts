@@ -15,6 +15,7 @@ import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 
 import { useDefaultTextGenerationModel } from "../model-provider";
 
+import { useThreadStore } from "./stores/thread-store";
 import { PREVIEW_THROTTLE_MS } from "./streaming-preview";
 
 const MAX_TOKENS = 10240;
@@ -66,8 +67,10 @@ export function useStreamText({
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
 
-  const { transport } = useHostServices();
-  const transportRef = useRef(transport);
+  const { createTransport } = useHostServices();
+  const runtimeId = useThreadStore((state) => state.runtimeId);
+  const createTransportRef = useRef(createTransport);
+  const runtimeIdRef = useRef(runtimeId);
 
   const defaultModel = useDefaultTextGenerationModel();
 
@@ -87,7 +90,8 @@ export function useStreamText({
   useEffect(() => {
     argsRef.current = { systemPrompt, messages, userPrompt, reasoning, model };
     defaultModelRef.current = defaultModel;
-    transportRef.current = transport;
+    createTransportRef.current = createTransport;
+    runtimeIdRef.current = runtimeId;
   });
 
   const controllerRef = useRef<AbortController | null>(null);
@@ -155,7 +159,10 @@ export function useStreamText({
       },
     };
 
-    const transport = transportRef.current;
+    const owningRuntimeId = runtimeIdRef.current;
+    const transport = owningRuntimeId
+      ? createTransportRef.current(owningRuntimeId)
+      : null;
     if (!transport) {
       setError("Text generation is not available here.");
       setStreaming(false);

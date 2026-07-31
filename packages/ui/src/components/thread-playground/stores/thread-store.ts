@@ -597,6 +597,7 @@ export function createThreadStore(
 
       return {
         thread: normalizedInitialThread,
+        runtimeId: options.runtimeId,
         streamingMessage: null,
         status: "idle",
         abortController: null,

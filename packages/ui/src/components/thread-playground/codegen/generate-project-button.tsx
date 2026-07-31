@@ -100,7 +100,7 @@ export function GenerateProjectButton({
 }) {
   const {
     generator,
-    transport,
+    createTransport,
     skills,
     files,
     builtinTools,
@@ -109,6 +109,7 @@ export function GenerateProjectButton({
     presentational,
   } = useHostServices();
   const context = useThreadStore((s) => s.thread.context);
+  const runtimeId = useThreadStore((s) => s.runtimeId);
   const savedModel = useThreadStore((s) => s.thread.model);
   const title = useThreadStore((s) => s.thread.title);
   const fallbackModel = useFirstAvailableModel();
@@ -183,7 +184,11 @@ export function GenerateProjectButton({
 
   const runGeneration = useCallback(
     async (targetDir: string) => {
-      if (!generator || !transport || !model) {
+      if (!generator || !runtimeId || !model) {
+        return;
+      }
+      const transport = createTransport(runtimeId);
+      if (!transport) {
         return;
       }
       setRunning(true);
@@ -206,7 +211,9 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const skillList = await listEnabledPromptVariableSkills(skills);
+        const skillList = await listEnabledPromptVariableSkills(skills, {
+          runtimeId,
+        });
         const rendered = await renderThreadPromptVariables({
           context: context ?? {},
           loadSkills: () => Promise.resolve(skillList),
@@ -241,13 +248,13 @@ export function GenerateProjectButton({
         // Best-effort: the user's search settings seed the project's .env when
         // it ships web tools. A failure here shouldn't abort generation.
         const searchInfo = await generator
-          .getSearchSettings()
+          .getSearchSettings({ runtimeId })
           .catch(() => undefined);
         setLastSearch(searchInfo);
         // Resolve the thread's MCP tools to their server configs (transport,
         // command/URL) from settings so the generated project connects for real.
         // Best-effort — a failure here shouldn't abort generation.
-        const mcpServers = await _resolveMcpServers(context, mcp);
+        const mcpServers = await _resolveMcpServers(context, mcp, runtimeId);
         setLastMcpServers(mcpServers);
         const outcome = await definition.run(workflow, {
           targetDir,
@@ -275,7 +282,8 @@ export function GenerateProjectButton({
     },
     [
       generator,
-      transport,
+      createTransport,
+      runtimeId,
       model,
       context,
       skills,
@@ -362,7 +370,7 @@ export function GenerateProjectButton({
   // Opt-in: write a real `.env` into the generated project, resolving the
   // model + search keys to their actual values (following `$ENV` references).
   const createEnvFile = useCallback(async () => {
-    if (!generator || !model || !result) {
+    if (!generator || !runtimeId || !model || !result) {
       return;
     }
     setWritingEnv(true);
@@ -390,7 +398,8 @@ export function GenerateProjectButton({
       }
       const { modelApiKey, envValues } = await generator.resolveEnv(
         model.provider,
-        envNames
+        envNames,
+        { runtimeId }
       );
       const resolveKey = (raw: string | undefined) =>
         !raw ? "" : raw.startsWith("$") ? (envValues[raw.slice(1)] ?? "") : raw;
@@ -423,6 +432,7 @@ export function GenerateProjectButton({
     }
   }, [
     generator,
+    runtimeId,
     model,
     result,
     providers,
@@ -432,7 +442,7 @@ export function GenerateProjectButton({
     openGeneratedProject,
   ]);
 
-  if (presentational || !generator || !transport) {
+  if (presentational || !generator || !runtimeId) {
     return null;
   }
 
@@ -1252,7 +1262,10 @@ function _resolveModelInfo(
  */
 async function _resolveMcpServers(
   context: ThreadContext | undefined,
-  mcp: { listServers(): Promise<McpServerView[]> }
+  mcp: {
+    listServers(options?: { runtimeId?: string }): Promise<McpServerView[]>;
+  },
+  runtimeId: string
 ): Promise<GeneratorMcpServer[]> {
   const usedServerIds = new Set(
     (context?.tools ?? []).flatMap((t) =>
@@ -1263,7 +1276,7 @@ async function _resolveMcpServers(
     return [];
   }
   try {
-    const servers = await mcp.listServers();
+    const servers = await mcp.listServers({ runtimeId });
     return servers
       .filter((s) => usedServerIds.has(s.id))
       .map((s) => ({
