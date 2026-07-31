@@ -47,6 +47,7 @@ import { SharedImportProvider } from "@/components/shared-import-provider";
 import {
   chooseActiveTabForRuntime,
   filterTabsForRuntime,
+  resolveShareThreadTarget,
   ThreadTabs,
   useThreadTabs,
 } from "@/components/thread-tabs";
@@ -67,6 +68,7 @@ import {
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
+import { buildShareThreadCommand } from "@/shared/share";
 import type { TraceRecord } from "@/shared/traces";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
@@ -363,8 +365,12 @@ function PageWorkspace({
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  // The thread path being shared (a specific file, or the resolved active tab).
-  const shareTargetRef = useRef("");
+  // The thread path and runtime being shared. Keep them together so opening the
+  // dialog can never silently reinterpret a remote path as local.
+  const [shareTarget, setShareTarget] = useState<{
+    path: string;
+    runtimeId: RuntimeId;
+  }>({ path: "", runtimeId: "local" });
   const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
@@ -517,16 +523,16 @@ function PageWorkspace({
     // header button / native menu / palette). Thread tab ids are
     // `thread:{runtimeId}:{path}`.
     shareThread: ({ path, runtimeId }) => {
-      const targetRuntimeId = runtimeId ?? workspaceRuntimeId;
-      if (targetRuntimeId !== workspaceRuntimeId) return;
       const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
-      const target =
-        path ??
-        (activeTab?.type === "thread" && activeTab.runtimeId === targetRuntimeId
-          ? activeTab.path
-          : undefined);
+      const target = resolveShareThreadTarget(
+        { path, runtimeId },
+        workspaceRuntimeId,
+        activeTab?.type === "thread"
+          ? { path: activeTab.path, runtimeId: activeTab.runtimeId }
+          : null
+      );
       if (!target) return;
-      shareTargetRef.current = target;
+      setShareTarget(target);
       setShareOpen(true);
     },
     importFiles: ({ parent = "", files, runtimeId }) => {
@@ -595,7 +601,7 @@ function PageWorkspace({
   );
   const handleShareThread = useCallback(
     (path: string, runtimeId: RuntimeId) =>
-      executeCommand({ type: "shareThread", args: { path, runtimeId } }),
+      executeCommand(buildShareThreadCommand(path, runtimeId)),
     [executeCommand]
   );
   // Copy the thread file to the OS clipboard as a file reference. The bun-side
@@ -817,7 +823,8 @@ function PageWorkspace({
       <LazyMount open={shareOpen}>
         <ShareThreadDialog
           open={shareOpen}
-          path={shareTargetRef.current}
+          path={shareTarget.path}
+          runtimeId={shareTarget.runtimeId}
           onOpenChange={setShareOpen}
         />
       </LazyMount>

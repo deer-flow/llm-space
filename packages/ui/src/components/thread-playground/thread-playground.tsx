@@ -26,7 +26,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import { useHostServices } from "@llm-space/ui/host";
+import { createShareThreadAction, useHostServices } from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -188,6 +188,7 @@ function ThreadPlaygroundContent({
   title: titleFromProps,
   headerDetails,
   headerActions,
+  runtimeId,
   onRenameTitle,
   validateTitle,
   readonly: readonlyFromProps = false,
@@ -334,7 +335,11 @@ function ThreadPlaygroundContent({
                   size="icon-lg"
                   aria-label="Share thread"
                   disabled={status === "running"}
-                  onClick={() => actions.shareThread(path)}
+                  onClick={() =>
+                    actions.shareThread(
+                      createShareThreadAction(path, runtimeId)
+                    )
+                  }
                 >
                   <Share2Icon className="size-4" />
                 </Button>

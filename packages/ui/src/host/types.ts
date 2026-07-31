@@ -30,6 +30,12 @@ export interface RuntimeScopedHostOptions {
   runtimeId?: string;
 }
 
+/** Identifies the thread and runtime selected by a Playground Share action. */
+export interface ShareThreadActionInput {
+  path: string;
+  runtimeId: string;
+}
+
 export interface ExecuteToolOptions extends RuntimeScopedHostOptions {}
 
 /** Invoke an executable tool (built-in or MCP). */
@@ -160,10 +166,10 @@ export interface HostActions {
   openSettings(tab: string): void;
   openLink(url: string): void;
   /**
-   * Open the host's Share surface for a thread. `path` targets a specific
-   * thread; omitting it shares the active thread. No-op on web (presentational).
+   * Open the host's Share surface for the thread owned by `runtimeId`. No-op on
+   * web (presentational).
    */
-  shareThread(path?: string): void;
+  shareThread(input: ShareThreadActionInput): void;
   /** Request opening the variables dialog (handled within the playground). */
   openVariables(variableName?: string): void;
   /** Register the variables-dialog opener; returns a disposer. No-op on web. */

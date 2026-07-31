@@ -29,12 +29,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-
-import { localFs } from "@/client/local-file-system";
-import { shareThread } from "@/client/share";
+import { readShareThread, shareThread } from "@/client/share";
 import { useCommands } from "@/commands";
 import { useGithubAuth } from "@/components/github-auth-provider";
 import { GitHubIcon } from "@/components/github-icon";
+import type { RuntimeId } from "@/shared/runtime";
 
 type ShareStatus = "idle" | "awaitingAuth" | "generating" | "success" | "error";
 
@@ -50,10 +49,12 @@ const GIST_CONNECTOR = "gist";
 export function ShareThreadDialog({
   open,
   path,
+  runtimeId,
   onOpenChange,
 }: {
   open: boolean;
   path: string;
+  runtimeId: RuntimeId;
   onOpenChange: (open: boolean) => void;
 }) {
   const { state: authState, signIn } = useGithubAuth();
@@ -91,8 +92,7 @@ export function ShareThreadDialog({
     setDescription("");
     setTitle(threadTitleFromPath(path));
     let stale = false;
-    void localFs
-      .read(path)
+    void readShareThread(runtimeId, path)
       .then((thread) => {
         if (!stale && thread.title) setTitle(thread.title);
       })
@@ -102,7 +102,7 @@ export function ShareThreadDialog({
     return () => {
       stale = true;
     };
-  }, [open, path]);
+  }, [open, path, runtimeId]);
 
   const generate = useCallback(async () => {
     cancelledRef.current = false;
@@ -110,7 +110,7 @@ export function ShareThreadDialog({
     setErrorMessage("");
     try {
       const trimmedTitle = title.trim();
-      const result = await shareThread(path, {
+      const result = await shareThread(runtimeId, path, {
         title: trimmedTitle || undefined,
         description: description.trim(),
       });
@@ -122,7 +122,7 @@ export function ShareThreadDialog({
       setErrorMessage(_friendlyError(error));
       setStatus("error");
     }
-  }, [path, title, description]);
+  }, [runtimeId, path, title, description]);
 
   const handleGenerate = useCallback(() => {
     if (authState.status === "signedIn") {

@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { createFileSystemClient } from "@/client";
 import { useCommands } from "@/commands";
 import type { RuntimeId } from "@/shared/runtime";
+import { buildShareThreadCommand } from "@/shared/share";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -196,10 +197,7 @@ export function NodeActions({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() =>
-                  executeCommand({
-                    type: "shareThread",
-                    args: { path: node.path, runtimeId },
-                  })
+                  executeCommand(buildShareThreadCommand(node.path, runtimeId))
                 }
               >
                 <Share2 />

@@ -6,6 +6,9 @@
  * page already offers an "Open in LLM Space" affordance.
  */
 
+import type { ShareThreadCommand } from "./commands";
+import type { RuntimeId } from "./runtime";
+
 /** The static site root (see `apps/web` `base` + the Pages deploy). */
 export const SHARE_WEB_BASE_URL = "https://deer-flow.github.io/llm-space/";
 
@@ -17,4 +20,12 @@ export const SHARE_WEB_BASE_URL = "https://deer-flow.github.io/llm-space/";
  */
 export function buildWebShareUrl(connectorId: string, threadId: string): string {
   return `${SHARE_WEB_BASE_URL}#/shared/${connectorId}/threads/${threadId}`;
+}
+
+/** Build a path-specific Share command without separating it from its owner. */
+export function buildShareThreadCommand(
+  path: string,
+  runtimeId: RuntimeId
+): ShareThreadCommand {
+  return { type: "shareThread", args: { path, runtimeId } };
 }

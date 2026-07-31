@@ -160,7 +160,6 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       getMainWindow,
       gistWriter,
       homePath,
-      localFs,
       runtimeRouter,
       remoteServerManager,
       skillsManager,
