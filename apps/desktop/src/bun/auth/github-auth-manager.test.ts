@@ -13,6 +13,7 @@ import type {
 import {
   GitHubAuthManager,
   type GitHubDeviceFlow,
+  type GitHubAuthManagerOptions,
 } from "./github-auth-manager";
 import type {
   AccessTokenResponse,
@@ -28,6 +29,12 @@ interface ProfileRequest {
   accessToken: string;
   signal: AbortSignal;
   deferred: Deferred<GithubUser>;
+}
+
+class NonAbortingAbortController extends AbortController {
+  override abort(reason?: unknown): void {
+    void reason;
+  }
 }
 
 const DEVICE_CODES: DeviceCodeResponse[] = [];
@@ -118,7 +125,9 @@ function _user(login: string): GithubUser {
   };
 }
 
-async function _createManager(): Promise<{
+async function _createManager(
+  options: Pick<GitHubAuthManagerOptions, "createAbortController"> = {}
+): Promise<{
   authPath: string;
   manager: GitHubAuthManager;
   states: GithubAuthState[];
@@ -130,6 +139,7 @@ async function _createManager(): Promise<{
   return {
     authPath: path.join(home, "settings", "auth.json"),
     manager: new GitHubAuthManager({
+      ...options,
       deviceFlow: DEVICE_FLOW,
       onChange: (state) => states.push(state),
     }),
@@ -226,5 +236,46 @@ describe("GitHubAuthManager", () => {
       scope: "gist",
       user: currentUser,
     });
+  });
+
+  test("controller identity rejects a non-current flow with an active signal", async () => {
+    _queueTwoFlows();
+    const controllers: AbortController[] = [
+      new NonAbortingAbortController(),
+      new AbortController(),
+    ];
+    const { authPath, manager } = await _createManager({
+      createAbortController: () => {
+        const controller = controllers.shift();
+        if (!controller) {
+          throw new Error("No AbortController queued for Device Flow test.");
+        }
+        return controller;
+      },
+    });
+
+    const firstSignIn = manager.signIn();
+    const firstProfile = await _waitForProfileRequest(0);
+    manager.cancelSignIn();
+    expect(firstProfile.signal.aborted).toBe(false);
+
+    const secondSignIn = manager.signIn();
+    const secondProfile = await _waitForProfileRequest(1);
+    firstProfile.deferred.resolve(_user("stale-user"));
+    await firstSignIn;
+
+    expect(manager.getState()).toEqual({
+      status: "signingIn",
+      userCode: "SECOND",
+      verificationUri: "https://github.com/login/device",
+    });
+    expect(manager.getAccessToken()).toBeNull();
+    expect(existsSync(authPath)).toBe(false);
+
+    const currentUser = _user("current-user");
+    secondProfile.deferred.resolve(currentUser);
+    await secondSignIn;
+    expect(manager.getState()).toEqual({ status: "signedIn", user: currentUser });
+    expect(manager.getAccessToken()).toBe("second-token");
   });
 });
