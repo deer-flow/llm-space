@@ -158,9 +158,10 @@ export async function pollForAccessToken(
 /** Fetch the authenticated user's public profile with a bearer token. */
 export async function fetchGithubUser(
   accessToken: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  fetchImpl: typeof fetch = fetch
 ): Promise<GithubUser> {
-  const response = await fetch(USER_URL, {
+  const response = await fetchImpl(USER_URL, {
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${accessToken}`,
@@ -182,7 +183,7 @@ export async function fetchGithubUser(
   const email =
     typeof data.email === "string" && data.email
       ? data.email
-      : await _fetchPrimaryEmail(accessToken, signal);
+      : await _fetchPrimaryEmail(accessToken, signal, fetchImpl);
   return {
     login,
     name: typeof data.name === "string" ? data.name : null,
@@ -195,10 +196,11 @@ export async function fetchGithubUser(
 /** The user's primary (or first verified) email, best-effort; null on failure. */
 async function _fetchPrimaryEmail(
   accessToken: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  fetchImpl: typeof fetch
 ): Promise<string | null> {
   try {
-    const response = await fetch(USER_EMAILS_URL, {
+    const response = await fetchImpl(USER_EMAILS_URL, {
       headers: {
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${accessToken}`,
