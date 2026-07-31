@@ -2,7 +2,11 @@ import type { BuiltinTool, BuiltinToolCallResponse } from "@llm-space/core";
 
 export interface ToolEntry {
   tool: BuiltinTool;
-  execute(this: void, args: Record<string, unknown>): Promise<unknown>;
+  execute(
+    this: void,
+    args: Record<string, unknown>,
+    config?: Record<string, unknown>
+  ): Promise<unknown>;
 }
 
 export interface ToolContribution {
@@ -96,15 +100,17 @@ export class ToolRegistry {
   async call({
     name,
     arguments: args,
+    config,
   }: {
     name: string;
     arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
   }): Promise<ToolCallResponse> {
     const entry = this._entriesByName.get(name);
     if (!entry) {
       throw new Error(`Built-in tool not found: ${name}`);
     }
-    const result = await entry.execute(args);
+    const result = await entry.execute(args, config);
     if (_isToolCallResponse(result)) {
       return { content: result.content };
     }

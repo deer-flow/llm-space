@@ -20,6 +20,10 @@ export async function getModelProviderGroups(
         api: modelManager.getApi(provider.id),
         disabledModels: modelManager.getDisabledModels(provider.id),
         customModels: modelManager.getCustomModels(provider.id),
+        imageGeneration:
+          provider.id === "ark"
+            ? modelManager.getArkImageGenerationConfig()
+            : undefined,
         websiteLink: modelManager.getWebsiteLink(provider.id),
         icon: modelManager.getProviderIcon(provider.id),
       }))

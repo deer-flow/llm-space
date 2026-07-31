@@ -146,10 +146,17 @@ describe("RemoteRuntimeClient", () => {
 
   test("posts filesystem, tool, MCP, and settings methods", async () => {
     const methods: string[] = [];
+    let builtInParams: unknown;
     await _withFetch(
       async (request) => {
-        const body = (await request.json()) as { method: string };
+        const body = (await request.json()) as {
+          method: string;
+          params?: unknown;
+        };
         methods.push(body.method);
+        if (body.method === "builtinTools.call") {
+          builtInParams = body.params;
+        }
         return Response.json({
           id: "1",
           ok: true,
@@ -166,7 +173,11 @@ describe("RemoteRuntimeClient", () => {
         await client.fsCp("a", "b");
         await client.fsMv("b", "c");
         await client.fsRm("c");
-        await client.builtInCallTool({ name: "ls", arguments: {} });
+        await client.builtInCallTool({
+          name: "generate_image",
+          arguments: { prompt: "fixture" },
+          config: { model: "seedream-fixture" },
+        });
         await client.mcpListTools("server-1");
         await client.mcpCallTool({
           serverId: "server-1",
@@ -191,6 +202,11 @@ describe("RemoteRuntimeClient", () => {
       "mcp.callTool",
       "search.set",
     ]);
+    expect(builtInParams).toEqual({
+      name: "generate_image",
+      arguments: { prompt: "fixture" },
+      config: { model: "seedream-fixture" },
+    });
   });
 
   test("parses SSE stream events", async () => {

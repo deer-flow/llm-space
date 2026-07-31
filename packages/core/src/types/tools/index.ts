@@ -70,6 +70,12 @@ const BuiltinTool = Type.Intersect([
      */
     icon: Type.Optional(Type.String()),
     /**
+     * User-owned configuration persisted with this Thread tool instance. It is
+     * never exposed in the model-facing parameter schema and is passed only to
+     * the trusted built-in runtime implementation.
+     */
+    config: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    /**
      * When `true`, the tool always ends the run and can never be auto-executed —
      * its result must be supplied by a human (e.g. `ask_user_question`). It is
      * excluded from {@link isExecutableTool} so neither the "auto run tools"

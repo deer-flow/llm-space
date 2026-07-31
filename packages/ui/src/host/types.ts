@@ -6,6 +6,7 @@
  */
 
 import type {
+  ArkImageGenerationConfig,
   AgentTransport,
   BuiltinTool,
   BuiltinToolCallResponse,
@@ -219,6 +220,7 @@ export interface ModelClient {
       api?:
         "anthropic-messages" | "openai-completions" | "openai-responses" | null;
       icon?: string | null;
+      imageGeneration?: ArkImageGenerationConfig;
     }
   ): Promise<ModelProviderGroup[]>;
   setModelEnabled(

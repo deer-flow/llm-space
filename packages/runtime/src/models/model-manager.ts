@@ -10,6 +10,13 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import {
+  DEFAULT_ARK_IMAGE_GENERATION_CONFIG,
+  getArkImageModelDefinitions,
+  SEEDREAM_IMAGE_MODELS,
+  SEEDREAM_IMAGE_SIZES,
+  type ArkImageGenerationConfig,
+  type SeedreamImageModelDefinition,
+  type SeedreamImageSize,
   type ModelProviderGroup,
   type CustomModel,
   type ModelConfig,
@@ -42,16 +49,20 @@ import {
  * next access.
  */
 export class ModelManager {
+  private readonly _settingsDir: string;
   private readonly _config: ModelsConfig;
   private _models: Models | null = null;
 
-  constructor() {
+  /** Load model settings from the normal app directory or an isolated test root. */
+  constructor(options: { settingsDir?: string } = {}) {
+    this._settingsDir = options.settingsDir ?? getSettingsDir();
     this._config = this._loadConfig();
     // Keep each provider's `customModels` in sync with its `models` list so the
     // renderer always sees which models are user-added, then persist any change.
     const providersChanged = this._normalizeCustomProviders();
     const modelsChanged = this._normalizeCustomModels();
-    if (providersChanged || modelsChanged) {
+    const imageGenerationChanged = this._normalizeArkImageGeneration();
+    if (providersChanged || modelsChanged || imageGenerationChanged) {
       this._saveConfig();
     }
   }
@@ -130,6 +141,9 @@ export class ModelManager {
       id,
       builtin: true,
       ...(apiKey !== undefined ? { apiKey } : {}),
+      ...(id === "ark"
+        ? { imageGeneration: { ...DEFAULT_ARK_IMAGE_GENERATION_CONFIG } }
+        : {}),
     });
 
     this._models = null;
@@ -173,6 +187,7 @@ export class ModelManager {
       name,
       api,
       icon,
+      imageGeneration,
     }: {
       apiKey?: string | null;
       baseUrl?: string | null;
@@ -180,6 +195,7 @@ export class ModelManager {
       name?: string | null;
       api?: CustomProviderApi | null;
       icon?: string | null;
+      imageGeneration?: ArkImageGenerationConfig;
     }
   ): void {
     const entry = this._config.providers.find(
@@ -214,6 +230,15 @@ export class ModelManager {
     if (icon !== undefined) {
       if (icon === null) delete entry.icon;
       else entry.icon = icon;
+    }
+    if (imageGeneration !== undefined) {
+      if (providerId !== "ark" || entry.builtin !== true) {
+        throw new Error(
+          "Image generation can only be configured on the builtin Ark provider."
+        );
+      }
+      _assertArkImageGenerationConfig(imageGeneration);
+      entry.imageGeneration = { ...imageGeneration };
     }
     // Rebuild the registry so a cleared baseUrl restores the model's default
     // (the cached model instance would otherwise keep the mutated value).
@@ -260,6 +285,14 @@ export class ModelManager {
   getProviderIcon(providerId: string): string | undefined {
     return this._config.providers.find((entry) => entry.id === providerId)
       ?.icon;
+  }
+
+  /** The saved Ark image-model inventory, or undefined without Ark. */
+  getArkImageGenerationConfig(): ArkImageGenerationConfig | undefined {
+    const config = this._config.providers.find(
+      (entry) => entry.id === "ark" && entry.builtin === true
+    )?.imageGeneration;
+    return config ? { ...config } : undefined;
   }
 
   /** The ids of the user-added models for a provider (empty by default). */
@@ -602,12 +635,34 @@ export class ModelManager {
     return changed;
   }
 
+  /**
+   * Normalize Ark's image-model inventory and remove legacy provider defaults.
+   * This keeps upgrades readable without treating image models as chat models
+   * or rejecting the whole settings file.
+   */
+  private _normalizeArkImageGeneration(): boolean {
+    const entry = this._config.providers.find(
+      (provider) => provider.id === "ark" && provider.builtin === true
+    );
+    if (!entry) {
+      return false;
+    }
+    const normalized = _normalizeArkImageGenerationConfig(
+      entry.imageGeneration
+    );
+    if (JSON.stringify(entry.imageGeneration) === JSON.stringify(normalized)) {
+      return false;
+    }
+    entry.imageGeneration = normalized;
+    return true;
+  }
+
   private get _configPath(): string {
-    return path.join(getSettingsDir(), "models.json");
+    return path.join(this._settingsDir, "models.json");
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
+    mkdirSync(this._settingsDir, { recursive: true });
     writeFileSync(
       this._configPath,
       `${JSON.stringify(this._config, null, 2)}\n`,
@@ -633,7 +688,7 @@ export class ModelManager {
         throw error;
       }
       const empty: ModelsConfig = { providers: [] };
-      mkdirSync(getSettingsDir(), { recursive: true });
+      mkdirSync(this._settingsDir, { recursive: true });
       writeFileSync(
         this._configPath,
         `${JSON.stringify(empty, null, 2)}\n`,
@@ -668,4 +723,155 @@ export class ModelManager {
   private _getCodexApiKey(): string | undefined {
     return getCodexCredentials()?.apiKey;
   }
+}
+
+/** Validate a renderer-supplied Ark image configuration before persisting it. */
+function _assertArkImageGenerationConfig(
+  config: ArkImageGenerationConfig
+): void {
+  _assertCustomArkImageModels(config.models);
+  const models = getArkImageModelDefinitions(config);
+  const modelIds = new Set(models.map((model) => model.id));
+  const disabledModels = config.disabledModels ?? [];
+  if (
+    disabledModels.some((modelId) => !modelIds.has(modelId)) ||
+    new Set(disabledModels).size !== disabledModels.length
+  ) {
+    throw new Error(
+      "Disabled Ark image models must reference unique model ids."
+    );
+  }
+}
+
+/** Normalize untrusted JSON from older or manually edited settings files. */
+function _normalizeArkImageGenerationConfig(
+  value: unknown
+): ArkImageGenerationConfig {
+  const candidate =
+    value && typeof value === "object"
+      ? (value as Partial<ArkImageGenerationConfig>)
+      : {};
+  const models = _normalizeCustomArkImageModels(candidate.models);
+  const withModels: ArkImageGenerationConfig = {
+    ...(models.length > 0 ? { models } : {}),
+  };
+  const modelIds = new Set(
+    getArkImageModelDefinitions(withModels).map((model) => model.id)
+  );
+  const disabledModels = Array.isArray(candidate.disabledModels)
+    ? [
+        ...new Set(
+          candidate.disabledModels.filter(
+            (modelId): modelId is string =>
+              typeof modelId === "string" && modelIds.has(modelId)
+          )
+        ),
+      ]
+    : [];
+  return {
+    ...(models.length > 0 ? { models } : {}),
+    ...(disabledModels.length > 0 ? { disabledModels } : {}),
+  };
+}
+
+/** Reject invalid custom model definitions supplied through renderer RPC. */
+function _assertCustomArkImageModels(
+  models: ArkImageGenerationConfig["models"]
+): void {
+  if (models === undefined) {
+    return;
+  }
+  if (!Array.isArray(models)) {
+    throw new Error("Custom Ark image models must be an array.");
+  }
+  const seen = new Set<string>(SEEDREAM_IMAGE_MODELS.map((model) => model.id));
+  for (const model of models) {
+    if (
+      !model ||
+      typeof model.id !== "string" ||
+      model.id.trim() !== model.id ||
+      model.id === "" ||
+      typeof model.name !== "string" ||
+      model.name.trim() !== model.name ||
+      model.name === ""
+    ) {
+      throw new Error("Custom Ark image models require a valid id and name.");
+    }
+    if (seen.has(model.id)) {
+      throw new Error(`Duplicate Ark image model id: ${model.id}`);
+    }
+    seen.add(model.id);
+    const sizes = model.supportedSizes;
+    if (
+      !Array.isArray(sizes) ||
+      sizes.length === 0 ||
+      sizes.some((size) => !_isSeedreamImageSize(size)) ||
+      new Set(sizes).size !== sizes.length ||
+      !sizes.includes(model.defaultSize)
+    ) {
+      throw new Error(
+        `Custom Ark image model ${model.id} has invalid size presets.`
+      );
+    }
+    if (model.icon !== undefined && typeof model.icon !== "string") {
+      throw new Error(
+        `Custom Ark image model ${model.id} has an invalid icon.`
+      );
+    }
+  }
+}
+
+/** Repair user-edited JSON by keeping only complete, unique custom models. */
+function _normalizeCustomArkImageModels(
+  value: unknown
+): SeedreamImageModelDefinition[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set<string>(SEEDREAM_IMAGE_MODELS.map((model) => model.id));
+  const models: SeedreamImageModelDefinition[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+    const candidate = raw as Partial<SeedreamImageModelDefinition>;
+    const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    const name =
+      typeof candidate.name === "string" ? candidate.name.trim() : "";
+    if (!id || !name || seen.has(id)) {
+      continue;
+    }
+    const supportedSizes = Array.isArray(candidate.supportedSizes)
+      ? [...new Set(candidate.supportedSizes.filter(_isSeedreamImageSize))]
+      : [];
+    if (supportedSizes.length === 0) {
+      continue;
+    }
+    const defaultSize =
+      _isSeedreamImageSize(candidate.defaultSize) &&
+      supportedSizes.includes(candidate.defaultSize)
+        ? candidate.defaultSize
+        : supportedSizes[0];
+    const icon =
+      typeof candidate.icon === "string" && candidate.icon.trim()
+        ? candidate.icon.trim()
+        : undefined;
+    seen.add(id);
+    models.push({
+      id,
+      name,
+      supportedSizes,
+      defaultSize,
+      ...(icon ? { icon } : {}),
+    });
+  }
+  return models;
+}
+
+/** Narrow unknown persisted values to Ark's supported size presets. */
+function _isSeedreamImageSize(value: unknown): value is SeedreamImageSize {
+  return (
+    typeof value === "string" &&
+    (SEEDREAM_IMAGE_SIZES as readonly string[]).includes(value)
+  );
 }

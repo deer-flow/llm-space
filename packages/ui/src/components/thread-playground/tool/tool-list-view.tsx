@@ -1,6 +1,10 @@
 "use client";
 
-import { type FunctionTool, type Tool } from "@llm-space/core";
+import {
+  type BuiltinTool,
+  type FunctionTool,
+  type Tool,
+} from "@llm-space/core";
 import {
   CableIcon,
   FunctionSquareIcon,
@@ -21,10 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
-import {
-  useThreadStore,
-  useThreadStoreActions,
-} from "../stores/thread-store";
+import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
 import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
 import { McpToolImportDialog } from "./mcp-tool-import-popover";
@@ -40,7 +41,7 @@ export function ToolListView({
 }) {
   const tools = useThreadStore((s) => s.thread.context?.tools);
   const runtimeId = useThreadStore((s) => s.runtimeId);
-  const { addTool, removeTool } = useThreadStoreActions();
+  const { addTool, removeTool, updateTool } = useThreadStoreActions();
   const { presentational } = useHostServices();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -57,6 +58,15 @@ export function ToolListView({
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
   const existingToolNames = useMemo(
     () => new Set((tools ?? []).map((tool) => tool.name)),
+    [tools]
+  );
+  const existingBuiltInTools = useMemo(
+    () =>
+      new Map(
+        (tools ?? [])
+          .filter((tool): tool is BuiltinTool => tool.type === "builtin")
+          .map((tool) => [tool.name, tool])
+      ),
     [tools]
   );
 
@@ -175,8 +185,10 @@ export function ToolListView({
           }}
           initialToolName={initialBuiltInToolName}
           existingToolNames={existingToolNames}
+          existingTools={existingBuiltInTools}
           runtimeId={runtimeId}
           onAdd={addTool}
+          onUpdate={updateTool}
           onRemove={removeTool}
         />
       </div>

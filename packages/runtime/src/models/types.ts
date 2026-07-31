@@ -1,4 +1,8 @@
-import type { CustomModel, ModelConfig } from "@llm-space/core";
+import type {
+  ArkImageGenerationConfig,
+  CustomModel,
+  ModelConfig,
+} from "@llm-space/core";
 
 export type CustomProviderApi =
   "anthropic-messages" | "openai-completions" | "openai-responses";
@@ -51,6 +55,8 @@ export interface ProviderConfig {
    * so these models can later be singled out for deletion.
    */
   customModels?: string[];
+  /** Native Ark image-model inventory; only valid on the builtin Ark provider. */
+  imageGeneration?: ArkImageGenerationConfig;
 }
 
 /** Shape of `settings/models.json`. */

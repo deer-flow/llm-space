@@ -160,6 +160,7 @@ async function _dispatch(
       return runtime.builtInCallTool({
         name: _stringParam(params, "name"),
         arguments: _recordParam(params, "arguments"),
+        config: _optionalRecordParam(params, "config"),
       });
     case "search.get":
       return runtime.getSearchSettings();
@@ -212,9 +213,11 @@ async function _dispatch(
     case "trace.importLangfuseJson":
       return runtime.traceImportLangfuseJson(
         _stringParam(params, "projectId"),
-        (params as unknown as {
-          files: Parameters<RuntimeClient["traceImportLangfuseJson"]>[1];
-        }).files
+        (
+          params as unknown as {
+            files: Parameters<RuntimeClient["traceImportLangfuseJson"]>[1];
+          }
+        ).files
       );
     case "trace.searchLangfuseTraces":
       return runtime.traceSearchLangfuseTraces(
@@ -304,4 +307,12 @@ function _recordParam(
     );
   }
   return value as Record<string, unknown>;
+}
+
+/** Read an optional object parameter without accepting arrays or primitives. */
+function _optionalRecordParam(
+  params: Record<string, unknown>,
+  name: string
+): Record<string, unknown> | undefined {
+  return params[name] === undefined ? undefined : _recordParam(params, name);
 }

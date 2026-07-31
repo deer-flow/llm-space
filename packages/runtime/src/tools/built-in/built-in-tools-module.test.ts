@@ -20,6 +20,7 @@ afterEach(async () => {
 describe("built-in tools module", () => {
   test("contributes the existing tools in their RPC list order", async () => {
     const tools = new ToolRegistry();
+    let generatedInput: unknown;
     const module = createBuiltInToolsModule({
       env: {},
       findSkill: (name) =>
@@ -30,6 +31,15 @@ describe("built-in tools module", () => {
               path: "/tmp/skills/fixture",
             }
           : null,
+      generateImage: (input) => {
+        generatedInput = input;
+        return Promise.resolve({
+          data: "aW1hZ2U=",
+          mimeType: "image/png",
+          model: "seedream-fixture",
+          size: "2048x2048",
+        });
+      },
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",
@@ -55,6 +65,7 @@ describe("built-in tools module", () => {
       "glob",
       "bash",
       "present_files",
+      "generate_image",
       "todo_write",
       "sleep",
       "ask_user_question",
@@ -72,6 +83,37 @@ describe("built-in tools module", () => {
         },
       ],
     });
+    expect(
+      await tools.call({
+        name: "generate_image",
+        arguments: { prompt: "A red circle" },
+        config: {
+          model: "seedream-fixture",
+          size: "2K",
+          watermark: true,
+        },
+      })
+    ).toEqual({
+      content: [
+        {
+          type: "text",
+          text: "Generated image with seedream-fixture at 2048x2048.",
+        },
+        { type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
+      ],
+    });
+    expect(generatedInput).toEqual({
+      prompt: "A red circle",
+      model: "seedream-fixture",
+      size: "2K",
+      watermark: true,
+    });
+    expect(
+      tools.call({
+        name: "generate_image",
+        arguments: { prompt: "A red circle" },
+      })
+    ).rejects.toThrow("Choose an enabled image model");
   });
 
   test("reports a missing dependency", () => {
@@ -79,6 +121,7 @@ describe("built-in tools module", () => {
     const module = createBuiltInToolsModule({
       env: {},
       findSkill: undefined,
+      generateImage: () => Promise.reject(new Error("unused")),
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",
@@ -105,6 +148,7 @@ describe("built-in tools module", () => {
     createBuiltInToolsModule({
       env: {},
       findSkill: () => null,
+      generateImage: () => Promise.reject(new Error("unused")),
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",
@@ -141,6 +185,7 @@ describe("built-in tools module", () => {
     createBuiltInToolsModule({
       env: {},
       findSkill: () => null,
+      generateImage: () => Promise.reject(new Error("unused")),
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",
@@ -177,6 +222,7 @@ describe("built-in tools module", () => {
     createBuiltInToolsModule({
       env: {},
       findSkill: () => null,
+      generateImage: () => Promise.reject(new Error("unused")),
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",

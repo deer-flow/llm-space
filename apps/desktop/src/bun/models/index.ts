@@ -1,1 +1,4 @@
-export { ModelManager } from "@llm-space/runtime/models";
+export {
+  createArkImageGenerator,
+  ModelManager,
+} from "@llm-space/runtime/models";

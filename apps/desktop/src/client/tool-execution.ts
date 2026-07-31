@@ -42,7 +42,7 @@ export async function executeTool(
     };
   }
   const result = await callBuiltInTool(
-    { name: tool.name, arguments: args },
+    { name: tool.name, arguments: args, config: tool.config },
     runtimeId
   );
   return {

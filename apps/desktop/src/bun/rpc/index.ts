@@ -316,8 +316,12 @@ export function createMainWindowRPC({
           }),
         builtInListTools: ({ runtimeId }) =>
           Promise.resolve(getRuntime(runtimeId).builtInListTools()),
-        builtInCallTool: ({ runtimeId, name, arguments: args }) =>
-          getRuntime(runtimeId).builtInCallTool({ name, arguments: args }),
+        builtInCallTool: ({ runtimeId, name, arguments: args, config }) =>
+          getRuntime(runtimeId).builtInCallTool({
+            name,
+            arguments: args,
+            config,
+          }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>
           Promise.resolve(analytics.setEnabled(enabled)),
@@ -410,7 +414,12 @@ export function createMainWindowRPC({
               title
             )
           ),
-        traceWriteWorkbench: async ({ runtimeId, projectId, traceKey, thread }) => {
+        traceWriteWorkbench: async ({
+          runtimeId,
+          projectId,
+          traceKey,
+          thread,
+        }) => {
           await getRuntime(runtimeId).traceWriteWorkbench(
             projectId,
             traceKey,

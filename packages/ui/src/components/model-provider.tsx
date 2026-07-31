@@ -2,6 +2,7 @@
 
 import type * as pi from "@earendil-works/pi-ai";
 import type {
+  ArkImageGenerationConfig,
   CustomModel,
   ModelConfig,
   ModelProviderGroup,
@@ -37,6 +38,7 @@ interface ModelContextValue {
         | "openai-responses"
         | null;
       icon?: string | null;
+      imageGeneration?: ArkImageGenerationConfig;
     }
   ) => Promise<void>;
   setModelEnabled: (
@@ -139,6 +141,7 @@ export function ModelProvider({
           | "openai-responses"
           | null;
         icon?: string | null;
+        imageGeneration?: ArkImageGenerationConfig;
       }
     ) => {
       setProviders(await client.updateProvider(providerId, fields));
@@ -347,6 +350,7 @@ export function useUpdateProvider(): (
       | "openai-responses"
       | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }
 ) => Promise<void> {
   return useModelProvider().updateProvider;

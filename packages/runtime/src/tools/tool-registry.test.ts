@@ -51,6 +51,39 @@ describe("ToolRegistry", () => {
     ).toThrow('Tool contribution "fixture.late" registered after freeze.');
   });
 
+  test("passes Thread-owned config separately from model arguments", async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      id: "fixture.config",
+      entries: [
+        {
+          tool: {
+            type: "builtin",
+            name: "fixture_config",
+            description: "Read trusted config.",
+            parameters: { type: "object", properties: {} },
+          },
+          execute: (_args, config) => Promise.resolve(config),
+        },
+      ],
+    });
+
+    expect(
+      await registry.call({
+        name: "fixture_config",
+        arguments: {},
+        config: { model: "fixture-model" },
+      })
+    ).toEqual({
+      content: [
+        {
+          type: "text",
+          text: '{\n  "model": "fixture-model"\n}',
+        },
+      ],
+    });
+  });
+
   test("serializes ordinary JSON with a content array as text", async () => {
     const registry = new ToolRegistry();
     registry.register({

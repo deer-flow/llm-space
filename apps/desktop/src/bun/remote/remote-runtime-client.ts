@@ -1,4 +1,5 @@
 import type {
+  ArkImageGenerationConfig,
   AgentEvent,
   BuiltinTool,
   CustomModel,
@@ -114,10 +115,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
   resolveGeneratorEnv(
     input: Parameters<RuntimeClient["resolveGeneratorEnv"]>[0]
   ) {
-    return this._rpc<{ modelApiKey: string; envValues: Record<string, string> }>(
-      "models.resolveGeneratorEnv",
-      input
-    );
+    return this._rpc<{
+      modelApiKey: string;
+      envValues: Record<string, string>;
+    }>("models.resolveGeneratorEnv", input);
   }
 
   fsLs(path: string) {
@@ -258,6 +259,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }) {
     return this._rpc<ModelProviderGroup[]>("models.updateProvider", input);
   }
@@ -322,7 +324,11 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }) {
     return this._rpc<McpCallToolResponse>("mcp.callTool", input);
   }
-  builtInCallTool(input: { name: string; arguments: Record<string, unknown> }) {
+  builtInCallTool(input: {
+    name: string;
+    arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
+  }) {
     return this._rpc<Awaited<ReturnType<RuntimeClient["builtInCallTool"]>>>(
       "builtinTools.call",
       input
@@ -406,7 +412,11 @@ export class RemoteRuntimeClient implements RuntimeClient {
       title,
     });
   }
-  async traceWriteWorkbench(projectId: string, traceKey: string, thread: Thread) {
+  async traceWriteWorkbench(
+    projectId: string,
+    traceKey: string,
+    thread: Thread
+  ) {
     await this._rpc<null>("trace.writeWorkbench", {
       projectId,
       traceKey,

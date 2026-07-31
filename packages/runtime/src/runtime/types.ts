@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
+  ArkImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
@@ -97,6 +98,7 @@ export interface RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }): Promise<ModelProviderGroup[]>;
   setModelEnabled(input: {
     providerId: string;
@@ -158,6 +160,7 @@ export interface RuntimeClient {
   builtInCallTool(input: {
     name: string;
     arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
   }): Promise<BuiltinToolCallResponse>;
 
   getSearchSettings(): MaybePromise<SearchSettings>;
@@ -199,7 +202,10 @@ export interface RuntimeClient {
     projectId: string;
     traceIds: string[];
   }): MaybePromise<TraceSyncResult>;
-  traceReadTrace(projectId: string, traceKey: string): MaybePromise<TraceRecord>;
+  traceReadTrace(
+    projectId: string,
+    traceKey: string
+  ): MaybePromise<TraceRecord>;
   traceReadOrCreateWorkbench(
     projectId: string,
     traceKey: string

@@ -18,7 +18,7 @@ import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
-import { ModelManager } from "../models";
+import { createArkImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
 import {
   RemoteServerManager,
@@ -51,6 +51,19 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
+  const generateImage = createArkImageGenerator({
+    getConfig: () => modelManager.getArkImageGenerationConfig(),
+    getApiKey: async () => {
+      // An explicitly configured `$ENV_NAME` remains authoritative even when
+      // unset; only a truly blank setting falls back to Ark's official env key.
+      const configured = await modelManager.getApiKey("ark", false);
+      return configured === undefined
+        ? process.env.ARK_API_KEY
+        : modelManager.getApiKey("ark");
+    },
+    getBaseUrl: () => modelManager.getBaseUrl("ark"),
+    getHeaders: () => modelManager.getHeaders("ark"),
+  });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager({
     managedSkillsDir: getManagedSkillsDir(),
@@ -71,6 +84,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       createBuiltInToolsModule({
         env: process.env,
         findSkill: skillsManager.findSkill.bind(skillsManager),
+        generateImage,
         getSearchSettings: searchSettings.get.bind(searchSettings),
         workspaceRoot: workspacePath,
         openPath,

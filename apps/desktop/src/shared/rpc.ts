@@ -1,4 +1,5 @@
 import type {
+  ArkImageGenerationConfig,
   AgentEvent,
   AgentStreamRequest,
   BuiltinTool,
@@ -155,6 +156,7 @@ export interface DesktopRPCType {
             | "openai-responses"
             | null;
           icon?: string | null;
+          imageGeneration?: ArkImageGenerationConfig;
         };
         response: ModelProviderGroup[];
       };
@@ -306,9 +308,7 @@ export interface DesktopRPCType {
       // `uv` runs. The wizard's "Next" gate on the directory step.
       generatorPrepareDirectory: {
         params: { parentDir: string; projectName: string };
-        response:
-          | { ok: true; dir: string }
-          | { ok: false; error: string };
+        response: { ok: true; dir: string } | { ok: false; error: string };
       };
       // Whether `uv` is installed on the host (+ version), so the renderer can
       // prompt to install it or fall back to instructions in PLAN.md.
@@ -343,7 +343,10 @@ export interface DesktopRPCType {
       // provider API key plus the raw values of named environment variables. Used
       // only after explicit user opt-in to materialize secrets to disk.
       generatorResolveEnv: {
-        params: RuntimeScopedParams & { providerId: string; envNames: string[] };
+        params: RuntimeScopedParams & {
+          providerId: string;
+          envNames: string[];
+        };
         response: { modelApiKey: string; envValues: Record<string, string> };
       };
       mcpListServers: {
@@ -389,6 +392,7 @@ export interface DesktopRPCType {
         params: RuntimeScopedParams & {
           name: string;
           arguments: Record<string, unknown>;
+          config?: Record<string, unknown>;
         };
         response: BuiltinToolCallResponse;
       };
@@ -487,7 +491,10 @@ export interface DesktopRPCType {
       };
       // Import renderer-read Langfuse JSON files into one trace project.
       traceImportLangfuseJson: {
-        params: RuntimeScopedParams & { projectId: string; files: TraceImportFile[] };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          files: TraceImportFile[];
+        };
         response: TraceImportResult;
       };
       // Search a bounded remote Langfuse trace list for explicit user sync.

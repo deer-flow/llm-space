@@ -1,5 +1,7 @@
 import * as pi from "@earendil-works/pi-ai";
 
+import type { ArkImageGenerationConfig } from "./image-generation";
+
 /**
  * A model as surfaced to the renderer: a pi model plus an optional `icon` — a
  * {@link https://github.com/lobehub/lobe-icons | @lobehub/icons} keyword used to
@@ -25,6 +27,8 @@ export interface ModelProviderGroup {
   disabledModels?: string[];
   /** Ids of the user-added custom models within this provider. */
   customModels?: string[];
+  /** Native Ark image-model inventory. Present only on the Ark provider. */
+  imageGeneration?: ArkImageGenerationConfig;
   websiteLink?: string;
   websiteURL?: string;
   apiKeyURL?: string;
