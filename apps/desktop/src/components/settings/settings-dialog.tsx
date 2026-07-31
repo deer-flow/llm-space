@@ -56,17 +56,23 @@ const PAGES = [
     Page: ({
       canConnect,
       canDisconnect,
+      acquireConnect,
+      acquireDisconnect,
       onConnected,
       onDisconnected,
     }: {
       canConnect?: () => boolean;
       canDisconnect?: (runtimeId: RuntimeId) => boolean;
+      acquireConnect?: () => (() => void) | null;
+      acquireDisconnect?: (runtimeId: RuntimeId) => (() => void) | null;
       onConnected?: (runtimeId: RuntimeId) => void;
-      onDisconnected?: (runtimeId: RuntimeId) => void;
+      onDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
     }) => (
       <RemoteServersPage
         canConnect={canConnect}
         canDisconnect={canDisconnect}
+        acquireConnect={acquireConnect}
+        acquireDisconnect={acquireDisconnect}
         onConnected={onConnected}
         onDisconnected={onDisconnected}
       />
@@ -129,6 +135,8 @@ export function SettingsDialog({
   onTabChange,
   canConnectRemote,
   canDisconnectRemote,
+  acquireConnectRemote,
+  acquireDisconnectRemote,
   onRemoteConnected,
   onRemoteDisconnected,
 }: {
@@ -138,8 +146,10 @@ export function SettingsDialog({
   onTabChange: (tab: SettingsTab) => void;
   canConnectRemote?: () => boolean;
   canDisconnectRemote?: (runtimeId: RuntimeId) => boolean;
+  acquireConnectRemote?: () => (() => void) | null;
+  acquireDisconnectRemote?: (runtimeId: RuntimeId) => (() => void) | null;
   onRemoteConnected?: (runtimeId: RuntimeId) => void;
-  onRemoteDisconnected?: (runtimeId: RuntimeId) => void;
+  onRemoteDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
   const [runtimeId, setRuntimeId] = useState<RuntimeId>("local");
 
@@ -195,6 +205,8 @@ export function SettingsDialog({
                   runtimeId={runtimeId}
                   canConnect={canConnectRemote}
                   canDisconnect={canDisconnectRemote}
+                  acquireConnect={acquireConnectRemote}
+                  acquireDisconnect={acquireDisconnectRemote}
                   onConnected={onRemoteConnected}
                   onDisconnected={onRemoteDisconnected}
                 />

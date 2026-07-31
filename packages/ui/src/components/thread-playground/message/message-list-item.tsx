@@ -339,7 +339,7 @@ function _ToolStepContinuation({
   const [callingTools, setCallingTools] = useState(false);
   const canCallTools =
     !readonly &&
-    status !== "running" &&
+    status === "idle" &&
     !callingTools &&
     callableToolCalls.length > 0;
   // "Continue" runs the thread from this message (continuing past the tool
@@ -347,7 +347,7 @@ function _ToolStepContinuation({
   // call has a response.
   const canContinue =
     !readonly &&
-    status !== "running" &&
+    status === "idle" &&
     !callingTools &&
     summarizeToolCalls(toolCalls).canContinue;
   const handleContinue = useCallback(async () => {

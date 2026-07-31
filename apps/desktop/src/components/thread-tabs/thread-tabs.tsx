@@ -29,8 +29,14 @@ import {
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
+import type { AcquireFileMutation } from "../file-system-tree-view/file-mutation-guard";
+
 import { RuntimePaneHost } from "./runtime-pane-host";
-import type { PaneStreamingChange } from "./runtime-run-tracker";
+import type {
+  PanePersistenceChange,
+  PaneRunSettled,
+  PaneRunStart,
+} from "./runtime-run-tracker";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
@@ -85,7 +91,16 @@ interface ThreadTabsProps {
     runtimeId: RuntimeId
   ) => void;
   onToggleSidebar?: () => void;
-  onStreamingChange?: PaneStreamingChange;
+  onRunStart?: PaneRunStart;
+  onRunSettled?: PaneRunSettled;
+  onPersistenceChange?: PanePersistenceChange;
+  onRefreshSettled?: (paneId: string) => void;
+  isMutationReserved?: (
+    paneId: string,
+    runtimeId: RuntimeId,
+    path?: string
+  ) => boolean;
+  acquireMutation?: AcquireFileMutation;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
 }
@@ -113,7 +128,12 @@ export function ThreadTabs({
   onMove,
   onTraceTitleChange,
   onToggleSidebar,
-  onStreamingChange,
+  onRunStart,
+  onRunSettled,
+  onPersistenceChange,
+  onRefreshSettled,
+  isMutationReserved,
+  acquireMutation,
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -396,7 +416,12 @@ export function ThreadTabs({
                 onMove={onMove}
                 onClose={() => close(tab.id)}
                 consumeDiscardedPane={consumeDiscardedPane}
-                onStreamingChange={onStreamingChange}
+                onRunStart={onRunStart}
+                onRunSettled={onRunSettled}
+                onPersistenceChange={onPersistenceChange}
+                onRefreshSettled={onRefreshSettled}
+                isMutationReserved={isMutationReserved}
+                acquireMutation={acquireMutation}
               />
             ) : (
               <TraceTabPane
@@ -406,7 +431,11 @@ export function ThreadTabs({
                 active={active}
                 refreshNonce={tab.refreshNonce ?? 0}
                 onClose={close}
-                onStreamingChange={onStreamingChange}
+                onRunStart={onRunStart}
+                onRunSettled={onRunSettled}
+                onPersistenceChange={onPersistenceChange}
+                onRefreshSettled={onRefreshSettled}
+                isMutationReserved={isMutationReserved}
                 onRenameTitle={onTraceTitleChange}
               />
             )

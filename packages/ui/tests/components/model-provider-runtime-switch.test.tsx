@@ -10,11 +10,13 @@ import {
   useDefaultModel,
   useModels,
   useRefreshModels,
+  useSetModelEnabled,
 } from "@llm-space/ui/components/model-provider";
 import type { ModelClient } from "@llm-space/ui/host";
 
 interface Deferred<T> {
   promise: Promise<T>;
+  reject(reason?: unknown): void;
   resolve(value: T): void;
 }
 
@@ -100,10 +102,12 @@ afterEach(async () => {
 
 function _deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((next, nextReject) => {
     resolve = next;
+    reject = nextReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function _model(
@@ -224,6 +228,31 @@ function RefreshProbe({
       onUnmount={onUnmount}
     />
   );
+}
+
+function MutationProbe({
+  onActions,
+  onModelId,
+}: {
+  onActions(actions: {
+    refresh: () => Promise<void>;
+    setModelEnabled: (
+      providerId: string,
+      modelId: string,
+      enabled: boolean
+    ) => Promise<void>;
+  }): void;
+  onModelId(modelId: string | null): void;
+}) {
+  const providers = useModels();
+  const refresh = useRefreshModels();
+  const setModelEnabled = useSetModelEnabled();
+  onModelId(providers[0]?.models[0]?.id ?? null);
+  useEffect(
+    () => onActions({ refresh, setModelEnabled }),
+    [onActions, refresh, setModelEnabled]
+  );
+  return null;
 }
 
 const NEVER = new Promise<never>(() => undefined);
@@ -399,5 +428,384 @@ describe("ModelProvider runtime switches", () => {
       providerIds: ["local-provider"],
     });
     expect({ mounts, unmounts }).toEqual({ mounts: 1, unmounts: 0 });
+  });
+
+  test("an A to B to A switch rejects the first A epoch's late response", async () => {
+    const staleModels = _deferred<ModelProviderGroup[]>();
+    const staleDefault = _deferred<ModelConfig | null>();
+    const currentModels = _deferred<ModelProviderGroup[]>();
+    const currentDefault = _deferred<ModelConfig | null>();
+    let aCall = 0;
+    const aClient = _client(
+      () => {
+        aCall += 1;
+        if (aCall === 1) {
+          return Promise.resolve(_providers("a-provider", "a-initial"));
+        }
+        return aCall === 2 ? staleModels.promise : currentModels.promise;
+      },
+      () => {
+        if (aCall === 1) {
+          return Promise.resolve({ provider: "a-provider", id: "a-initial" });
+        }
+        return aCall === 2 ? staleDefault.promise : currentDefault.promise;
+      }
+    );
+    const bClient = _client(
+      () => Promise.resolve(_providers("b-provider", "b-model")),
+      () => Promise.resolve({ provider: "b-provider", id: "b-model" })
+    );
+    const snapshots: ModelSnapshot[] = [];
+    let refresh: (() => Promise<void>) | null = null;
+    const probe = (
+      <RefreshProbe
+        onMount={() => undefined}
+        onRefresh={(next) => {
+          refresh = next;
+        }}
+        onSnapshot={(snapshot) => snapshots.push(snapshot)}
+        onUnmount={() => undefined}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    let staleRefresh: Promise<void> | null = null;
+    await act(async () => {
+      staleRefresh = refresh?.() ?? null;
+    });
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      staleModels.resolve(_providers("a-provider", "a-stale"));
+      staleDefault.resolve({ provider: "a-provider", id: "a-stale" });
+      await staleRefresh;
+    });
+    expect(snapshots.at(-1)?.providerIds).toEqual([]);
+
+    await act(async () => {
+      currentModels.resolve(_providers("a-provider", "a-current"));
+      currentDefault.resolve({ provider: "a-provider", id: "a-current" });
+      await Promise.resolve();
+    });
+    expect(snapshots.at(-1)).toEqual({
+      defaultModel: { provider: "a-provider", id: "a-current" },
+      providerIds: ["a-provider"],
+    });
+  });
+
+  test("a rapid A to pending B to A switch does not reveal A's old epoch", async () => {
+    const nextAModels = _deferred<ModelProviderGroup[]>();
+    const nextADefault = _deferred<ModelConfig | null>();
+    const pendingBModels = _deferred<ModelProviderGroup[]>();
+    const pendingBDefault = _deferred<ModelConfig | null>();
+    let aCall = 0;
+    const aClient = _client(
+      () => {
+        aCall += 1;
+        return aCall === 1
+          ? Promise.resolve(_providers("a-provider", "a-old"))
+          : nextAModels.promise;
+      },
+      () =>
+        aCall === 1
+          ? Promise.resolve({ provider: "a-provider", id: "a-old" })
+          : nextADefault.promise
+    );
+    const bClient = _client(
+      () => pendingBModels.promise,
+      () => pendingBDefault.promise
+    );
+    const snapshots: ModelSnapshot[] = [];
+    const probe = (
+      <ModelProbe
+        onMount={() => undefined}
+        onSnapshot={(snapshot) => snapshots.push(snapshot)}
+        onUnmount={() => undefined}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    expect(snapshots.at(-1)?.defaultModel?.id).toBe("a-old");
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+    });
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      // An unrelated parent render after A commits must not make A epoch 1's
+      // still-cached snapshot visible while A epoch 3 is loading.
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+    });
+
+    expect(snapshots.at(-1)).toEqual({
+      defaultModel: null,
+      providerIds: [],
+    });
+    await act(async () => {
+      nextAModels.resolve(_providers("a-provider", "a-new"));
+      nextADefault.resolve({ provider: "a-provider", id: "a-new" });
+      await Promise.resolve();
+    });
+    expect(snapshots.at(-1)?.defaultModel?.id).toBe("a-new");
+  });
+
+  test("same-client refreshes only commit the newest request generation", async () => {
+    const olderModels = _deferred<ModelProviderGroup[]>();
+    const olderDefault = _deferred<ModelConfig | null>();
+    const newerModels = _deferred<ModelProviderGroup[]>();
+    const newerDefault = _deferred<ModelConfig | null>();
+    let call = 0;
+    const client = _client(
+      () => {
+        call += 1;
+        if (call === 1) {
+          return Promise.resolve(_providers("provider", "initial"));
+        }
+        return call === 2 ? olderModels.promise : newerModels.promise;
+      },
+      () => {
+        if (call === 1) {
+          return Promise.resolve({ provider: "provider", id: "initial" });
+        }
+        return call === 2 ? olderDefault.promise : newerDefault.promise;
+      }
+    );
+    const snapshots: ModelSnapshot[] = [];
+    let refresh: (() => Promise<void>) | null = null;
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <ModelProvider client={client}>
+          <RefreshProbe
+            onMount={() => undefined}
+            onRefresh={(next) => {
+              refresh = next;
+            }}
+            onSnapshot={(snapshot) => snapshots.push(snapshot)}
+            onUnmount={() => undefined}
+          />
+        </ModelProvider>
+      );
+      await Promise.resolve();
+    });
+
+    let olderRefresh: Promise<void> | null = null;
+    let newerRefresh: Promise<void> | null = null;
+    await act(async () => {
+      olderRefresh = refresh?.() ?? null;
+      newerRefresh = refresh?.() ?? null;
+    });
+    await act(async () => {
+      newerModels.resolve(_providers("provider", "newer"));
+      newerDefault.resolve({ provider: "provider", id: "newer" });
+      await newerRefresh;
+    });
+    expect(snapshots.at(-1)?.defaultModel?.id).toBe("newer");
+
+    await act(async () => {
+      olderModels.resolve(_providers("provider", "older"));
+      olderDefault.resolve({ provider: "provider", id: "older" });
+      await olderRefresh;
+    });
+    expect(snapshots.at(-1)?.defaultModel?.id).toBe("newer");
+  });
+
+  test("same-client mutations execute in invocation order and refresh waits behind them", async () => {
+    const firstMutation = _deferred<ModelProviderGroup[]>();
+    const secondMutation = _deferred<ModelProviderGroup[]>();
+    const mutationCalls: boolean[] = [];
+    let reads = 0;
+    const client = _client(
+      () => {
+        reads += 1;
+        return Promise.resolve(_providers("provider", `read-${reads}`));
+      },
+      () => Promise.resolve(null)
+    );
+    client.setModelEnabled = async (_providerId, _modelId, enabled) => {
+      mutationCalls.push(enabled);
+      return enabled ? secondMutation.promise : firstMutation.promise;
+    };
+    let actions!: {
+      refresh: () => Promise<void>;
+      setModelEnabled: (
+        providerId: string,
+        modelId: string,
+        enabled: boolean
+      ) => Promise<void>;
+    };
+    const modelIds: (string | null)[] = [];
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <ModelProvider client={client}>
+          <MutationProbe
+            onActions={(next) => {
+              actions = next;
+            }}
+            onModelId={(modelId) => modelIds.push(modelId)}
+          />
+        </ModelProvider>
+      );
+      await Promise.resolve();
+    });
+    expect(reads).toBe(1);
+
+    let disable: Promise<void> | null = null;
+    let enable: Promise<void> | null = null;
+    let refresh: Promise<void> | null = null;
+    await act(async () => {
+      disable = actions.setModelEnabled("provider", "model", false);
+      enable = actions.setModelEnabled("provider", "model", true);
+      refresh = actions.refresh();
+      await Promise.resolve();
+    });
+
+    expect(mutationCalls).toEqual([false]);
+    expect(reads).toBe(1);
+    await act(async () => {
+      firstMutation.resolve(_providers("provider", "disabled"));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mutationCalls).toEqual([false, true]);
+    expect(reads).toBe(1);
+
+    secondMutation.resolve(_providers("provider", "enabled"));
+    await act(async () => {
+      await Promise.all([disable, enable, refresh]);
+    });
+
+    expect(reads).toBe(2);
+    expect(modelIds.at(-1)).toBe("read-2");
+  });
+
+  test("A to B to A waits for A's old-epoch mutation before refreshing", async () => {
+    const mutationMayLand = _deferred<void>();
+    let aModelId = "a-old";
+    const aClient = _client(
+      () => Promise.resolve(_providers("a-provider", aModelId)),
+      () => Promise.resolve(null)
+    );
+    aClient.setModelEnabled = async () => {
+      await mutationMayLand.promise;
+      aModelId = "a-after-mutation";
+      return _providers("a-provider", aModelId);
+    };
+    const bClient = _client(
+      () => Promise.resolve(_providers("b-provider", "b-model")),
+      () => Promise.resolve(null)
+    );
+    let actions!: {
+      refresh: () => Promise<void>;
+      setModelEnabled: (
+        providerId: string,
+        modelId: string,
+        enabled: boolean
+      ) => Promise<void>;
+    };
+    const modelIds: (string | null)[] = [];
+    const probe = (
+      <MutationProbe
+        onActions={(next) => {
+          actions = next;
+        }}
+        onModelId={(modelId) => modelIds.push(modelId)}
+      />
+    );
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    const oldEpochMutation = actions.setModelEnabled(
+      "a-provider",
+      "a-model",
+      false
+    );
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      await Promise.resolve();
+    });
+    expect(modelIds.at(-1)).toBeNull();
+
+    mutationMayLand.resolve();
+    await act(async () => {
+      await oldEpochMutation;
+      await Promise.resolve();
+    });
+
+    expect(modelIds.at(-1)).toBe("a-after-mutation");
+  });
+
+  test("a failed later mutation leaves the last successful backend state visible", async () => {
+    const disableResult = _deferred<ModelProviderGroup[]>();
+    const enableResult = _deferred<ModelProviderGroup[]>();
+    let backendModelId = "enabled";
+    const client = _client(
+      () => Promise.resolve(_providers("provider", backendModelId)),
+      () => Promise.resolve(null)
+    );
+    client.setModelEnabled = async (_providerId, _modelId, enabled) =>
+      enabled ? enableResult.promise : disableResult.promise;
+    let actions!: {
+      refresh: () => Promise<void>;
+      setModelEnabled: (
+        providerId: string,
+        modelId: string,
+        enabled: boolean
+      ) => Promise<void>;
+    };
+    const modelIds: (string | null)[] = [];
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <ModelProvider client={client}>
+          <MutationProbe
+            onActions={(next) => {
+              actions = next;
+            }}
+            onModelId={(modelId) => modelIds.push(modelId)}
+          />
+        </ModelProvider>
+      );
+      await Promise.resolve();
+    });
+
+    const disable = actions.setModelEnabled("provider", "model", false);
+    const enable = actions.setModelEnabled("provider", "model", true);
+    backendModelId = "disabled";
+    await act(async () => {
+      disableResult.resolve(_providers("provider", backendModelId));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    enableResult.reject(new Error("enable failed"));
+    await Promise.allSettled([disable, enable]);
+
+    expect(modelIds.at(-1)).toBe("disabled");
   });
 });

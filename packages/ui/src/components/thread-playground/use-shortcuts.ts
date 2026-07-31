@@ -33,7 +33,7 @@ export function useShortcuts({ readonly }: { readonly: boolean }) {
           } catch {
             // Ignored
           }
-        } else {
+        } else if (status === "idle") {
           void run();
         }
         return;

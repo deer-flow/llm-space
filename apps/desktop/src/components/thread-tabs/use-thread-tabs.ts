@@ -15,6 +15,7 @@ import { createFileSystemClient, traceClient } from "@/client";
 import { listRuntimes } from "@/client/remote-servers";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { pruneInvalidRestoredTabs } from "./restored-tab-pruning";
 import { removeTabsForRuntime } from "./tab-runtime-scope";
 
 /** An open workspace thread tab. `id` is stable as `thread:{path}`. */
@@ -335,7 +336,9 @@ async function _availableRuntimeIds(): Promise<Set<RuntimeId> | undefined> {
   }
 }
 
-export function useThreadTabs(): ThreadTabs {
+export function useThreadTabs(
+  options: { canPruneRestoredTab?: (tab: AppTab) => boolean } = {}
+): ThreadTabs {
   const restoredTabs = useRef<AppTab[] | null>(null);
   if (restoredTabs.current === null) {
     restoredTabs.current = _loadPersistedTabs();
@@ -371,7 +374,6 @@ export function useThreadTabs(): ThreadTabs {
 
   useEffect(() => {
     const restored = tabsRef.current;
-    const restoredActive = activeId;
     if (restored.length === 0) return;
     let cancelled = false;
     void (async () => {
@@ -383,19 +385,29 @@ export function useThreadTabs(): ThreadTabs {
       );
     })().then((checked) => {
       if (cancelled) return;
-      const alive = checked.filter((tab): tab is AppTab => tab !== null);
-      if (alive.length !== restored.length) setTabs(alive);
-      const aliveIds = alive.map((tab) => tab.id);
-      setActiveId(
-        restoredActive !== null && aliveIds.includes(restoredActive)
-          ? restoredActive
-          : (alive[0]?.id ?? null)
+      const invalid = checked.flatMap((tab, index) =>
+        tab === null && restored[index] ? [restored[index]] : []
       );
+      setTabs((current) => {
+        const next = pruneInvalidRestoredTabs(
+          current,
+          invalid,
+          options.canPruneRestoredTab ?? (() => true)
+        );
+        if (next === current || next.length === current.length) return current;
+        setActiveId((currentActive) =>
+          currentActive !== null &&
+          next.some((tab) => tab.id === currentActive)
+            ? currentActive
+            : (next[0]?.id ?? null)
+        );
+        return next;
+      });
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restoration check; reads the initial activeId, must not re-run when it changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restoration check; reads initial tabs/options and must not re-run when they change
   }, []);
 
   const open = useCallback((path: string, runtimeId: RuntimeId = "local") => {

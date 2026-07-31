@@ -41,6 +41,7 @@ import {
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { RuntimeId } from "@/shared/runtime";
 
+import type { AcquireFileMutation } from "./file-mutation-guard";
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
 
@@ -76,6 +77,7 @@ function _FileSystemTreeView({
   onSelectFile,
   onRemove,
   onMove,
+  acquireMutation,
 }: {
   className?: string;
   runtimeId: RuntimeId;
@@ -86,9 +88,14 @@ function _FileSystemTreeView({
   onRemove?: (path: string, runtimeId: RuntimeId) => void;
   /** Fired after a path changes via rename or move (`from` → `to`). */
   onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
+  acquireMutation?: AcquireFileMutation;
 }) {
   const fullScreen = useFullScreen();
   const seedHost = useHostServices();
+  const mutationReconciliation = useMemo(
+    () => ({ onMove, onRemove }),
+    [onMove, onRemove]
+  );
   const {
     nodesByPath,
     loadingByPath,
@@ -105,7 +112,7 @@ function _FileSystemTreeView({
     reveal,
     move,
     rename,
-  } = useFileSystemTree(runtimeId);
+  } = useFileSystemTree(runtimeId, acquireMutation, mutationReconciliation);
 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -397,8 +404,6 @@ function _FileSystemTreeView({
         new Promise<boolean>((resolve) => {
           setOverwriteConflict({ ...info, resolve });
         }),
-    }).then((to) => {
-      if (to) onMove?.(source.id, to, runtimeId);
     });
   }
 
@@ -444,7 +449,6 @@ function _FileSystemTreeView({
                   Icon ? threadFileNameFromTitle(base) : base
                 ).then((to) => {
                   if (to) {
-                    onMove?.(from, to, runtimeId);
                     if (openAfter) revealCreatedFile(to);
                   } else if (openAfter) {
                     // Rename was a no-op/failed; the file still lives at `from`.
@@ -535,9 +539,7 @@ function _FileSystemTreeView({
           const path = deleting;
           setDeleting(null);
           if (path) {
-            void remove(path).then((ok) => {
-              if (ok) onRemove?.(path, runtimeId);
-            });
+            void remove(path);
           }
         }}
       />

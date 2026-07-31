@@ -21,11 +21,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type Dispatch,
   type MutableRefObject,
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { flushSync } from "react-dom";
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
@@ -46,7 +48,16 @@ import {
   filterTabsForRuntime,
   ThreadTabs,
   useThreadTabs,
+  type AppTab,
 } from "@/components/thread-tabs";
+import {
+  acquireFileMutationForTabs,
+  closeAllTabsIfAllowed,
+  closeOtherTabsIfAllowed,
+  closeTabIfAllowed,
+  paneIdForTab,
+  refreshTabIfAllowed,
+} from "@/components/thread-tabs/pane-mutation-actions";
 import { RuntimeRunTracker } from "@/components/thread-tabs/runtime-run-tracker";
 import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
 import { UpdateIndicator } from "@/components/update-indicator";
@@ -262,7 +273,24 @@ function PageWorkspace({
   setWorkspaceRuntimeId: Dispatch<SetStateAction<RuntimeId>>;
   workspaceRuntimeIdRef: MutableRefObject<RuntimeId>;
 }) {
-  const tabs = useThreadTabs();
+  const runtimeRunTrackerRef = useRef(new RuntimeRunTracker());
+  useSyncExternalStore(
+    runtimeRunTrackerRef.current.subscribe,
+    runtimeRunTrackerRef.current.getSnapshot,
+    runtimeRunTrackerRef.current.getSnapshot
+  );
+  const canPruneRestoredTab = useCallback((tab: AppTab) => {
+    const paneId = paneIdForTab(tab);
+    return (
+      !runtimeRunTrackerRef.current.isPaneBusy(paneId) &&
+      !runtimeRunTrackerRef.current.isMutationReserved(
+        paneId,
+        tab.runtimeId,
+        tab.type === "thread" ? tab.path : undefined
+      )
+    );
+  }, []);
+  const tabs = useThreadTabs({ canPruneRestoredTab });
   const { executeCommand } = useCommands();
   const models = useModels();
   const queryClient = useQueryClient();
@@ -273,6 +301,8 @@ function PageWorkspace({
     closeAllInRuntime,
     discardRuntime,
     closeOthersInRuntime,
+    handleMove,
+    handleRemove,
     openTrace,
     reopenClosed,
   } = tabs;
@@ -288,9 +318,13 @@ function PageWorkspace({
   // The visible active tab is read through a ref so command handlers never go
   // stale or accidentally target a tab from another runtime.
   const activeTabIdRef = useRef(visibleActiveId);
+  const allTabsRef = useRef(tabs.tabs);
   useEffect(() => {
     activeTabIdRef.current = visibleActiveId;
   }, [visibleActiveId]);
+  useEffect(() => {
+    allTabsRef.current = tabs.tabs;
+  }, [tabs.tabs]);
   const activateVisibleTab = useCallback(
     (id: string) => {
       if (visibleTabs.some((tab) => tab.id === id)) tabs.activate(id);
@@ -318,7 +352,6 @@ function PageWorkspace({
     },
     [tabs, visibleActiveId, visibleTabs]
   );
-  const runtimeRunTrackerRef = useRef(new RuntimeRunTracker());
   const showRuntimeRunBlocked = useCallback((action: string) => {
     toast.info("Wait for active runs to finish", {
       description: `Completed output will be saved before ${action}.`,
@@ -337,11 +370,77 @@ function PageWorkspace({
     showRuntimeRunBlocked("changing remote connections");
     return false;
   }, [showRuntimeRunBlocked]);
-  const handlePaneStreamingChange = useCallback(
-    (paneId: string, runtimeId: RuntimeId, running: boolean) => {
-      runtimeRunTrackerRef.current.setRunning(paneId, runtimeId, running);
+  const handlePaneRunStart = useCallback(
+    (paneId: string, runtimeId: RuntimeId, runId: string, path?: string) =>
+      runtimeRunTrackerRef.current.beginRun(
+        paneId,
+        runtimeId,
+        runId,
+        path
+      ),
+    []
+  );
+  const handlePaneRunSettled = useCallback(
+    (paneId: string, runId: string) => {
+      runtimeRunTrackerRef.current.settleRun(paneId, runId);
     },
     []
+  );
+  const handlePanePersistenceChange = useCallback(
+    (
+      paneId: string,
+      runtimeId: RuntimeId,
+      owner: object,
+      busy: boolean,
+      path?: string
+    ) => {
+      runtimeRunTrackerRef.current.setPersistenceBusy(
+        paneId,
+        runtimeId,
+        owner,
+        busy,
+        path
+      );
+    },
+    []
+  );
+  const isPaneMutationReserved = useCallback(
+    (paneId: string, runtimeId: RuntimeId, path?: string) =>
+      runtimeRunTrackerRef.current.isMutationReserved(
+        paneId,
+        runtimeId,
+        path
+      ),
+    []
+  );
+  const acquireFileMutation = useCallback(
+    (paths: string[], runtimeId: RuntimeId, action: string) =>
+      acquireFileMutationForTabs({
+        tracker: runtimeRunTrackerRef.current,
+        tabs: allTabsRef.current,
+        paths,
+        runtimeId,
+        onBlocked: () => showRuntimeRunBlocked(action),
+      }),
+    [showRuntimeRunBlocked]
+  );
+  const acquireRemoteConnectionMutation = useCallback(
+    () => {
+      const release = runtimeRunTrackerRef.current.reserveAll();
+      if (release) return release;
+      showRuntimeRunBlocked("changing remote connections");
+      return null;
+    },
+    [showRuntimeRunBlocked]
+  );
+  const acquireRuntimeDisconnectMutation = useCallback(
+    (runtimeId: RuntimeId) => {
+      const release = runtimeRunTrackerRef.current.reserveRuntime(runtimeId);
+      if (release) return release;
+      showRuntimeRunBlocked("disconnecting this runtime");
+      return null;
+    },
+    [showRuntimeRunBlocked]
   );
   const discardRuntimeWorkspace = useCallback(
     (runtimeId: RuntimeId) => {
@@ -437,6 +536,26 @@ function PageWorkspace({
     [refreshRuntimes, switchWorkspaceRuntime]
   );
 
+  const commitDisconnectedRuntime = useCallback(
+    (runtimeId: RuntimeId) => {
+      // The runtime reservation is released as soon as this callback returns.
+      // Commit tab removal and any active-runtime transition synchronously so
+      // no pane can acquire a fresh run lease against a disconnected runtime
+      // in the React scheduling gap.
+      flushSync(() => {
+        discardRuntimeWorkspace(runtimeId);
+        if (workspaceRuntimeIdRef.current === runtimeId) {
+          transitionWorkspaceRuntime("local");
+        }
+      });
+    },
+    [
+      discardRuntimeWorkspace,
+      transitionWorkspaceRuntime,
+      workspaceRuntimeIdRef,
+    ]
+  );
+
   useEffect(() => {
     void refreshRuntimes({ syncDefault: true }).catch(() => undefined);
   }, [refreshRuntimes]);
@@ -509,16 +628,40 @@ function PageWorkspace({
       const target =
         id ??
         (path ? threadTabId(path, targetRuntimeId) : activeTabIdRef.current);
-      if (target) close(target);
+      if (!target) return;
+      closeTabIfAllowed({
+        tracker: runtimeRunTrackerRef.current,
+        tabs: tabs.tabs,
+        targetId: target,
+        onBlocked: () => showRuntimeRunBlocked("closing this tab"),
+        close,
+      });
     },
     closeOtherTabs: ({ id, path, runtimeId }) => {
       const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
       const target =
         id ??
         (path ? threadTabId(path, targetRuntimeId) : activeTabIdRef.current);
-      if (target) closeOthersInRuntime(target, targetRuntimeId);
+      if (!target) return;
+      closeOtherTabsIfAllowed({
+        tracker: runtimeRunTrackerRef.current,
+        tabs: tabs.tabs,
+        keepId: target,
+        runtimeId: targetRuntimeId,
+        onBlocked: () => showRuntimeRunBlocked("closing other tabs"),
+        closeOthers: closeOthersInRuntime,
+      });
     },
-    closeAllTabs: () => closeAllInRuntime(workspaceRuntimeIdRef.current),
+    closeAllTabs: () => {
+      const runtimeId = workspaceRuntimeIdRef.current;
+      closeAllTabsIfAllowed({
+        tracker: runtimeRunTrackerRef.current,
+        tabs: tabs.tabs,
+        runtimeId,
+        onBlocked: () => showRuntimeRunBlocked("closing all tabs"),
+        closeAll: closeAllInRuntime,
+      });
+    },
     reopenClosedTab: () => void reopenClosed(),
     selectNextTab: () => activateVisibleSibling(1),
     selectPreviousTab: () => activateVisibleSibling(-1),
@@ -607,6 +750,52 @@ function PageWorkspace({
   const handleCloseAllTabs = useCallback(
     () => executeCommand({ type: "closeAllTabs", args: {} }),
     [executeCommand]
+  );
+  const refreshReservationsRef = useRef(new Map<string, () => void>());
+  const handleRefreshTab = useCallback(
+    (id: string) => {
+      const tab = tabs.tabs.find((candidate) => candidate.id === id);
+      if (!tab) return;
+      const reservation = refreshTabIfAllowed({
+        tracker: runtimeRunTrackerRef.current,
+        tabs: tabs.tabs,
+        targetId: tab.id,
+        onBlocked: () => showRuntimeRunBlocked("refreshing this tab"),
+        refresh: tabs.refresh,
+      });
+      if (reservation) {
+        refreshReservationsRef.current.set(
+          reservation.paneId,
+          reservation.release
+        );
+      }
+    },
+    [showRuntimeRunBlocked, tabs]
+  );
+  const handlePaneRefreshSettled = useCallback((paneId: string) => {
+    const release = refreshReservationsRef.current.get(paneId);
+    if (!release) return;
+    refreshReservationsRef.current.delete(paneId);
+    release();
+  }, []);
+  useEffect(
+    () => () => {
+      refreshReservationsRef.current.forEach((release) => release());
+      refreshReservationsRef.current.clear();
+    },
+    []
+  );
+  const reconcileFileRemove = useCallback(
+    (path: string, runtimeId: RuntimeId) => {
+      flushSync(() => handleRemove(path, runtimeId));
+    },
+    [handleRemove]
+  );
+  const reconcileFileMove = useCallback(
+    (from: string, to: string, runtimeId: RuntimeId) => {
+      flushSync(() => handleMove(from, to, runtimeId));
+    },
+    [handleMove]
   );
   const handleRevealFile = useCallback(
     (path: string, runtimeId: RuntimeId) =>
@@ -728,8 +917,9 @@ function PageWorkspace({
                 effectiveSidebarMode === "files" ? "min-h-0 flex-1" : "hidden"
               }
               onSelectFile={tabs.open}
-              onRemove={tabs.handleRemove}
-              onMove={tabs.handleMove}
+              onRemove={reconcileFileRemove}
+              onMove={reconcileFileMove}
+              acquireMutation={acquireFileMutation}
             />
             {tracingEnabled && (
               <LazyMount open={effectiveSidebarMode === "traces"}>
@@ -755,12 +945,8 @@ function PageWorkspace({
             <RemoteStatus
               runtimeId={workspaceRuntimeId}
               canDisconnect={canDisconnectRuntime}
-              onDisconnecting={discardRuntimeWorkspace}
-              onDisconnected={(runtimeId) => {
-                discardRuntimeWorkspace(runtimeId);
-                if (workspaceRuntimeIdRef.current !== runtimeId) return;
-                transitionWorkspaceRuntime("local");
-              }}
+              acquireDisconnect={acquireRuntimeDisconnectMutation}
+              onDisconnected={commitDisconnectedRuntime}
             />
             <AccountStatus />
           </ResizablePanel>
@@ -788,7 +974,7 @@ function PageWorkspace({
               }
               activeId={visibleActiveId}
               activate={activateVisibleTab}
-              refresh={tabs.refresh}
+              refresh={handleRefreshTab}
               consumeDiscardedPane={tabs.consumeDiscardedPane}
               sidebarOpen={sidebarOpen}
               fullScreen={fullScreen}
@@ -801,10 +987,15 @@ function PageWorkspace({
               copyFile={handleCopyFile}
               reorder={reorderVisibleTabs}
               onNewFile={handleNewFile}
-              onMove={tabs.handleMove}
+              onMove={reconcileFileMove}
               onTraceTitleChange={tabs.handleTraceTitleChange}
               onToggleSidebar={handleToggleSidebar}
-              onStreamingChange={handlePaneStreamingChange}
+              onRunStart={handlePaneRunStart}
+              onRunSettled={handlePaneRunSettled}
+              onPersistenceChange={handlePanePersistenceChange}
+              onRefreshSettled={handlePaneRefreshSettled}
+              isMutationReserved={isPaneMutationReserved}
+              acquireMutation={acquireFileMutation}
               toolbarSlot={<UpdateIndicator />}
             />
           </ResizablePanel>
@@ -822,15 +1013,12 @@ function PageWorkspace({
           onTabChange={setSettingsTab}
           canConnectRemote={canConnectRemote}
           canDisconnectRemote={canDisconnectRuntime}
+          acquireConnectRemote={acquireRemoteConnectionMutation}
+          acquireDisconnectRemote={acquireRuntimeDisconnectMutation}
           onRemoteConnected={(runtimeId) => {
             transitionWorkspaceRuntime(runtimeId);
           }}
-          onRemoteDisconnected={(runtimeId) => {
-            discardRuntimeWorkspace(runtimeId);
-            if (workspaceRuntimeIdRef.current === runtimeId) {
-              transitionWorkspaceRuntime("local");
-            }
-          }}
+          onRemoteDisconnected={commitDisconnectedRuntime}
         />
       </LazyMount>
       <LazyMount open={commandPaletteOpen}>

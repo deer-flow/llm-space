@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentTransport, Thread } from "@llm-space/core";
 import type { ModelClient } from "@llm-space/ui/host";
-import { act, useEffect, useState } from "react";
+import { act, useEffect, useLayoutEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { runRemoteRuntimeActionIfAllowed } from "@/components/remote-runtime-actions";
@@ -13,6 +13,8 @@ import {
   settleStreamingPane,
 } from "@/components/thread-tabs/runtime-run-tracker";
 import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
+import { SerializedPersistence } from "@/components/thread-tabs/serialized-persistence";
+import { usePaneRefreshAcknowledgement } from "@/components/thread-tabs/use-pane-refresh-ack";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
@@ -155,10 +157,12 @@ function _createRoot(): Root {
 
 function _deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((nextResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
+    reject = nextReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function _event(value: unknown): AgentEvent {
@@ -218,7 +222,12 @@ describe("WorkspaceModelScope", () => {
       ["local", _client()],
       ["remote:server-1", _client()],
     ]);
+    const clientCreations = new Map<RuntimeId, number>();
     const createClient = (runtimeId: RuntimeId) => {
+      clientCreations.set(
+        runtimeId,
+        (clientCreations.get(runtimeId) ?? 0) + 1
+      );
       const client = clients.get(runtimeId);
       if (!client) throw new Error(`Missing test client for ${runtimeId}`);
       return client;
@@ -257,10 +266,562 @@ describe("WorkspaceModelScope", () => {
     });
 
     expect({ mounts, unmounts }).toEqual({ mounts: 1, unmounts: 0 });
+
+    await act(async () => {
+      activeRoot?.render(
+        <WorkspaceModelScope runtimeId="local" createClient={createClient}>
+          {probe}
+        </WorkspaceModelScope>
+      );
+      await Promise.resolve();
+    });
+
+    expect(Object.fromEntries(clientCreations)).toEqual({
+      local: 1,
+      "remote:server-1": 1,
+    });
   });
 });
 
 describe("RuntimePaneHost", () => {
+  test("an older settlement leaves a newer run lease active", () => {
+    const tracker = new RuntimeRunTracker();
+    tracker.beginRun("local-pane", "local", "run-1");
+    tracker.beginRun("local-pane", "local", "run-2");
+
+    expect(tracker.settleRun("local-pane", "run-1")).toBe(true);
+    expect(tracker.canDisconnect("local")).toBe(false);
+    expect(tracker.settleRun("local-pane", "run-2")).toBe(true);
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("overlapping run owners keep the pane busy until both settle", () => {
+    const tracker = new RuntimeRunTracker();
+    tracker.beginRun("local-pane", "local", "run-1");
+    tracker.beginRun("local-pane", "local", "run-2");
+
+    expect(tracker.settleRun("local-pane", "run-2")).toBe(true);
+    expect(tracker.canDisconnect("local")).toBe(false);
+    expect(tracker.settleRun("local-pane", "run-1")).toBe(true);
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("a delayed first-run end cannot capture the second run token", async () => {
+    const store = createThreadStore({ context: {} });
+    const tracker = new RuntimeRunTracker();
+    const starts: string[] = [];
+    const ends: string[] = [];
+    const callbacks: ThreadPlaygroundEventCallbacks = {
+      onStreamingStart: (runId) => {
+        starts.push(runId);
+        tracker.beginRun("local-pane", "local", runId);
+      },
+      onStreamingEnd: (runId) => {
+        ends.push(runId);
+        tracker.settleRun("local-pane", runId);
+      },
+    };
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={callbacks}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    act(() => {
+      store.setState({ status: "preparing", activeRunId: "run-1" });
+      store.setState({ status: "idle", activeRunId: null });
+      store.setState({ status: "preparing", activeRunId: "run-2" });
+    });
+    await Promise.resolve();
+
+    expect(starts).toEqual(["run-1", "run-2"]);
+    expect(ends).toEqual(["run-1"]);
+    expect(tracker.canDisconnect("local")).toBe(false);
+  });
+
+  test("async prompt preparation owns the pane before transport starts", async () => {
+    const include = _deferred<string>();
+    let transportCalls = 0;
+    const store = createThreadStore(
+      {
+        context: {
+          systemPrompt: '@include("slow.txt")',
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Run" }],
+            },
+          ],
+        },
+      },
+      {
+        loadFile: () => include.promise,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        transport: async function* () {
+          transportCalls += 1;
+          yield _event({
+            type: "message_start",
+            message: { role: "assistant" },
+          });
+          yield _event({
+            type: "message_end",
+            message: { role: "assistant", content: [] },
+          });
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    const callbacks: ThreadPlaygroundEventCallbacks = {
+      onStreamingStart: (runId) => {
+        tracker.beginRun("local-pane", "local", runId);
+      },
+      onStreamingEnd: (runId) => {
+        tracker.settleRun("local-pane", runId);
+      },
+    };
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge store={store} callbacks={callbacks} onMount={() => () => undefined} />
+      );
+    });
+
+    const run = store.getState().run();
+    await Promise.resolve();
+    expect(store.getState().status).toBe("preparing");
+    expect(tracker.canDisconnect("local")).toBe(false);
+    expect(transportCalls).toBe(0);
+
+    include.resolve("Prepared");
+    await run;
+    await Promise.resolve();
+    expect(store.getState().status).toBe("idle");
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("a synchronous preflight failure releases the same preparing token", async () => {
+    const store = createThreadStore(
+      { context: {} },
+      {
+        resolveModel: () => {
+          throw new Error("model lookup failed");
+        },
+      }
+    );
+    const starts: string[] = [];
+    const ends: string[] = [];
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={{
+            onStreamingStart: (runId) => {
+              starts.push(runId);
+            },
+            onStreamingEnd: (runId) => {
+              ends.push(runId);
+            },
+          }}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    await store.getState().run();
+    await Promise.resolve();
+    expect(store.getState().status).toBe("idle");
+    expect(starts).toHaveLength(1);
+    expect(ends).toEqual(starts);
+  });
+
+  test("a no-op preflight failure settles without manufacturing a write", async () => {
+    const store = createThreadStore(
+      { context: {} },
+      {
+        resolveModel: () => {
+          throw new Error("model lookup failed");
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    const writes: Thread[] = [];
+    const persistence = new SerializedPersistence<Thread>(async (thread) => {
+      writes.push(thread);
+    });
+    let settlement: Promise<void> | null = null;
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={{
+            onChange: (thread) => persistence.setPending(thread),
+            onStreamingStart: (runId) =>
+              tracker.beginRun("local-pane", "local", runId),
+            onStreamingEnd: (runId) => {
+              settlement = settleStreamingPane(
+                () => persistence.flush(),
+                () => tracker.settleRun("local-pane", runId)
+              );
+            },
+          }}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    await store.getState().run();
+    await Promise.resolve();
+    await settlement;
+
+    expect(writes).toEqual([]);
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("a no-op preflight failure still flushes one preexisting edit", async () => {
+    const store = createThreadStore(
+      { context: {} },
+      {
+        resolveModel: () => {
+          throw new Error("model lookup failed");
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    const writes: Thread[] = [];
+    const persistence = new SerializedPersistence<Thread>(async (thread) => {
+      writes.push(thread);
+    });
+    persistence.setPending(store.getState().thread);
+    let settlement: Promise<void> | null = null;
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={{
+            onChange: (thread) => persistence.setPending(thread),
+            onStreamingStart: (runId) =>
+              tracker.beginRun("local-pane", "local", runId),
+            onStreamingEnd: (runId) => {
+              settlement = settleStreamingPane(
+                () => persistence.flush(),
+                () => tracker.settleRun("local-pane", runId)
+              );
+            },
+          }}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    await store.getState().run();
+    await Promise.resolve();
+    await settlement;
+
+    expect(writes).toHaveLength(1);
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("a reserved pane rejects a new preparing run before transport starts", async () => {
+    let transportCalls = 0;
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Run" }],
+            },
+          ],
+        },
+      },
+      {
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        transport: async function* () {
+          transportCalls += 1;
+          yield _event({ type: "agent_end", messages: [] });
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    const release = tracker.reservePanes(["local-pane"]);
+    expect(release).not.toBeNull();
+    let changeCalls = 0;
+    let endCalls = 0;
+    const callbacks: ThreadPlaygroundEventCallbacks = {
+      onChange: () => {
+        changeCalls += 1;
+      },
+      onStreamingStart: (runId) =>
+        tracker.beginRun("local-pane", "local", runId),
+      onStreamingEnd: (runId) => {
+        endCalls += 1;
+        tracker.settleRun("local-pane", runId);
+      },
+    };
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={callbacks}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    await store.getState().run();
+    await Promise.resolve();
+    expect(store.getState().status).toBe("idle");
+    expect(transportCalls).toBe(0);
+    expect(tracker.hasAnyRunning()).toBe(false);
+    expect({ changeCalls, endCalls }).toEqual({
+      changeCalls: 0,
+      endCalls: 0,
+    });
+    release?.();
+  });
+
+  test("refresh releases only after the replacement owner commits", async () => {
+    let ownerCommits = 0;
+    let completeRefresh: (() => void) | null = null;
+    const settledAt: number[] = [];
+    const tracker = new RuntimeRunTracker();
+    const release = tracker.reservePanes(["local-pane"]);
+    expect(release).not.toBeNull();
+    let transportCalls = 0;
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Run" }],
+            },
+          ],
+        },
+      },
+      {
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        transport: async function* () {
+          transportCalls += 1;
+          yield _event({ type: "agent_end", messages: [] });
+        },
+      }
+    );
+
+    function KeyedOwner() {
+      useLayoutEffect(() => {
+        ownerCommits += 1;
+      }, []);
+      return null;
+    }
+
+    function RefreshOwner() {
+      const [reloadKey, setReloadKey] = useState(0);
+      const { markCommitPending } = usePaneRefreshAcknowledgement({
+        paneId: "local-pane",
+        reloadKey,
+        onSettled: () => {
+          settledAt.push(ownerCommits);
+          release?.();
+        },
+      });
+      useEffect(() => {
+        completeRefresh = () => {
+          markCommitPending();
+          setReloadKey((key) => key + 1);
+        };
+      }, [markCommitPending]);
+      return <KeyedOwner key={reloadKey} />;
+    }
+
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <>
+          <RefreshOwner />
+          <StoreEventBridge
+            store={store}
+            callbacks={{
+              onStreamingStart: (runId) =>
+                tracker.beginRun("local-pane", "local", runId),
+              onStreamingEnd: (runId) => {
+                tracker.settleRun("local-pane", runId);
+              },
+            }}
+            onMount={() => () => undefined}
+          />
+        </>
+      );
+    });
+
+    await store.getState().run();
+    expect(transportCalls).toBe(0);
+    await act(async () => completeRefresh?.());
+    expect(settledAt).toEqual([2]);
+    await store.getState().run();
+    await Promise.resolve();
+    expect(transportCalls).toBe(1);
+  });
+
+  test("a remote mutation holds its pane reservation through the RPC", async () => {
+    const rpc = _deferred();
+    const tracker = new RuntimeRunTracker();
+    const action = runRemoteRuntimeActionIfAllowed({
+      allowed: () => true,
+      acquire: () => tracker.reservePanes(["local-pane"]),
+      action: () => rpc.promise,
+    });
+    await Promise.resolve();
+
+    expect(tracker.beginRun("local-pane", "local", "during-rpc")).toBe(false);
+    rpc.resolve();
+    expect(await action).toBe(true);
+    expect(tracker.beginRun("local-pane", "local", "after-rpc")).toBe(true);
+  });
+
+  test("an old persistence owner cannot falsely unlock a replacement pane", () => {
+    const tracker = new RuntimeRunTracker();
+    const oldOwner = {};
+    const currentOwner = {};
+    tracker.setPersistenceBusy("local-pane", "local", oldOwner, true);
+    tracker.setPersistenceBusy("local-pane", "local", currentOwner, true);
+    tracker.setPersistenceBusy("local-pane", "local", oldOwner, false);
+
+    expect(tracker.reservePanes(["local-pane"])).toBeNull();
+    tracker.setPersistenceBusy("local-pane", "local", currentOwner, false);
+    const release = tracker.reservePanes(["local-pane"]);
+    expect(release).not.toBeNull();
+    release?.();
+  });
+
+  test("a replacement persistence owner cannot hide an older writer", () => {
+    const tracker = new RuntimeRunTracker();
+    const oldOwner = {};
+    const replacementOwner = {};
+    tracker.setPersistenceBusy("local-pane", "local", oldOwner, true);
+    tracker.setPersistenceBusy("local-pane", "local", replacementOwner, true);
+    tracker.setPersistenceBusy(
+      "local-pane",
+      "local",
+      replacementOwner,
+      false
+    );
+
+    expect(tracker.reservePanes(["local-pane"])).toBeNull();
+    tracker.setPersistenceBusy("local-pane", "local", oldOwner, false);
+    const release = tracker.reservePanes(["local-pane"]);
+    expect(release).not.toBeNull();
+    release?.();
+  });
+
+  test("unmount aborts a deferred owner and settles after partial output persists", async () => {
+    const streamStarted = _deferred();
+    const releaseTransport = _deferred();
+    const releaseWrite = _deferred();
+    let streamSignal: AbortSignal | undefined;
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Run" }],
+            },
+          ],
+        },
+      },
+      {
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        transport: async function* (_request, options) {
+          streamSignal = options.signal;
+          yield _event({
+            type: "message_start",
+            message: { role: "assistant" },
+          });
+          yield _event({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "text_start",
+              contentIndex: 0,
+            },
+          });
+          yield _event({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "text_delta",
+              contentIndex: 0,
+              delta: "partial",
+            },
+          });
+          streamStarted.resolve();
+          await Promise.race([
+            releaseTransport.promise,
+            new Promise<void>((resolve) => {
+              options.signal?.addEventListener("abort", () => resolve(), {
+                once: true,
+              });
+            }),
+          ]);
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    let pendingThread: Thread | null = null;
+    let settlement: Promise<void> | null = null;
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={{
+            onChange: (thread) => {
+              pendingThread = thread;
+            },
+            onStreamingStart: (runId) =>
+              tracker.beginRun("local-pane", "local", runId),
+            onStreamingEnd: (runId) => {
+              settlement = settleStreamingPane(
+                async () => {
+                  if (!pendingThread) return;
+                  await releaseWrite.promise;
+                },
+                () => tracker.settleRun("local-pane", runId)
+              );
+            },
+          }}
+          onMount={() => () => undefined}
+        />
+      );
+    });
+
+    const run = store.getState().run();
+    await streamStarted.promise;
+    await act(async () => {
+      activeRoot?.unmount();
+      activeRoot = null;
+    });
+
+    const abortedOnUnmount = streamSignal?.aborted;
+    releaseTransport.resolve();
+    releaseWrite.resolve();
+    await Promise.all([run, settlement]);
+    expect(abortedOnUnmount).toBe(true);
+    expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
   test("runtime round trips preserve each thread store and its undo history", async () => {
     const panes: TestPane[] = [
       { id: "local-thread", runtimeId: "local" },
@@ -382,10 +943,10 @@ describe("RuntimePaneHost", () => {
       onChange: (thread) => {
         pendingThread = thread;
       },
-      onStreamingStart: () => {
-        tracker.setRunning("local-pane", "local", true);
+      onStreamingStart: (runId) => {
+        tracker.beginRun("local-pane", "local", runId);
       },
-      onStreamingEnd: () => {
+      onStreamingEnd: (runId) => {
         settlement = settleStreamingPane(
           async () => {
             const thread = pendingThread;
@@ -395,7 +956,7 @@ describe("RuntimePaneHost", () => {
             await releaseFsWrite.promise;
             persistedThread = thread;
           },
-          () => tracker.setRunning("local-pane", "local", false)
+          () => tracker.settleRun("local-pane", runId)
         );
       },
     };
@@ -473,6 +1034,7 @@ describe("RuntimePaneHost", () => {
     expect(persistedThread).toBeNull();
     expect(fsWriteCalls).toBe(1);
 
+    tracker.beginRun("local-pane", "local", "run-2");
     releaseFsWrite.resolve();
     await settlement;
     const persisted = persistedThread as Thread | null;
@@ -481,6 +1043,8 @@ describe("RuntimePaneHost", () => {
       content: [{ type: "text", text: "Done" }],
     });
     expect(persisted?.runHistory).toHaveLength(1);
+    expect(tracker.canTransition("local", "remote:server-1")).toBe(false);
+    tracker.settleRun("local-pane", "run-2");
     const switchedAfterPersistence = switchWorkspaceRuntimeIfAllowed({
       tracker,
       currentRuntimeId: "local",
@@ -508,5 +1072,39 @@ describe("RuntimePaneHost", () => {
       disconnectCalls: 1,
       discardCalls: 1,
     });
+  });
+
+  test("a disk-full terminal save retries the newest revision before releasing its lease", async () => {
+    const failedWrite = _deferred();
+    const retry = _deferred();
+    const persisted: string[] = [];
+    const persistence = new SerializedPersistence<string>(
+      async (value) => {
+        if (value === "A") await failedWrite.promise;
+        persisted.push(value);
+      },
+      { waitBeforeRetry: () => retry.promise }
+    );
+    const tracker = new RuntimeRunTracker();
+    tracker.beginRun("local-pane", "local", "run-1");
+    persistence.setPending("A");
+    const debounceFlush = persistence.flush();
+    await Promise.resolve();
+    persistence.setPending("B");
+    const terminalSettlement = settleStreamingPane(
+      () => persistence.flush(),
+      () => tracker.settleRun("local-pane", "run-1")
+    );
+
+    failedWrite.reject(new Error("disk full"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(tracker.canDisconnect("local")).toBe(false);
+    expect(persisted).toEqual([]);
+
+    retry.resolve();
+    await Promise.all([debounceFlush, terminalSettlement]);
+    expect(persisted).toEqual(["B"]);
+    expect(tracker.canDisconnect("local")).toBe(true);
   });
 });

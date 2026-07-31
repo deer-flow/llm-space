@@ -44,7 +44,10 @@ import type {
 } from "@/shared/remote-servers";
 import type { RuntimeId } from "@/shared/runtime";
 
-import { runRemoteRuntimeActionIfAllowed } from "../remote-runtime-actions";
+import {
+  runRemoteRuntimeActionIfAllowed,
+  runRemoteTrustContinuationIfAllowed,
+} from "../remote-runtime-actions";
 
 import {
   canConnectRemoteServer,
@@ -72,13 +75,17 @@ function _emptyForm(): FormState {
 export function RemoteServersPage({
   canConnect,
   canDisconnect,
+  acquireConnect,
+  acquireDisconnect,
   onConnected,
   onDisconnected,
 }: {
   canConnect?: () => boolean;
   canDisconnect?: (runtimeId: RuntimeId) => boolean;
+  acquireConnect?: () => (() => void) | null;
+  acquireDisconnect?: (runtimeId: RuntimeId) => (() => void) | null;
   onConnected?: (runtimeId: RuntimeId) => void;
-  onDisconnected?: (runtimeId: RuntimeId) => void;
+  onDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
   const [servers, setServers] = useState<RemoteServerView[]>([]);
   const serversRef = useRef<RemoteServerView[]>([]);
@@ -131,22 +138,41 @@ export function RemoteServersPage({
 
   const save = async () => {
     if (!form) return;
-    try {
-      const draft = _draft(form);
-      const next = form.id
-        ? await updateRemoteServer(form.id, draft)
-        : await addRemoteServer(draft);
-      updateServers(next);
-      const nextId = form.id ?? next.at(-1)?.id ?? null;
-      setSelectedId(nextId);
-      setForm(null);
-      toast.success("Remote server saved");
-    } catch (error) {
-      toast.error("Failed to save remote server", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
+    const previousRuntimeId = form.id
+      ? servers.find((server) => server.id === form.id)?.runtimeId
+      : undefined;
+    const persist = async (): Promise<boolean> => {
+      try {
+        const draft = _draft(form);
+        const next = form.id
+          ? await updateRemoteServer(form.id, draft)
+          : await addRemoteServer(draft);
+        updateServers(next);
+        const nextId = form.id ?? next.at(-1)?.id ?? null;
+        setSelectedId(nextId);
+        setForm(null);
+        toast.success("Remote server saved");
+        return true;
+      } catch (error) {
+        toast.error("Failed to save remote server", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+        return false;
+      }
+    };
+    if (!previousRuntimeId) {
+      await persist();
+      return;
     }
+    await runRemoteRuntimeActionIfAllowed({
+      allowed: () => canDisconnect?.(previousRuntimeId) ?? true,
+      acquire: acquireDisconnect
+        ? () => acquireDisconnect(previousRuntimeId)
+        : undefined,
+      action: persist,
+      afterAction: () => onDisconnected?.(previousRuntimeId),
+    });
   };
 
   const run = async (
@@ -154,15 +180,11 @@ export function RemoteServersPage({
     action: (id: string) => Promise<RemoteServerView[]>,
     options: {
       closeOnConnected?: boolean;
-      notifyDisconnected?: boolean;
       selectFallback?: boolean;
     } = {}
-  ) => {
+  ): Promise<boolean> => {
     setBusyId(id);
     try {
-      const previousRuntimeId = servers.find(
-        (server) => server.id === id
-      )?.runtimeId;
       const next = await action(id);
       updateServers(next);
       setSelectedId(
@@ -175,9 +197,7 @@ export function RemoteServersPage({
         if (connected?.status === "connected")
           onConnected?.(connected.runtimeId);
       }
-      if (options.notifyDisconnected && previousRuntimeId) {
-        onDisconnected?.(previousRuntimeId);
-      }
+      return true;
     } catch (error) {
       let failed = serversRef.current.find((server) => server.id === id);
       try {
@@ -191,6 +211,7 @@ export function RemoteServersPage({
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
+      return false;
     } finally {
       setBusyId(null);
     }
@@ -200,20 +221,31 @@ export function RemoteServersPage({
     server: RemoteServerView,
     request: RemoteHostKeyTrustRequest
   ) => {
-    setTrustBusy(true);
-    try {
-      const next = await trustRemoteServerHostKey(server.id, request.requestId);
-      updateServers(next);
-      const connected = next.find((item) => item.id === server.id);
-      if (connected?.status === "connected") onConnected?.(connected.runtimeId);
-    } catch (error) {
-      toast.error("Failed to trust SSH host", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    } finally {
-      setTrustBusy(false);
-    }
+    await runRemoteTrustContinuationIfAllowed({
+      allowed: () => canConnect?.() ?? true,
+      acquire: acquireConnect,
+      trust: async () => {
+        setTrustBusy(true);
+        try {
+          const next = await trustRemoteServerHostKey(
+            server.id,
+            request.requestId
+          );
+          updateServers(next);
+          const connected = next.find((item) => item.id === server.id);
+          if (connected?.status === "connected") {
+            onConnected?.(connected.runtimeId);
+          }
+        } catch (error) {
+          toast.error("Failed to trust SSH host", {
+            description:
+              error instanceof Error ? error.message : "Please try again.",
+          });
+        } finally {
+          setTrustBusy(false);
+        }
+      },
+    });
   };
 
   const rejectHostKey = async (
@@ -345,6 +377,7 @@ export function RemoteServersPage({
               onConnect={() =>
                 void runRemoteRuntimeActionIfAllowed({
                   allowed: () => canConnect?.() ?? true,
+                  acquire: acquireConnect,
                   action: () =>
                     run(selected.id, connectRemoteServer, {
                       closeOnConnected: true,
@@ -354,16 +387,26 @@ export function RemoteServersPage({
               onDisconnect={() =>
                 void runRemoteRuntimeActionIfAllowed({
                   allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
-                  action: () =>
-                    run(selected.id, disconnectRemoteServer, {
-                      notifyDisconnected: true,
-                    }),
+                  acquire: acquireDisconnect
+                    ? () => acquireDisconnect(selected.runtimeId)
+                    : undefined,
+                  action: () => run(selected.id, disconnectRemoteServer),
+                  afterAction: () => onDisconnected?.(selected.runtimeId),
                 })
               }
               onEdit={() => startEdit(selected)}
               onRemove={() =>
-                void run(selected.id, removeRemoteServer, {
-                  selectFallback: true,
+                void runRemoteRuntimeActionIfAllowed({
+                  allowed: () =>
+                    canDisconnect?.(selected.runtimeId) ?? true,
+                  acquire: acquireDisconnect
+                    ? () => acquireDisconnect(selected.runtimeId)
+                    : undefined,
+                  action: () =>
+                    run(selected.id, removeRemoteServer, {
+                      selectFallback: true,
+                    }),
+                  afterAction: () => onDisconnected?.(selected.runtimeId),
                 })
               }
               onTrustHostKey={(request) => void trustHostKey(selected, request)}

@@ -7,7 +7,14 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
@@ -16,8 +23,12 @@ import type { TraceRecord } from "@/shared/traces";
 
 import {
   settleStreamingPane,
-  type PaneStreamingChange,
+  type PanePersistenceChange,
+  type PaneRunSettled,
+  type PaneRunStart,
 } from "./runtime-run-tracker";
+import { SerializedPersistence } from "./serialized-persistence";
+import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
 
 interface TraceTabPaneProps {
   projectId: string;
@@ -26,7 +37,15 @@ interface TraceTabPaneProps {
   active: boolean;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
-  onStreamingChange?: PaneStreamingChange;
+  onRunStart?: PaneRunStart;
+  onRunSettled?: PaneRunSettled;
+  onPersistenceChange?: PanePersistenceChange;
+  onRefreshSettled?: (paneId: string) => void;
+  isMutationReserved?: (
+    paneId: string,
+    runtimeId: RuntimeId,
+    path?: string
+  ) => boolean;
   onRenameTitle?: (
     projectId: string,
     traceKey: string,
@@ -42,7 +61,11 @@ function _TraceTabPane({
   active,
   refreshNonce = 0,
   onClose,
-  onStreamingChange,
+  onRunStart,
+  onRunSettled,
+  onPersistenceChange,
+  onRefreshSettled,
+  isMutationReserved,
   onRenameTitle,
 }: TraceTabPaneProps) {
   const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
@@ -69,23 +92,52 @@ function _TraceTabPane({
   }, [error, isError, onClose, tabId]);
 
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<Thread | null>(null);
+  const [persistenceOwner] = useState<object>(() => ({}));
+  const persistence = useMemo(
+    () =>
+      new SerializedPersistence<Thread>(
+        (next) =>
+          traceClient.writeWorkbench(projectId, traceKey, next, runtimeId),
+        {
+          onBusyChange: (busy) =>
+            onPersistenceChange?.(
+              tabId,
+              runtimeId,
+              persistenceOwner,
+              busy
+            ),
+          onWriteError: (writeError) => {
+            toast.error("Failed to save trace workbench; retrying", {
+              description:
+                writeError instanceof Error
+                  ? writeError.message
+                  : "Storage is temporarily unavailable.",
+            });
+          },
+        }
+      ),
+    [
+      onPersistenceChange,
+      persistenceOwner,
+      projectId,
+      runtimeId,
+      tabId,
+      traceKey,
+    ]
+  );
 
   const flushPending = useCallback(async () => {
     if (writeTimer.current) {
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    const thread = pending.current;
-    pending.current = null;
-    if (thread !== null) {
-      await traceClient.writeWorkbench(projectId, traceKey, thread, runtimeId);
-    }
-  }, [projectId, runtimeId, traceKey]);
+    await persistence.flush();
+  }, [persistence]);
 
   const handleChange = useCallback(
     (next: Thread) => {
-      pending.current = next;
+      if (isMutationReserved?.(tabId, runtimeId)) return;
+      persistence.setPending(next);
       if (writeTimer.current) {
         clearTimeout(writeTimer.current);
       }
@@ -93,22 +145,24 @@ function _TraceTabPane({
         void flushPending();
       }, 500);
     },
-    [flushPending]
+    [flushPending, isMutationReserved, persistence, runtimeId, tabId]
   );
 
-  const handleStreamingStart = useCallback(() => {
-    onStreamingChange?.(tabId, runtimeId, true);
-  }, [onStreamingChange, runtimeId, tabId]);
-  const handleStreamingEnd = useCallback(() => {
+  const handleStreamingStart = useCallback((runId?: string) => {
+    if (!runId) return false;
+    return onRunStart?.(tabId, runtimeId, runId) ?? true;
+  }, [onRunStart, runtimeId, tabId]);
+  const handleStreamingEnd = useCallback((runId?: string) => {
+    if (!runId) return;
     void settleStreamingPane(flushPending, () => {
-      onStreamingChange?.(tabId, runtimeId, false);
+      onRunSettled?.(tabId, runId);
     }).catch((error) => {
       toast.error("Failed to save completed run", {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     });
-  }, [flushPending, onStreamingChange, runtimeId, tabId]);
+  }, [flushPending, onRunSettled, tabId]);
 
   const handleRenameTitle = useCallback(
     async (title: string): Promise<boolean> => {
@@ -140,6 +194,12 @@ function _TraceTabPane({
 
   const [reloadKey, setReloadKey] = useState(0);
   const appliedRefreshRef = useRef(refreshNonce);
+  const { markCommitPending, settleWithoutCommit } =
+    usePaneRefreshAcknowledgement({
+      paneId: tabId,
+      reloadKey,
+      onSettled: onRefreshSettled,
+    });
   useEffect(() => {
     if (appliedRefreshRef.current === refreshNonce) {
       return;
@@ -149,22 +209,34 @@ function _TraceTabPane({
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    pending.current = null;
+    persistence.discardPending();
     void (async () => {
       try {
+        await persistence.flush();
         await qc.refetchQueries({
           queryKey: ["trace", runtimeId, "workbench", projectId, traceKey],
           exact: true,
         });
+        markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
         toast.error("Error", {
           description:
             error instanceof Error ? error.message : "Failed to refresh trace",
         });
+        settleWithoutCommit();
       }
     })();
-  }, [projectId, qc, refreshNonce, runtimeId, traceKey]);
+  }, [
+    markCommitPending,
+    persistence,
+    projectId,
+    qc,
+    refreshNonce,
+    runtimeId,
+    settleWithoutCommit,
+    traceKey,
+  ]);
 
   const trace = data?.trace;
 
@@ -178,6 +250,7 @@ function _TraceTabPane({
         title={trace?.title ?? traceKey}
         headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
         initialValue={data?.thread}
+        readonly={isMutationReserved?.(tabId, runtimeId) ?? false}
         active={active}
         transport={rpcTransport}
         runtimeId={runtimeId}

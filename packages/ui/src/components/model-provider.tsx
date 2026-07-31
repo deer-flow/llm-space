@@ -71,7 +71,14 @@ const EMPTY_MODEL_PROVIDERS: ModelProviderGroup[] = [];
 interface ModelSnapshot {
   client: ModelClient;
   defaultModel: ModelConfig | null;
+  epoch: number;
   providers: ModelProviderGroup[] | null;
+}
+
+interface ModelRequestLease {
+  client: ModelClient;
+  epoch: number;
+  generation: number;
 }
 
 function buildModelIndex(providers: ModelProviderGroup[]) {
@@ -102,72 +109,158 @@ export function ModelProvider({
   const [snapshot, setSnapshot] = useState<ModelSnapshot>(() => ({
     client,
     defaultModel: null,
+    epoch: 1,
     providers: null,
   }));
-  const activeClientRef = useRef(client);
+  const committedScopeRef = useRef({ client, epoch: 1 });
+  const nextEpochRef = useRef(1);
+  const latestRequestGenerationRef = useRef(0);
+  const mutationTailsRef = useRef(
+    new WeakMap<ModelClient, Promise<void>>()
+  );
   useLayoutEffect(() => {
-    activeClientRef.current = client;
+    if (committedScopeRef.current.client === client) return;
+    const nextScope = {
+      client,
+      epoch: ++nextEpochRef.current,
+    };
+    committedScopeRef.current = nextScope;
+    // Invalidate every request issued by the previous committed scope before
+    // passive effects can start the new scope's initial refresh.
+    latestRequestGenerationRef.current += 1;
+    setSnapshot({
+      client,
+      defaultModel: null,
+      epoch: nextScope.epoch,
+      providers: EMPTY_MODEL_PROVIDERS,
+    });
   }, [client]);
 
+  const beginRequest = useCallback((source: ModelClient) => {
+    const scope = committedScopeRef.current;
+    if (scope.client !== source) return null;
+    return {
+      ...scope,
+      generation: ++latestRequestGenerationRef.current,
+    };
+  }, []);
+
+  const isCurrentScope = useCallback((lease: ModelRequestLease) => {
+    const scope = committedScopeRef.current;
+    return (
+      scope.client === lease.client && scope.epoch === lease.epoch
+    );
+  }, []);
+  const isCurrentRequest = useCallback(
+    (lease: ModelRequestLease) =>
+      isCurrentScope(lease) &&
+      latestRequestGenerationRef.current === lease.generation,
+    [isCurrentScope]
+  );
+
+  const enqueueMutation = useCallback(
+    async <T,>(
+      source: ModelClient,
+      mutate: () => Promise<T>
+    ): Promise<{ lease: ModelRequestLease; value: T } | null> => {
+      const lease = beginRequest(source);
+      if (!lease) return null;
+      const previous = mutationTailsRef.current.get(source) ?? Promise.resolve();
+      const result = previous.then(async () => ({
+        lease,
+        value: await mutate(),
+      }));
+      // Keep the side-effect queue alive after a failed mutation, while still
+      // returning the original rejection to its caller. The queue is keyed by
+      // client (not render epoch) so A -> B -> A refreshes wait for an A request
+      // that was already in flight before the round trip.
+      mutationTailsRef.current.set(
+        source,
+        result.then(
+          () => undefined,
+          () => undefined
+        )
+      );
+      return result;
+    },
+    [beginRequest]
+  );
+
   const commitProviders = useCallback(
-    (source: ModelClient, providers: ModelProviderGroup[]) => {
+    (lease: ModelRequestLease | null, providers: ModelProviderGroup[]) => {
+      if (!lease) return;
       setSnapshot((current) =>
-        activeClientRef.current === source
+        isCurrentScope(lease)
           ? {
-              client: source,
+              client: lease.client,
               defaultModel:
-                current.client === source ? current.defaultModel : null,
+                current.client === lease.client &&
+                current.epoch === lease.epoch
+                  ? current.defaultModel
+                  : null,
+              epoch: lease.epoch,
               providers,
             }
           : current
       );
     },
-    []
+    [isCurrentScope]
   );
 
   const setDefaultModel = useCallback(
     async (model: ModelConfig | null) => {
-      const defaultModel = await client.setDefaultModel(model);
+      const result = await enqueueMutation(client, () =>
+        client.setDefaultModel(model)
+      );
+      if (!result) return;
+      const { lease, value: defaultModel } = result;
       setSnapshot((current) =>
-        activeClientRef.current === client
+        isCurrentScope(lease)
           ? {
               client,
               defaultModel,
+              epoch: lease.epoch,
               providers:
-                current.client === client
+                current.client === client && current.epoch === lease.epoch
                   ? current.providers
                   : EMPTY_MODEL_PROVIDERS,
             }
           : current
       );
     },
-    [client]
+    [client, enqueueMutation, isCurrentScope]
   );
 
   const removeProvider = useCallback(
     async (providerId: string) => {
-      commitProviders(client, await client.removeProvider(providerId));
+      const result = await enqueueMutation(client, () =>
+        client.removeProvider(providerId)
+      );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const addProvider = useCallback(
     async (providerId: string) => {
-      commitProviders(client, await client.addProvider(providerId));
+      const result = await enqueueMutation(client, () =>
+        client.addProvider(providerId)
+      );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const addCustomProvider = useCallback(
     async (name: string, baseUrl: string) => {
       const id = uuid();
-      commitProviders(
-        client,
-        await client.addCustomProvider({ id, name, baseUrl })
+      const result = await enqueueMutation(client, () =>
+        client.addCustomProvider({ id, name, baseUrl })
       );
+      if (result) commitProviders(result.lease, result.value);
       return id;
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const updateProvider = useCallback(
@@ -186,29 +279,32 @@ export function ModelProvider({
         icon?: string | null;
       }
     ) => {
-      commitProviders(client, await client.updateProvider(providerId, fields));
+      const result = await enqueueMutation(client, () =>
+        client.updateProvider(providerId, fields)
+      );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const setModelEnabled = useCallback(
     async (providerId: string, modelId: string, enabled: boolean) => {
-      commitProviders(
-        client,
-        await client.setModelEnabled(providerId, modelId, enabled)
+      const result = await enqueueMutation(client, () =>
+        client.setModelEnabled(providerId, modelId, enabled)
       );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const setAllModelsEnabled = useCallback(
     async (providerId: string, enabled: boolean) => {
-      commitProviders(
-        client,
-        await client.setAllModelsEnabled(providerId, enabled)
+      const result = await enqueueMutation(client, () =>
+        client.setAllModelsEnabled(providerId, enabled)
       );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const testModelConnection = useCallback(
@@ -220,22 +316,22 @@ export function ModelProvider({
 
   const removeCustomModel = useCallback(
     async (providerId: string, modelId: string) => {
-      commitProviders(
-        client,
-        await client.removeCustomModel(providerId, modelId)
+      const result = await enqueueMutation(client, () =>
+        client.removeCustomModel(providerId, modelId)
       );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const upsertCustomModel = useCallback(
     async (providerId: string, model: CustomModel, originalId?: string) => {
-      commitProviders(
-        client,
-        await client.upsertCustomModel(providerId, model, originalId)
+      const result = await enqueueMutation(client, () =>
+        client.upsertCustomModel(providerId, model, originalId)
       );
+      if (result) commitProviders(result.lease, result.value);
     },
-    [client, commitProviders]
+    [client, commitProviders, enqueueMutation]
   );
 
   const builtinProviders = useCallback(
@@ -247,24 +343,32 @@ export function ModelProvider({
   // read (e.g. every time the model dropdown opens) — the result is never cached
   // beyond the current render.
   const refresh = useCallback(async () => {
+    const lease = beginRequest(client);
+    if (!lease) return;
     try {
+      const pendingMutation = mutationTailsRef.current.get(client);
+      if (pendingMutation) await pendingMutation;
+      if (!isCurrentRequest(lease)) return;
       const [nextProviders, nextDefault] = await Promise.all([
         client.availableModels(),
         client.getDefaultModel(),
       ]);
       setSnapshot((current) =>
-        activeClientRef.current === client
+        isCurrentRequest(lease)
           ? {
               client,
               defaultModel: nextDefault ?? null,
+              epoch: lease.epoch,
               providers: nextProviders,
             }
           : current
       );
     } catch (error) {
-      console.error("Failed to fetch models", error);
+      if (isCurrentRequest(lease)) {
+        console.error("Failed to fetch models", error);
+      }
     }
-  }, [client]);
+  }, [beginRequest, client, isCurrentRequest]);
 
   useEffect(() => {
     void refresh();
@@ -273,14 +377,20 @@ export function ModelProvider({
   // A client change represents a runtime switch. Keep the already-mounted
   // workspace alive, but expose an empty model view until that runtime's fetch
   // completes so consumers can never observe the previous runtime's models.
+  const committedScope = committedScopeRef.current;
+  const snapshotMatchesCommittedScope =
+    committedScope.client === client &&
+    snapshot.client === client &&
+    snapshot.epoch === committedScope.epoch;
   const providers =
-    snapshot.client === client
+    snapshotMatchesCommittedScope
       ? snapshot.providers
       : snapshot.providers === null
         ? null
         : EMPTY_MODEL_PROVIDERS;
-  const defaultModel =
-    snapshot.client === client ? snapshot.defaultModel : null;
+  const defaultModel = snapshotMatchesCommittedScope
+    ? snapshot.defaultModel
+    : null;
 
   const contextValue = useMemo((): ModelContextValue | null => {
     if (!providers) {

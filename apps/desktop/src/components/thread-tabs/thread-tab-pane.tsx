@@ -5,16 +5,31 @@ import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { createFileSystemClient, createRpcTransport } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
+  runFileMutationWithGuard,
+  type AcquireFileMutation,
+} from "../file-system-tree-view/file-mutation-guard";
+
+import {
   settleStreamingPane,
-  type PaneStreamingChange,
+  type PanePersistenceChange,
+  type PaneRunSettled,
+  type PaneRunStart,
 } from "./runtime-run-tracker";
+import { SerializedPersistence } from "./serialized-persistence";
+import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
 
 interface ThreadTabPaneProps {
   paneId: string;
@@ -31,7 +46,16 @@ interface ThreadTabPaneProps {
   onClose?: (path: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
   consumeDiscardedPane?: (paneId: string) => boolean;
-  onStreamingChange?: PaneStreamingChange;
+  onRunStart?: PaneRunStart;
+  onRunSettled?: PaneRunSettled;
+  onPersistenceChange?: PanePersistenceChange;
+  onRefreshSettled?: (paneId: string) => void;
+  isMutationReserved?: (
+    paneId: string,
+    runtimeId: RuntimeId,
+    path?: string
+  ) => boolean;
+  acquireMutation?: AcquireFileMutation;
 }
 
 /**
@@ -48,7 +72,12 @@ export function ThreadTabPane({
   onMove,
   onClose,
   consumeDiscardedPane,
-  onStreamingChange,
+  onRunStart,
+  onRunSettled,
+  onPersistenceChange,
+  onRefreshSettled,
+  isMutationReserved,
+  acquireMutation,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
@@ -86,9 +115,7 @@ export function ThreadTabPane({
   }, [loadError, error, path, onClose]);
 
   // Persist edits back to the same path, debounced so we don't write per keystroke.
-  // `pending` holds the latest unsaved thread so we can flush it on unmount.
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<Thread | null>(null);
   const pathRef = useRef(path);
   // Keep the latest path in a ref for post-commit reads (debounced write flush,
   // refresh refetch, rename) without mutating during render. Declared before the
@@ -96,43 +123,68 @@ export function ThreadTabPane({
   useEffect(() => {
     pathRef.current = path;
   });
+  const [persistenceOwner] = useState<object>(() => ({}));
+  const persistence = useMemo(
+    () =>
+      new SerializedPersistence<Thread>(
+        (next) => fs.write(pathRef.current, { ...next, runtimeId }),
+        {
+          onBusyChange: (busy) =>
+            onPersistenceChange?.(
+              paneId,
+              runtimeId,
+              persistenceOwner,
+              busy,
+              pathRef.current
+            ),
+          onWriteError: (writeError) => {
+            toast.error("Failed to save thread; retrying", {
+              description:
+                writeError instanceof Error
+                  ? writeError.message
+                  : "Storage is temporarily unavailable.",
+            });
+          },
+        }
+      ),
+    [fs, onPersistenceChange, paneId, persistenceOwner, runtimeId]
+  );
 
   const flushPending = useCallback(async () => {
     if (writeTimer.current) {
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    const thread = pending.current;
-    pending.current = null;
-    if (thread !== null) {
-      await fs.write(pathRef.current, { ...thread, runtimeId });
-    }
-  }, [fs, runtimeId]);
+    await persistence.flush();
+  }, [persistence]);
 
   const handleChange = useCallback(
     (next: Thread) => {
-      pending.current = next;
+      if (isMutationReserved?.(paneId, runtimeId, pathRef.current)) return;
+      persistence.setPending(next);
       if (writeTimer.current) clearTimeout(writeTimer.current);
       writeTimer.current = setTimeout(() => {
         void flushPending();
       }, 500);
     },
-    [flushPending]
+    [flushPending, isMutationReserved, paneId, persistence, runtimeId]
   );
 
-  const handleStreamingStart = useCallback(() => {
-    onStreamingChange?.(paneId, runtimeId, true);
-  }, [onStreamingChange, paneId, runtimeId]);
-  const handleStreamingEnd = useCallback(() => {
+  const handleStreamingStart = useCallback((runId?: string) => {
+    if (!runId) return false;
+    return onRunStart?.(paneId, runtimeId, runId, pathRef.current) ?? true;
+  }, [onRunStart, paneId, runtimeId]);
+  const handleStreamingEnd = useCallback((runId?: string) => {
+    if (!runId) return;
     void settleStreamingPane(flushPending, () => {
-      onStreamingChange?.(paneId, runtimeId, false);
+      onRunSettled?.(paneId, runId);
     }).catch((error) => {
       toast.error("Failed to save completed run", {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     });
-  }, [flushPending, onStreamingChange, paneId, runtimeId]);
+  }, [flushPending, onRunSettled, paneId]);
 
   // Flush pending edits on a normal close. An editor displaced by an overwrite
   // instead drops them so stale destination content cannot replace the moved file.
@@ -141,18 +193,24 @@ export function ThreadTabPane({
       if (consumeDiscardedPane?.(paneId)) {
         if (writeTimer.current) clearTimeout(writeTimer.current);
         writeTimer.current = null;
-        pending.current = null;
+        persistence.discardPending();
         return;
       }
       void flushPending();
     };
-  }, [consumeDiscardedPane, flushPending, paneId]);
+  }, [consumeDiscardedPane, flushPending, paneId, persistence]);
 
   // "Refresh" the thread from disk: re-read the file and remount the playground
   // on a fresh store (via reloadKey), discarding any in-memory edits. Driven by
   // the per-tab refreshNonce, so it works even for an inactive (hidden) pane.
   const [reloadKey, setReloadKey] = useState(0);
   const appliedRefreshRef = useRef(refreshNonce);
+  const { markCommitPending, settleWithoutCommit } =
+    usePaneRefreshAcknowledgement({
+      paneId,
+      reloadKey,
+      onSettled: onRefreshSettled,
+    });
   useEffect(() => {
     if (appliedRefreshRef.current === refreshNonce) {
       return;
@@ -164,22 +222,32 @@ export function ThreadTabPane({
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    pending.current = null;
+    persistence.discardPending();
     void (async () => {
       try {
+        await persistence.flush();
         await qc.refetchQueries({
           queryKey: ["thread", runtimeId, pathRef.current],
           exact: true,
         });
+        markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
         toast.error("Error", {
           description:
             error instanceof Error ? error.message : "Failed to refresh",
         });
+        settleWithoutCommit();
       }
     })();
-  }, [refreshNonce, qc, runtimeId]);
+  }, [
+    markCommitPending,
+    persistence,
+    refreshNonce,
+    qc,
+    runtimeId,
+    settleWithoutCommit,
+  ]);
 
   const handleRenameTitle = useCallback(
     async (title: string): Promise<boolean> => {
@@ -189,22 +257,34 @@ export function ThreadTabPane({
         return true;
       }
 
-      await flushPending();
-      await fs.mv(from, to);
-      const moved = await fs.read(to);
-      await fs.write(to, { ...moved, runtimeId });
-      qc.setQueryData(["thread", runtimeId, to], moved);
-      void qc.invalidateQueries({ queryKey: ["fs", runtimeId, "ls"] });
-      void qc.invalidateQueries({ queryKey: ["thread", runtimeId, from] });
-      if (parentOf(from) !== parentOf(to)) {
-        void qc.invalidateQueries({
-          queryKey: ["fs", runtimeId, "ls", parentOf(from)],
-        });
-      }
-      onMove?.(from, to, runtimeId);
-      return true;
+      return runFileMutationWithGuard({
+        acquireMutation,
+        paths: [from, to],
+        runtimeId,
+        action: "renaming this thread",
+        blockedResult: false,
+        mutate: async () => {
+          await flushPending();
+          await fs.mv(from, to);
+          const moved = await fs.read(to);
+          await fs.write(to, { ...moved, runtimeId });
+          qc.setQueryData(["thread", runtimeId, to], moved);
+          void qc.invalidateQueries({ queryKey: ["fs", runtimeId, "ls"] });
+          void qc.invalidateQueries({
+            queryKey: ["thread", runtimeId, from],
+          });
+          if (parentOf(from) !== parentOf(to)) {
+            void qc.invalidateQueries({
+              queryKey: ["fs", runtimeId, "ls", parentOf(from)],
+            });
+          }
+          return true;
+        },
+        reconcile: (renamed) =>
+          renamed ? onMove?.(from, to, runtimeId) : undefined,
+      });
     },
-    [flushPending, fs, onMove, qc, runtimeId]
+    [acquireMutation, flushPending, fs, onMove, qc, runtimeId]
   );
 
   if (loadError) {
@@ -228,6 +308,9 @@ export function ThreadTabPane({
         loading={isLoading}
         path={path}
         initialValue={thread}
+        readonly={
+          isMutationReserved?.(paneId, runtimeId, pathRef.current) ?? false
+        }
         active={active}
         transport={rpcTransport}
         runtimeId={runtimeId}

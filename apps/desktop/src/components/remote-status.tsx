@@ -18,13 +18,15 @@ import { runRemoteRuntimeActionIfAllowed } from "./remote-runtime-actions";
 export function RemoteStatus({
   runtimeId,
   canDisconnect,
+  acquireDisconnect,
   onDisconnecting,
   onDisconnected,
 }: {
   runtimeId: RuntimeId;
   canDisconnect?: (runtimeId: RuntimeId) => boolean;
+  acquireDisconnect?: (runtimeId: RuntimeId) => (() => void) | null;
   onDisconnecting?: (runtimeId: RuntimeId) => void;
-  onDisconnected: (runtimeId: RuntimeId) => void;
+  onDisconnected: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
   const [server, setServer] = useState<RemoteServerView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,21 +65,26 @@ export function RemoteStatus({
   const disconnect = async () => {
     await runRemoteRuntimeActionIfAllowed({
       allowed: () => canDisconnect?.(runtimeId) ?? true,
+      acquire: acquireDisconnect
+        ? () => acquireDisconnect(runtimeId)
+        : undefined,
       beforeAction: () => onDisconnecting?.(runtimeId),
       action: async () => {
         setBusy(true);
         try {
           await disconnectRemoteServer(server.id);
-          onDisconnected(runtimeId);
+          return true;
         } catch (error) {
           toast.error("Failed to disconnect remote", {
             description:
               error instanceof Error ? error.message : "Please try again.",
           });
+          return false;
         } finally {
           setBusy(false);
         }
       },
+      afterAction: () => onDisconnected(runtimeId),
     });
   };
 
