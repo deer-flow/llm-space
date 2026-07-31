@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -91,6 +91,9 @@ export class OpenSshHostKeyService implements SshHostKeyService {
     config: SshRemoteRuntimeConfig,
     request: RemoteHostKeyTrustRequest
   ): Promise<void> {
+    const publicKeyLine = _approvedPublicKeyLine(request);
+    await _verifyApprovedHostKey(config, publicKeyLine);
+
     const knownHostsFile = _expandHome(
       request.knownHostsFile ?? "~/.ssh/known_hosts"
     );
@@ -103,45 +106,121 @@ export class OpenSshHostKeyService implements SshHostKeyService {
       await _removeKnownHost(config, request, knownHostsFile);
     }
 
-    await _acceptHostKey(config).catch((error) => {
-      const publicKeyLine = request.publicKeyLine;
-      if (!publicKeyLine) throw error;
-
-      const current = existsSync(knownHostsFile)
-        ? readFileSync(knownHostsFile, "utf8")
-        : "";
-      if (_hasKnownHostLine(current, publicKeyLine)) return;
-      const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-      writeFileSync(
-        knownHostsFile,
-        `${current}${prefix}${publicKeyLine}\n`,
-        "utf8"
-      );
-    });
+    const current = existsSync(knownHostsFile)
+      ? readFileSync(knownHostsFile, "utf8")
+      : "";
+    if (_hasKnownHostLine(current, publicKeyLine)) return;
+    const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
+    writeFileSync(
+      knownHostsFile,
+      `${current}${prefix}${publicKeyLine}\n`,
+      "utf8"
+    );
   }
 }
 
-async function _acceptHostKey(config: SshRemoteRuntimeConfig): Promise<void> {
+async function _verifyApprovedHostKey(
+  config: SshRemoteRuntimeConfig,
+  publicKeyLine: string
+): Promise<void> {
+  const temporaryDirectory = mkdtempSync(
+    path.join(os.tmpdir(), "llm-space-approved-host-key-")
+  );
+  const knownHostsFile = path.join(temporaryDirectory, "known_hosts");
+
+  try {
+    writeFileSync(knownHostsFile, `${publicKeyLine}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await _connectWithApprovedHostKey(config, knownHostsFile, publicKeyLine);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+async function _connectWithApprovedHostKey(
+  config: SshRemoteRuntimeConfig,
+  knownHostsFile: string,
+  publicKeyLine: string
+): Promise<void> {
   const target = buildSshTarget(config);
   const baseArgs = buildSshBaseArgs(config);
-  const result = await _run("ssh", [
-    ...baseArgs.slice(0, -1),
-    "-o",
-    "StrictHostKeyChecking=accept-new",
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "NumberOfPasswordPrompts=0",
-    target,
-    "true",
-  ]);
+  const result = await _run(
+    "ssh",
+    [
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "-o",
+      `UserKnownHostsFile=${knownHostsFile}`,
+      "-o",
+      `GlobalKnownHostsFile=${os.devNull}`,
+      "-o",
+      "KnownHostsCommand=none",
+      "-o",
+      "LogLevel=DEBUG1",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "NumberOfPasswordPrompts=0",
+      ...baseArgs.slice(0, -1),
+      target,
+      "true",
+    ],
+    { preserveOutputStart: true }
+  );
   const output = `${result.stdout}${result.stderr}`;
-  if (result.code === 0 || _isAuthenticationFailure(output)) return;
+  if (result.code === 0) return;
+  if (
+    !_isChangedHostKey(output) &&
+    !_isFirstTimeHostKey(output) &&
+    _isAuthenticationFailure(output) &&
+    _hasApprovedHostKeyMatch(output, publicKeyLine)
+  ) {
+    return;
+  }
   throw new Error(
     output.trim() || `SSH host key trust failed with exit code ${result.code}.`
   );
+}
+
+function _hasApprovedHostKeyMatch(
+  output: string,
+  publicKeyLine: string
+): boolean {
+  const [lookupHost, , publicKey] = publicKeyLine.split(/\s+/);
+  if (!lookupHost || !publicKey) return false;
+  const fingerprint = _fingerprint(publicKey);
+  const serverKeyMatches = output.split(/\r?\n/).some((line) => {
+    const match = /^debug1: Server host key:\s+\S+\s+(SHA256:[A-Za-z0-9+/=]+)/i.exec(
+      line
+    );
+    return match?.[1] === fingerprint;
+  });
+  return (
+    serverKeyMatches &&
+    output.includes(`Host '${lookupHost}' is known and matches the `)
+  );
+}
+
+function _approvedPublicKeyLine(request: RemoteHostKeyTrustRequest): string {
+  const publicKeyLine = request.publicKeyLine?.trim();
+  if (!publicKeyLine) {
+    throw new Error("The approved SSH host public key is unavailable.");
+  }
+  const [, keyType, publicKey] = publicKeyLine.split(/\s+/);
+  if (
+    keyType !== request.keyType ||
+    !publicKey ||
+    _fingerprint(publicKey) !== request.fingerprint
+  ) {
+    throw new Error(
+      "The SSH host public key does not match the approved fingerprint."
+    );
+  }
+  return publicKeyLine;
 }
 
 export function parseSshHostKeyOutput(
@@ -429,18 +508,17 @@ function _fingerprint(publicKey: string): string {
 async function _run(
   command: string,
   args: string[],
-  timeoutMs = 15_000
+  options: { preserveOutputStart?: boolean; timeoutMs?: number } = {}
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
   const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
   let stdout = "";
   let stderr = "";
   const appendStdout = (chunk: Buffer) => {
-    stdout += chunk.toString("utf8");
-    if (stdout.length > 20_000) stdout = stdout.slice(-20_000);
+    stdout = _appendOutput(stdout, chunk, options.preserveOutputStart === true);
   };
   const appendStderr = (chunk: Buffer) => {
-    stderr += chunk.toString("utf8");
-    if (stderr.length > 20_000) stderr = stderr.slice(-20_000);
+    stderr = _appendOutput(stderr, chunk, options.preserveOutputStart === true);
   };
   child.stdout?.on("data", appendStdout);
   child.stderr?.on("data", appendStderr);
@@ -459,4 +537,19 @@ async function _run(
       resolve({ code, stdout, stderr });
     });
   });
+}
+
+function _appendOutput(
+  current: string,
+  chunk: Buffer,
+  preserveStart: boolean
+): string {
+  const next = current + chunk.toString("utf8");
+  if (next.length <= 20_000) return next;
+  if (!preserveStart) return next.slice(-20_000);
+
+  const marker = "\n... SSH output truncated ...\n";
+  const startLength = 10_000;
+  const endLength = 20_000 - startLength - marker.length;
+  return `${next.slice(0, startLength)}${marker}${next.slice(-endLength)}`;
 }
