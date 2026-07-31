@@ -5,6 +5,28 @@ export interface ShareThreadTarget {
   path: string;
 }
 
+/**
+ * Pure render output for a dialog target. React may discard the render that
+ * created it; only a committed layout phase is allowed to apply it to a flow.
+ */
+export interface ShareThreadDialogCommit {
+  readonly open: boolean;
+  readonly target: Readonly<ShareThreadTarget>;
+  commit(flow: ShareThreadDialogFlow): void;
+}
+
+export function prepareShareThreadDialogCommit(
+  open: boolean,
+  target: ShareThreadTarget
+): ShareThreadDialogCommit {
+  const snapshot = Object.freeze({ ...target });
+  return Object.freeze({
+    open,
+    target: snapshot,
+    commit: (flow: ShareThreadDialogFlow) => flow.sync(open, snapshot),
+  });
+}
+
 export interface ShareThreadDraft {
   title: string;
   description: string;

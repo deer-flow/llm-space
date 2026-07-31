@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
+  prepareShareThreadDialogCommit,
   ShareThreadDialogFlow,
   type ShareThreadTarget,
   type ShareThreadTransaction,
@@ -33,6 +34,37 @@ function _transaction(
 }
 
 describe("ShareThreadDialogFlow", () => {
+  test("a discarded speculative render cannot invalidate the committed target", async () => {
+    const flow = new ShareThreadDialogFlow();
+    const requested: ShareThreadTransaction[] = [];
+    const displayed: string[] = [];
+    flow.sync(true, _target("remote:alpha", "threads/a.json"));
+    const transactionA = _transaction(flow, "A title");
+
+    // React may render B speculatively and then discard it. Preparing B must be
+    // pure: only a committed layout phase is allowed to apply the new target.
+    prepareShareThreadDialogCommit(
+      true,
+      _target("remote:beta", "threads/b.json")
+    );
+
+    await flow.publish(
+      transactionA,
+      (transaction) => {
+        requested.push(transaction);
+        return Promise.resolve({ shareUrl: "https://example.test/a" });
+      },
+      {
+        onStart: () => undefined,
+        onSuccess: (result) => displayed.push(result.shareUrl),
+        onError: () => undefined,
+      }
+    );
+
+    expect(requested).toEqual([transactionA]);
+    expect(displayed).toEqual(["https://example.test/a"]);
+  });
+
   test("drops A's late share result after close and reopen on B", async () => {
     const flow = new ShareThreadDialogFlow();
     const deferredA = _deferred<{ shareUrl: string }>();

@@ -27,7 +27,14 @@ import {
   Loader2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { readShareThread, shareThread } from "@/client/share";
 import { useCommands } from "@/commands";
@@ -36,6 +43,7 @@ import { GitHubIcon } from "@/components/github-icon";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
+  prepareShareThreadDialogCommit,
   ShareThreadDialogFlow,
   type ShareThreadTransaction,
 } from "./share-thread-dialog-flow";
@@ -78,13 +86,18 @@ export function ShareThreadDialog({
   const [flow] = useState(() => new ShareThreadDialogFlow());
   const authTransactionRef = useRef<ShareThreadTransaction | null>(null);
 
-  // Synchronize during render so a target change invalidates old async work
-  // before a passive effect or promise callback can observe the new dialog.
-  flow.sync(open, { runtimeId, path });
+  // Preparing a target is deliberately pure: React may discard this render.
+  // The layout phase below is the first point at which the target is committed.
+  const targetCommit = useMemo(
+    () => prepareShareThreadDialogCommit(open, { runtimeId, path }),
+    [open, path, runtimeId]
+  );
 
   // Reset every time the dialog (re)opens, and prefill the title from the thread
-  // on disk so the shared copy is nicely named without extra typing.
-  useEffect(() => {
+  // on disk so the shared copy is nicely named without extra typing. A layout
+  // effect both commits ownership and clears target-specific UI before paint.
+  useLayoutEffect(() => {
+    targetCommit.commit(flow);
     if (!open) return;
     authTransactionRef.current = null;
     setStatus("idle");
@@ -98,7 +111,7 @@ export function ShareThreadDialog({
       (target) => readShareThread(target.runtimeId, target.path),
       setTitle
     );
-  }, [flow, open, path, runtimeId]);
+  }, [flow, open, path, targetCommit]);
 
   const publishTransaction = useCallback(
     (transaction: ShareThreadTransaction) => {
@@ -189,148 +202,145 @@ export function ShareThreadDialog({
     [flow, onOpenChange]
   );
 
-  const handleConfirmSignInOpenChange = useCallback(
-    (next: boolean) => {
-      if (!next) authTransactionRef.current = null;
-      setConfirmSignInOpen(next);
-    },
-    []
-  );
+  const handleConfirmSignInOpenChange = useCallback((next: boolean) => {
+    if (!next) authTransactionRef.current = null;
+    setConfirmSignInOpen(next);
+  }, []);
 
   const busy = status === "awaitingAuth" || status === "generating";
 
   return (
     <>
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share thread</DialogTitle>
-          <DialogDescription>
-            Publish this thread to a link anyone can open in their browser.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share thread</DialogTitle>
+            <DialogDescription>
+              Publish this thread to a link anyone can open in their browser.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-200/90">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-400" />
-          <p>
-            Anyone with the link can view the full thread — its prompts,
-            messages, and tool calls. It&rsquo;s published as a secret GitHub
-            Gist under your account; delete the gist to revoke access.
-          </p>
-        </div>
-
-        {status === "success" ? (
-          <div className="space-y-2">
-            <span className="text-muted-foreground text-xs font-medium">
-              Share link
-            </span>
-            <div className="flex items-center gap-2">
-              <Input
-                readOnly
-                value={shareUrl}
-                className="font-mono"
-                onFocus={(event) => event.currentTarget.select()}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopy}
-                className="shrink-0"
-              >
-                {copied ? (
-                  <CheckIcon className="text-emerald-500" />
-                ) : (
-                  <CopyIcon />
-                )}
-                {copied ? "Copied" : "Copy"}
-              </Button>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                executeCommand({ type: "openLink", args: { url: shareUrl } })
-              }
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
-            >
-              <ExternalLinkIcon className="size-3.5" />
-              Open in browser
-            </button>
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-200/90">
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-400" />
+            <p>
+              Anyone with the link can view the full thread — its prompts,
+              messages, and tool calls. It&rsquo;s published as a secret GitHub
+              Gist under your account; delete the gist to revoke access.
+            </p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Share via
-              </span>
-              <Select
-                value={connector}
-                onValueChange={setConnector}
-                disabled={busy}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={GIST_CONNECTOR}>
-                    <GitHubIcon className="size-3.5" />
-                    GitHub Gist
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Title
-              </span>
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Untitled thread"
-                disabled={busy}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Description{" "}
-                <span className="text-muted-foreground/60">(optional)</span>
-              </span>
-              <Textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="What is this thread about?"
-                disabled={busy}
-                rows={2}
-              />
-            </div>
-            {status === "error" ? (
-              <p className="text-destructive text-xs">{errorMessage}</p>
-            ) : null}
-          </div>
-        )}
 
-        <DialogFooter>
           {status === "success" ? (
-            <Button onClick={() => handleOpenChange(false)}>Done</Button>
+            <div className="space-y-2">
+              <span className="text-muted-foreground text-xs font-medium">
+                Share link
+              </span>
+              <div className="flex items-center gap-2">
+                <Input
+                  readOnly
+                  value={shareUrl}
+                  className="font-mono"
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="shrink-0"
+                >
+                  {copied ? (
+                    <CheckIcon className="text-emerald-500" />
+                  ) : (
+                    <CopyIcon />
+                  )}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  executeCommand({ type: "openLink", args: { url: shareUrl } })
+                }
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+              >
+                <ExternalLinkIcon className="size-3.5" />
+                Open in browser
+              </button>
+            </div>
           ) : (
-            <>
-              <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={busy}>
-                {busy ? <Loader2Icon className="animate-spin" /> : null}
-                {status === "awaitingAuth"
-                  ? "Waiting for GitHub sign-in…"
-                  : status === "generating"
-                    ? "Creating link…"
-                    : status === "error"
-                      ? "Try again"
-                      : "Generate link"}
-              </Button>
-            </>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-medium">
+                  Share via
+                </span>
+                <Select
+                  value={connector}
+                  onValueChange={setConnector}
+                  disabled={busy}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={GIST_CONNECTOR}>
+                      <GitHubIcon className="size-3.5" />
+                      GitHub Gist
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-medium">
+                  Title
+                </span>
+                <Input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Untitled thread"
+                  disabled={busy}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-medium">
+                  Description{" "}
+                  <span className="text-muted-foreground/60">(optional)</span>
+                </span>
+                <Textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What is this thread about?"
+                  disabled={busy}
+                  rows={2}
+                />
+              </div>
+              {status === "error" ? (
+                <p className="text-destructive text-xs">{errorMessage}</p>
+              ) : null}
+            </div>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          <DialogFooter>
+            {status === "success" ? (
+              <Button onClick={() => handleOpenChange(false)}>Done</Button>
+            ) : (
+              <>
+                <Button variant="ghost" onClick={() => handleOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleGenerate} disabled={busy}>
+                  {busy ? <Loader2Icon className="animate-spin" /> : null}
+                  {status === "awaitingAuth"
+                    ? "Waiting for GitHub sign-in…"
+                    : status === "generating"
+                      ? "Creating link…"
+                      : status === "error"
+                        ? "Try again"
+                        : "Generate link"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmSignInOpen}

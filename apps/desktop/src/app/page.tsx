@@ -43,9 +43,8 @@ import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
 import { RemoteStatus } from "@/components/remote-status";
-import {
-  createShareThreadCommandHandler,
-} from "@/components/share-thread-command-handler";
+import { createShareThreadCommandHandler } from "@/components/share-thread-command-handler";
+import type { ShareThreadTarget } from "@/components/share-thread-dialog-flow";
 import { SharedImportProvider } from "@/components/shared-import-provider";
 import {
   chooseActiveTabForRuntime,
@@ -121,6 +120,47 @@ function LazyMount({ open, children }: { open: boolean; children: ReactNode }) {
   if (open) mounted.current = true;
   if (!mounted.current) return null;
   return <Suspense fallback={null}>{children}</Suspense>;
+}
+
+/**
+ * Page-owned share command registration and dialog state. Keeping this as one
+ * mounted production boundary makes the command target and dialog target the
+ * same immutable pair instead of parallel path/runtime state.
+ */
+export function PageShareThreadController({
+  workspaceRuntimeId,
+  getActiveThread,
+}: {
+  workspaceRuntimeId: RuntimeId;
+  getActiveThread: () => ShareThreadTarget | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState<ShareThreadTarget>({
+    path: "",
+    runtimeId: "local",
+  });
+
+  useRegisterCommands({
+    shareThread: createShareThreadCommandHandler({
+      getWorkspaceRuntimeId: () => workspaceRuntimeId,
+      getActiveThread,
+      openDialog: (nextTarget) => {
+        setTarget(nextTarget);
+        setOpen(true);
+      },
+    }),
+  });
+
+  return (
+    <LazyMount open={open}>
+      <ShareThreadDialog
+        open={open}
+        path={target.path}
+        runtimeId={target.runtimeId}
+        onOpenChange={setOpen}
+      />
+    </LazyMount>
+  );
 }
 
 function _SidebarModeSwitch({
@@ -271,7 +311,7 @@ function WorkspaceModelScope({
   );
 }
 
-function PageWorkspace({
+export function PageWorkspace({
   workspaceRuntimeId,
   setWorkspaceRuntimeId,
   workspaceRuntimeIdRef,
@@ -303,6 +343,12 @@ function PageWorkspace({
       chooseActiveTabForRuntime(tabs.tabs, tabs.activeId, workspaceRuntimeId),
     [tabs.activeId, tabs.tabs, workspaceRuntimeId]
   );
+  const getActiveShareThread = useCallback((): ShareThreadTarget | null => {
+    const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
+    return activeTab?.type === "thread"
+      ? { path: activeTab.path, runtimeId: activeTab.runtimeId }
+      : null;
+  }, [visibleActiveId, visibleTabs]);
   // The visible active tab is read through a ref so command handlers never go
   // stale or accidentally target a tab from another runtime.
   const activeTabIdRef = useRef(visibleActiveId);
@@ -366,13 +412,6 @@ function PageWorkspace({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  // The thread path and runtime being shared. Keep them together so opening the
-  // dialog can never silently reinterpret a remote path as local.
-  const [shareTarget, setShareTarget] = useState<{
-    path: string;
-    runtimeId: RuntimeId;
-  }>({ path: "", runtimeId: "local" });
   const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
@@ -521,22 +560,6 @@ function PageWorkspace({
       examplesParentRef.current = parent;
       setExamplesOpen(true);
     },
-    // Share a specific thread, or the active thread when no path is given (the
-    // header button / native menu / palette). Thread tab ids are
-    // `thread:{runtimeId}:{path}`.
-    shareThread: createShareThreadCommandHandler({
-      getWorkspaceRuntimeId: () => workspaceRuntimeId,
-      getActiveThread: () => {
-        const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
-        return activeTab?.type === "thread"
-          ? { path: activeTab.path, runtimeId: activeTab.runtimeId }
-          : null;
-      },
-      openDialog: (target) => {
-        setShareTarget(target);
-        setShareOpen(true);
-      },
-    }),
     importFiles: ({ parent = "", files, runtimeId }) => {
       const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
       if (targetRuntimeId !== workspaceRuntimeIdRef.current) return;
@@ -795,6 +818,10 @@ function PageWorkspace({
       <GithubDeviceDialog />
       <GithubStarReminder />
       <FeatureReminderDialog />
+      <PageShareThreadController
+        workspaceRuntimeId={workspaceRuntimeId}
+        getActiveThread={getActiveShareThread}
+      />
       <LazyMount open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}
@@ -821,14 +848,6 @@ function PageWorkspace({
       </LazyMount>
       <LazyMount open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
-      </LazyMount>
-      <LazyMount open={shareOpen}>
-        <ShareThreadDialog
-          open={shareOpen}
-          path={shareTarget.path}
-          runtimeId={shareTarget.runtimeId}
-          onOpenChange={setShareOpen}
-        />
       </LazyMount>
       <LazyMount open={examplesOpen}>
         <StartFromExampleDialog
