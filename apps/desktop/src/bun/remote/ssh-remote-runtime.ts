@@ -56,6 +56,7 @@ export interface SshRemoteRuntimeOptions {
 }
 
 interface SshRemoteRuntimeDependencies {
+  generateToken: typeof _generateToken;
   findFreePort: typeof findFreePort;
   installRemoteServerPackage: typeof installRemoteServerPackage;
   getOrDownloadServerPackage: typeof getOrDownloadServerPackage;
@@ -65,6 +66,7 @@ interface SshRemoteRuntimeDependencies {
 }
 
 const DEFAULT_DEPENDENCIES: SshRemoteRuntimeDependencies = {
+  generateToken: _generateToken,
   findFreePort,
   installRemoteServerPackage,
   getOrDownloadServerPackage,
@@ -77,8 +79,8 @@ export async function startSshRemoteRuntime(
   config: SshRemoteRuntimeConfig,
   options: SshRemoteRuntimeOptions = {}
 ): Promise<SshRemoteRuntimeHandle> {
-  const token = _generateToken();
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...options.dependencies };
+  const token = dependencies.generateToken();
   const localPort = config.localPort ?? (await dependencies.findFreePort());
   const allProcesses: ManagedProcess[] = [];
 
@@ -202,16 +204,14 @@ async function _startInstalledRuntimeOnce(input: {
               remoteRepo: input.config.remoteRepo,
               host: "127.0.0.1",
               port: input.config.remoteServerPort,
-              token: input.token,
               home: input.config.remoteHome,
             }),
           ]
         : buildRemoteServerArgs({
             config: input.config,
-            token: input.token,
             entrypoint: input.install.entrypoint,
           }),
-      { collectOutput: false }
+      { collectOutput: false, stdinInput: `${input.token}\n` }
     );
     processes.push(serverProcess);
     await _waitForProcessAlive(serverProcess, "server-start", input.config);

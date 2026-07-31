@@ -1,8 +1,21 @@
 import { describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import {
   buildRemoteServerCommand,
+  buildRemoteServerArgs,
   buildSourceRemoteServerCommand,
   buildSshBaseArgs,
   buildSshTarget,
@@ -26,6 +39,8 @@ const CONFIG: SshRemoteRuntimeConfig = {
   remoteServerPort: 39123,
   makeDefault: true,
 };
+
+const SENTINEL_TOKEN = "sentinel-runtime-token-do-not-leak";
 
 describe("ssh command builders", () => {
   test("builds target and base args", () => {
@@ -80,19 +95,19 @@ describe("ssh command builders", () => {
     );
   });
 
-  test("shell quotes remote server command", () => {
+  test("keeps the packaged runtime token out of local and remote argv", () => {
     expect(shellQuote("a'b$c")).toBe("'a'\\''b$c'");
-    const command = buildRemoteServerCommand({
+    const sshArgs = buildRemoteServerArgs({
+      config: CONFIG,
       entrypoint: "/opt/llm space/server/bin/llm-space-server",
-      host: "127.0.0.1",
-      port: 39123,
-      token: "tok'en$;",
-      home: "/tmp/home path",
     });
+    const command = sshArgs.at(-1) ?? "";
+
+    expect(command).not.toContain("--token ");
+    expect(command).toContain("--token-stdin");
     expect(command).toContain(
       "exec '/opt/llm space/server/bin/llm-space-server'"
     );
-    expect(command).toContain("--token 'tok'\\''en$;'");
     expect(command).toContain("--home '/tmp/home path'");
   });
 
@@ -107,7 +122,6 @@ describe("ssh command builders", () => {
         "~/.llm-space/remote-runtime/versions/4.4.4/bin/llm-space-server",
       host: "127.0.0.1",
       port: 39123,
-      token: "token",
       home: "~/.llm-space-server",
     });
 
@@ -136,24 +150,37 @@ describe("ssh command builders", () => {
     );
   });
 
-  test("keeps source mode as legacy fallback", () => {
+  test("keeps the source runtime token out of remote argv", () => {
     const command = buildSourceRemoteServerCommand({
       remoteRepo: "/repo path/llm-space",
       host: "127.0.0.1",
       port: 39123,
-      token: "token",
       home: "/tmp/home path",
     });
+    expect(command).not.toContain("--token ");
+    expect(command).toContain("--token-stdin");
     expect(command).toContain("cd '/repo path/llm-space'");
-    expect(command).toContain("exec bun --filter @llm-space/server dev --");
+    expect(command).toContain("exec bun apps/server/src/index.ts");
+    expect(command).not.toContain("--filter");
   });
+
+  test.each(["installed", "source"] as const)(
+    "keeps the protected token out of the executed %s runtime argv",
+    async (mode) => {
+      const result = await _captureExecutedRuntime(mode);
+
+      expect(result.localShellArgv.join("\0")).not.toContain(SENTINEL_TOKEN);
+      expect(result.remoteArgv.join("\0")).not.toContain(SENTINEL_TOKEN);
+      expect(result.remoteArgv).toContain("--token-stdin");
+      expect(result.receivedToken).toBe(SENTINEL_TOKEN);
+    }
+  );
 
   test("expands source mode tilde paths", () => {
     const command = buildSourceRemoteServerCommand({
       remoteRepo: "~/repo/llm-space",
       host: "127.0.0.1",
       port: 39123,
-      token: "token",
       home: "~/.llm-space-server",
     });
 
@@ -161,3 +188,65 @@ describe("ssh command builders", () => {
     expect(command).toContain('--home "$HOME"/'.concat("'.llm-space-server'"));
   });
 });
+
+async function _captureExecutedRuntime(mode: "installed" | "source"): Promise<{
+  localShellArgv: string[];
+  remoteArgv: string[];
+  receivedToken: string;
+}> {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "llm-space-runtime-argv-")
+  );
+  const argvPath = path.join(directory, "argv");
+  const tokenPath = path.join(directory, "token");
+  const executablePath = path.join(
+    directory,
+    mode === "source" ? "bun" : "server"
+  );
+  const script = `#!/bin/sh\numask 077\nprintf '%s\\n' "$@" > "$ARGV_CAPTURE"\nIFS= read -r token\nprintf '%s' "$token" > "$TOKEN_CAPTURE"\n`;
+
+  try {
+    await writeFile(executablePath, script, { encoding: "utf8", mode: 0o700 });
+    await chmod(executablePath, 0o700);
+    const repositoryPath = path.join(directory, "repo");
+    await mkdir(repositoryPath, { mode: 0o700 });
+    const command =
+      mode === "source"
+        ? buildSourceRemoteServerCommand({
+            remoteRepo: repositoryPath,
+            host: "127.0.0.1",
+            port: 39123,
+            home: path.join(directory, "home"),
+          })
+        : buildRemoteServerCommand({
+            entrypoint: executablePath,
+            host: "127.0.0.1",
+            port: 39123,
+            home: path.join(directory, "home"),
+          });
+    const child = spawn("/bin/sh", ["-c", command], {
+      env: {
+        ...process.env,
+        ARGV_CAPTURE: argvPath,
+        TOKEN_CAPTURE: tokenPath,
+        PATH: `${directory}:${process.env.PATH ?? ""}`,
+      },
+      stdio: ["pipe", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.stdin?.end(`${SENTINEL_TOKEN}\n`);
+    const [exitCode] = (await once(child, "exit")) as [number | null];
+    expect(exitCode, stderr).toBe(0);
+
+    return {
+      localShellArgv: child.spawnargs,
+      remoteArgv: (await readFile(argvPath, "utf8")).trimEnd().split("\n"),
+      receivedToken: await readFile(tokenPath, "utf8"),
+    };
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}

@@ -17,6 +17,14 @@ let serverSpawnCalls = 0;
 let stopCalls = 0;
 let diagnosticCalls = 0;
 let remoteExecCalls: string[] = [];
+let spawnCalls: {
+  label: string;
+  command: string;
+  args: string[];
+  options?: { collectOutput?: boolean; stdinInput?: string };
+}[] = [];
+
+const SENTINEL_TOKEN = "sentinel-runtime-token-do-not-leak";
 
 const CONFIG: SshRemoteRuntimeConfig = {
   id: "remote:test",
@@ -31,6 +39,7 @@ const CONFIG: SshRemoteRuntimeConfig = {
 };
 
 const TEST_DEPENDENCIES = {
+  generateToken: () => SENTINEL_TOKEN,
   findFreePort: () => Promise.resolve(40000),
   installRemoteServerPackage: () => {
     installCalls += 1;
@@ -66,7 +75,13 @@ const TEST_DEPENDENCIES = {
       stderr: "",
     });
   },
-  spawnManagedProcess: (label: string) => {
+  spawnManagedProcess: (
+    label: string,
+    command: string,
+    args: string[],
+    options?: { collectOutput?: boolean; stdinInput?: string }
+  ) => {
+    spawnCalls.push({ label, command, args, options });
     const attempt = installCalls;
     if (label === "remote server") {
       serverSpawnCalls += 1;
@@ -114,16 +129,58 @@ beforeEach(() => {
   stopCalls = 0;
   diagnosticCalls = 0;
   remoteExecCalls = [];
+  spawnCalls = [];
 });
 
 describe("startSshRemoteRuntime", () => {
+  test.each(["installed", "source"] as const)(
+    "passes the %s runtime token only through a closed stdin payload",
+    async (mode) => {
+      scenario = "success";
+      const originalMode = process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+      if (mode === "source") {
+        process.env.LLM_SPACE_REMOTE_SERVER_MODE = "source";
+      } else {
+        delete process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+      }
+
+      try {
+        await _withFetch(async () => {
+          const handle = await startSshRemoteRuntime(CONFIG, {
+            dependencies: TEST_DEPENDENCIES,
+          });
+          await handle.stop();
+        });
+      } finally {
+        if (originalMode === undefined) {
+          delete process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+        } else {
+          process.env.LLM_SPACE_REMOTE_SERVER_MODE = originalMode;
+        }
+      }
+
+      const serverSpawn = spawnCalls.find(
+        (call) => call.label === "remote server"
+      );
+      expect(serverSpawn).toBeDefined();
+      expect(serverSpawn?.command).toBe("ssh");
+      expect(serverSpawn?.args.join("\0")).not.toContain(SENTINEL_TOKEN);
+      expect(serverSpawn?.args.at(-1)).not.toContain("--token ");
+      expect(serverSpawn?.args.at(-1)).toContain("--token-stdin");
+      expect(serverSpawn?.options?.stdinInput).toBe(`${SENTINEL_TOKEN}\n`);
+    }
+  );
+
   test("does not reinstall when the runtime binary is missing", async () => {
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
       (error) => {
         expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).not.toContain(SENTINEL_TOKEN);
         expect((error as Error).message).toContain(
           "Remote runtime binary is missing"
         );
@@ -141,7 +198,9 @@ describe("startSshRemoteRuntime", () => {
   test("does not reinstall for non-runtime startup failures", async () => {
     scenario = "non-runtime-failure";
 
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -169,6 +228,14 @@ describe("startSshRemoteRuntime", () => {
 
     expect(installCalls).toBe(1);
     expect(serverSpawnCalls).toBe(2);
+    const serverSpawns = spawnCalls.filter(
+      (call) => call.label === "remote server"
+    );
+    expect(serverSpawns).toHaveLength(2);
+    for (const spawn of serverSpawns) {
+      expect(spawn.args.join("\0")).not.toContain(SENTINEL_TOKEN);
+      expect(spawn.options?.stdinInput).toBe(`${SENTINEL_TOKEN}\n`);
+    }
     expect(remoteExecCalls.some((command) => command.includes("PIDS"))).toBe(
       true
     );
@@ -181,7 +248,9 @@ describe("startSshRemoteRuntime", () => {
   test("does not stop unknown remote port owners", async () => {
     scenario = "port-in-use-unknown-owner";
 
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -204,7 +273,9 @@ describe("startSshRemoteRuntime", () => {
   test("retries remote port recovery only once", async () => {
     scenario = "port-in-use-retry-fails";
 
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
