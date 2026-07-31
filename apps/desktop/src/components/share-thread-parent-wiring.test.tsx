@@ -156,6 +156,49 @@ await mock.module(
   "../../../../packages/ui/src/components/code-editor/index",
   () => TEST_CODE_EDITOR_MODULE
 );
+function _TestMenuItem({
+  children,
+  disabled,
+  onSelect,
+}: {
+  children?: ReactNode;
+  disabled?: boolean;
+  onSelect?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => onSelect?.()}
+    >
+      {children}
+    </button>
+  );
+}
+
+const _MenuContainer = ({ children }: { children?: ReactNode }) => (
+  <div>{children}</div>
+);
+const _MenuPassThrough = ({ children }: { children?: ReactNode }) => (
+  <>{children}</>
+);
+
+await mock.module("@llm-space/ui/ui/dropdown-menu", () => ({
+  DropdownMenu: _MenuPassThrough,
+  DropdownMenuContent: _MenuContainer,
+  DropdownMenuItem: _TestMenuItem,
+  DropdownMenuSeparator: () => <hr />,
+  DropdownMenuTrigger: _MenuPassThrough,
+}));
+await mock.module("@llm-space/ui/ui/context-menu", () => ({
+  ContextMenu: _MenuPassThrough,
+  ContextMenuContent: _MenuContainer,
+  ContextMenuGroup: _MenuPassThrough,
+  ContextMenuItem: _TestMenuItem,
+  ContextMenuSeparator: () => <hr />,
+  ContextMenuTrigger: _MenuPassThrough,
+}));
 await mock.module("@sinm/react-chrome-tabs", () => ({
   Tabs: ({ className }: { className?: string }) => (
     <div className={className}>
