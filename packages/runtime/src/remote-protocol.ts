@@ -1,6 +1,6 @@
 import type { RuntimeCapability } from "./runtime";
 
-export const REMOTE_RUNTIME_PROTOCOL_VERSION = 1;
+export const REMOTE_RUNTIME_PROTOCOL_VERSION = 2;
 
 export interface RemoteRuntimeHealthResponse {
   ok: true;
@@ -25,6 +25,8 @@ export type RemoteRuntimeRpcMethod =
   | "fs.read"
   | "fs.write"
   | "fs.realpath"
+  | "fs.readText"
+  | "fs.textFileExists"
   | "models.available"
   | "models.removeProvider"
   | "models.builtinProviders"

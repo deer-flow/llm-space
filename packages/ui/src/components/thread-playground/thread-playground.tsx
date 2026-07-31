@@ -54,6 +54,7 @@ import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
+import { createRuntimePromptFiles } from "./runtime-prompt-files";
 import {
   canRedo,
   canUndo,
@@ -147,8 +148,9 @@ function _ThreadPlayground({
   const defaultModelRef = useRef(defaultModel);
   defaultModelRef.current = defaultModel;
   const { executeTool, skills, files } = useHostServices();
-  const [store] = useState(() =>
-    createThreadStore(initialValue, {
+  const [store] = useState(() => {
+    const promptFiles = createRuntimePromptFiles(files, runtimeId ?? "local");
+    return createThreadStore(initialValue, {
       transport,
       resolveModel: (saved) =>
         resolveModelConfig(
@@ -163,10 +165,10 @@ function _ThreadPlayground({
         ? (tool, args) => executeTool(tool, args, { runtimeId })
         : undefined,
       loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
-      loadFile: (path) => files.readText(path),
-      fileExists: (path) => files.exists(path),
-    })
-  );
+      loadFile: promptFiles.loadFile,
+      fileExists: promptFiles.fileExists,
+    });
+  });
   useThreadPlaygroundEvents(store, {
     onChange,
     onStreamingStart,

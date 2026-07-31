@@ -57,6 +57,7 @@ import { Input } from "../../../ui/input";
 import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
+import { createRuntimePromptFiles } from "../runtime-prompt-files";
 import { useThreadStore } from "../stores/thread-store";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
@@ -111,6 +112,7 @@ export function GenerateProjectButton({
   const context = useThreadStore((s) => s.thread.context);
   const savedModel = useThreadStore((s) => s.thread.model);
   const title = useThreadStore((s) => s.thread.title);
+  const runtimeId = useThreadStore((s) => s.runtimeId);
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
@@ -206,24 +208,28 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
+        const promptFiles = createRuntimePromptFiles(
+          files,
+          runtimeId ?? "local"
+        );
         const skillList = await listEnabledPromptVariableSkills(skills);
         const rendered = await renderThreadPromptVariables({
           context: context ?? {},
           loadSkills: () => Promise.resolve(skillList),
-          loadFile: (path) => files.readText(path),
-          fileExists: (path) => files.exists(path),
+          loadFile: promptFiles.loadFile,
+          fileExists: promptFiles.fileExists,
         });
         // Ship the raw prompt (variables live at runtime), with `@include`
         // macros expanded now since the generated project renders with Jinja2.
         const systemPromptTemplate = await _expandIncludes(
           context?.systemPrompt ?? "",
-          (path) => files.readText(path)
+          promptFiles.loadFile
         );
         const firstMessage = context?.messages?.[0];
         const firstUserMessageTemplate =
           useMetaUserPrompt && firstMessage?.role === "user"
             ? await _expandIncludes(getMessageText(firstMessage), (path) =>
-                files.readText(path)
+                promptFiles.loadFile(path)
               )
             : undefined;
         const renderedVariableValues: Record<string, string> =
@@ -282,6 +288,7 @@ export function GenerateProjectButton({
       files,
       framework,
       providers,
+      runtimeId,
       mcp,
       useMetaUserPrompt,
     ]

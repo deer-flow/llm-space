@@ -1,8 +1,4 @@
-import {
-  readUserTextFile,
-  userDirectoryExists,
-  userTextFileExists,
-} from "@llm-space/core/server";
+import { userDirectoryExists } from "@llm-space/core/server";
 import type { LocalFileSystem } from "@llm-space/core/server";
 import {
   GIST_CONNECTOR_ID,
@@ -35,6 +31,7 @@ import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
+import { createPromptFileRpcHandlers } from "./prompt-files";
 import { buildSharedThread } from "./share-thread";
 
 /**
@@ -80,6 +77,7 @@ export function createMainWindowRPC({
   updater,
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
+  const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
   const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
@@ -235,13 +233,8 @@ export function createMainWindowRPC({
         fsRealpath: async ({ runtimeId, path }) => ({
           path: await getRuntime(runtimeId).fsRealpath(path),
         }),
-        // Unconfined text read for the prompt `@include` macro (any path + `~`).
-        fsReadText: async ({ path }) => ({
-          text: await readUserTextFile(path),
-        }),
-        fsTextFileExists: async ({ path }) => ({
-          exists: await userTextFileExists(path),
-        }),
+        // Unconfined prompt-file access (any path + `~`) stays on its owner.
+        ...promptFileRequests,
         fsDirectoryExists: async ({ path }) => ({
           exists: await userDirectoryExists(path),
         }),

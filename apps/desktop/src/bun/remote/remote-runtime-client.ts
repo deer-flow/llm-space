@@ -141,6 +141,14 @@ export class RemoteRuntimeClient implements RuntimeClient {
     return result.path;
   }
 
+  readTextFile(path: string) {
+    return this._rpc<string>("fs.readText", { path });
+  }
+
+  textFileExists(path: string) {
+    return this._rpc<boolean>("fs.textFileExists", { path });
+  }
+
   mcpListServers() {
     return this._rpc<McpServerView[]>("mcp.listServers");
   }
