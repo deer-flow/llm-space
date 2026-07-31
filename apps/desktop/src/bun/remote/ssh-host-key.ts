@@ -225,7 +225,7 @@ function _approvedPublicKeyLine(request: RemoteHostKeyTrustRequest): string {
 
 export function parseSshHostKeyOutput(
   output: string,
-  config: Pick<SshRemoteRuntimeConfig, "host" | "port" | "user">
+  config: SshHostKeyLookup
 ): Omit<RemoteHostKeyTrustRequest, "requestId" | "target" | "host" | "user"> | null {
   const key = _parseServerKey(output);
   const changed = _isChangedHostKey(output);
@@ -235,13 +235,14 @@ export function parseSshHostKeyOutput(
   const offending = /Offending \S+ key in ([^:\n]+):(\d+)/i.exec(output);
   const knownHostsFile = offending?.[1] ?? _knownHostsFileFromOutput(output);
   const knownHostsLine = offending?.[2] ? Number(offending[2]) : undefined;
-  const lookupHost = _knownHostsHost(config.host, config.port);
+  const lookupHost = _knownHostsLookupHost(config);
   const publicKeyLine = key.publicKey
     ? `${lookupHost} ${key.keyType} ${key.publicKey}`
     : undefined;
   return {
     kind: changed ? "changed" : "first-time",
     resolvedHost: config.host,
+    hostKeyAlias: config.hostKeyAlias,
     port: config.port,
     keyType: key.keyType,
     fingerprint: key.fingerprint,
@@ -266,6 +267,13 @@ interface ResolvedSshConfig {
   userKnownHostsFile?: string;
 }
 
+interface SshHostKeyLookup {
+  host: string;
+  port?: number;
+  user?: string;
+  hostKeyAlias?: string;
+}
+
 async function _removeKnownHost(
   config: SshRemoteRuntimeConfig,
   request: RemoteHostKeyTrustRequest,
@@ -276,7 +284,8 @@ async function _removeKnownHost(
   }
 
   const host = request.resolvedHost ?? config.host;
-  const lookupHost = _knownHostsHost(host, request.port ?? config.port);
+  const lookupHost =
+    request.hostKeyAlias ?? _knownHostsHost(host, request.port ?? config.port);
   const result = await _run("ssh-keygen", ["-R", lookupHost, "-f", knownHostsFile]);
   const output = `${result.stdout}${result.stderr}`;
   if (result.code === 0 && !/not found/i.test(output)) {
@@ -356,6 +365,10 @@ function _knownHostsHost(host: string, port: number | undefined): string {
   return port && port !== 22 ? `[${host}]:${port}` : host;
 }
 
+function _knownHostsLookupHost(lookup: SshHostKeyLookup): string {
+  return lookup.hostKeyAlias ?? _knownHostsHost(lookup.host, lookup.port);
+}
+
 function _expandHome(input: string): string {
   if (input === "~") return os.homedir();
   if (input.startsWith("~/")) return path.join(os.homedir(), input.slice(2));
@@ -403,7 +416,11 @@ async function _scanPublicKeyLine(
     host,
   ]);
   if (result.code !== 0 && !result.stdout.trim()) return undefined;
-  const lookupHost = _knownHostsHost(resolved?.hostKeyAlias ?? host, port);
+  const lookupHost = _knownHostsLookupHost({
+    host,
+    port,
+    hostKeyAlias: resolved?.hostKeyAlias,
+  });
   for (const line of result.stdout.split(/\r?\n/)) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3) continue;
@@ -429,7 +446,11 @@ async function _scanKey(
     host,
   ]);
   if (result.code !== 0 && !result.stdout.trim()) return undefined;
-  const lookupHost = _knownHostsHost(resolved?.hostKeyAlias ?? host, port);
+  const lookupHost = _knownHostsLookupHost({
+    host,
+    port,
+    hostKeyAlias: resolved?.hostKeyAlias,
+  });
   for (const line of result.stdout.split(/\r?\n/)) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3) continue;
@@ -437,6 +458,7 @@ async function _scanKey(
     if (!keyType || !publicKey) continue;
     return {
       resolvedHost: host,
+      hostKeyAlias: resolved?.hostKeyAlias,
       port,
       keyType,
       fingerprint: _fingerprint(publicKey),
@@ -483,11 +505,12 @@ async function _resolveSshConfig(
 function _hostKeyLookup(
   config: SshRemoteRuntimeConfig,
   resolved: ResolvedSshConfig | undefined
-): Pick<SshRemoteRuntimeConfig, "host" | "port" | "user"> {
+): SshHostKeyLookup {
   return {
-    host: resolved?.hostKeyAlias ?? resolved?.hostname ?? config.host,
+    host: resolved?.hostname ?? config.host,
     port: resolved?.port ?? config.port,
     user: resolved?.user ?? config.user,
+    hostKeyAlias: resolved?.hostKeyAlias,
   };
 }
 
@@ -524,17 +547,35 @@ async function _run(
   child.stderr?.on("data", appendStderr);
 
   return await new Promise((resolve, reject) => {
+    let settled = false;
+    let timedOut = false;
     const timer = setTimeout(() => {
+      timedOut = true;
       child.kill("SIGKILL");
-      resolve({ code: null, stdout, stderr: `${stderr}\nSSH host key probe timed out after ${timeoutMs}ms.` });
     }, timeoutMs);
-    child.once("error", (error) => {
+    const settle = (
+      result: { code: number | null; stdout: string; stderr: string }
+    ) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       reject(error);
-    });
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr });
+    };
+    child.once("error", fail);
+    child.once("close", (code) => {
+      settle({
+        code: timedOut ? null : code,
+        stdout,
+        stderr: timedOut
+          ? `${stderr}\nSSH host key probe timed out after ${timeoutMs}ms.`
+          : stderr,
+      });
     });
   });
 }

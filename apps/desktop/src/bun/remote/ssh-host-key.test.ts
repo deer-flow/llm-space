@@ -23,13 +23,17 @@ const CONFIG: Pick<SshRemoteRuntimeConfig, "host" | "port" | "user"> = {
 };
 
 const PUBLIC_KEY = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=";
-const APPROVED_PUBLIC_KEY = "YXBwcm92ZWQtaG9zdC1rZXktQQ==";
+// Disposable public host-key fixtures generated specifically for this test.
+const APPROVED_PUBLIC_KEY =
+  "AAAAC3NzaC1lZDI1NTE5AAAAIMWClLm642k5fDUelNUlE3uW88/ogeoX5EIKILobXc7A";
 const APPROVED_FINGERPRINT =
-  "SHA256:0+PCggjAR7ckC7d7kmOGGZOSJnzR8b/tLDxPGLwAXIo";
-const UNAPPROVED_PUBLIC_KEY = "dW5hcHByb3ZlZC1ob3N0LWtleS1C";
+  "SHA256:lGTUsW7JPjScNpoleUyyUfsRVyPN3zum2sOh8kX3D0Q";
+const UNAPPROVED_PUBLIC_KEY =
+  "AAAAC3NzaC1lZDI1NTE5AAAAIFN2zaqYUz8BS9QSM92UvdjzwXiOBwZokPiIeS+PDRkk";
 const UNAPPROVED_FINGERPRINT =
-  "SHA256:6G7x+IJxVNm/lEaE8KcEL2rSL7bbx2ajlhdRdoKLnPk";
-const PREVIOUS_PUBLIC_KEY = "cHJldmlvdXMtaG9zdC1rZXk=";
+  "SHA256:d1n12MYv9HCctUnqJO5LKg3j9ZDaJTQU9U2Mbt1v2Zs";
+const PREVIOUS_PUBLIC_KEY =
+  "AAAAC3NzaC1lZDI1NTE5AAAAIEGnEOIsKFobwDnd4yyLXW+lZ9N7P7HM4JyG72pImjxo";
 const HOST_ALIAS = "stable-host-alias";
 const CUSTOM_PORT = 2222;
 
@@ -109,13 +113,15 @@ describe("OpenSshHostKeyService", () => {
 
           expect(request).toMatchObject({
             kind,
+            resolvedHost: "203.0.113.10",
             port: CUSTOM_PORT,
             fingerprint: APPROVED_FINGERPRINT,
-            publicKeyLine: `[${HOST_ALIAS}]:${CUSTOM_PORT} ssh-ed25519 ${APPROVED_PUBLIC_KEY}`,
+            publicKeyLine: `${HOST_ALIAS} ssh-ed25519 ${APPROVED_PUBLIC_KEY}`,
           });
 
           process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
-          process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE = `[${HOST_ALIAS}]:${CUSTOM_PORT} ssh-ed25519 ${UNAPPROVED_PUBLIC_KEY}`;
+          process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY =
+            UNAPPROVED_PUBLIC_KEY;
           process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT =
             UNAPPROVED_FINGERPRINT;
 
@@ -143,9 +149,8 @@ describe("OpenSshHostKeyService", () => {
   test("rejects a public key that does not match the approved fingerprint", async () => {
     await _withFakeOpenSsh("first-time", async ({ service }) => {
       const request = await _checkForTrust(service);
-      request.publicKeyLine = `[${HOST_ALIAS}]:${CUSTOM_PORT} ssh-ed25519 ${UNAPPROVED_PUBLIC_KEY}`;
+      request.publicKeyLine = `${HOST_ALIAS} ssh-ed25519 ${UNAPPROVED_PUBLIC_KEY}`;
       process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
-      process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE = request.publicKeyLine;
 
       expect(service.trust(SSH_CONFIG, request)).rejects.toThrow(
         "does not match the approved fingerprint"
@@ -175,8 +180,10 @@ describe("OpenSshHostKeyService", () => {
       async ({ knownHostsFile, service }) => {
         const request = await _checkForTrust(service);
         process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
-        process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE =
-          request.publicKeyLine;
+        process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY =
+          APPROVED_PUBLIC_KEY;
+        process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT =
+          APPROVED_FINGERPRINT;
         process.env.SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT = "1";
 
         await service.trust(SSH_CONFIG, request);
@@ -195,8 +202,10 @@ describe("OpenSshHostKeyService", () => {
         async ({ home, knownHostsFile, service }) => {
           const request = await _checkForTrust(service);
           process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
-          process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE =
-            request.publicKeyLine;
+          process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY =
+            APPROVED_PUBLIC_KEY;
+          process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT =
+            APPROVED_FINGERPRINT;
 
           await service.trust(SSH_CONFIG, request);
 
@@ -209,13 +218,29 @@ describe("OpenSshHostKeyService", () => {
           expect(backups).toHaveLength(kind === "changed" ? 1 : 0);
           if (kind === "changed") {
             expect(readFileSync(path.join(home, backups[0]), "utf8")).toBe(
-              `[${HOST_ALIAS}]:${CUSTOM_PORT} ssh-ed25519 ${PREVIOUS_PUBLIC_KEY}\n`
+              `${HOST_ALIAS} ssh-ed25519 ${PREVIOUS_PUBLIC_KEY}\n`
             );
           }
         }
       );
     });
   }
+
+  test("preserves host-key diagnostics written after the child exits", async () => {
+    await _withFakeOpenSsh("first-time", async ({ service }) => {
+      const request = await _checkForTrust(service);
+      process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
+      process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY =
+        UNAPPROVED_PUBLIC_KEY;
+      process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT =
+        UNAPPROVED_FINGERPRINT;
+      process.env.SSH_HOST_KEY_TEST_DELAYED_OUTPUT = "1";
+
+      expect(service.trust(SSH_CONFIG, request)).rejects.toThrow(
+        "REMOTE HOST IDENTIFICATION HAS CHANGED"
+      );
+    });
+  });
 });
 
 async function _checkForTrust(
@@ -246,12 +271,13 @@ async function _withFakeOpenSsh(
     knownHostsFile: process.env.SSH_HOST_KEY_TEST_KNOWN_HOSTS_FILE,
     approvedFingerprint: process.env.SSH_HOST_KEY_TEST_APPROVED_FINGERPRINT,
     scanKeyLine: process.env.SSH_HOST_KEY_TEST_SCAN_KEY_LINE,
-    presentedKeyLine: process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE,
+    presentedPublicKey: process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY,
     presentedFingerprint:
       process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT,
     upstreamAuthFailure:
       process.env.SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE,
     longAuthOutput: process.env.SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT,
+    delayedOutput: process.env.SSH_HOST_KEY_TEST_DELAYED_OUTPUT,
   };
 
   try {
@@ -262,7 +288,7 @@ async function _withFakeOpenSsh(
     if (kind === "changed") {
       writeFileSync(
         knownHostsFile,
-        `[${HOST_ALIAS}]:${CUSTOM_PORT} ssh-ed25519 ${PREVIOUS_PUBLIC_KEY}\n`,
+        `${HOST_ALIAS} ssh-ed25519 ${PREVIOUS_PUBLIC_KEY}\n`,
         "utf8"
       );
     }
@@ -273,10 +299,11 @@ async function _withFakeOpenSsh(
     process.env.SSH_HOST_KEY_TEST_KNOWN_HOSTS_FILE = knownHostsFile;
     process.env.SSH_HOST_KEY_TEST_APPROVED_FINGERPRINT = APPROVED_FINGERPRINT;
     process.env.SSH_HOST_KEY_TEST_SCAN_KEY_LINE = `[203.0.113.10]:${CUSTOM_PORT} ssh-ed25519 ${APPROVED_PUBLIC_KEY}`;
-    delete process.env.SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE;
+    delete process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY;
     delete process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT;
     delete process.env.SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE;
     delete process.env.SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT;
+    delete process.env.SSH_HOST_KEY_TEST_DELAYED_OUTPUT;
 
     await run({
       home,
@@ -297,8 +324,8 @@ async function _withFakeOpenSsh(
     );
     _restoreEnv("SSH_HOST_KEY_TEST_SCAN_KEY_LINE", previousEnv.scanKeyLine);
     _restoreEnv(
-      "SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE",
-      previousEnv.presentedKeyLine
+      "SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY",
+      previousEnv.presentedPublicKey
     );
     _restoreEnv(
       "SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT",
@@ -311,6 +338,10 @@ async function _withFakeOpenSsh(
     _restoreEnv(
       "SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT",
       previousEnv.longAuthOutput
+    );
+    _restoreEnv(
+      "SSH_HOST_KEY_TEST_DELAYED_OUTPUT",
+      previousEnv.delayedOutput
     );
     rmSync(home, { recursive: true, force: true });
   }
@@ -377,9 +408,9 @@ fi
 if [ "$strict" = yes ]; then
   if [ "$SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE" = 1 ]; then
     printf 'jump@proxy: Permission denied (publickey).\n' >&2
-  elif [ -n "$user_known_hosts" ] && grep -F -x "$SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE" "$user_known_hosts" >/dev/null 2>&1; then
-    printf 'debug1: Server host key: ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_APPROVED_FINGERPRINT" >&2
-    printf "debug1: Host '[${HOST_ALIAS}]:${CUSTOM_PORT}' is known and matches the ED25519 host key.\n" >&2
+  elif [ -n "$user_known_hosts" ] && grep -F -x "${HOST_ALIAS} ssh-ed25519 $SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY" "$user_known_hosts" >/dev/null 2>&1; then
+    printf 'debug1: Server host key: ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT" >&2
+    printf "debug1: Host '${HOST_ALIAS}' is known and matches the ED25519 host key.\n" >&2
     if [ "$SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT" = 1 ]; then
       line=0
       while [ "$line" -lt 700 ]; do
@@ -389,15 +420,24 @@ if [ "$strict" = yes ]; then
     fi
     printf 'developer@devbox: Permission denied (publickey).\n' >&2
   else
-    printf 'debug1: Server host key: ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT" >&2
-    printf '@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @\n' >&2
-    printf 'developer@devbox: Permission denied (publickey).\n' >&2
+    if [ "$SSH_HOST_KEY_TEST_DELAYED_OUTPUT" = 1 ]; then
+      (
+        sleep 0.05
+        printf 'debug1: Server host key: ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT" >&2
+        printf '@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @\n' >&2
+        printf 'developer@devbox: Permission denied (publickey).\n' >&2
+      ) &
+    else
+      printf 'debug1: Server host key: ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT" >&2
+      printf '@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @\n' >&2
+      printf 'developer@devbox: Permission denied (publickey).\n' >&2
+    fi
   fi
   exit 255
 fi
 
 if [ "$strict" = accept-new ]; then
-  printf '%s\n' "$SSH_HOST_KEY_TEST_PRESENTED_KEY_LINE" >> "$SSH_HOST_KEY_TEST_KNOWN_HOSTS_FILE"
+  printf '${HOST_ALIAS} ssh-ed25519 %s\n' "$SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY" >> "$SSH_HOST_KEY_TEST_KNOWN_HOSTS_FILE"
   printf 'developer@devbox: Permission denied (publickey).\n' >&2
   exit 255
 fi
