@@ -21,8 +21,7 @@ import { getOrDownloadServerPackage } from "./server-package-cache";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import {
   buildRemoteServerArgs,
-  buildSourceRemoteServerCommand,
-  buildSshBaseArgs,
+  buildSourceRemoteServerArgs,
   buildTunnelArgs,
   joinRemotePath,
   shellPath,
@@ -198,15 +197,7 @@ async function _startInstalledRuntimeOnce(input: {
       "remote server",
       "ssh",
       process.env.LLM_SPACE_REMOTE_SERVER_MODE === "source"
-        ? [
-            ...buildSshBaseArgs(input.config),
-            buildSourceRemoteServerCommand({
-              remoteRepo: input.config.remoteRepo,
-              host: "127.0.0.1",
-              port: input.config.remoteServerPort,
-              home: input.config.remoteHome,
-            }),
-          ]
+        ? buildSourceRemoteServerArgs({ config: input.config })
         : buildRemoteServerArgs({
             config: input.config,
             entrypoint: input.install.entrypoint,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
   chmod,
@@ -16,6 +16,7 @@ import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import {
   buildRemoteServerCommand,
   buildRemoteServerArgs,
+  buildSourceRemoteServerArgs,
   buildSourceRemoteServerCommand,
   buildSshBaseArgs,
   buildSshTarget,
@@ -41,6 +42,14 @@ const CONFIG: SshRemoteRuntimeConfig = {
 };
 
 const SENTINEL_TOKEN = "sentinel-runtime-token-do-not-leak";
+const SERVER_TTY_CONFIG: SshRemoteRuntimeConfig = {
+  ...CONFIG,
+  host: "tty-probe",
+  user: undefined,
+  port: undefined,
+  identityFile: undefined,
+  extraArgs: ["-tt"],
+};
 
 describe("ssh command builders", () => {
   test("builds target and base args", () => {
@@ -58,6 +67,7 @@ describe("ssh command builders", () => {
       "jump",
       "user@host",
     ]);
+    expect(buildSshBaseArgs(CONFIG)).not.toContain("-T");
   });
 
   test("does not override OpenSSH config by default", () => {
@@ -93,6 +103,12 @@ describe("ssh command builders", () => {
     expect(buildTunnelArgs({ config: CONFIG, localPort: 40000 })).toContain(
       "127.0.0.1:40000:127.0.0.1:39123"
     );
+    const forcedTtyArgs = buildTunnelArgs({
+      config: SERVER_TTY_CONFIG,
+      localPort: 40000,
+    });
+    expect(forcedTtyArgs).toContain("-tt");
+    expect(forcedTtyArgs).not.toContain("-T");
   });
 
   test("keeps the packaged runtime token out of local and remote argv", () => {
@@ -110,6 +126,49 @@ describe("ssh command builders", () => {
     );
     expect(command).toContain("--home '/tmp/home path'");
   });
+
+  test("disables TTY after user options and before the packaged server target", () => {
+    const sshArgs = buildRemoteServerArgs({
+      config: SERVER_TTY_CONFIG,
+      entrypoint: "/opt/llm-space-server",
+    });
+    const userTtyIndex = sshArgs.indexOf("-tt");
+    const disableTtyIndex = sshArgs.indexOf("-T");
+    const targetIndex = sshArgs.indexOf("tty-probe");
+
+    expect(disableTtyIndex).toBeGreaterThan(userTtyIndex);
+    expect(disableTtyIndex).toBeLessThan(targetIndex);
+  });
+
+  test.each(["installed", "source"] as const)(
+    "OpenSSH resolves the %s server session to requesttty false",
+    async (mode) => {
+      const directory = await mkdtemp(path.join(tmpdir(), "llm-space-ssh-g-"));
+      try {
+        const configPath = path.join(directory, "config");
+        await writeFile(
+          configPath,
+          "Host tty-probe\n  HostName 127.0.0.1\n  RequestTTY force\n",
+          { encoding: "utf8", mode: 0o600 }
+        );
+        const sshArgs =
+          mode === "source"
+            ? buildSourceRemoteServerArgs({ config: SERVER_TTY_CONFIG })
+            : buildRemoteServerArgs({
+                config: SERVER_TTY_CONFIG,
+                entrypoint: "/opt/llm-space-server",
+              });
+        const result = spawnSync("ssh", ["-F", configPath, "-G", ...sshArgs], {
+          encoding: "utf8",
+        });
+
+        expect(result.status, result.stderr).toBe(0);
+        expect(/^requesttty false$/m.test(result.stdout)).toBe(true);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
 
   test("expands current-user tilde paths on the remote shell", () => {
     expect(shellPath("~")).toBe('"$HOME"');

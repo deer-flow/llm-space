@@ -36,15 +36,29 @@ export function buildRemoteServerArgs(input: {
   config: SshRemoteRuntimeConfig;
   entrypoint: string;
 }): string[] {
-  return [
-    ...buildSshBaseArgs(input.config),
+  return _buildRemoteServerSessionArgs(
+    input.config,
     buildRemoteServerCommand({
       entrypoint: input.entrypoint,
       host: "127.0.0.1",
       port: input.config.remoteServerPort,
       home: input.config.remoteHome,
-    }),
-  ];
+    })
+  );
+}
+
+export function buildSourceRemoteServerArgs(input: {
+  config: SshRemoteRuntimeConfig;
+}): string[] {
+  return _buildRemoteServerSessionArgs(
+    input.config,
+    buildSourceRemoteServerCommand({
+      remoteRepo: input.config.remoteRepo,
+      host: "127.0.0.1",
+      port: input.config.remoteServerPort,
+      home: input.config.remoteHome,
+    })
+  );
 }
 
 export function buildRemoteServerCommand(input: {
@@ -114,4 +128,16 @@ export function shellQuote(value: unknown): string {
     throw new Error(`Cannot shell-quote non-string value: ${String(value)}`);
   }
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function _buildRemoteServerSessionArgs(
+  config: SshRemoteRuntimeConfig,
+  command: string
+): string[] {
+  return [
+    ...buildSshBaseArgs(config).slice(0, -1),
+    "-T",
+    buildSshTarget(config),
+    command,
+  ];
 }

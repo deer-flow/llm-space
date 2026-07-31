@@ -30,7 +30,7 @@ const CONFIG: SshRemoteRuntimeConfig = {
   id: "remote:test",
   name: "test",
   host: "host",
-  extraArgs: [],
+  extraArgs: ["-tt"],
   remoteRepo: "",
   remoteInstallDir: "~/.llm-space/remote-runtime",
   remoteHome: "~/.llm-space-server",
@@ -165,6 +165,11 @@ describe("startSshRemoteRuntime", () => {
       expect(serverSpawn).toBeDefined();
       expect(serverSpawn?.command).toBe("ssh");
       expect(serverSpawn?.args.join("\0")).not.toContain(SENTINEL_TOKEN);
+      const userTtyIndex = serverSpawn?.args.indexOf("-tt") ?? -1;
+      const disableTtyIndex = serverSpawn?.args.indexOf("-T") ?? -1;
+      const targetIndex = serverSpawn?.args.indexOf(CONFIG.host) ?? -1;
+      expect(disableTtyIndex).toBeGreaterThan(userTtyIndex);
+      expect(disableTtyIndex).toBeLessThan(targetIndex);
       expect(serverSpawn?.args.at(-1)).not.toContain("--token ");
       expect(serverSpawn?.args.at(-1)).toContain("--token-stdin");
       expect(serverSpawn?.options?.stdinInput).toBe(`${SENTINEL_TOKEN}\n`);
