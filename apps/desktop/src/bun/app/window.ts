@@ -4,7 +4,7 @@ import {
   getWindowFullScreen,
   getWindowMaximized,
   getWindowZoom,
-  loadWindowState,
+  WindowStateStore,
 } from "@llm-space/core/server";
 import { BrowserWindow, Updater } from "electrobun/bun";
 
@@ -42,7 +42,8 @@ export async function createMainWindow({
   executeCommand: (command: Command, window: BrowserWindow) => void;
 }): Promise<BrowserWindow> {
   const url = await getMainViewUrl();
-  const windowState = await loadWindowState();
+  const windowStateStore = await WindowStateStore.load();
+  const windowState = windowStateStore.state;
   const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
   const savedZoom = getWindowZoom(windowState) ?? 1;
 
@@ -59,6 +60,7 @@ export async function createMainWindow({
   });
 
   attachWindowStates(window, {
+    store: windowStateStore,
     isMaximized: getWindowMaximized(windowState),
     isFullScreen: getWindowFullScreen(windowState),
     zoom: savedZoom,

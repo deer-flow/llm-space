@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { env } from "node:process";
 
@@ -10,11 +10,16 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import {
-  type ModelProviderGroup,
+  ModelConfig,
   type CustomModel,
-  type ModelConfig,
+  type ModelProviderGroup,
 } from "@llm-space/core";
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
+import { z } from "zod";
 
 import {
   BUILTIN_PROVIDER_META,
@@ -29,6 +34,59 @@ import {
   type ModelsConfig,
   type ProviderConfig,
 } from "./types";
+
+const CustomModelFileSchema = z.looseObject({
+  id: z.string(),
+  name: z.string(),
+  api: z.enum(["anthropic-messages", "openai-completions", "openai-responses"]),
+  provider: z.string().optional(),
+  baseUrl: z.string().optional(),
+  icon: z.string().optional(),
+  reasoning: z.boolean(),
+  input: z.array(z.enum(["text", "image"])),
+  cost: z.object({
+    input: z.number(),
+    output: z.number(),
+    cacheRead: z.number(),
+    cacheWrite: z.number(),
+    tiers: z
+      .array(
+        z.object({
+          input: z.number(),
+          output: z.number(),
+          cacheRead: z.number(),
+          cacheWrite: z.number(),
+          inputTokensAbove: z.number(),
+        })
+      )
+      .optional(),
+  }),
+  contextWindow: z.number().positive(),
+  maxTokens: z.number().positive(),
+  headers: z.record(z.string(), z.string()).optional(),
+}) as unknown as z.ZodType<CustomModel>;
+const ModelConfigFileSchema = z.fromJSONSchema(
+  ModelConfig as unknown as Parameters<typeof z.fromJSONSchema>[0]
+);
+const ProviderConfigFileSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  builtin: z.boolean().optional(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  api: z
+    .enum(["anthropic-messages", "openai-completions", "openai-responses"])
+    .optional(),
+  icon: z.string().optional(),
+  disabledModels: z.array(z.string()).optional(),
+  models: z.array(CustomModelFileSchema).optional(),
+  customModels: z.array(z.string()).optional(),
+});
+const ModelsConfigFileSchema = z.object({
+  providers: z.array(ProviderConfigFileSchema),
+  defaultModel: ModelConfigFileSchema.optional(),
+});
 
 /**
  * Owns `settings/models.json`: the single in-memory source of truth for the
@@ -607,12 +665,7 @@ export class ModelManager {
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(this._config, null, 2)}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, this._config);
   }
 
   /**
@@ -620,27 +673,12 @@ export class ModelManager {
    * config on disk so the app has something to edit, and report no providers.
    */
   private _loadConfig(): ModelsConfig {
-    try {
-      const parsed = JSON.parse(
-        readFileSync(this._configPath, "utf8")
-      ) as ModelsConfig;
-      return {
-        providers: Array.isArray(parsed.providers) ? parsed.providers : [],
-        defaultModel: parsed.defaultModel,
-      };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-      const empty: ModelsConfig = { providers: [] };
-      mkdirSync(getSettingsDir(), { recursive: true });
-      writeFileSync(
-        this._configPath,
-        `${JSON.stringify(empty, null, 2)}\n`,
-        "utf8"
-      );
-      return empty;
-    }
+    return readJsonFileSync(this._configPath, {
+      schema: ModelsConfigFileSchema as z.ZodType<ModelsConfig>,
+      recovery: "best-effort",
+      fallback: (): ModelsConfig => ({ providers: [] }),
+      seedMissing: true,
+    }).value;
   }
 
   private async _detectProviders() {

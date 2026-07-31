@@ -4,11 +4,14 @@ import * as path from "node:path";
 
 import {
   normalizeThread,
+  PersistedThreadZodSchema,
+  RecoverablePersistedThreadZodSchema,
   type FileNode,
   type FileSystem,
   type Thread,
   type ThreadStorage,
 } from "../../../types";
+import { readJsonFile } from "../../json-file";
 import { packThreadImages, unpackThreadImages } from "../blob";
 
 /**
@@ -95,14 +98,27 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
   // --- ThreadStorage ------------------------------------------------------
 
   async read(p: string): Promise<Thread> {
-    const text = await fs.readFile(this._resolve(p), "utf8");
-    const parsed = JSON.parse(text) as Thread;
-    return normalizeThread(unpackThreadImages(parsed));
+    const real = this._resolve(p);
+    const result = await readJsonFile(real, {
+      schema: PersistedThreadZodSchema,
+      recovery: "best-effort",
+      recoverySchema: RecoverablePersistedThreadZodSchema,
+      repair: false,
+    });
+    const thread = normalizeThread(unpackThreadImages(result.value));
+    if (result.source === "recovered") {
+      await this.write(p, thread);
+      console.warn(
+        `Recovered truncated thread ${p}; backup: ${result.backupPath}`
+      );
+    }
+    return thread;
   }
 
   async write(p: string, thread: Thread): Promise<void> {
     const real = this._resolve(p);
     const serializable = packThreadImages(normalizeThread(thread));
+    PersistedThreadZodSchema.parse(serializable);
     const text = JSON.stringify(serializable, null, 2);
     const directory = path.dirname(real);
     await fs.mkdir(directory, { recursive: true });

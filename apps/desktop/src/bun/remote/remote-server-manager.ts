@@ -1,13 +1,17 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { uuid } from "@llm-space/core";
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
 import type {
   RuntimeClient,
   RuntimeId,
   RuntimeRouter,
 } from "@llm-space/runtime/runtime";
+import { z } from "zod";
 
 import type {
   RemoteConnectionStage,
@@ -21,10 +25,7 @@ import type {
 
 import { DEFAULT_REMOTE_INSTALL_DIR } from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
-import {
-  OpenSshHostKeyService,
-  type SshHostKeyService,
-} from "./ssh-host-key";
+import { OpenSshHostKeyService, type SshHostKeyService } from "./ssh-host-key";
 import { startSshRemoteRuntime } from "./ssh-remote-runtime";
 
 interface RemoteRuntimeHandle {
@@ -53,6 +54,28 @@ type PersistedRemoteServerConfig = RemoteServerConfig & {
 
 const REMOTE_SERVERS_CONFIG_VERSION = 2;
 
+const RemoteServersConfigFileSchema = z.object({
+  version: z.number().optional(),
+  servers: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.literal("ssh"),
+      name: z.string(),
+      host: z.string(),
+      user: z.string().optional(),
+      remoteInstallDir: z.string().optional(),
+      remoteHome: z.string().optional(),
+      remoteServerPort: z.number().optional(),
+      port: z.number().optional(),
+      identityFile: z.string().optional(),
+      remoteRepo: z.string().optional(),
+      localPort: z.number().optional(),
+      createdAt: z.number(),
+      updatedAt: z.number(),
+    })
+  ),
+});
+
 interface ConnectedServer {
   status: "connected" | "connecting" | "error" | "trust-required";
   stage: RemoteConnectionStage;
@@ -75,11 +98,9 @@ export class RemoteServerManager {
 
   constructor(
     private readonly _runtimeRouter: RuntimeRouter,
-    private readonly _startSshRemoteRuntime: StartSshRemoteRuntime =
-      startSshRemoteRuntime,
+    private readonly _startSshRemoteRuntime: StartSshRemoteRuntime = startSshRemoteRuntime,
     private _onStatusChanged?: RemoteServerStatusListener,
-    private readonly _hostKeyService: SshHostKeyService =
-      new OpenSshHostKeyService()
+    private readonly _hostKeyService: SshHostKeyService = new OpenSshHostKeyService()
   ) {
     this._servers = this._load();
   }
@@ -169,14 +190,17 @@ export class RemoteServerManager {
       if (hostKey.status === "error") {
         throw new Error(hostKey.message);
       }
-      const handle = await this._startSshRemoteRuntime(this._sshConfig(server), {
-        onProgress: ({ stage, message }) =>
-          this._setConnection(id, {
-            status: "connecting",
-            stage: _connectionStage(stage),
-            stageLabel: message,
-          }),
-      });
+      const handle = await this._startSshRemoteRuntime(
+        this._sshConfig(server),
+        {
+          onProgress: ({ stage, message }) =>
+            this._setConnection(id, {
+              status: "connecting",
+              stage: _connectionStage(stage),
+              stageLabel: message,
+            }),
+        }
+      );
       const runtimeId = this._runtimeId(server.id);
       this._runtimeRouter.register(runtimeId, handle.client);
       this._runtimeRouter.setDefaultRuntime(runtimeId);
@@ -386,7 +410,11 @@ export class RemoteServerManager {
 
   private _assertNotConnected(id: string, action: string): void {
     const status = this._connections.get(id)?.status;
-    if (status === "connected" || status === "connecting" || status === "trust-required") {
+    if (
+      status === "connected" ||
+      status === "connecting" ||
+      status === "trust-required"
+    ) {
       throw new Error(`Disconnect remote server before ${action}: ${id}`);
     }
   }
@@ -418,26 +446,23 @@ export class RemoteServerManager {
   }
 
   private _load(): RemoteServerConfig[] {
-    if (!existsSync(this._configPath)) return [];
-    const parsed = JSON.parse(
-      readFileSync(this._configPath, "utf8")
-    ) as RemoteServersConfigFile;
+    const parsed = readJsonFileSync(this._configPath, {
+      schema:
+        RemoteServersConfigFileSchema as z.ZodType<RemoteServersConfigFile>,
+      recovery: "best-effort",
+      fallback: (): RemoteServersConfigFile => ({ servers: [] }),
+      seedMissing: false,
+    }).value;
     return Array.isArray(parsed.servers)
       ? parsed.servers.map((server) => this._normalizeLoadedServer(server))
       : [];
   }
 
   private _save(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(
-        { version: REMOTE_SERVERS_CONFIG_VERSION, servers: this._servers },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, {
+      version: REMOTE_SERVERS_CONFIG_VERSION,
+      servers: this._servers,
+    });
   }
 
   private _normalizeLoadedServer(

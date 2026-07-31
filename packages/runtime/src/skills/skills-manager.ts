@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,9 +9,25 @@ import {
   type SkillInfo,
   type SkillsSettings,
 } from "@llm-space/core";
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
 import matter from "gray-matter";
 import { isValidSkillName, validateSkillFrontmatter } from "skills-handler";
+import { z } from "zod";
+
+const SkillsSettingsFileSchema = z.object({
+  discoveryPaths: z
+    .array(
+      z.object({
+        path: z.string(),
+        hiddenSkills: z.array(z.string()).default([]),
+      })
+    )
+    .optional(),
+});
 
 /**
  * Owns `settings/skills.json`: the discovery folders backing the built-in Skill
@@ -244,12 +260,7 @@ export class SkillsManager {
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(this._settings, null, 2)}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, this._settings);
   }
 
   /**
@@ -257,24 +268,13 @@ export class SkillsManager {
    * missing files stay valid. Seeds the default config on disk when absent.
    */
   private _loadConfig(): SkillsSettings {
-    try {
-      const parsed = JSON.parse(
-        readFileSync(this._configPath, "utf8")
-      ) as Partial<SkillsSettings>;
-      return this._normalize(parsed);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-      const defaults = this._defaultSettings();
-      mkdirSync(getSettingsDir(), { recursive: true });
-      writeFileSync(
-        this._configPath,
-        `${JSON.stringify(defaults, null, 2)}\n`,
-        "utf8"
-      );
-      return defaults;
-    }
+    const result = readJsonFileSync(this._configPath, {
+      schema: SkillsSettingsFileSchema,
+      recovery: "best-effort",
+      fallback: () => this._defaultSettings(),
+      seedMissing: true,
+    });
+    return this._normalize(result.value);
   }
 
   private _normalize(input: Partial<SkillsSettings>): SkillsSettings {

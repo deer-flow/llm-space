@@ -1,14 +1,17 @@
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { readFileSync } from "node:fs";
+import { rmSync } from "node:fs";
 import path from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
+import { z } from "zod";
 
 import {
   GITHUB_OAUTH_CLIENT_ID,
   type AuthConfig,
   type GithubAuthState,
-  type GithubUser,
 } from "../../shared/auth";
 
 import {
@@ -17,6 +20,21 @@ import {
   pollForAccessToken,
   requestDeviceCode,
 } from "./github-device-flow";
+
+const AuthConfigSchema: z.ZodType<AuthConfig | null> = z
+  .object({
+    accessToken: z.string().min(1),
+    tokenType: z.string(),
+    scope: z.string(),
+    user: z.object({
+      login: z.string().min(1),
+      name: z.string().nullable(),
+      email: z.string().nullable(),
+      avatarUrl: z.string(),
+      htmlUrl: z.string(),
+    }),
+  })
+  .or(z.null());
 
 export interface GitHubAuthManagerOptions {
   /** Pushed on every auth-state transition (→ renderer over RPC). */
@@ -156,18 +174,7 @@ export class GitHubAuthManager {
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(this._config, null, 2)}\n`,
-      "utf8"
-    );
-    // The file holds a bearer token — keep it owner-only.
-    try {
-      chmodSync(this._configPath, 0o600);
-    } catch (error) {
-      console.error("Failed to restrict auth.json permissions:", error);
-    }
+    atomicWriteJsonFileSync(this._configPath, this._config, { mode: 0o600 });
   }
 
   /**
@@ -176,51 +183,19 @@ export class GitHubAuthManager {
    * startup.
    */
   private _loadConfig(): AuthConfig | null {
-    let raw: string;
     try {
-      raw = readFileSync(this._configPath, "utf8");
+      return readJsonFileSync(this._configPath, {
+        schema: AuthConfigSchema,
+        recovery: "none",
+        fallback: () => null,
+        mode: 0o600,
+        seedMissing: false,
+      }).value;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return null;
-      }
       console.error("Failed to read auth.json:", error);
       return null;
     }
-    try {
-      return _normalize(JSON.parse(raw) as Partial<AuthConfig>);
-    } catch (error) {
-      console.error("Ignoring malformed auth.json:", error);
-      return null;
-    }
   }
-}
-
-/** Validate a parsed `auth.json`, or throw if it isn't a usable token blob. */
-function _normalize(input: Partial<AuthConfig>): AuthConfig {
-  const user = input.user as Partial<GithubUser> | undefined;
-  if (
-    typeof input.accessToken !== "string" ||
-    !input.accessToken ||
-    !user ||
-    typeof user.login !== "string"
-  ) {
-    throw new Error("auth.json is missing a token or user");
-  }
-  return {
-    accessToken: input.accessToken,
-    tokenType: typeof input.tokenType === "string" ? input.tokenType : "bearer",
-    scope: typeof input.scope === "string" ? input.scope : "gist",
-    user: {
-      login: user.login,
-      name: typeof user.name === "string" ? user.name : null,
-      email: typeof user.email === "string" ? user.email : null,
-      avatarUrl: typeof user.avatarUrl === "string" ? user.avatarUrl : "",
-      htmlUrl:
-        typeof user.htmlUrl === "string"
-          ? user.htmlUrl
-          : `https://github.com/${user.login}`,
-    },
-  };
 }
 
 /** A human-readable message for a caught sign-in error. */

@@ -5,6 +5,8 @@ import path from "node:path";
 
 import {
   normalizeThread,
+  ModelUsage as ModelUsageJsonSchema,
+  ThreadZodSchema,
   uuid,
   type AssistantMessage,
   type Message,
@@ -13,10 +15,12 @@ import {
   type Thread,
   type ToolCall,
 } from "@llm-space/core";
+import { atomicWriteJsonFile, readJsonFile } from "@llm-space/core/server";
 import {
   aggregateMessageUsage,
   aggregateModelUsage,
 } from "@llm-space/core/thread";
+import { z } from "zod";
 
 import {
   LangfuseClient,
@@ -65,6 +69,71 @@ interface ParsedLangfuseFile {
   projectIds: Set<string>;
   projectNames: Set<string>;
 }
+
+const TraceSourceSchema = z.object({
+  type: z.literal("langfuse"),
+  mode: z.enum(["manual", "connected"]),
+  traceId: z.string(),
+  projectId: z.string().optional(),
+  projectName: z.string().optional(),
+  fileName: z.string().optional(),
+});
+const ModelUsageSchema = z.fromJSONSchema(
+  ModelUsageJsonSchema as unknown as Parameters<typeof z.fromJSONSchema>[0]
+) as z.ZodType<ModelUsage>;
+const TraceRecordSchema: z.ZodType<TraceRecord> = z.object({
+  id: z.string(),
+  key: z.string(),
+  projectId: z.string(),
+  title: z.string(),
+  observationCount: z.number(),
+  importedAt: z.number(),
+  updatedAt: z.number(),
+  startedAt: z.string().optional(),
+  endedAt: z.string().optional(),
+  latencyMs: z.number().optional(),
+  model: z.string().optional(),
+  status: z.enum(["ok", "error", "unknown"]).optional(),
+  usage: ModelUsageSchema.optional(),
+  source: TraceSourceSchema,
+});
+const TraceStoredProjectSchema: z.ZodType<TraceStoredProject> = z.object({
+  id: z.string(),
+  name: z.string(),
+  source: z.discriminatedUnion("mode", [
+    z.object({
+      type: z.literal("langfuse"),
+      mode: z.literal("manual"),
+      langfuseProjectId: z.string().optional(),
+      langfuseProjectName: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal("langfuse"),
+      mode: z.literal("connected"),
+      baseUrl: z.string(),
+      publicKey: z.string(),
+      secretKey: z.string(),
+      publicKeyPreview: z.string(),
+      secretKeyPreview: z.string(),
+      langfuseProjectId: z.string().optional(),
+      langfuseProjectName: z.string().optional(),
+      lastSyncAt: z.number().optional(),
+      lastSyncStatus: z.enum(["success", "error"]).optional(),
+      lastSyncError: z.string().optional(),
+    }),
+  ]),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+const LangfuseRawTraceSchema: z.ZodType<LangfuseRawTrace> = z.object({
+  source: TraceSourceSchema,
+  importedAt: z.number(),
+  rows: z.array(z.record(z.string(), z.unknown())),
+});
+const LangfuseImportSchema = z.union([
+  z.array(z.record(z.string(), z.unknown())),
+  z.object({ data: z.array(z.record(z.string(), z.unknown())) }),
+]);
 
 const TRACE_PROJECT_ID_PREFIX = "proj";
 const TRACE_KEY_MAX_SLUG = 48;
@@ -403,25 +472,23 @@ export class TraceManager {
     const workbenchPath = this._workbenchPath(projectId, traceKey);
     if (!existsSync(workbenchPath)) {
       const raw = await this._readRawTrace(projectId, traceKey);
-      await fs.writeFile(
+      await atomicWriteJsonFile(
         workbenchPath,
-        JSON.stringify(_createWorkbench(trace, raw.rows), null, 2),
-        "utf8"
+        _createWorkbench(trace, raw.rows)
       );
     }
     const raw = await this._readRawTrace(projectId, traceKey);
-    const thread = JSON.parse(
-      await fs.readFile(workbenchPath, "utf8")
-    ) as Thread;
+    const thread = (
+      await readJsonFile(workbenchPath, {
+        schema: ThreadZodSchema,
+        recovery: "best-effort",
+      })
+    ).value;
     const normalizedThread = _normalizeExistingWorkbenchThread(
       _threadWithImportedModel(thread, raw.rows)
     );
     if (normalizedThread !== thread) {
-      await fs.writeFile(
-        workbenchPath,
-        JSON.stringify(normalizedThread, null, 2),
-        "utf8"
-      );
+      await atomicWriteJsonFile(workbenchPath, normalizedThread);
     }
     return { trace, thread: normalizedThread };
   }
@@ -443,25 +510,24 @@ export class TraceManager {
       title: normalizedTitle,
       updatedAt: Date.now(),
     };
-    await fs.writeFile(
-      this._tracePath(projectId, traceKey),
-      JSON.stringify(nextTrace, null, 2),
-      "utf8"
-    );
+    await atomicWriteJsonFile(this._tracePath(projectId, traceKey), nextTrace);
 
     const workbenchPath = this._workbenchPath(projectId, traceKey);
     if (!existsSync(workbenchPath)) {
       const raw = await this._readRawTrace(projectId, traceKey);
       const thread = _createWorkbench(nextTrace, raw.rows);
-      await fs.writeFile(workbenchPath, JSON.stringify(thread, null, 2), "utf8");
+      await atomicWriteJsonFile(workbenchPath, thread);
       return { trace: nextTrace, thread };
     }
 
-    const currentThread = JSON.parse(
-      await fs.readFile(workbenchPath, "utf8")
-    ) as Thread;
+    const currentThread = (
+      await readJsonFile(workbenchPath, {
+        schema: ThreadZodSchema,
+        recovery: "best-effort",
+      })
+    ).value;
     const thread = _threadWithTitle(currentThread, normalizedTitle);
-    await fs.writeFile(workbenchPath, JSON.stringify(thread, null, 2), "utf8");
+    await atomicWriteJsonFile(workbenchPath, thread);
     return { trace: nextTrace, thread };
   }
 
@@ -475,11 +541,8 @@ export class TraceManager {
     thread: Thread
   ): Promise<void> {
     await this.readTrace(projectId, traceKey);
-    await fs.writeFile(
-      this._workbenchPath(projectId, traceKey),
-      JSON.stringify(thread, null, 2),
-      "utf8"
-    );
+    ThreadZodSchema.parse(thread);
+    await atomicWriteJsonFile(this._workbenchPath(projectId, traceKey), thread);
   }
 
   private async _writeImportedTrace({
@@ -521,16 +584,10 @@ export class TraceManager {
       importedAt,
       rows,
     };
-    await fs.writeFile(
-      path.join(dir, "raw.json"),
-      JSON.stringify(raw, null, 2),
-      "utf8"
-    );
-    await fs.writeFile(
-      path.join(dir, "trace.json"),
-      JSON.stringify(trace, null, 2),
-      "utf8"
-    );
+    LangfuseRawTraceSchema.parse(raw);
+    TraceRecordSchema.parse(trace);
+    await atomicWriteJsonFile(path.join(dir, "raw.json"), raw);
+    await atomicWriteJsonFile(path.join(dir, "trace.json"), trace);
     return trace;
   }
 
@@ -550,7 +607,9 @@ export class TraceManager {
     return candidate;
   }
 
-  private async _requireProject(projectId: string): Promise<TraceStoredProject> {
+  private async _requireProject(
+    projectId: string
+  ): Promise<TraceStoredProject> {
     return this._readProject(projectId);
   }
 
@@ -599,20 +658,24 @@ export class TraceManager {
   }
 
   private async _readProject(projectId: string): Promise<TraceStoredProject> {
-    return JSON.parse(
-      await fs.readFile(
+    return (
+      await readJsonFile(
         path.join(this._projectDir(projectId), "project.json"),
-        "utf8"
+        {
+          schema: TraceStoredProjectSchema,
+          recovery: "none",
+          repair: false,
+        }
       )
-    ) as TraceStoredProject;
+    ).value;
   }
 
   private async _writeProject(project: TraceStoredProject): Promise<void> {
     await fs.mkdir(this._projectDir(project.id), { recursive: true });
-    await fs.writeFile(
+    TraceStoredProjectSchema.parse(project);
+    await atomicWriteJsonFile(
       path.join(this._projectDir(project.id), "project.json"),
-      JSON.stringify(project, null, 2),
-      "utf8"
+      project
     );
   }
 
@@ -620,9 +683,12 @@ export class TraceManager {
     projectId: string,
     traceKey: string
   ): Promise<TraceRecord> {
-    const trace = JSON.parse(
-      await fs.readFile(this._tracePath(projectId, traceKey), "utf8")
-    ) as TraceRecord;
+    const trace = (
+      await readJsonFile(this._tracePath(projectId, traceKey), {
+        schema: TraceRecordSchema,
+        recovery: "best-effort",
+      })
+    ).value;
     if (trace.model) {
       return trace;
     }
@@ -633,10 +699,9 @@ export class TraceManager {
         return trace;
       }
       const nextTrace = { ...trace, model, updatedAt: Date.now() };
-      await fs.writeFile(
+      await atomicWriteJsonFile(
         this._tracePath(projectId, traceKey),
-        JSON.stringify(nextTrace, null, 2),
-        "utf8"
+        nextTrace
       );
       return nextTrace;
     } catch {
@@ -648,12 +713,16 @@ export class TraceManager {
     projectId: string,
     traceKey: string
   ): Promise<LangfuseRawTrace> {
-    return JSON.parse(
-      await fs.readFile(
+    return (
+      await readJsonFile(
         path.join(this._traceDir(projectId, traceKey), "raw.json"),
-        "utf8"
+        {
+          schema: LangfuseRawTraceSchema,
+          recovery: "none",
+          repair: false,
+        }
       )
-    ) as LangfuseRawTrace;
+    ).value;
   }
 
   private _projectDir(projectId: string): string {
@@ -686,23 +755,17 @@ export class TraceManager {
 }
 
 function _extractLangfuseRows(text: string): LangfuseObservation[] | null {
-  let parsed: unknown;
+  let raw: unknown;
   try {
-    parsed = JSON.parse(text);
+    raw = JSON.parse(text);
   } catch {
     return null;
   }
-  const rows = Array.isArray(parsed)
-    ? parsed
-    : _asRecord(parsed) && Array.isArray(_asRecord(parsed)?.data)
-      ? (_asRecord(parsed)?.data as unknown[])
-      : null;
-  if (!rows) {
-    return null;
-  }
-  const observations = rows
-    .map(_asRecord)
-    .filter((row): row is LangfuseObservation => Boolean(row));
+  const parsed = LangfuseImportSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const observations = Array.isArray(parsed.data)
+    ? parsed.data
+    : parsed.data.data;
   return observations.some(_looksLikeLangfuseObservation) ? observations : null;
 }
 
@@ -910,9 +973,7 @@ function _threadWithImportedModel(
     ...thread,
     model,
     runHistory: thread.runHistory?.map((run) =>
-      run.thread.model
-        ? run
-        : { ...run, thread: { ...run.thread, model } }
+      run.thread.model ? run : { ...run, thread: { ...run.thread, model } }
     ),
   };
 }
@@ -967,7 +1028,9 @@ function _normalizeThreadMessages(thread: Thread): {
 function _normalizeMessageText(message: Message): Message {
   const content = _normalizeTextContent(message.content);
   let next =
-    content === message.content ? message : ({ ...message, content } as Message);
+    content === message.content
+      ? message
+      : ({ ...message, content } as Message);
   if (next.role !== "assistant" || !next.toolCalls) {
     return next;
   }
@@ -1424,9 +1487,7 @@ function _traceModelIdFromRows(
   );
 }
 
-function _codexModelFromRows(
-  rows: LangfuseObservation[]
-): string | undefined {
+function _codexModelFromRows(rows: LangfuseObservation[]): string | undefined {
   const rootRows = rows.filter(_isRootObservation);
   return _firstString(
     ...rootRows.map(_codexModelFromRowMetadata),

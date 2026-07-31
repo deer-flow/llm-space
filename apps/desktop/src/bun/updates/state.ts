@@ -1,7 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFile,
+  getSettingsDir,
+  readJsonFile,
+} from "@llm-space/core/server";
+import { z } from "zod";
 
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "../../shared/updates";
 
@@ -25,20 +29,35 @@ interface UpdatesState {
 
 const STATE_PATH = join(getSettingsDir(), "updates.json");
 const VALID_MODES: readonly UpdateMode[] = ["automatic", "manual", "off"];
+const UpdatesStateSchema: z.ZodType<UpdatesState> = z.object({
+  mode: z.enum(VALID_MODES).optional(),
+  lastSeenHashes: z.record(z.string(), z.string()).optional(),
+});
+let stateQueue: Promise<unknown> = Promise.resolve();
 
 async function _load(): Promise<UpdatesState> {
-  try {
-    return JSON.parse(await readFile(STATE_PATH, "utf8")) as UpdatesState;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-    throw error;
-  }
+  return (
+    await readJsonFile(STATE_PATH, {
+      schema: UpdatesStateSchema,
+      recovery: "best-effort",
+      fallback: () => ({}),
+      seedMissing: false,
+    })
+  ).value;
 }
 
-async function _merge(patch: UpdatesState): Promise<void> {
-  const next = { ...(await _load()), ...patch };
-  await mkdir(getSettingsDir(), { recursive: true });
-  await writeFile(STATE_PATH, JSON.stringify(next, null, 2));
+function _update<T>(
+  mutate: (state: UpdatesState) => { state: UpdatesState; result: T }
+): Promise<T> {
+  const operation = stateQueue
+    .catch(() => undefined)
+    .then(async () => {
+      const update = mutate(await _load());
+      await atomicWriteJsonFile(STATE_PATH, update.state);
+      return update.result;
+    });
+  stateQueue = operation;
+  return operation;
 }
 
 export async function getUpdateMode(): Promise<UpdateMode> {
@@ -47,7 +66,10 @@ export async function getUpdateMode(): Promise<UpdateMode> {
 }
 
 export async function setUpdateMode(mode: UpdateMode): Promise<void> {
-  await _merge({ mode });
+  await _update((state) => ({
+    state: { ...state, mode },
+    result: undefined,
+  }));
 }
 
 export async function getLastSeenHash(
@@ -60,6 +82,14 @@ export async function setLastSeenHash(
   identifier: string,
   hash: string
 ): Promise<void> {
-  const lastSeenHashes = (await _load()).lastSeenHashes ?? {};
-  await _merge({ lastSeenHashes: { ...lastSeenHashes, [identifier]: hash } });
+  await _update((state) => ({
+    state: {
+      ...state,
+      lastSeenHashes: {
+        ...state.lastSeenHashes,
+        [identifier]: hash,
+      },
+    },
+    result: undefined,
+  }));
 }
