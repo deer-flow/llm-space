@@ -73,8 +73,8 @@ function createRuntime(): RuntimeClient {
         },
         tools: [],
       }) as never,
-    mcpCallTool: () => Promise.resolve({ contentText: "" }),
-    builtInCallTool: () => Promise.resolve({ contentText: "" }),
+    mcpCallTool: () => Promise.resolve({ content: [] }),
+    builtInCallTool: () => Promise.resolve({ content: [] }),
     setSearchSettings: (settings) => settings,
     setNetworkSettings: (settings) => settings,
     detectSystemProxy: () => ({

@@ -234,3 +234,46 @@ describe("Thread assistant message timing schema", () => {
     ).toBe(false);
   });
 });
+
+describe("Thread image content schema", () => {
+  test("accepts only pi-compatible image content", () => {
+    expect(
+      validator.Check({
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  data: "c3Zn",
+                  mimeType: "image/svg+xml",
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe(true);
+    expect(
+      validator.Check({
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [
+                {
+                  type: "image_data",
+                  data: "cG5n",
+                  mimeType: "image/png",
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe(false);
+  });
+});

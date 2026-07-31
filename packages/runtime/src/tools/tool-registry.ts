@@ -1,4 +1,4 @@
-import type { BuiltinTool } from "@llm-space/core";
+import type { BuiltinTool, BuiltinToolCallResponse } from "@llm-space/core";
 
 export interface ToolEntry {
   tool: BuiltinTool;
@@ -10,8 +10,26 @@ export interface ToolContribution {
   entries: readonly ToolEntry[];
 }
 
-export interface ToolCallResponse {
-  contentText: string;
+export type ToolCallResponse = BuiltinToolCallResponse;
+
+const STRUCTURED_TOOL_CALL_RESPONSE = Symbol("structuredToolCallResponse");
+
+interface StructuredToolCallResponse extends ToolCallResponse {
+  [STRUCTURED_TOOL_CALL_RESPONSE]: true;
+}
+
+/**
+ * Mark model-facing content explicitly so an ordinary JSON `content` property
+ * cannot be mistaken for the runtime response contract.
+ */
+export function createToolCallResponse(
+  content: ToolCallResponse["content"]
+): ToolCallResponse {
+  const response: StructuredToolCallResponse = {
+    [STRUCTURED_TOOL_CALL_RESPONSE]: true,
+    content,
+  };
+  return response;
 }
 
 export class ToolRegistry {
@@ -86,7 +104,13 @@ export class ToolRegistry {
     if (!entry) {
       throw new Error(`Built-in tool not found: ${name}`);
     }
-    return { contentText: _serializeToolResult(await entry.execute(args)) };
+    const result = await entry.execute(args);
+    if (_isToolCallResponse(result)) {
+      return { content: result.content };
+    }
+    return {
+      content: [{ type: "text", text: _serializeToolResult(result) }],
+    };
   }
 }
 
@@ -109,4 +133,16 @@ function _serializeToolResult(result: unknown): string {
     return result;
   }
   return JSON.stringify(result, null, 2);
+}
+
+/** Recognize only responses created explicitly by {@link createToolCallResponse}. */
+function _isToolCallResponse(
+  result: unknown
+): result is StructuredToolCallResponse {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    STRUCTURED_TOOL_CALL_RESPONSE in result &&
+    result[STRUCTURED_TOOL_CALL_RESPONSE] === true
+  );
 }

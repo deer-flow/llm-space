@@ -1,0 +1,130 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { AgentEvent, AgentTransport } from "@llm-space/core";
+
+import { createThreadStore } from "./thread-store";
+
+const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+beforeAll(() => {
+  globalThis.requestAnimationFrame = (callback) =>
+    setTimeout(() => callback(performance.now()), 0);
+  globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle);
+});
+
+afterAll(() => {
+  globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+  globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+});
+
+function _event(value: unknown): AgentEvent {
+  return value as AgentEvent;
+}
+
+describe("auto-run tool results", () => {
+  test("preserves structured image content returned by a built-in tool", async () => {
+    const events = [
+      _event({
+        type: "message_start",
+        message: { role: "assistant" },
+      }),
+      _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_start",
+          contentIndex: 0,
+          partial: {
+            content: [
+              {
+                type: "toolCall",
+                id: "tool-1",
+                name: "read",
+                arguments: {},
+              },
+            ],
+          },
+        },
+      }),
+      _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_delta",
+          contentIndex: 0,
+          delta: '{"path":"/tmp/pixel.png"}',
+        },
+      }),
+      _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_end",
+          contentIndex: 0,
+          toolCall: {
+            type: "toolCall",
+            id: "tool-1",
+            name: "read",
+            arguments: { path: "/tmp/pixel.png" },
+          },
+        },
+      }),
+      _event({
+        type: "message_end",
+        message: { role: "assistant" },
+      }),
+    ];
+    const transport: AgentTransport = async function* () {
+      yield* events;
+    };
+    const outputContent = [
+      { type: "text" as const, text: "[image file: pixel.png]" },
+      {
+        type: "image" as const,
+        data: "cG5nLWJ5dGVz",
+        mimeType: "image/png",
+      },
+    ];
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Read the image" }],
+            },
+          ],
+          tools: [
+            {
+              type: "builtin",
+              name: "read",
+              description: "Read a file.",
+              parameters: { type: "object", properties: {} },
+            },
+          ],
+        },
+      },
+      {
+        transport,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        getAutoRunTools: () => true,
+        executeTool: () =>
+          Promise.resolve({
+            content: outputContent,
+            isError: false,
+          }),
+      }
+    );
+
+    await store.getState().run();
+
+    const messages = store.getState().thread.context?.messages ?? [];
+    const assistant = messages.at(-1);
+    expect(assistant?.role).toBe("assistant");
+    if (assistant?.role !== "assistant") {
+      throw new Error("Expected an assistant message");
+    }
+    expect(assistant.toolCalls?.[0]?.output).toEqual({
+      content: outputContent,
+      isError: false,
+    });
+  });
+});

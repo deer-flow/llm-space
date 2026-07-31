@@ -1,4 +1,5 @@
 import { isExecutableTool, type Tool, type ToolCall } from "@llm-space/core";
+import { getToolResultText } from "@llm-space/core/thread";
 import { useCallback, useMemo } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
@@ -21,7 +22,8 @@ export function useToolCallRunner(messageId: string) {
   const { executeTool } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
   const runtimeId = useThreadStore((state) => state.runtimeId);
-  const { updateToolCallOutputText } = useThreadStoreActions();
+  const { updateToolCallOutput, updateToolCallOutputText } =
+    useThreadStoreActions();
 
   const toolsByName = useMemo(
     () => new Map((tools ?? []).map((tool) => [tool.name, tool])),
@@ -39,15 +41,16 @@ export function useToolCallRunner(messageId: string) {
         return null;
       }
       try {
-        const { contentText, isError } = await executeTool(
+        const { content, isError } = await executeTool(
           tool,
           toolCall.input.arguments,
           { runtimeId }
         );
-        updateToolCallOutputText(messageId, toolCall.id, contentText, isError);
+        updateToolCallOutput(messageId, toolCall.id, content, isError);
+        const text = getToolResultText(content);
         return {
           isError,
-          isFirecrawlLimit: isError && isFirecrawlLimitError(contentText),
+          isFirecrawlLimit: isError && isFirecrawlLimitError(text),
         };
       } catch (error) {
         const text =
@@ -56,7 +59,14 @@ export function useToolCallRunner(messageId: string) {
         return { isError: true, isFirecrawlLimit: isFirecrawlLimitError(text) };
       }
     },
-    [executeTool, messageId, resolveTool, runtimeId, updateToolCallOutputText]
+    [
+      executeTool,
+      messageId,
+      resolveTool,
+      runtimeId,
+      updateToolCallOutput,
+      updateToolCallOutputText,
+    ]
   );
 
   return { resolveTool, runToolCall };

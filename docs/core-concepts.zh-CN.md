@@ -138,7 +138,7 @@ Messages 是 Thread 的对话历史。LLM Space 当前主要使用两种消息�
 用户消息的内容可以是：
 
 - 文本：`{ "type": "text", "text": "..." }`
-- 图片数据：`{ "type": "image_data", "mimeType": "image/png", "data": "..." }`
+- 图片数据：`{ "type": "image", "mimeType": "image/png", "data": "..." }`
 
 助手消息的内容主要是文本，也可以附带：
 

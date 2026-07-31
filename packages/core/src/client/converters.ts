@@ -81,19 +81,7 @@ function _convertMessageContents(
   message: Message
 ): (pi.TextContent | pi.ImageContent | pi.ThinkingContent | pi.ToolCall)[] {
   if (message.role === "user") {
-    return message.content.map((content) => {
-      if (content.type === "text") {
-        return { ...content } satisfies pi.TextContent;
-      } else if (content.type === "image_data") {
-        return {
-          type: "image",
-          mimeType: content.mimeType,
-          data: content.data,
-        } satisfies pi.ImageContent;
-      } else {
-        throw new Error(`Unsupported content type: ${JSON.stringify(content)}`);
-      }
-    });
+    return message.content;
   } else if (message.role === "assistant") {
     const contents: (
       pi.TextContent | pi.ImageContent | pi.ThinkingContent | pi.ToolCall
@@ -107,7 +95,7 @@ function _convertMessageContents(
     for (const content of message.content) {
       if (content.type === "text") {
         contents.push({ ...content } satisfies pi.TextContent);
-      } else if (content.type === "image_data") {
+      } else if (content.type === "image") {
         // Assistant messages may not carry images; drop them on conversion.
         continue;
       } else {

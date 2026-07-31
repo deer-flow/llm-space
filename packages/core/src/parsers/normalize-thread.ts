@@ -1,6 +1,6 @@
 import type {
   AssistantMessage,
-  ImageDataContent,
+  ImageContent,
   Message,
   ModelConfig,
   ModelProviderGroup,
@@ -29,7 +29,7 @@ import type { ThreadParseContext } from "./thread-parser";
  */
 interface ResolvedContent {
   text: TextContent[];
-  images: ImageDataContent[];
+  images: ImageContent[];
   thinking: string[];
   toolUses: RawToolUse[];
   toolResults: RawToolResult[];
@@ -323,7 +323,10 @@ function _resolveContent(content: unknown): ResolvedContent {
       }
 
       case "image": {
-        const image = _resolveAnthropicImage(b);
+        const image =
+          typeof b.mimeType === "string" && typeof b.data === "string"
+            ? _imageContent(b.mimeType, b.data)
+            : _resolveAnthropicImage(b);
         if (image) {
           result.images.push(image);
         }
@@ -334,17 +337,6 @@ function _resolveContent(content: unknown): ResolvedContent {
         const image = _resolveOpenAiImage(b);
         if (image) {
           result.images.push(image);
-        }
-        break;
-      }
-
-      case "image_data": {
-        // Already our internal shape.
-        if (typeof b.mimeType === "string" && typeof b.data === "string") {
-          const image = _imageData(b.mimeType, b.data);
-          if (image) {
-            result.images.push(image);
-          }
         }
         break;
       }
@@ -502,7 +494,7 @@ function _resolveToolSource(source: unknown): LegacyMcpToolSource | undefined {
 /** Anthropic image block: only base64 sources can be inlined. */
 function _resolveAnthropicImage(
   b: Record<string, unknown>
-): ImageDataContent | undefined {
+): ImageContent | undefined {
   const source = _asRecord(b.source);
   if (!source) {
     return undefined;
@@ -512,7 +504,7 @@ function _resolveAnthropicImage(
     typeof source.media_type === "string" &&
     typeof source.data === "string"
   ) {
-    return _imageData(source.media_type, source.data);
+    return _imageContent(source.media_type, source.data);
   }
   return undefined;
 }
@@ -520,7 +512,7 @@ function _resolveAnthropicImage(
 /** OpenAI image block: only `data:` base64 URLs can be inlined. */
 function _resolveOpenAiImage(
   b: Record<string, unknown>
-): ImageDataContent | undefined {
+): ImageContent | undefined {
   const imageUrl = _asRecord(b.image_url);
   const rawUrl = imageUrl?.url ?? b.image_url;
   const url = typeof rawUrl === "string" ? rawUrl : undefined;
@@ -531,18 +523,15 @@ function _resolveOpenAiImage(
   if (match?.[1] === undefined || match[2] === undefined) {
     return undefined;
   }
-  return _imageData(match[1], match[2]);
+  return _imageContent(match[1], match[2]);
 }
 
-/** Build an {@link ImageDataContent}, enforcing the `image/<subtype>` shape. */
-function _imageData(
+/** Build image content in pi's model-facing shape without another conversion. */
+function _imageContent(
   mimeType: string,
   data: string
-): ImageDataContent | undefined {
-  if (!/^image\/\w+$/.test(mimeType)) {
-    return undefined;
-  }
-  return { type: "image_data", mimeType, data };
+): ImageContent {
+  return { type: "image", mimeType, data };
 }
 
 /** Set a tool call's output, matching by id. Unmatched results are dropped. */

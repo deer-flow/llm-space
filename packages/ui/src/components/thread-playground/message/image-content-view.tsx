@@ -1,4 +1,4 @@
-import type { ImageDataContent } from "@llm-space/core";
+import type { ImageContent } from "@llm-space/core";
 import { ImageIcon, XIcon } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
@@ -21,7 +21,7 @@ function _ImageContentView({
   compact,
   imageNumber,
 }: {
-  image: ImageDataContent;
+  image: ImageContent;
   readonly?: boolean;
   onRemove?: () => void;
   className?: string;
@@ -143,7 +143,7 @@ function _ImageContentList({
   className,
 }: {
   messageId: string;
-  images: { content: ImageDataContent; contentIndex: number }[];
+  images: { content: ImageContent; contentIndex: number }[];
   readonly?: boolean;
   className?: string;
 }) {

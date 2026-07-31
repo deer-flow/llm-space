@@ -1474,11 +1474,12 @@ function _flattenToolResult(result: CallToolResult): McpCallToolResponse {
     parts.push(JSON.stringify(result.structuredContent, null, 2));
   }
   const text = parts.join("\n\n").trim();
+  const truncatedText =
+    text.length > MAX_OUTPUT_CHARS
+      ? `${text.slice(0, MAX_OUTPUT_CHARS)}\n\n[truncated]`
+      : text;
   return {
-    contentText:
-      text.length > MAX_OUTPUT_CHARS
-        ? `${text.slice(0, MAX_OUTPUT_CHARS)}\n\n[truncated]`
-        : text,
+    content: [{ type: "text", text: truncatedText }],
     isError: result.isError,
   };
 }

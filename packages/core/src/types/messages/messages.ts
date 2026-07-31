@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 
-import { ImageDataContent, TextContent } from "./contents";
+import { ImageContent, TextContent } from "./contents";
 import { ToolCall } from "./tools";
 import { ModelUsage } from "./usage";
 
@@ -20,8 +20,8 @@ export type AssistantMessageTiming = Static<typeof AssistantMessageTiming>;
 /**
  * The allowed content types of a user message.
  */
-export const UserMessageContent = Type.Union([TextContent, ImageDataContent]);
-export type UserMessageContent = TextContent | ImageDataContent;
+export const UserMessageContent = Type.Union([TextContent, ImageContent]);
+export type UserMessageContent = TextContent | ImageContent;
 
 /**
  * A message sent from user.

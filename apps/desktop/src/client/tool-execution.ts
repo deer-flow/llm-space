@@ -1,4 +1,8 @@
-import type { BuiltinTool, McpTool } from "@llm-space/core";
+import type {
+  BuiltinTool,
+  BuiltinToolCallResponse,
+  McpTool,
+} from "@llm-space/core";
 
 import { callBuiltInTool } from "@/client/built-in-tools";
 import { callMcpTool } from "@/client/mcp";
@@ -9,8 +13,7 @@ import type { RuntimeId } from "@/shared/runtime";
  * `isError` on the response; built-in tools signal failure by throwing, so a
  * successful built-in result is always `isError: false`.
  */
-export interface ToolCallResult {
-  contentText: string;
+export interface ToolCallResult extends BuiltinToolCallResponse {
   isError: boolean;
 }
 
@@ -34,7 +37,7 @@ export async function executeTool(
       runtimeId
     );
     return {
-      contentText: result.contentText,
+      content: result.content,
       isError: result.isError ?? false,
     };
   }
@@ -42,5 +45,8 @@ export async function executeTool(
     { name: tool.name, arguments: args },
     runtimeId
   );
-  return { contentText: result.contentText, isError: false };
+  return {
+    content: result.content,
+    isError: false,
+  };
 }

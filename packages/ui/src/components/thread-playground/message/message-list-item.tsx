@@ -2,7 +2,7 @@ import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import {
   getMessageText,
   isExecutableTool,
-  type ImageDataContent,
+  type ImageContent,
   type Message,
   type ThreadContext,
   type ToolCall,
@@ -72,13 +72,13 @@ function _MessageListItem({
   );
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
-    const result: { content: ImageDataContent; contentIndex: number }[] = [];
+    const result: { content: ImageContent; contentIndex: number }[] = [];
     // Assistant messages must not display images.
     if (message.role === "assistant") {
       return result;
     }
     message.content.forEach((content, contentIndex) => {
-      if (content.type === "image_data") {
+      if (content.type === "image") {
         result.push({ content, contentIndex });
       }
     });

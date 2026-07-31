@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   AgentStreamRequest,
   BuiltinTool,
+  BuiltinToolCallResponse,
   CustomModel,
   FileNode,
   McpCallToolResponse,
@@ -157,7 +158,7 @@ export interface RuntimeClient {
   builtInCallTool(input: {
     name: string;
     arguments: Record<string, unknown>;
-  }): Promise<{ contentText: string }>;
+  }): Promise<BuiltinToolCallResponse>;
 
   getSearchSettings(): MaybePromise<SearchSettings>;
   setSearchSettings(settings: SearchSettings): MaybePromise<SearchSettings>;

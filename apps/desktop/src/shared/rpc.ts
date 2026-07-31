@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   AgentStreamRequest,
   BuiltinTool,
+  BuiltinToolCallResponse,
   CustomModel,
   FileNode,
   ModelConfig,
@@ -389,7 +390,7 @@ export interface DesktopRPCType {
           name: string;
           arguments: Record<string, unknown>;
         };
-        response: { contentText: string };
+        response: BuiltinToolCallResponse;
       };
       // The user's anonymous-analytics opt-out preference plus whether the
       // hard gates allow sending at all (see `shared/analytics.ts`).
