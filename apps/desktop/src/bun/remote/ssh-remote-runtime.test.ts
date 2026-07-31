@@ -586,7 +586,10 @@ class StatefulSshFake {
       stop: async () => {
         if (process.stopCompleted) return;
         this.events.push(`stop:start:${id}`);
-        await Promise.resolve();
+        // Keep cleanup observably asynchronous across an event-loop turn. A
+        // microtask-only stop can finish before a detached cleanup continuation
+        // advances, making tests pass even when production forgets to await it.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
         process.active = false;
         process.serverAlive = false;
         process.stopCompleted = true;
