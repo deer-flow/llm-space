@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { runRemoteTrustContinuationIfAllowed } from "./remote-runtime-actions";
+import {
+  runRemoteRuntimeActionIfAllowed,
+  runRemoteTrustContinuationIfAllowed,
+} from "./remote-runtime-actions";
 import { RuntimeRunTracker } from "./thread-tabs/runtime-run-tracker";
 
 function _deferred() {
@@ -57,5 +60,43 @@ describe("remote runtime production actions", () => {
     expect(
       tracker.beginRun("remote-pane", "remote:server-1", "after-cleanup")
     ).toBe(true);
+  });
+
+  test("an applied mutation reports its error after cleanup while the lease is held", async () => {
+    const order: string[] = [];
+    const tracker = new RuntimeRunTracker();
+    const error = new Error("stop failed");
+    const result = await runRemoteRuntimeActionIfAllowed({
+      allowed: () => true,
+      acquire: () => {
+        const release = tracker.reserveRuntime("remote:server-1");
+        if (!release) return null;
+        return () => {
+          order.push("release");
+          release();
+        };
+      },
+      action: () => {
+        order.push("action");
+        return Promise.resolve({ applied: true, error });
+      },
+      afterAction: () => {
+        order.push("cleanup");
+        expect(
+          tracker.beginRun(
+            "remote-pane",
+            "remote:server-1",
+            "during-cleanup"
+          )
+        ).toBe(false);
+      },
+      onError: (reported) => {
+        order.push("error");
+        expect(reported).toBe(error);
+      },
+    });
+
+    expect(result).toBe(true);
+    expect(order).toEqual(["action", "cleanup", "error", "release"]);
   });
 });

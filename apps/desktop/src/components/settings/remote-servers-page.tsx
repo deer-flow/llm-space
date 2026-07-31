@@ -38,6 +38,7 @@ import {
   updateRemoteServer,
 } from "@/client/remote-servers";
 import type {
+  RemoteDisconnectResult,
   RemoteHostKeyTrustRequest,
   RemoteServerDraft,
   RemoteServerView,
@@ -47,6 +48,7 @@ import type { RuntimeId } from "@/shared/runtime";
 import {
   runRemoteRuntimeActionIfAllowed,
   runRemoteTrustContinuationIfAllowed,
+  type RemoteRuntimeActionOutcome,
 } from "../remote-runtime-actions";
 
 import {
@@ -177,15 +179,18 @@ export function RemoteServersPage({
 
   const run = async (
     id: string,
-    action: (id: string) => Promise<RemoteServerView[]>,
+    action: (
+      id: string
+    ) => Promise<RemoteServerView[] | RemoteDisconnectResult>,
     options: {
       closeOnConnected?: boolean;
       selectFallback?: boolean;
     } = {}
-  ): Promise<boolean> => {
+  ): Promise<boolean | RemoteRuntimeActionOutcome> => {
     setBusyId(id);
     try {
-      const next = await action(id);
+      const result = await action(id);
+      const next = Array.isArray(result) ? result : result.servers;
       updateServers(next);
       setSelectedId(
         options.selectFallback && !next.some((server) => server.id === id)
@@ -197,24 +202,28 @@ export function RemoteServersPage({
         if (connected?.status === "connected")
           onConnected?.(connected.runtimeId);
       }
-      return true;
+      return !Array.isArray(result) && result.status === "applied-with-error"
+        ? { applied: true, error: new Error(result.error) }
+        : true;
     } catch (error) {
-      let failed = serversRef.current.find((server) => server.id === id);
       try {
         const latest = await listRemoteServers();
         updateServers(latest);
-        failed = latest.find((server) => server.id === id) ?? failed;
       } catch {
-        // Keep the best-known local snapshot for the toast title.
+        // Keep the best-known local snapshot for error reporting.
       }
-      toast.error(_failureTitle(failed), {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-      return false;
+      return { applied: false, error };
     } finally {
       setBusyId(null);
     }
+  };
+
+  const reportRunError = (id: string, error: unknown) => {
+    const failed = serversRef.current.find((server) => server.id === id);
+    toast.error(_failureTitle(failed), {
+      description:
+        error instanceof Error ? error.message : "Please try again.",
+    });
   };
 
   const trustHostKey = async (
@@ -382,6 +391,7 @@ export function RemoteServersPage({
                     run(selected.id, connectRemoteServer, {
                       closeOnConnected: true,
                     }),
+                  onError: (error) => reportRunError(selected.id, error),
                 })
               }
               onDisconnect={() =>
@@ -392,6 +402,7 @@ export function RemoteServersPage({
                     : undefined,
                   action: () => run(selected.id, disconnectRemoteServer),
                   afterAction: () => onDisconnected?.(selected.runtimeId),
+                  onError: (error) => reportRunError(selected.id, error),
                 })
               }
               onEdit={() => startEdit(selected)}
@@ -407,6 +418,7 @@ export function RemoteServersPage({
                       selectFallback: true,
                     }),
                   afterAction: () => onDisconnected?.(selected.runtimeId),
+                  onError: (error) => reportRunError(selected.id, error),
                 })
               }
               onTrustHostKey={(request) => void trustHostKey(selected, request)}

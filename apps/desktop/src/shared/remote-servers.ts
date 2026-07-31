@@ -78,3 +78,15 @@ export interface RemoteServerView extends RemoteServerConfig {
 export interface RemoteServerStatusChangedPayload {
   servers: RemoteServerView[];
 }
+
+/** A disconnect can finish locally even when stopping the remote process fails. */
+export type RemoteDisconnectResult =
+  | {
+      status: "applied";
+      servers: RemoteServerView[];
+    }
+  | {
+      status: "applied-with-error";
+      servers: RemoteServerView[];
+      error: string;
+    };

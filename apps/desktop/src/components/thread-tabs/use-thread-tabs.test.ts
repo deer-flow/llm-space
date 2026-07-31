@@ -1,7 +1,25 @@
 import { expect, test } from "bun:test";
 
 import { pruneInvalidRestoredTabs } from "./restored-tab-pruning";
+import { isFatalThreadLoadError } from "./thread-load-state";
 import type { AppTab } from "./use-thread-tabs";
+
+test("a background read failure is non-fatal while cached thread data exists", () => {
+  expect(
+    isFatalThreadLoadError({
+      hasThread: true,
+      isError: true,
+      isLoading: false,
+    })
+  ).toBe(false);
+  expect(
+    isFatalThreadLoadError({
+      hasThread: false,
+      isError: true,
+      isLoading: false,
+    })
+  ).toBe(true);
+});
 
 test("restoration pruning preserves busy and subsequently opened pane owners", () => {
   const busy: AppTab = {

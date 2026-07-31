@@ -3,6 +3,11 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentTransport, Thread } from "@llm-space/core";
 import type { ModelClient } from "@llm-space/ui/host";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
 import { act, useEffect, useLayoutEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -26,6 +31,7 @@ import {
   type ThreadPlaygroundEventCallbacks,
 } from "../../../../packages/ui/src/components/thread-playground/use-thread-playground-events";
 
+import { invalidateRuntimeSwitchQueries } from "./runtime-switch-queries";
 import { WorkspaceModelScope } from "./workspace-model-scope";
 
 class FakeHTMLElement {}
@@ -202,16 +208,100 @@ function StorePane({
   return null;
 }
 
+interface QueryTestPane extends TestPane {
+  path: string;
+}
+
+function QueryStorePane({
+  pane,
+  onMount,
+  onLoadError,
+  read,
+}: {
+  pane: QueryTestPane;
+  onMount(pane: TestPane, store: ThreadStore): () => void;
+  onLoadError(id: string): void;
+  read(pane: QueryTestPane): Promise<string>;
+}) {
+  const [store] = useState(() =>
+    createThreadStore({ context: { systemPrompt: pane.id } })
+  );
+  const { error } = useQuery({
+    queryKey: ["thread", pane.runtimeId, pane.path],
+    queryFn: () => read(pane),
+    retry: false,
+    staleTime: Infinity,
+  });
+  useEffect(() => onMount(pane, store), [onMount, pane, store]);
+  useEffect(() => {
+    if (error) onLoadError(pane.id);
+  }, [error, onLoadError, pane.id]);
+  return null;
+}
+
+function QueryRuntimePaneHost({
+  initialTabs,
+  activeId,
+  onMount,
+  onTabsChange,
+  read,
+}: {
+  initialTabs: QueryTestPane[];
+  activeId: string;
+  onMount(pane: TestPane, store: ThreadStore): () => void;
+  onTabsChange(tabs: QueryTestPane[]): void;
+  read(pane: QueryTestPane): Promise<string>;
+}) {
+  const [tabs, setTabs] = useState(initialTabs);
+  useLayoutEffect(() => onTabsChange(tabs), [onTabsChange, tabs]);
+  return (
+    <RuntimePaneHost
+      tabs={tabs}
+      activeId={activeId}
+      getPaneKey={(pane) => pane.id}
+      renderPane={(pane) => (
+        <QueryStorePane
+          pane={pane}
+          onMount={onMount}
+          onLoadError={(id) =>
+            setTabs((current) => current.filter((tab) => tab.id !== id))
+          }
+          read={read}
+        />
+      )}
+    />
+  );
+}
+
+function FsQueryProbe({
+  runtimeId,
+  read,
+}: {
+  runtimeId: RuntimeId;
+  read(runtimeId: RuntimeId): Promise<string>;
+}) {
+  useQuery({
+    queryKey: ["fs", runtimeId, "ls"],
+    queryFn: () => read(runtimeId),
+    retry: false,
+    staleTime: Infinity,
+  });
+  return null;
+}
+
 function StoreEventBridge({
   store,
   callbacks,
   onMount,
+  onLayout,
 }: {
   store: ThreadStore;
   callbacks: ThreadPlaygroundEventCallbacks;
   onMount(): () => void;
+  onLayout?: () => void;
 }) {
   useThreadPlaygroundEvents(store, callbacks);
+  useLayoutEffect(() => onLayout?.(), [onLayout]);
   useEffect(onMount, [onMount]);
   return null;
 }
@@ -403,6 +493,64 @@ describe("RuntimePaneHost", () => {
     await Promise.resolve();
     expect(store.getState().status).toBe("idle");
     expect(tracker.canDisconnect("local")).toBe(true);
+  });
+
+  test("the run owner is installed before passive effects can flush", async () => {
+    const finish = _deferred();
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Run" }],
+            },
+          ],
+        },
+      },
+      {
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        transport: async function* () {
+          await finish.promise;
+          yield _event({
+            type: "message_start",
+            message: { role: "assistant" },
+          });
+          yield _event({
+            type: "message_end",
+            message: { role: "assistant", content: [] },
+          });
+        },
+      }
+    );
+    const tracker = new RuntimeRunTracker();
+    let run: Promise<void> | undefined;
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(
+        <StoreEventBridge
+          store={store}
+          callbacks={{
+            onStreamingStart: (runId) =>
+              tracker.beginRun("local-pane", "local", runId),
+            onStreamingEnd: (runId) =>
+              tracker.settleRun("local-pane", runId),
+          }}
+          onLayout={() => {
+            run = store.getState().run();
+          }}
+          onMount={() => () => undefined}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    expect(store.getState().status).not.toBe("idle");
+    expect(tracker.canDisconnect("local")).toBe(false);
+    finish.resolve();
+    await run;
+    await Promise.resolve();
   });
 
   test("a synchronous preflight failure releases the same preparing token", async () => {
@@ -881,6 +1029,125 @@ describe("RuntimePaneHost", () => {
       "remote-thread": 1,
     });
     expect(Object.fromEntries(unmountCounts)).toEqual({});
+  });
+
+  test("runtime switching does not refetch or close hidden thread owners", async () => {
+    const panes: QueryTestPane[] = [
+      { id: "local-active", runtimeId: "local", path: "active.json" },
+      { id: "local-hidden", runtimeId: "local", path: "hidden.json" },
+      {
+        id: "remote-active",
+        runtimeId: "remote:server-1",
+        path: "remote-active.json",
+      },
+      {
+        id: "remote-hidden",
+        runtimeId: "remote:server-1",
+        path: "remote-hidden.json",
+      },
+    ];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const reads = new Map<string, number>();
+    const read = (pane: QueryTestPane) => {
+      const count = (reads.get(pane.id) ?? 0) + 1;
+      reads.set(pane.id, count);
+      return count === 1
+        ? Promise.resolve(pane.id)
+        : Promise.reject(new Error(`transient ${pane.id} read failure`));
+    };
+    const stores = new Map<string, ThreadStore>();
+    const mounts = new Map<string, number>();
+    const unmounts = new Map<string, number>();
+    const onMount = (pane: TestPane, store: ThreadStore) => {
+      stores.set(pane.id, store);
+      mounts.set(pane.id, (mounts.get(pane.id) ?? 0) + 1);
+      return () => {
+        unmounts.set(pane.id, (unmounts.get(pane.id) ?? 0) + 1);
+      };
+    };
+    let openTabs = panes;
+    const onTabsChange = (tabs: QueryTestPane[]) => {
+      openTabs = tabs;
+    };
+    const fsReads = new Map<RuntimeId, number>();
+    const readFs = (runtimeId: RuntimeId) => {
+      fsReads.set(runtimeId, (fsReads.get(runtimeId) ?? 0) + 1);
+      return Promise.resolve(runtimeId);
+    };
+    const render = (activeId: string) => (
+      <QueryClientProvider client={queryClient}>
+        <FsQueryProbe runtimeId="local" read={readFs} />
+        <FsQueryProbe runtimeId="remote:server-1" read={readFs} />
+        <QueryRuntimePaneHost
+          initialTabs={panes}
+          activeId={activeId}
+          onMount={onMount}
+          onTabsChange={onTabsChange}
+          read={read}
+        />
+      </QueryClientProvider>
+    );
+    activeRoot = _createRoot();
+    await act(async () => {
+      activeRoot?.render(render("local-active"));
+      await Promise.resolve();
+    });
+    const originalLocalHidden = stores.get("local-hidden");
+    const originalRemoteHidden = stores.get("remote-hidden");
+    expect(originalLocalHidden).toBeDefined();
+    expect(originalRemoteHidden).toBeDefined();
+    originalLocalHidden?.getState().updateSystemPrompt("first edit");
+    originalLocalHidden?.getState().updateSystemPrompt("second edit");
+    originalRemoteHidden?.getState().updateSystemPrompt("first remote edit");
+    originalRemoteHidden?.getState().updateSystemPrompt("second remote edit");
+
+    await act(async () => {
+      activeRoot?.render(render("remote-active"));
+      await invalidateRuntimeSwitchQueries(queryClient, "remote:server-1");
+      await Promise.resolve();
+    });
+    expect(Object.fromEntries(fsReads)).toEqual({
+      local: 1,
+      "remote:server-1": 2,
+    });
+    await act(async () => {
+      activeRoot?.render(render("local-active"));
+      await invalidateRuntimeSwitchQueries(queryClient, "local");
+      await Promise.resolve();
+    });
+
+    expect(Object.fromEntries(reads)).toEqual({
+      "local-active": 1,
+      "local-hidden": 1,
+      "remote-active": 1,
+      "remote-hidden": 1,
+    });
+    expect(Object.fromEntries(fsReads)).toEqual({
+      local: 2,
+      "remote:server-1": 2,
+    });
+    expect(openTabs.map((tab) => tab.id)).toEqual(
+      panes.map((pane) => pane.id)
+    );
+    expect(stores.get("local-hidden")).toBe(originalLocalHidden);
+    expect(stores.get("remote-hidden")).toBe(originalRemoteHidden);
+    stores.get("local-hidden")?.getState().undo();
+    stores.get("remote-hidden")?.getState().undo();
+    expect(
+      stores.get("local-hidden")?.getState().thread.context?.systemPrompt
+    ).toBe("first edit");
+    expect(
+      stores.get("remote-hidden")?.getState().thread.context?.systemPrompt
+    ).toBe("first remote edit");
+    expect(Object.fromEntries(mounts)).toEqual({
+      "local-active": 1,
+      "local-hidden": 1,
+      "remote-active": 1,
+      "remote-hidden": 1,
+    });
+    expect(Object.fromEntries(unmounts)).toEqual({});
   });
 
   test("an active stream blocks teardown until its final state is persisted", async () => {

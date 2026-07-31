@@ -29,6 +29,7 @@ import {
   type PaneRunStart,
 } from "./runtime-run-tracker";
 import { SerializedPersistence } from "./serialized-persistence";
+import { isFatalThreadLoadError } from "./thread-load-state";
 import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
 
 interface ThreadTabPaneProps {
@@ -100,7 +101,11 @@ export function ThreadTabPane({
     gcTime: 0,
     retry: false,
   });
-  const loadError = isError || (!isLoading && !thread);
+  const loadError = isFatalThreadLoadError({
+    hasThread: thread !== undefined,
+    isError,
+    isLoading,
+  });
 
   // The tab is opened optimistically (see `useThreadTabs.open`) without
   // pre-checking the file exists, so a since-deleted (or otherwise unreadable)

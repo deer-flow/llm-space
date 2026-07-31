@@ -448,13 +448,11 @@ describe("RemoteServerManager", () => {
 
     const [server] = manager.addServer({ name: "host", host: "host" });
     await manager.connectServer(server.id);
-    try {
-      await manager.disconnectServer(server.id);
-      throw new Error("disconnect should fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toBe("stop failed");
-    }
+    const result = await manager.disconnectServer(server.id);
+    expect(result.status).toBe("applied-with-error");
+    if (result.status !== "applied-with-error") return;
+    expect(result.error).toBe("stop failed");
+    expect(result.servers[0]?.status).toBe("disconnected");
 
     const [view] = manager.listServers();
     expect(view?.status).toBe("disconnected");

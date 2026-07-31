@@ -72,19 +72,22 @@ export function RemoteStatus({
       action: async () => {
         setBusy(true);
         try {
-          await disconnectRemoteServer(server.id);
-          return true;
+          const result = await disconnectRemoteServer(server.id);
+          return result.status === "applied-with-error"
+            ? { applied: true, error: new Error(result.error) }
+            : true;
         } catch (error) {
-          toast.error("Failed to disconnect remote", {
-            description:
-              error instanceof Error ? error.message : "Please try again.",
-          });
-          return false;
+          return { applied: false, error };
         } finally {
           setBusy(false);
         }
       },
       afterAction: () => onDisconnected(runtimeId),
+      onError: (error) =>
+        toast.error("Failed to disconnect remote", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        }),
     });
   };
 

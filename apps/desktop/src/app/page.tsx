@@ -79,6 +79,7 @@ import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
 
+import { invalidateRuntimeSwitchQueries } from "./runtime-switch-queries";
 import { WorkspaceModelScope } from "./workspace-model-scope";
 
 // Overlay surfaces that aren't part of the first paint — settings, the command
@@ -491,8 +492,7 @@ function PageWorkspace({
           workspaceRuntimeIdRef.current = nextRuntimeId;
           setWorkspaceRuntimeId(nextRuntimeId);
           setSidebarMode("files");
-          void queryClient.invalidateQueries({ queryKey: ["fs"] });
-          void queryClient.invalidateQueries({ queryKey: ["thread"] });
+          void invalidateRuntimeSwitchQueries(queryClient, nextRuntimeId);
         },
       });
     },

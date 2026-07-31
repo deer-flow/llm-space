@@ -1,5 +1,5 @@
 import type { Thread } from "@llm-space/core";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import type { ThreadStore } from "./stores";
 
@@ -19,16 +19,16 @@ export function useThreadPlaygroundEvents(
   const rejectedRunIdsRef = useRef(new Set<string>());
   const runStartThreadsRef = useRef(new Map<string, Thread>());
 
-  // Keep the callback refs current after each commit. The store subscription
-  // below reads them only when the store fires (always post-commit), so a
-  // passive effect is enough and avoids mutating refs during render.
-  useEffect(() => {
+  // Install the latest callbacks and ownership subscription before the pane
+  // becomes interactive. A run can enter `preparing` immediately after commit,
+  // before passive effects have had a chance to flush.
+  useLayoutEffect(() => {
     onChangeRef.current = callbacks.onChange;
     onStreamingStartRef.current = callbacks.onStreamingStart;
     onStreamingEndRef.current = callbacks.onStreamingEnd;
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const unsubscribe = store.subscribe((state, prevState) => {
       const { status } = state;
       const prevStatus = prevState.status;
