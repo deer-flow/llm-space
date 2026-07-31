@@ -4,6 +4,32 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.3] - 2026-07-31
+
+A maintenance release with clipboard and tool-response improvements, refreshed
+MiniMax models, and a steadier streaming UI.
+
+### Added
+
+- Copy a file reference to the OS clipboard directly from a thread tab's context
+  menu.
+- Tool responses can now carry image content.
+
+### Changed
+
+- MiniMax providers now target their OpenAI-compatible chat endpoints. MiniMax-M3
+  is refreshed with updated pricing, a 1M-token context window, text/image/video
+  input, and adaptive/disabled thinking; MiniMax-M2.7 stays an always-on
+  reasoning model.
+- Codex CLI now supports API-key mode, with inline run-validation guidance and a
+  more explicit desktop startup order.
+
+### Fixed
+
+- `todo_write` rendering stays stable while streaming: incomplete items are kept
+  out of the preview, cancelled states are preserved, and its parsing is isolated
+  from generic tool-call rendering.
+
 ## [4.6.2] - 2026-07-29
 
 A small quality-of-life release for inspecting tool calls.
