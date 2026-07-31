@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
 
@@ -6,11 +6,6 @@ import { findFreePort } from "./port";
 import { spawnManagedProcess, type ManagedProcess } from "./process-utils";
 import { execRemoteCommand } from "./remote-exec";
 import { uploadRemoteFile } from "./remote-file-transfer";
-import {
-  buildRemotePortOwnerProbeCommand,
-  buildStopRemotePortOwnerCommand,
-  parseRemotePortOwnerProbeOutput,
-} from "./remote-port-owner";
 import { RemoteRuntimeClient } from "./remote-runtime-client";
 import {
   installRemoteServerPackage,
@@ -72,6 +67,10 @@ const DEFAULT_DEPENDENCIES: SshRemoteRuntimeDependencies = {
   spawnManagedProcess,
   execRemoteCommand,
 };
+
+const MAX_REMOTE_PORT_ATTEMPTS = 5;
+const MIN_EPHEMERAL_REMOTE_PORT = 49_152;
+const MAX_EPHEMERAL_REMOTE_PORT_EXCLUSIVE = 65_536;
 
 export async function startSshRemoteRuntime(
   config: SshRemoteRuntimeConfig,
@@ -157,25 +156,37 @@ async function _startInstalledRuntime(input: {
   options: SshRemoteRuntimeOptions;
   dependencies: SshRemoteRuntimeDependencies;
 }): Promise<{ client: RemoteRuntimeClient; processes: ManagedProcess[] }> {
-  let retriedPortRecovery = false;
-  while (true) {
+  const attemptedPorts = new Set<number>();
+  let remotePort = input.config.remoteServerPort;
+  for (let attempt = 1; attempt <= MAX_REMOTE_PORT_ATTEMPTS; attempt += 1) {
+    attemptedPorts.add(remotePort);
     try {
-      return await _startInstalledRuntimeOnce(input);
+      return await _startInstalledRuntimeOnce({ ...input, remotePort });
     } catch (error) {
       const portFailure = parseRemotePortInUseFailure(_errorMessage(error));
-      if (portFailure && !retriedPortRecovery) {
-        retriedPortRecovery = true;
-        await _recoverRemotePortInUse(
-          input.config,
-          input.options,
-          input.dependencies,
-          portFailure.port
-        );
-        continue;
+      if (!portFailure) {
+        throw await _appendRemoteRuntimeDiagnostics(error, input);
       }
-      throw await _appendRemoteRuntimeDiagnostics(error, input);
+      if (portFailure.port !== remotePort) {
+        throw new Error(
+          `Remote runtime reported port ${portFailure.port} in use, but this connection attempted port ${remotePort}.`,
+          { cause: error }
+        );
+      }
+      if (attempt === MAX_REMOTE_PORT_ATTEMPTS) {
+        throw new Error(
+          `Could not find an available per-connection remote port after ${MAX_REMOTE_PORT_ATTEMPTS} attempts; no existing listener was stopped. Retry the connection or configure a different remote server port.`,
+          { cause: error }
+        );
+      }
+      input.options.onProgress?.({
+        stage: "server-start",
+        message: "Retrying with a different per-connection remote port",
+      });
+      remotePort = _nextRemotePort(attemptedPorts);
     }
   }
+  throw new Error("Remote port selection exhausted unexpectedly.");
 }
 
 async function _startInstalledRuntimeOnce(input: {
@@ -185,8 +196,13 @@ async function _startInstalledRuntimeOnce(input: {
   localPort: number;
   options: SshRemoteRuntimeOptions;
   dependencies: SshRemoteRuntimeDependencies;
+  remotePort: number;
 }): Promise<{ client: RemoteRuntimeClient; processes: ManagedProcess[] }> {
   const processes: ManagedProcess[] = [];
+  const connectionConfig = {
+    ...input.config,
+    remoteServerPort: input.remotePort,
+  };
   try {
     input.options.onProgress?.({
       stage: "server-start",
@@ -201,13 +217,13 @@ async function _startInstalledRuntimeOnce(input: {
             buildSourceRemoteServerCommand({
               remoteRepo: input.config.remoteRepo,
               host: "127.0.0.1",
-              port: input.config.remoteServerPort,
+              port: input.remotePort,
               token: input.token,
               home: input.config.remoteHome,
             }),
           ]
         : buildRemoteServerArgs({
-            config: input.config,
+            config: connectionConfig,
             token: input.token,
             entrypoint: input.install.entrypoint,
           }),
@@ -223,7 +239,7 @@ async function _startInstalledRuntimeOnce(input: {
     const tunnelProcess = input.dependencies.spawnManagedProcess(
       "ssh tunnel",
       "ssh",
-      buildTunnelArgs({ config: input.config, localPort: input.localPort })
+      buildTunnelArgs({ config: connectionConfig, localPort: input.localPort })
     );
     processes.push(tunnelProcess);
     await _waitForProcessAlive(tunnelProcess, "tunnel-start", input.config);
@@ -246,48 +262,15 @@ async function _startInstalledRuntimeOnce(input: {
   }
 }
 
-async function _recoverRemotePortInUse(
-  config: SshRemoteRuntimeConfig,
-  options: SshRemoteRuntimeOptions,
-  dependencies: SshRemoteRuntimeDependencies,
-  port: number
-): Promise<void> {
-  if (port !== config.remoteServerPort) {
-    throw new Error(
-      `Remote runtime reported port ${port} in use, but this connection is configured for port ${config.remoteServerPort}.`
+function _nextRemotePort(attemptedPorts: ReadonlySet<number>): number {
+  let port: number;
+  do {
+    port = randomInt(
+      MIN_EPHEMERAL_REMOTE_PORT,
+      MAX_EPHEMERAL_REMOTE_PORT_EXCLUSIVE
     );
-  }
-  options.onProgress?.({
-    stage: "server-start",
-    message: "Checking stale remote runtime port owner",
-  });
-  const probe = await dependencies.execRemoteCommand(
-    config,
-    buildRemotePortOwnerProbeCommand(config),
-    10_000
-  );
-  const owner = parseRemotePortOwnerProbeOutput(
-    [probe.stdout, probe.stderr].filter(Boolean).join("\n"),
-    config
-  );
-  if (owner.kind !== "llm-space") {
-    throw new Error(
-      [
-        `Remote runtime port ${port} is in use, but LLM Space could not verify it owns the listening process.`,
-        `Owner: ${owner.kind}.`,
-        owner.detail,
-      ].join(" ")
-    );
-  }
-  options.onProgress?.({
-    stage: "server-start",
-    message: "Restarting stale remote runtime server",
-  });
-  await dependencies.execRemoteCommand(
-    config,
-    buildStopRemotePortOwnerCommand(owner.pid),
-    10_000
-  );
+  } while (attemptedPorts.has(port));
+  return port;
 }
 
 async function _appendRemoteRuntimeDiagnostics(

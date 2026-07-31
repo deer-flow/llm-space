@@ -9,14 +9,16 @@ let scenario:
   | "missing-runtime-binary"
   | "non-runtime-failure"
   | "port-in-use"
-  | "port-in-use-unknown-owner"
   | "port-in-use-retry-fails"
+  | "second-client-collision"
   | "success";
 let installCalls = 0;
 let serverSpawnCalls = 0;
 let stopCalls = 0;
 let diagnosticCalls = 0;
 let remoteExecCalls: string[] = [];
+let serverPorts: number[] = [];
+let tunnelPorts: number[] = [];
 
 const CONFIG: SshRemoteRuntimeConfig = {
   id: "remote:test",
@@ -47,18 +49,6 @@ const TEST_DEPENDENCIES = {
   uploadRemoteFile: () => Promise.resolve(),
   execRemoteCommand: (_config: SshRemoteRuntimeConfig, command: string) => {
     remoteExecCalls.push(command);
-    if (command.includes("PIDS")) {
-      return Promise.resolve({
-        stdout:
-          scenario === "port-in-use-unknown-owner"
-            ? "PID=123\nARGS=python -m http.server 39123\n"
-            : "PID=2067161\nARGS=/home/test/.llm-space/remote-runtime/versions/4.4.4/bin/llm-space-server --host 127.0.0.1 --port 39123\n",
-        stderr: "",
-      });
-    }
-    if (command.includes("kill -TERM")) {
-      return Promise.resolve({ stdout: "", stderr: "" });
-    }
     diagnosticCalls += 1;
     return Promise.resolve({
       stdout:
@@ -66,10 +56,14 @@ const TEST_DEPENDENCIES = {
       stderr: "",
     });
   },
-  spawnManagedProcess: (label: string) => {
+  spawnManagedProcess: (label: string, _command: string, args: string[]) => {
     const attempt = installCalls;
     if (label === "remote server") {
       serverSpawnCalls += 1;
+      serverPorts.push(_serverPort(args));
+    }
+    if (label === "ssh tunnel") {
+      tunnelPorts.push(_tunnelPort(args));
     }
     const missing =
       label === "remote server" &&
@@ -82,13 +76,19 @@ const TEST_DEPENDENCIES = {
     const portInUse =
       label === "remote server" &&
       (scenario === "port-in-use" ||
-        scenario === "port-in-use-unknown-owner" ||
         scenario === "port-in-use-retry-fails") &&
       (serverSpawnCalls === 1 || scenario === "port-in-use-retry-fails");
+    const secondClientCollision =
+      label === "remote server" &&
+      scenario === "second-client-collision" &&
+      serverSpawnCalls === 2;
     return {
       label,
       child: {
-        exitCode: missing || nonRuntimeFailure || portInUse ? 127 : null,
+        exitCode:
+          missing || nonRuntimeFailure || portInUse || secondClientCollision
+            ? 127
+            : null,
         signalCode: null,
       },
       output: () =>
@@ -96,8 +96,8 @@ const TEST_DEPENDENCIES = {
           ? "bash: line 1: /opt/runtime/versions/test/bin/llm-space-server: No such file or directory"
           : nonRuntimeFailure
             ? "bash: bun: command not found"
-            : portInUse
-              ? "Failed to start server. Is port 39123 in use?"
+            : portInUse || secondClientCollision
+              ? `Failed to start server. Is port ${serverPorts.at(-1)} in use?`
               : "",
       stop: () => {
         stopCalls += 1;
@@ -114,6 +114,8 @@ beforeEach(() => {
   stopCalls = 0;
   diagnosticCalls = 0;
   remoteExecCalls = [];
+  serverPorts = [];
+  tunnelPorts = [];
 });
 
 describe("startSshRemoteRuntime", () => {
@@ -157,7 +159,7 @@ describe("startSshRemoteRuntime", () => {
     expect(diagnosticCalls).toBe(0);
   });
 
-  test("stops a stale llm-space server and retries once when the remote port is in use", async () => {
+  test("uses a different per-connection port without signaling the existing listener", async () => {
     scenario = "port-in-use";
 
     await _withFetch(async () => {
@@ -169,39 +171,36 @@ describe("startSshRemoteRuntime", () => {
 
     expect(installCalls).toBe(1);
     expect(serverSpawnCalls).toBe(2);
-    expect(remoteExecCalls.some((command) => command.includes("PIDS"))).toBe(
-      true
-    );
-    expect(
-      remoteExecCalls.some((command) => command.includes("kill -TERM"))
-    ).toBe(true);
+    expect(serverPorts[0]).toBe(39123);
+    expect(serverPorts[1]).not.toBe(serverPorts[0]);
+    expect(tunnelPorts).toEqual([serverPorts[1]]);
+    expect(remoteExecCalls).toEqual([]);
     expect(stopCalls).toBeGreaterThanOrEqual(1);
   });
 
-  test("does not stop unknown remote port owners", async () => {
-    scenario = "port-in-use-unknown-owner";
+  test("keeps two clients on the same default SSH target healthy", async () => {
+    scenario = "second-client-collision";
 
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
-      () => {
-        throw new Error("connect should fail");
-      },
-      (error) => {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toContain(
-          "could not verify it owns the listening process"
-        );
-      }
-    );
+    await _withFetch(async () => {
+      const first = await startSshRemoteRuntime(CONFIG, {
+        dependencies: TEST_DEPENDENCIES,
+      });
+      const second = await startSshRemoteRuntime(CONFIG, {
+        dependencies: TEST_DEPENDENCIES,
+      });
 
-    expect(remoteExecCalls.some((command) => command.includes("PIDS"))).toBe(
-      true
-    );
-    expect(
-      remoteExecCalls.some((command) => command.includes("kill -TERM"))
-    ).toBe(false);
+      expect(tunnelPorts).toHaveLength(2);
+      expect(tunnelPorts[1]).not.toBe(tunnelPorts[0]);
+      expect(remoteExecCalls).toEqual([]);
+
+      await first.client.connect();
+      await second.stop();
+      await first.client.connect();
+      await first.stop();
+    });
   });
 
-  test("retries remote port recovery only once", async () => {
+  test("fails non-destructively after bounded per-connection port collisions", async () => {
     scenario = "port-in-use-retry-fails";
 
     await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
@@ -211,16 +210,29 @@ describe("startSshRemoteRuntime", () => {
       (error) => {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toContain(
-          "Remote runtime port 39123 is already in use"
+          "no existing listener was stopped"
         );
       }
     );
 
-    expect(
-      remoteExecCalls.filter((command) => command.includes("kill -TERM"))
-    ).toHaveLength(1);
+    expect(serverPorts.length).toBeGreaterThan(1);
+    expect(new Set(serverPorts).size).toBe(serverPorts.length);
+    expect(remoteExecCalls).toEqual([]);
   });
 });
+
+function _serverPort(args: string[]): number {
+  const match = /--port\s+(\d+)/.exec(args.at(-1) ?? "");
+  if (!match) throw new Error(`Missing remote server port in ${args.join(" ")}`);
+  return Number(match[1]);
+}
+
+function _tunnelPort(args: string[]): number {
+  const forward = args[args.indexOf("-L") + 1] ?? "";
+  const match = /:127\.0\.0\.1:(\d+)$/.exec(forward);
+  if (!match) throw new Error(`Missing tunnel port in ${args.join(" ")}`);
+  return Number(match[1]);
+}
 
 async function _withFetch(run: () => Promise<void>): Promise<void> {
   const original = globalThis.fetch;
