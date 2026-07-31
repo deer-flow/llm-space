@@ -116,7 +116,13 @@ export class GitHubAuthManager {
         device.interval,
         controller.signal
       );
-      const user = await fetchGithubUser(token.accessToken);
+      const user = await fetchGithubUser(token.accessToken, controller.signal);
+      if (
+        controller.signal.aborted ||
+        this._signInController !== controller
+      ) {
+        return;
+      }
       this._config = {
         accessToken: token.accessToken,
         tokenType: token.tokenType,
@@ -130,8 +136,8 @@ export class GitHubAuthManager {
       }
       return;
     } finally {
-      this._pending = null;
       if (this._signInController === controller) {
+        this._pending = null;
         this._signInController = null;
       }
     }
@@ -145,6 +151,7 @@ export class GitHubAuthManager {
     }
     this._signInController.abort();
     this._signInController = null;
+    this._pending = null;
     this._emit();
   }
 
