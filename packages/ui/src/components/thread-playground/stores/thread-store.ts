@@ -1560,7 +1560,7 @@ function _isNonEmptyAssistantDelta(event: AgentEvent): boolean {
 
 export const ThreadStoreContext = createContext<ThreadStore | null>(null);
 
-function useThreadStoreApi(): ThreadStore {
+export function useThreadStoreApi(): ThreadStore {
   const store = useContext(ThreadStoreContext);
   if (!store) throw new Error("hooks must be used within <ThreadPlayground>");
   return store;

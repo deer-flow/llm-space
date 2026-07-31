@@ -59,7 +59,11 @@ import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
 import { createRuntimePromptFiles } from "../runtime-prompt-files";
-import { useThreadStore } from "../stores/thread-store";
+import {
+  useThreadStore,
+  useThreadStoreApi,
+  type ThreadStore,
+} from "../stores/thread-store";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
 /** The generator to run. V1 ships only LangGraph. */
@@ -91,7 +95,7 @@ type WizardStep = "framework" | "target" | "run";
  * Runtime ownership is explicit so this path cannot silently read same-named
  * files from the desktop's local runtime.
  */
-export async function prepareGenerateProjectPromptContext({
+async function _prepareGenerateProjectPromptContext({
   context,
   files,
   runtimeId,
@@ -132,6 +136,35 @@ export async function prepareGenerateProjectPromptContext({
   };
 }
 
+/** Bind Generate Project prompt reads directly to one owning thread store. */
+export function createGenerateProjectPromptPreparer({
+  files,
+  store,
+}: {
+  files: FilesHost;
+  store: ThreadStore;
+}) {
+  return ({
+    skillList,
+    useMetaUserPrompt,
+  }: {
+    skillList: Awaited<ReturnType<typeof listEnabledPromptVariableSkills>>;
+    useMetaUserPrompt: boolean;
+  }) => {
+    const { runtimeId, thread } = store.getState();
+    if (!runtimeId) {
+      throw new Error("Generate Project requires an owning runtimeId");
+    }
+    return _prepareGenerateProjectPromptContext({
+      context: thread.context ?? {},
+      files,
+      runtimeId,
+      skillList,
+      useMetaUserPrompt,
+    });
+  };
+}
+
 /**
  * Header action that exports the current thread as a runnable code project via
  * the pluggable `@llm-space/core/generator`. A step-by-step wizard walks the
@@ -156,13 +189,17 @@ export function GenerateProjectButton({
     actions,
     presentational,
   } = useHostServices();
+  const store = useThreadStoreApi();
   const context = useThreadStore((s) => s.thread.context);
   const savedModel = useThreadStore((s) => s.thread.model);
   const title = useThreadStore((s) => s.thread.title);
-  const runtimeId = useThreadStore((s) => s.runtimeId);
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
+  const preparePromptContext = useMemo(
+    () => createGenerateProjectPromptPreparer({ files, store }),
+    [files, store]
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>("framework");
@@ -255,19 +292,13 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        if (!runtimeId) {
-          throw new Error("Generate Project requires an owning runtimeId");
-        }
         const skillList = await listEnabledPromptVariableSkills(skills);
         const {
           rendered,
           systemPromptTemplate,
           firstUserMessageTemplate,
           renderedVariableValues,
-        } = await prepareGenerateProjectPromptContext({
-          context: context ?? {},
-          files,
-          runtimeId,
+        } = await preparePromptContext({
           skillList,
           useMetaUserPrompt,
         });
@@ -322,10 +353,9 @@ export function GenerateProjectButton({
       model,
       context,
       skills,
-      files,
+      preparePromptContext,
       framework,
       providers,
-      runtimeId,
       mcp,
       useMetaUserPrompt,
     ]

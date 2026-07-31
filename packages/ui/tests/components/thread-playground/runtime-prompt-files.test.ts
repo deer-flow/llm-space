@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { renderThreadPromptVariables } from "@llm-space/core/thread";
 import type { ThreadContext } from "@llm-space/core/types";
 
-import { prepareGenerateProjectPromptContext } from "../../../src/components/thread-playground/codegen/generate-project-button";
+import { createGenerateProjectPromptPreparer } from "../../../src/components/thread-playground/codegen/generate-project-button";
 import { createRuntimePromptFiles } from "../../../src/components/thread-playground/runtime-prompt-files";
 import { createThreadStore } from "../../../src/components/thread-playground/stores/thread-store";
 import type { FilesHost } from "../../../src/host/types";
@@ -49,15 +49,11 @@ describe("runtime prompt files", () => {
       },
       { runtimeId: "remote:test" }
     );
-    const { runtimeId, thread } = store.getState();
-    if (!runtimeId) {
-      throw new Error("Thread store lost its runtime owner");
-    }
-
-    const prepared = await prepareGenerateProjectPromptContext({
-      context: thread.context ?? {},
+    const preparePrompt = createGenerateProjectPromptPreparer({
       files,
-      runtimeId,
+      store,
+    });
+    const prepared = await preparePrompt({
       skillList: [],
       useMetaUserPrompt: false,
     });
