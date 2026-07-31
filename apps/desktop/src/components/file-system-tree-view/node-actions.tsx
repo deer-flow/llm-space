@@ -21,7 +21,6 @@ import {
   MoreHorizontal,
   RefreshCw,
   SettingsIcon,
-  Share2,
   TextCursorInput,
   Trash2,
 } from "lucide-react";
@@ -30,7 +29,8 @@ import { toast } from "sonner";
 import { createFileSystemClient } from "@/client";
 import { useCommands } from "@/commands";
 import type { RuntimeId } from "@/shared/runtime";
-import { buildShareThreadCommand } from "@/shared/share";
+
+import { ShareThreadMenuItem } from "./share-thread-menu-item";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -195,14 +195,11 @@ export function NodeActions({
           {!isDir && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() =>
-                  executeCommand(buildShareThreadCommand(node.path, runtimeId))
-                }
-              >
-                <Share2 />
-                Share...
-              </DropdownMenuItem>
+              <ShareThreadMenuItem
+                path={node.path}
+                runtimeId={runtimeId}
+                executeCommand={executeCommand}
+              />
             </>
           )}
           {isDir && (

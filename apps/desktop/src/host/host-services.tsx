@@ -34,7 +34,8 @@ import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
-import { buildShareThreadCommand } from "@/shared/share";
+
+import { createDesktopShareThreadAction } from "./share-thread-action";
 
 // One transport for the app: stream agent runs over Electrobun RPC to the bun
 // process. It multiplexes concurrent runs by internal `streamId`, so a single
@@ -151,13 +152,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
             args: { tab: tab as SettingsTab },
           }),
         openLink: (url) => executeCommand({ type: "openLink", args: { url } }),
-        shareThread: (input) => {
-          const { path, runtimeId } = input as unknown as {
-            path: string;
-            runtimeId: RuntimeId;
-          };
-          executeCommand(buildShareThreadCommand(path, runtimeId));
-        },
+        shareThread: createDesktopShareThreadAction(executeCommand),
         openVariables: (variableName) =>
           executeCommand({ type: "openVariables", args: { variableName } }),
         registerOpenVariables: (handler) =>

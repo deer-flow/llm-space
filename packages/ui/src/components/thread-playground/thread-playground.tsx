@@ -6,7 +6,6 @@ import {
   HistoryIcon,
   PlayIcon,
   Redo2Icon,
-  Share2Icon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -26,7 +25,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import { createShareThreadAction, useHostServices } from "@llm-space/ui/host";
+import { useHostServices } from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -65,6 +64,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
+import { ThreadShareButton } from "./thread-share-button";
 import { ToolListView } from "./tool/tool-list-view";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
@@ -330,19 +330,12 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
               <Tooltip content="Share thread">
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Share thread"
+                <ThreadShareButton
+                  path={path}
+                  runtimeId={runtimeId}
                   disabled={status === "running"}
-                  onClick={() =>
-                    actions.shareThread(
-                      createShareThreadAction(path, runtimeId)
-                    )
-                  }
-                >
-                  <Share2Icon className="size-4" />
-                </Button>
+                  onShare={(input) => actions.shareThread(input)}
+                />
               </Tooltip>
               <GenerateProjectButton disabled={status === "running"} />
             </div>

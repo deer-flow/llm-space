@@ -29,6 +29,7 @@ import {
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { ShareThreadMenuItem } from "./share-thread-menu-item";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
@@ -333,13 +334,11 @@ export function ThreadTabs({
                   Copy file
                 </ContextMenuItem>
                 <ContextMenuGroup>
-                  <ContextMenuItem
-                    onSelect={() =>
-                      share(contextMenuTab.path, contextMenuTab.runtimeId)
-                    }
-                  >
-                    Share...
-                  </ContextMenuItem>
+                  <ShareThreadMenuItem
+                    path={contextMenuTab.path}
+                    runtimeId={contextMenuTab.runtimeId}
+                    onShare={share}
+                  />
                 </ContextMenuGroup>
                 <ContextMenuSeparator />
                 <ContextMenuGroup>

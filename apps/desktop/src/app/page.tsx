@@ -43,11 +43,13 @@ import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
 import { RemoteStatus } from "@/components/remote-status";
+import {
+  createShareThreadCommandHandler,
+} from "@/components/share-thread-command-handler";
 import { SharedImportProvider } from "@/components/shared-import-provider";
 import {
   chooseActiveTabForRuntime,
   filterTabsForRuntime,
-  resolveShareThreadTarget,
   ThreadTabs,
   useThreadTabs,
 } from "@/components/thread-tabs";
@@ -522,19 +524,19 @@ function PageWorkspace({
     // Share a specific thread, or the active thread when no path is given (the
     // header button / native menu / palette). Thread tab ids are
     // `thread:{runtimeId}:{path}`.
-    shareThread: ({ path, runtimeId }) => {
-      const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
-      const target = resolveShareThreadTarget(
-        { path, runtimeId },
-        workspaceRuntimeId,
-        activeTab?.type === "thread"
+    shareThread: createShareThreadCommandHandler({
+      getWorkspaceRuntimeId: () => workspaceRuntimeId,
+      getActiveThread: () => {
+        const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
+        return activeTab?.type === "thread"
           ? { path: activeTab.path, runtimeId: activeTab.runtimeId }
-          : null
-      );
-      if (!target) return;
-      setShareTarget(target);
-      setShareOpen(true);
-    },
+          : null;
+      },
+      openDialog: (target) => {
+        setShareTarget(target);
+        setShareOpen(true);
+      },
+    }),
     importFiles: ({ parent = "", files, runtimeId }) => {
       const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
       if (targetRuntimeId !== workspaceRuntimeIdRef.current) return;

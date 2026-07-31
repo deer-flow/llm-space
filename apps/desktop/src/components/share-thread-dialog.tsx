@@ -35,6 +35,11 @@ import { useGithubAuth } from "@/components/github-auth-provider";
 import { GitHubIcon } from "@/components/github-icon";
 import type { RuntimeId } from "@/shared/runtime";
 
+import {
+  ShareThreadDialogFlow,
+  type ShareThreadTransaction,
+} from "./share-thread-dialog-flow";
+
 type ShareStatus = "idle" | "awaitingAuth" | "generating" | "success" | "error";
 
 /** The only connector today; the dropdown is shown for future connectors. */
@@ -70,20 +75,18 @@ export function ShareThreadDialog({
   // Shown when a signed-out user clicks Generate, before we start the GitHub
   // Device Flow, so the sign-in isn't sprung on them unexpectedly.
   const [confirmSignInOpen, setConfirmSignInOpen] = useState(false);
+  const [flow] = useState(() => new ShareThreadDialogFlow());
+  const authTransactionRef = useRef<ShareThreadTransaction | null>(null);
 
-  // Guards a result / late sign-in landing after the user closed the dialog —
-  // the in-flight RPC request itself can't be aborted.
-  const cancelledRef = useRef(false);
-  // Distinguishes the brief "signedOut" right after clicking Generate from a
-  // real Device-Flow cancel: only a signedOut *after* "signingIn" is a cancel.
-  const sawSigningInRef = useRef(false);
+  // Synchronize during render so a target change invalidates old async work
+  // before a passive effect or promise callback can observe the new dialog.
+  flow.sync(open, { runtimeId, path });
 
   // Reset every time the dialog (re)opens, and prefill the title from the thread
   // on disk so the shared copy is nicely named without extra typing.
   useEffect(() => {
     if (!open) return;
-    cancelledRef.current = false;
-    sawSigningInRef.current = false;
+    authTransactionRef.current = null;
     setStatus("idle");
     setShareUrl("");
     setErrorMessage("");
@@ -91,70 +94,78 @@ export function ShareThreadDialog({
     setConfirmSignInOpen(false);
     setDescription("");
     setTitle(threadTitleFromPath(path));
-    let stale = false;
-    void readShareThread(runtimeId, path)
-      .then((thread) => {
-        if (!stale && thread.title) setTitle(thread.title);
-      })
-      .catch(() => {
-        // Non-fatal: keep the path-derived title.
-      });
-    return () => {
-      stale = true;
-    };
-  }, [open, path, runtimeId]);
+    void flow.prefillTitle(
+      (target) => readShareThread(target.runtimeId, target.path),
+      setTitle
+    );
+  }, [flow, open, path, runtimeId]);
 
-  const generate = useCallback(async () => {
-    cancelledRef.current = false;
-    setStatus("generating");
-    setErrorMessage("");
-    try {
-      const trimmedTitle = title.trim();
-      const result = await shareThread(runtimeId, path, {
-        title: trimmedTitle || undefined,
-        description: description.trim(),
-      });
-      if (cancelledRef.current) return;
-      setShareUrl(result.shareUrl);
-      setStatus("success");
-    } catch (error) {
-      if (cancelledRef.current) return;
-      setErrorMessage(_friendlyError(error));
-      setStatus("error");
-    }
-  }, [runtimeId, path, title, description]);
+  const publishTransaction = useCallback(
+    (transaction: ShareThreadTransaction) => {
+      void flow.publish(
+        transaction,
+        (snapshot) =>
+          shareThread(snapshot.runtimeId, snapshot.path, {
+            title: snapshot.title,
+            description: snapshot.description,
+          }),
+        {
+          onStart: () => {
+            setStatus("generating");
+            setErrorMessage("");
+          },
+          onSuccess: (result) => {
+            setShareUrl(result.shareUrl);
+            setStatus("success");
+          },
+          onError: (error) => {
+            setErrorMessage(_friendlyError(error));
+            setStatus("error");
+          },
+        }
+      );
+    },
+    [flow]
+  );
 
   const handleGenerate = useCallback(() => {
+    const transaction = flow.createTransaction({ title, description });
+    if (!transaction) return;
     if (authState.status === "signedIn") {
-      void generate();
+      publishTransaction(transaction);
       return;
     }
     // Not signed in: confirm before springing the GitHub sign-in on the user.
+    authTransactionRef.current = transaction;
     setConfirmSignInOpen(true);
-  }, [authState.status, generate]);
+  }, [authState.status, description, flow, publishTransaction, title]);
 
   // Confirmed the sign-in prompt: drive the Device Flow; the effect below
   // resumes the share automatically once the user is signed in.
   const handleConfirmSignIn = useCallback(() => {
+    const transaction = authTransactionRef.current;
+    authTransactionRef.current = null;
     setConfirmSignInOpen(false);
-    sawSigningInRef.current = false;
+    if (!transaction) return;
+    if (authState.status === "signedIn") {
+      publishTransaction(transaction);
+      return;
+    }
+    if (!flow.beginAuth(transaction)) return;
     setStatus("awaitingAuth");
     signIn();
-  }, [signIn]);
+  }, [authState.status, flow, publishTransaction, signIn]);
 
   // Resume (or abort) once the Device Flow settles while we're waiting on auth.
   useEffect(() => {
     if (status !== "awaitingAuth") return;
-    if (authState.status === "signingIn") {
-      sawSigningInRef.current = true;
-    } else if (authState.status === "signedIn") {
-      void generate();
-    } else if (authState.status === "signedOut" && sawSigningInRef.current) {
-      // The user cancelled the sign-in / it failed — back to the start.
-      sawSigningInRef.current = false;
+    const observation = flow.observeAuth(authState.status);
+    if (observation.type === "resume") {
+      publishTransaction(observation.transaction);
+    } else if (observation.type === "cancelled") {
       setStatus("idle");
     }
-  }, [status, authState.status, generate]);
+  }, [authState.status, flow, publishTransaction, status]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -167,12 +178,23 @@ export function ShareThreadDialog({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      // Closing mid-flight: mark cancelled so a pending result / sign-in is
-      // discarded, then let the reopen effect reset the rest.
-      if (!next) cancelledRef.current = true;
+      // Invalidate the current epoch immediately; the RPC itself cannot abort.
+      if (!next) {
+        flow.invalidate();
+        authTransactionRef.current = null;
+        setConfirmSignInOpen(false);
+      }
       onOpenChange(next);
     },
-    [onOpenChange]
+    [flow, onOpenChange]
+  );
+
+  const handleConfirmSignInOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) authTransactionRef.current = null;
+      setConfirmSignInOpen(next);
+    },
+    []
   );
 
   const busy = status === "awaitingAuth" || status === "generating";
@@ -312,7 +334,7 @@ export function ShareThreadDialog({
 
       <ConfirmDialog
         open={confirmSignInOpen}
-        onOpenChange={setConfirmSignInOpen}
+        onOpenChange={handleConfirmSignInOpenChange}
         dimBackground={false}
         title="Sign in to GitHub?"
         description="Sharing publishes this thread as a secret GitHub Gist, so you need to sign in to GitHub first. Continue?"
