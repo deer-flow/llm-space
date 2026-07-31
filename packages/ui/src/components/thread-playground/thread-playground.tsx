@@ -138,6 +138,7 @@ function _ThreadPlayground({
   onStreamingEnd,
   ...props
 }: ThreadPlaygroundProps) {
+  const [ownerRuntimeId] = useState(() => runtimeId ?? "local");
   // Keep live refs to the provider list and default model so the store can
   // resolve a thread's model (its own, else the default/first available) at
   // run/edit time without being recreated.
@@ -149,7 +150,7 @@ function _ThreadPlayground({
   defaultModelRef.current = defaultModel;
   const { executeTool, skills, files } = useHostServices();
   const [store] = useState(() => {
-    const promptFiles = createRuntimePromptFiles(files, runtimeId ?? "local");
+    const promptFiles = createRuntimePromptFiles(files, ownerRuntimeId);
     return createThreadStore(initialValue, {
       transport,
       resolveModel: (saved) =>
@@ -160,11 +161,15 @@ function _ThreadPlayground({
         ),
       getAutoRunTools,
       getReactLoop,
-      runtimeId,
+      runtimeId: ownerRuntimeId,
       executeTool: executeTool
-        ? (tool, args) => executeTool(tool, args, { runtimeId })
+        ? (tool, args) =>
+            executeTool(tool, args, { runtimeId: ownerRuntimeId })
         : undefined,
-      loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
+      loadSkills: () =>
+        listEnabledPromptVariableSkills(skills, {
+          runtimeId: ownerRuntimeId,
+        }),
       loadFile: promptFiles.loadFile,
       fileExists: promptFiles.fileExists,
     });
@@ -176,7 +181,7 @@ function _ThreadPlayground({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent runtimeId={runtimeId} {...props} />
+      <ThreadPlaygroundContent runtimeId={ownerRuntimeId} {...props} />
     </ThreadStoreContext.Provider>
   );
 }

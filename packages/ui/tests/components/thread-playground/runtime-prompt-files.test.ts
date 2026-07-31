@@ -3,10 +3,77 @@ import { describe, expect, test } from "bun:test";
 import { renderThreadPromptVariables } from "@llm-space/core/thread";
 import type { ThreadContext } from "@llm-space/core/types";
 
+import { prepareGenerateProjectPromptContext } from "../../../src/components/thread-playground/codegen/generate-project-button";
 import { createRuntimePromptFiles } from "../../../src/components/thread-playground/runtime-prompt-files";
+import { createThreadStore } from "../../../src/components/thread-playground/stores/thread-store";
 import type { FilesHost } from "../../../src/host/types";
 
 describe("runtime prompt files", () => {
+  test("preserves the owning runtime in the thread store", () => {
+    const store = createThreadStore(
+      {},
+      {
+        runtimeId: "remote:test",
+      }
+    );
+
+    expect(store.getState().runtimeId).toBe("remote:test");
+  });
+
+  test("prepares generated projects from the store's owning runtime", async () => {
+    const accesses: { path: string; runtimeId: string }[] = [];
+    const files = {
+      readText: (
+        path: string,
+        { runtimeId }: { runtimeId: string }
+      ): Promise<string> => {
+        accesses.push({ path, runtimeId });
+        return Promise.resolve(
+          runtimeId === "remote:test" ? "REMOTE SENTINEL" : "LOCAL LEAK"
+        );
+      },
+      exists: () => Promise.resolve(true),
+      directoryExists: () => Promise.resolve(null),
+      pickFile: () => Promise.resolve(null),
+      pickDirectory: () => Promise.resolve(null),
+    } satisfies FilesHost;
+    const store = createThreadStore(
+      {
+        context: {
+          systemPrompt:
+            '{{@include("/workspace/same.md")}} | {{ document }}',
+          variables: {
+            document: { type: "file", value: "/workspace/same.md" },
+          },
+        },
+      },
+      { runtimeId: "remote:test" }
+    );
+    const { runtimeId, thread } = store.getState();
+    if (!runtimeId) {
+      throw new Error("Thread store lost its runtime owner");
+    }
+
+    const prepared = await prepareGenerateProjectPromptContext({
+      context: thread.context ?? {},
+      files,
+      runtimeId,
+      skillList: [],
+      useMetaUserPrompt: false,
+    });
+
+    expect(prepared.rendered.context.systemPrompt).toBe(
+      "REMOTE SENTINEL | REMOTE SENTINEL"
+    );
+    expect(prepared.systemPromptTemplate).toBe(
+      "REMOTE SENTINEL | {{ document }}"
+    );
+    expect(accesses.length).toBeGreaterThan(0);
+    expect(accesses.every((access) => access.runtimeId === "remote:test")).toBe(
+      true
+    );
+  });
+
   test("requires explicit ownership instead of falling through to a default", () => {
     const files = {
       readText: () => Promise.resolve("LOCAL LEAK"),

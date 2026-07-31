@@ -43,6 +43,7 @@ import { useHostServices } from "@llm-space/ui/host";
 import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import type { FilesHost } from "../../../host/types";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../../ui/button";
 import {
@@ -84,6 +85,52 @@ const FRAMEWORKS = [
 ] as const;
 
 type WizardStep = "framework" | "target" | "run";
+
+/**
+ * Prepare the prompt inputs consumed by the real Generate Project workflow.
+ * Runtime ownership is explicit so this path cannot silently read same-named
+ * files from the desktop's local runtime.
+ */
+export async function prepareGenerateProjectPromptContext({
+  context,
+  files,
+  runtimeId,
+  skillList,
+  useMetaUserPrompt,
+}: {
+  context: ThreadContext;
+  files: FilesHost;
+  runtimeId: string;
+  skillList: Awaited<ReturnType<typeof listEnabledPromptVariableSkills>>;
+  useMetaUserPrompt: boolean;
+}) {
+  const promptFiles = createRuntimePromptFiles(files, runtimeId);
+  const rendered = await renderThreadPromptVariables({
+    context,
+    loadSkills: () => Promise.resolve(skillList),
+    loadFile: promptFiles.loadFile,
+    fileExists: promptFiles.fileExists,
+  });
+  const systemPromptTemplate = await _expandIncludes(
+    context.systemPrompt ?? "",
+    promptFiles.loadFile
+  );
+  const firstMessage = context.messages?.[0];
+  const firstUserMessageTemplate =
+    useMetaUserPrompt && firstMessage?.role === "user"
+      ? await _expandIncludes(getMessageText(firstMessage), promptFiles.loadFile)
+      : undefined;
+  const renderedVariableValues: Record<string, string> = Object.fromEntries(
+    rendered.variables.map((variable) => [variable.name, variable.value])
+  );
+
+  return {
+    rendered,
+    systemPromptTemplate,
+    firstUserMessageTemplate,
+    renderedVariableValues,
+  };
+}
 
 /**
  * Header action that exports the current thread as a runnable code project via
@@ -208,32 +255,22 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const promptFiles = createRuntimePromptFiles(
-          files,
-          runtimeId ?? "local"
-        );
+        if (!runtimeId) {
+          throw new Error("Generate Project requires an owning runtimeId");
+        }
         const skillList = await listEnabledPromptVariableSkills(skills);
-        const rendered = await renderThreadPromptVariables({
+        const {
+          rendered,
+          systemPromptTemplate,
+          firstUserMessageTemplate,
+          renderedVariableValues,
+        } = await prepareGenerateProjectPromptContext({
           context: context ?? {},
-          loadSkills: () => Promise.resolve(skillList),
-          loadFile: promptFiles.loadFile,
-          fileExists: promptFiles.fileExists,
+          files,
+          runtimeId,
+          skillList,
+          useMetaUserPrompt,
         });
-        // Ship the raw prompt (variables live at runtime), with `@include`
-        // macros expanded now since the generated project renders with Jinja2.
-        const systemPromptTemplate = await _expandIncludes(
-          context?.systemPrompt ?? "",
-          promptFiles.loadFile
-        );
-        const firstMessage = context?.messages?.[0];
-        const firstUserMessageTemplate =
-          useMetaUserPrompt && firstMessage?.role === "user"
-            ? await _expandIncludes(getMessageText(firstMessage), (path) =>
-                promptFiles.loadFile(path)
-              )
-            : undefined;
-        const renderedVariableValues: Record<string, string> =
-          Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
           runOneShot: createOneShotRunner({ transport }),
           defaultModel: model,
