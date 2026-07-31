@@ -36,6 +36,7 @@ import type { UpdaterService } from "../updates";
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
 import { buildSharedThread } from "./share-thread";
+import { forwardStreamThread } from "./stream-thread-request";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -440,8 +441,10 @@ export function createMainWindowRPC({
         sendStreamThreadRequest: (payload) => {
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
           // messages. `rpc` is initialized by the time this handler runs.
-          void getRuntime(payload.runtimeId).streamThread(payload, (message) =>
-            rpc.send.receiveStreamThreadResponse(message)
+          void forwardStreamThread(
+            getRuntime(payload.runtimeId),
+            payload,
+            (message) => rpc.send.receiveStreamThreadResponse(message)
           );
         },
         abortStreamThread: (payload) =>

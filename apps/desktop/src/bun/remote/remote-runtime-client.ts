@@ -196,6 +196,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
             type: "error",
             message: event.message,
           });
+          return;
         } else {
           send({ streamId: payload.streamId, type: "event", event });
         }
