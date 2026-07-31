@@ -7,8 +7,6 @@ import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { groqProvider } from "@earendil-works/pi-ai/providers/groq";
 import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface";
-import { minimaxProvider } from "@earendil-works/pi-ai/providers/minimax";
-import { minimaxCnProvider } from "@earendil-works/pi-ai/providers/minimax-cn";
 import { moonshotaiProvider } from "@earendil-works/pi-ai/providers/moonshotai";
 import { moonshotaiCnProvider } from "@earendil-works/pi-ai/providers/moonshotai-cn";
 import { nvidiaProvider } from "@earendil-works/pi-ai/providers/nvidia";
@@ -23,6 +21,8 @@ import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-
 import { arkProvider } from "./ark";
 import { arkAgentPlanProvider } from "./ark-agent-plan";
 import { arkCodingPlanProvider } from "./ark-coding-plan";
+import { minimaxProvider } from "./minimax";
+import { minimaxCnProvider } from "./minimax-cn";
 import { openaiCodexProvider } from "./openai-codex";
 
 /** Static, non-`Provider` metadata for a builtin provider. */
