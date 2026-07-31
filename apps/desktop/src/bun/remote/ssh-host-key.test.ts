@@ -15,7 +15,11 @@ import path from "node:path";
 import type { RemoteHostKeyTrustRequest } from "../../shared/remote-servers";
 
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
-import { OpenSshHostKeyService, parseSshHostKeyOutput } from "./ssh-host-key";
+import {
+  OpenSshHostKeyService,
+  parseSshHostKeyOutput,
+  runSshHostKeyCommand,
+} from "./ssh-host-key";
 
 const CONFIG: Pick<SshRemoteRuntimeConfig, "host" | "port" | "user"> = {
   host: "203.0.113.10",
@@ -100,6 +104,26 @@ devbox ssh-ed25519 ${PUBLIC_KEY}`,
         CONFIG
       )
     ).toBeNull();
+  });
+});
+
+describe("runSshHostKeyCommand", () => {
+  test("settles after a bounded timeout when a descendant keeps stderr open", async () => {
+    const startedAt = performance.now();
+    const result = await _withDeadline(
+      runSshHostKeyCommand(
+        "/bin/sh",
+        ["-c", "(sleep 1) >&2 & while :; do :; done"],
+        { timeoutMs: 20, postKillDrainMs: 40 }
+      ),
+      300
+    );
+
+    expect(result.code).toBeNull();
+    expect(result.stderr).toContain(
+      "SSH host key probe timed out after 20ms."
+    );
+    expect(performance.now() - startedAt).toBeLessThan(300);
   });
 });
 
@@ -357,6 +381,24 @@ function _restoreEnv(name: string, value: string | undefined): void {
     delete process.env[name];
   } else {
     process.env[name] = value;
+  }
+}
+
+async function _withDeadline<T>(
+  promise: Promise<T>,
+  timeoutMs: number
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Command did not settle within ${timeoutMs}ms.`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

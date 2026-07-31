@@ -9,6 +9,8 @@ import type { RemoteHostKeyTrustRequest } from "../../shared/remote-servers";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import { buildSshBaseArgs, buildSshTarget } from "./ssh-command";
 
+const DEFAULT_POST_KILL_DRAIN_MS = 250;
+
 export type SshHostKeyCheckResult =
   | { status: "trusted" }
   | { status: "first-time"; request: RemoteHostKeyTrustRequest }
@@ -28,7 +30,7 @@ export class OpenSshHostKeyService implements SshHostKeyService {
     const target = buildSshTarget(config);
     const baseArgs = buildSshBaseArgs(config);
     const resolved = await _resolveSshConfig(config).catch(() => undefined);
-    const probe = await _run("ssh", [
+    const probe = await runSshHostKeyCommand("ssh", [
       ...baseArgs.slice(0, -1),
       "-o",
       "BatchMode=yes",
@@ -146,7 +148,7 @@ async function _connectWithApprovedHostKey(
 ): Promise<void> {
   const target = buildSshTarget(config);
   const baseArgs = buildSshBaseArgs(config);
-  const result = await _run(
+  const result = await runSshHostKeyCommand(
     "ssh",
     [
       "-o",
@@ -286,7 +288,12 @@ async function _removeKnownHost(
   const host = request.resolvedHost ?? config.host;
   const lookupHost =
     request.hostKeyAlias ?? _knownHostsHost(host, request.port ?? config.port);
-  const result = await _run("ssh-keygen", ["-R", lookupHost, "-f", knownHostsFile]);
+  const result = await runSshHostKeyCommand("ssh-keygen", [
+    "-R",
+    lookupHost,
+    "-f",
+    knownHostsFile,
+  ]);
   const output = `${result.stdout}${result.stderr}`;
   if (result.code === 0 && !/not found/i.test(output)) {
     return;
@@ -409,7 +416,7 @@ async function _scanPublicKeyLine(
 ): Promise<string | undefined> {
   const host = resolved?.hostname ?? request.resolvedHost ?? config.host;
   const port = resolved?.port ?? request.port ?? config.port;
-  const result = await _run("ssh-keyscan", [
+  const result = await runSshHostKeyCommand("ssh-keyscan", [
     ...(port ? ["-p", String(port)] : []),
     "-T",
     "10",
@@ -439,7 +446,7 @@ async function _scanKey(
 ): Promise<Omit<RemoteHostKeyTrustRequest, "requestId" | "target" | "host" | "user" | "kind"> | undefined> {
   const host = resolved?.hostname ?? config.host;
   const port = resolved?.port ?? config.port;
-  const result = await _run("ssh-keyscan", [
+  const result = await runSshHostKeyCommand("ssh-keyscan", [
     ...(port ? ["-p", String(port)] : []),
     "-T",
     "10",
@@ -474,7 +481,11 @@ async function _resolveSshConfig(
 ): Promise<ResolvedSshConfig> {
   const baseArgs = buildSshBaseArgs(config);
   const target = buildSshTarget(config);
-  const result = await _run("ssh", [...baseArgs.slice(0, -1), "-G", target]);
+  const result = await runSshHostKeyCommand("ssh", [
+    ...baseArgs.slice(0, -1),
+    "-G",
+    target,
+  ]);
   if (result.code !== 0) return {};
 
   const resolved: ResolvedSshConfig = {};
@@ -528,12 +539,20 @@ function _fingerprint(publicKey: string): string {
   return `SHA256:${digest}`;
 }
 
-async function _run(
+export async function runSshHostKeyCommand(
   command: string,
   args: string[],
-  options: { preserveOutputStart?: boolean; timeoutMs?: number } = {}
+  options: {
+    preserveOutputStart?: boolean;
+    timeoutMs?: number;
+    postKillDrainMs?: number;
+  } = {}
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   const timeoutMs = options.timeoutMs ?? 15_000;
+  const postKillDrainMs = Math.max(
+    0,
+    options.postKillDrainMs ?? DEFAULT_POST_KILL_DRAIN_MS
+  );
   const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
   let stdout = "";
   let stderr = "";
@@ -549,34 +568,60 @@ async function _run(
   return await new Promise((resolve, reject) => {
     let settled = false;
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-    }, timeoutMs);
-    const settle = (
+    let postKillDrainTimer: ReturnType<typeof setTimeout> | undefined;
+    function cleanup(): void {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (postKillDrainTimer) clearTimeout(postKillDrainTimer);
+      child.removeListener("error", fail);
+      child.removeListener("close", close);
+      child.stdout?.removeListener("data", appendStdout);
+      child.stderr?.removeListener("data", appendStderr);
+    }
+    function settle(
       result: { code: number | null; stdout: string; stderr: string }
-    ) => {
+    ): void {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       resolve(result);
-    };
-    const fail = (error: Error) => {
+    }
+    function fail(error: Error): void {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       reject(error);
-    };
-    child.once("error", fail);
-    child.once("close", (code) => {
-      settle({
+    }
+    function buildResult(code: number | null): {
+      code: number | null;
+      stdout: string;
+      stderr: string;
+    } {
+      return {
         code: timedOut ? null : code,
         stdout,
         stderr: timedOut
           ? `${stderr}\nSSH host key probe timed out after ${timeoutMs}ms.`
           : stderr,
-      });
-    });
+      };
+    }
+    function close(code: number | null): void {
+      settle(buildResult(code));
+    }
+
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+      if (settled) return;
+      postKillDrainTimer = setTimeout(() => {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+        settle(buildResult(null));
+      }, postKillDrainMs);
+    }, timeoutMs);
+    child.once("error", fail);
+    child.once("close", close);
   });
 }
 
