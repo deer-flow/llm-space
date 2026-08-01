@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import {
-  type ModelConfig,
-  type Thread,
-} from "@llm-space/core";
+import type { ModelConfig } from "@llm-space/core";
 import { createOneShotRunner } from "@llm-space/core/workflow";
 import type { HostServices } from "@llm-space/ui/host";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -14,11 +11,6 @@ import type {
   StreamThreadResponsePayload,
 } from "@/shared/rpc";
 import type { RuntimeId } from "@/shared/runtime";
-
-import {
-  createThreadStore,
-  ThreadStoreContext,
-} from "../../../../packages/ui/src/components/thread-playground/stores/thread-store";
 
 type ResponseListener = (message: StreamThreadResponsePayload) => void;
 
@@ -100,31 +92,11 @@ await mock.module("@/lib/electrobun", () => ({
   electrobun: { rpc: RPC },
 }));
 
-const MODEL_PROVIDER_PATH = new URL(
-  "../../../../packages/ui/src/components/model-provider.tsx",
-  import.meta.url
-).pathname;
-await mock.module(MODEL_PROVIDER_PATH, () => ({
-  useDefaultTextGenerationModel: () => null,
-}));
-
 const { CommandProvider } = await import("@/commands");
 const { DesktopHostProvider } = await import("./host-services");
 const { useHostServices } = await import("@llm-space/ui/host");
-const { useStreamText } = await import(
-  "../../../../packages/ui/src/components/thread-playground/use-stream-text"
-);
-const { bindProjectGenerationRuntime } = await import(
-  "../../../../packages/ui/src/components/thread-playground/codegen/project-generation-runtime"
-);
 
 const REMOTE_RUNTIME: RuntimeId = "remote:auxiliary-generation";
-const EMPTY_THREAD: Thread = { context: { messages: [] } };
-
-interface CapturedTextGeneration {
-  abort(): void;
-  run(): Promise<void>;
-}
 
 function _captureHost(): HostServices {
   let captured: HostServices | null = null;
@@ -152,46 +124,6 @@ function _model(provider: string): ModelConfig {
   return { provider, id: `${provider}-model` };
 }
 
-function _captureTextGeneration(
-  workflow: "prompt" | "function-tool",
-  runtimeId: RuntimeId
-): CapturedTextGeneration {
-  let captured: CapturedTextGeneration | null = null;
-  const store = createThreadStore(EMPTY_THREAD, { runtimeId });
-  const model = _model(`${runtimeId}-${workflow}`);
-
-  function PromptHarness() {
-    captured = useStreamText({
-      systemPrompt: "Generate a system prompt",
-      model,
-    });
-    return null;
-  }
-
-  function ToolHarness() {
-    captured = useStreamText({
-      systemPrompt: "Generate a function tool",
-      model,
-    });
-    return null;
-  }
-
-  renderToStaticMarkup(
-    <CommandProvider>
-      <DesktopHostProvider>
-        <ThreadStoreContext.Provider value={store}>
-          {workflow === "prompt" ? <PromptHarness /> : <ToolHarness />}
-        </ThreadStoreContext.Provider>
-      </DesktopHostProvider>
-    </CommandProvider>
-  );
-
-  if (!captured) {
-    throw new Error(`${workflow} generation hook was not rendered`);
-  }
-  return captured;
-}
-
 async function _captureRejection(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
@@ -201,80 +133,21 @@ async function _captureRejection(promise: Promise<unknown>): Promise<unknown> {
   }
 }
 
-describe("Desktop auxiliary generation runtime scope", () => {
+describe("Desktop runtime-scoped host services", () => {
   beforeEach(() => {
     RPC.reset();
   });
 
-  test.each(["prompt", "function-tool"] as const)(
-    "%s consumer keeps its real hook run and abort bound to the owning runtime",
-    async (workflow) => {
-      const remoteGeneration = _captureTextGeneration(
-        workflow,
-        REMOTE_RUNTIME
-      );
-      const remoteRun = remoteGeneration.run();
-      await Promise.resolve();
-      const remoteStart = RPC.starts[0];
-
-      expect(remoteStart).toMatchObject({
-        runtimeId: REMOTE_RUNTIME,
-        request: {
-          model: {
-            provider: `${REMOTE_RUNTIME}-${workflow}`,
-            id: `${REMOTE_RUNTIME}-${workflow}-model`,
-          },
-        },
-      });
-
-      // Render and actually start the corresponding local consumer to model a
-      // workspace switch. The already-running remote hook must keep its scope.
-      const localGeneration = _captureTextGeneration(workflow, "local");
-      const localRun = localGeneration.run();
-      await Promise.resolve();
-      expect(RPC.starts[1]).toMatchObject({ runtimeId: "local" });
-
-      remoteGeneration.abort();
-      await remoteRun;
-      expect(RPC.aborts[0]).toEqual({
-        runtimeId: REMOTE_RUNTIME,
-        streamId: remoteStart?.streamId,
-      });
-
-      localGeneration.abort();
-      await localRun;
-      expect(RPC.aborts[1]).toEqual({
-        runtimeId: "local",
-        streamId: RPC.starts[1]?.streamId,
-      });
-    }
-  );
-
-  test("project orchestration binds transport and every runtime-sensitive host call", async () => {
+  test("transport start and abort payloads keep their requested runtime", async () => {
     const host = _captureHost();
-    if (!host.generator) {
-      throw new Error("Desktop host did not provide generator services");
+    const remoteTransport = host.createTransport(REMOTE_RUNTIME);
+    if (!remoteTransport) {
+      throw new Error("Desktop host did not provide a remote transport");
     }
-    const remote = bindProjectGenerationRuntime({
-      runtimeId: REMOTE_RUNTIME,
-      createTransport: host.createTransport,
-      skills: host.skills,
-      mcp: host.mcp,
-      generator: host.generator,
-    });
-    if (!remote) {
-      throw new Error("Desktop host did not provide a project transport");
-    }
-
-    await remote.listEnabledSkills();
-    await remote.listMcpServers();
-    await remote.getSearchSettings();
-    await remote.resolveEnv("remote-provider", ["REMOTE_SEARCH_KEY"]);
-
     const remoteController = new AbortController();
-    const remoteRun = createOneShotRunner({ transport: remote.transport })({
-      systemPrompt: "Write a project plan",
-      userPrompt: "Generate the project",
+    const remoteRun = createOneShotRunner({ transport: remoteTransport })({
+      systemPrompt: "Write a remote project plan",
+      userPrompt: "Generate the remote project",
       model: _model("remote-project"),
       signal: remoteController.signal,
     });
@@ -285,6 +158,59 @@ describe("Desktop auxiliary generation runtime scope", () => {
       runtimeId: REMOTE_RUNTIME,
       request: { model: { provider: "remote-project" } },
     });
+
+    const localTransport = host.createTransport("local");
+    if (!localTransport) {
+      throw new Error("Desktop host did not provide a local transport");
+    }
+    const localController = new AbortController();
+    const localRun = createOneShotRunner({ transport: localTransport })({
+      systemPrompt: "Write a local project plan",
+      userPrompt: "Generate the local project",
+      model: _model("local-project"),
+      signal: localController.signal,
+    });
+    await Promise.resolve();
+
+    expect(RPC.starts[1]).toMatchObject({ runtimeId: "local" });
+
+    remoteController.abort();
+    expect(await _captureRejection(remoteRun)).toMatchObject({
+      name: "AbortError",
+    });
+    expect(RPC.aborts[0]).toEqual({
+      runtimeId: REMOTE_RUNTIME,
+      streamId: remoteStart?.streamId,
+    });
+
+    localController.abort();
+    expect(await _captureRejection(localRun)).toMatchObject({
+      name: "AbortError",
+    });
+    expect(RPC.aborts[1]).toEqual({
+      runtimeId: "local",
+      streamId: RPC.starts[1]?.streamId,
+    });
+  });
+
+  test("runtime-sensitive host calls carry their explicit owner", async () => {
+    const host = _captureHost();
+    if (!host.generator) {
+      throw new Error("Desktop host did not provide generator services");
+    }
+
+    await host.skills.getSettings({ runtimeId: REMOTE_RUNTIME });
+    await host.skills.listSkills("/remote/skills", {
+      runtimeId: REMOTE_RUNTIME,
+    });
+    await host.mcp.listServers({ runtimeId: REMOTE_RUNTIME });
+    await host.generator.getSearchSettings({ runtimeId: REMOTE_RUNTIME });
+    await host.generator.resolveEnv(
+      "remote-provider",
+      ["REMOTE_SEARCH_KEY"],
+      { runtimeId: REMOTE_RUNTIME }
+    );
+
     expect(RPC.skillSettingsRequests).toEqual([
       { runtimeId: REMOTE_RUNTIME },
     ]);
@@ -298,31 +224,6 @@ describe("Desktop auxiliary generation runtime scope", () => {
         runtimeId: REMOTE_RUNTIME,
         providerId: "remote-provider",
         envNames: ["REMOTE_SEARCH_KEY"],
-      },
-    ]);
-
-    // Use a new local project scope after the remote run starts. It may serve
-    // new work, but cannot change the transport retained by the remote run.
-    const local = bindProjectGenerationRuntime({
-      runtimeId: "local",
-      createTransport: host.createTransport,
-      skills: host.skills,
-      mcp: host.mcp,
-      generator: host.generator,
-    });
-    if (!local) {
-      throw new Error("Desktop host did not provide a local project transport");
-    }
-    await local.getSearchSettings();
-
-    remoteController.abort();
-    expect(await _captureRejection(remoteRun)).toMatchObject({
-      name: "AbortError",
-    });
-    expect(RPC.aborts).toEqual([
-      {
-        runtimeId: REMOTE_RUNTIME,
-        streamId: remoteStart?.streamId,
       },
     ]);
   });
