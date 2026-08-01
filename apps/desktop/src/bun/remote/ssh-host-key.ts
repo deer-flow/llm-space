@@ -1,6 +1,13 @@
-import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -8,8 +15,7 @@ import type { RemoteHostKeyTrustRequest } from "../../shared/remote-servers";
 
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import { buildSshBaseArgs, buildSshTarget } from "./ssh-command";
-
-const DEFAULT_POST_KILL_DRAIN_MS = 250;
+import { runSshHostKeyCommand } from "./ssh-host-key-command";
 
 export type SshHostKeyCheckResult =
   | { status: "trusted" }
@@ -64,9 +70,11 @@ export class OpenSshHostKeyService implements SshHostKeyService {
       }
     }
     if (key && !key.publicKeyLine) {
-      const publicKeyLine = await _scanPublicKeyLine(config, key, resolved).catch(
-        () => undefined
-      );
+      const publicKeyLine = await _scanPublicKeyLine(
+        config,
+        key,
+        resolved
+      ).catch(() => undefined);
       if (publicKeyLine) key.publicKeyLine = publicKeyLine;
     }
     if (key) {
@@ -84,7 +92,9 @@ export class OpenSshHostKeyService implements SshHostKeyService {
     if (_isAuthenticationFailure(output)) return { status: "trusted" };
     return {
       status: "error",
-      message: output.trim() || `SSH host key probe failed with exit code ${probe.code}.`,
+      message:
+        output.trim() ||
+        `SSH host key probe failed with exit code ${probe.code}.`,
       rawOutput: output,
     };
   }
@@ -147,7 +157,9 @@ async function _connectWithApprovedHostKey(
   publicKeyLine: string
 ): Promise<void> {
   const target = buildSshTarget(config);
-  const baseArgs = buildSshBaseArgs(config);
+  const baseArgs = _withoutMultiplexingArgs(
+    buildSshBaseArgs(config).slice(0, -1)
+  );
   const result = await runSshHostKeyCommand(
     "ssh",
     [
@@ -160,6 +172,14 @@ async function _connectWithApprovedHostKey(
       "-o",
       "KnownHostsCommand=none",
       "-o",
+      "ControlMaster=no",
+      "-o",
+      "ControlPath=none",
+      "-o",
+      "ControlPersist=no",
+      "-o",
+      "VerifyHostKeyDNS=no",
+      "-o",
       "LogLevel=DEBUG1",
       "-o",
       "BatchMode=yes",
@@ -167,25 +187,54 @@ async function _connectWithApprovedHostKey(
       "ConnectTimeout=10",
       "-o",
       "NumberOfPasswordPrompts=0",
-      ...baseArgs.slice(0, -1),
+      ...baseArgs,
+      "-S",
+      "none",
       target,
       "true",
     ],
     { preserveOutputStart: true }
   );
   const output = `${result.stdout}${result.stderr}`;
-  if (result.code === 0) return;
+  const hostKeyFailed =
+    _isChangedHostKey(output) || _isFirstTimeHostKey(output);
+  const approvedHostKeyMatched = _hasApprovedHostKeyMatch(
+    output,
+    publicKeyLine
+  );
   if (
-    !_isChangedHostKey(output) &&
-    !_isFirstTimeHostKey(output) &&
-    _isAuthenticationFailure(output) &&
-    _hasApprovedHostKeyMatch(output, publicKeyLine)
+    !hostKeyFailed &&
+    approvedHostKeyMatched &&
+    (result.code === 0 || _isAuthenticationFailure(output))
   ) {
     return;
   }
+  const detail = output.trim();
   throw new Error(
-    output.trim() || `SSH host key trust failed with exit code ${result.code}.`
+    detail
+      ? `${detail}\nSSH host key verification did not confirm the approved SSH host key.`
+      : `SSH host key verification did not confirm the approved SSH host key (exit code ${result.code}).`
   );
+}
+
+function _withoutMultiplexingArgs(args: string[]): string[] {
+  const filtered: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--") continue;
+    if (arg === "-S" || arg === "-O") {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-S") || arg.startsWith("-O")) continue;
+    if (/^-[1246AaCfgKkMNnqTtVvXxYy]+$/.test(arg) && arg.includes("M")) {
+      const withoutControlMaster = arg.replaceAll("M", "");
+      if (withoutControlMaster !== "-") filtered.push(withoutControlMaster);
+      continue;
+    }
+    filtered.push(arg);
+  }
+  return filtered;
 }
 
 function _hasApprovedHostKeyMatch(
@@ -196,9 +245,8 @@ function _hasApprovedHostKeyMatch(
   if (!lookupHost || !publicKey) return false;
   const fingerprint = _fingerprint(publicKey);
   const serverKeyMatches = output.split(/\r?\n/).some((line) => {
-    const match = /^debug1: Server host key:\s+\S+\s+(SHA256:[A-Za-z0-9+/=]+)/i.exec(
-      line
-    );
+    const match =
+      /^debug1: Server host key:\s+\S+\s+(SHA256:[A-Za-z0-9+/=]+)/i.exec(line);
     return match?.[1] === fingerprint;
   });
   return (
@@ -228,7 +276,10 @@ function _approvedPublicKeyLine(request: RemoteHostKeyTrustRequest): string {
 export function parseSshHostKeyOutput(
   output: string,
   config: SshHostKeyLookup
-): Omit<RemoteHostKeyTrustRequest, "requestId" | "target" | "host" | "user"> | null {
+): Omit<
+  RemoteHostKeyTrustRequest,
+  "requestId" | "target" | "host" | "user"
+> | null {
   const key = _parseServerKey(output);
   const changed = _isChangedHostKey(output);
   const firstTime = _isFirstTimeHostKey(output);
@@ -276,6 +327,13 @@ interface SshHostKeyLookup {
   hostKeyAlias?: string;
 }
 
+interface ScannedHostKey {
+  keyType: string;
+  publicKey: string;
+  fingerprint: string;
+  publicKeyLine: string;
+}
+
 async function _removeKnownHost(
   config: SshRemoteRuntimeConfig,
   request: RemoteHostKeyTrustRequest,
@@ -301,15 +359,22 @@ async function _removeKnownHost(
 
   if (request.knownHostsLine) return;
 
-  throw new Error(
-    `Failed to remove stale SSH host key: ${output}`
-  );
+  throw new Error(`Failed to remove stale SSH host key: ${output}`);
 }
 
 function _parseServerKey(output: string): ParsedServerKey | null {
-  const fingerprint = /(?:fingerprint for the \S+ key sent by the remote host is|Server host key:|key fingerprint is)\s*(?:\S+\s+)?(SHA256:[A-Za-z0-9+/=]+)/i.exec(output)?.[1] ?? /(SHA256:[A-Za-z0-9+/=]+)/i.exec(output)?.[1];
-  const serverKey = /^debug1: Server host key:\s+(\S+)\s+(SHA256:[A-Za-z0-9+/=]+)(?:\s+.*)?$/im.exec(output);
-  const keyType = serverKey?.[1] ?? _publicKeyTypeFromOutput(output) ?? _keyTypeFromOutput(output);
+  const fingerprint =
+    /(?:fingerprint for the \S+ key sent by the remote host is|Server host key:|key fingerprint is)\s*(?:\S+\s+)?(SHA256:[A-Za-z0-9+/=]+)/i.exec(
+      output
+    )?.[1] ?? /(SHA256:[A-Za-z0-9+/=]+)/i.exec(output)?.[1];
+  const serverKey =
+    /^debug1: Server host key:\s+(\S+)\s+(SHA256:[A-Za-z0-9+/=]+)(?:\s+.*)?$/im.exec(
+      output
+    );
+  const keyType =
+    serverKey?.[1] ??
+    _publicKeyTypeFromOutput(output) ??
+    _keyTypeFromOutput(output);
   if (!fingerprint || !keyType) return null;
   return {
     keyType,
@@ -322,15 +387,22 @@ function _parseServerKey(output: string): ParsedServerKey | null {
 }
 
 function _publicKeyFromOutput(output: string): string | undefined {
-  return /^\S+\s+(ssh-ed25519|ecdsa-sha2-\S+|ssh-rsa|rsa-sha2-\S+)\s+([A-Za-z0-9+/=]+)(?:\s.*)?$/m.exec(output)?.[2];
+  return /^\S+\s+(ssh-ed25519|ecdsa-sha2-\S+|ssh-rsa|rsa-sha2-\S+)\s+([A-Za-z0-9+/=]+)(?:\s.*)?$/m.exec(
+    output
+  )?.[2];
 }
 
 function _publicKeyTypeFromOutput(output: string): string | undefined {
-  return /^\S+\s+(ssh-ed25519|ecdsa-sha2-\S+|ssh-rsa|rsa-sha2-\S+)\s+[A-Za-z0-9+/=]+(?:\s.*)?$/m.exec(output)?.[1];
+  return /^\S+\s+(ssh-ed25519|ecdsa-sha2-\S+|ssh-rsa|rsa-sha2-\S+)\s+[A-Za-z0-9+/=]+(?:\s.*)?$/m.exec(
+    output
+  )?.[1];
 }
 
 function _keyTypeFromOutput(output: string): string | undefined {
-  const fromFingerprint = /fingerprint for the (\S+) key sent by the remote host is/i.exec(output)?.[1];
+  const fromFingerprint =
+    /fingerprint for the (\S+) key sent by the remote host is/i.exec(
+      output
+    )?.[1];
   if (!fromFingerprint) return undefined;
   if (fromFingerprint.toUpperCase() === "ECDSA") return "ecdsa-sha2-nistp256";
   if (fromFingerprint.toUpperCase() === "ED25519") return "ssh-ed25519";
@@ -365,7 +437,9 @@ function _isAuthenticationFailure(output: string): boolean {
 }
 
 function _knownHostsFileFromOutput(output: string): string | undefined {
-  return /Add correct host key in ([^\n]+?) to get rid of this message\./i.exec(output)?.[1];
+  return /Add correct host key in ([^\n]+?) to get rid of this message\./i.exec(
+    output
+  )?.[1];
 }
 
 function _knownHostsHost(host: string, port: number | undefined): string {
@@ -416,64 +490,75 @@ async function _scanPublicKeyLine(
 ): Promise<string | undefined> {
   const host = resolved?.hostname ?? request.resolvedHost ?? config.host;
   const port = resolved?.port ?? request.port ?? config.port;
-  const result = await runSshHostKeyCommand("ssh-keyscan", [
-    ...(port ? ["-p", String(port)] : []),
-    "-T",
-    "10",
-    host,
-  ]);
-  if (result.code !== 0 && !result.stdout.trim()) return undefined;
   const lookupHost = _knownHostsLookupHost({
     host,
     port,
     hostKeyAlias: resolved?.hostKeyAlias,
   });
-  for (const line of result.stdout.split(/\r?\n/)) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 3) continue;
-    const [, keyType, publicKey] = parts;
-    if (keyType !== request.keyType) continue;
-    const fingerprint = _fingerprint(publicKey);
-    if (fingerprint !== request.fingerprint) continue;
-    return `${lookupHost} ${keyType} ${publicKey}`;
-  }
-  return undefined;
+  const scanned = await _scanHostKeys(host, port, lookupHost);
+  return scanned.find(
+    (key) =>
+      key.keyType === request.keyType && key.fingerprint === request.fingerprint
+  )?.publicKeyLine;
 }
 
 async function _scanKey(
   config: SshRemoteRuntimeConfig,
   resolved?: ResolvedSshConfig
-): Promise<Omit<RemoteHostKeyTrustRequest, "requestId" | "target" | "host" | "user" | "kind"> | undefined> {
+): Promise<
+  | Omit<
+      RemoteHostKeyTrustRequest,
+      "requestId" | "target" | "host" | "user" | "kind"
+    >
+  | undefined
+> {
   const host = resolved?.hostname ?? config.host;
   const port = resolved?.port ?? config.port;
+  const lookupHost = _knownHostsLookupHost({
+    host,
+    port,
+    hostKeyAlias: resolved?.hostKeyAlias,
+  });
+  const [scanned] = await _scanHostKeys(host, port, lookupHost);
+  if (!scanned) return undefined;
+  return {
+    resolvedHost: host,
+    hostKeyAlias: resolved?.hostKeyAlias,
+    port,
+    keyType: scanned.keyType,
+    fingerprint: scanned.fingerprint,
+    knownHostsFile: resolved?.userKnownHostsFile ?? "~/.ssh/known_hosts",
+    publicKeyLine: scanned.publicKeyLine,
+  };
+}
+
+async function _scanHostKeys(
+  host: string,
+  port: number | undefined,
+  lookupHost: string
+): Promise<ScannedHostKey[]> {
   const result = await runSshHostKeyCommand("ssh-keyscan", [
     ...(port ? ["-p", String(port)] : []),
     "-T",
     "10",
     host,
   ]);
-  if (result.code !== 0 && !result.stdout.trim()) return undefined;
-  const lookupHost = _knownHostsLookupHost({
-    host,
-    port,
-    hostKeyAlias: resolved?.hostKeyAlias,
-  });
+  if (result.code !== 0 && !result.stdout.trim()) return [];
+
+  const keys: ScannedHostKey[] = [];
   for (const line of result.stdout.split(/\r?\n/)) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3) continue;
     const [, keyType, publicKey] = parts;
     if (!keyType || !publicKey) continue;
-    return {
-      resolvedHost: host,
-      hostKeyAlias: resolved?.hostKeyAlias,
-      port,
+    keys.push({
       keyType,
+      publicKey,
       fingerprint: _fingerprint(publicKey),
-      knownHostsFile: resolved?.userKnownHostsFile ?? "~/.ssh/known_hosts",
       publicKeyLine: `${lookupHost} ${keyType} ${publicKey}`,
-    };
+    });
   }
-  return undefined;
+  return keys;
 }
 
 async function _resolveSshConfig(
@@ -537,105 +622,4 @@ function _fingerprint(publicKey: string): string {
     .digest("base64")
     .replace(/=+$/, "");
   return `SHA256:${digest}`;
-}
-
-export async function runSshHostKeyCommand(
-  command: string,
-  args: string[],
-  options: {
-    preserveOutputStart?: boolean;
-    timeoutMs?: number;
-    postKillDrainMs?: number;
-  } = {}
-): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  const timeoutMs = options.timeoutMs ?? 15_000;
-  const postKillDrainMs = Math.max(
-    0,
-    options.postKillDrainMs ?? DEFAULT_POST_KILL_DRAIN_MS
-  );
-  const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-  let stdout = "";
-  let stderr = "";
-  const appendStdout = (chunk: Buffer) => {
-    stdout = _appendOutput(stdout, chunk, options.preserveOutputStart === true);
-  };
-  const appendStderr = (chunk: Buffer) => {
-    stderr = _appendOutput(stderr, chunk, options.preserveOutputStart === true);
-  };
-  child.stdout?.on("data", appendStdout);
-  child.stderr?.on("data", appendStderr);
-
-  return await new Promise((resolve, reject) => {
-    let settled = false;
-    let timedOut = false;
-    let postKillDrainTimer: ReturnType<typeof setTimeout> | undefined;
-    function cleanup(): void {
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-      if (postKillDrainTimer) clearTimeout(postKillDrainTimer);
-      child.removeListener("error", fail);
-      child.removeListener("close", close);
-      child.stdout?.removeListener("data", appendStdout);
-      child.stderr?.removeListener("data", appendStderr);
-    }
-    function settle(
-      result: { code: number | null; stdout: string; stderr: string }
-    ): void {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(result);
-    }
-    function fail(error: Error): void {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      child.stdout?.destroy();
-      child.stderr?.destroy();
-      reject(error);
-    }
-    function buildResult(code: number | null): {
-      code: number | null;
-      stdout: string;
-      stderr: string;
-    } {
-      return {
-        code: timedOut ? null : code,
-        stdout,
-        stderr: timedOut
-          ? `${stderr}\nSSH host key probe timed out after ${timeoutMs}ms.`
-          : stderr,
-      };
-    }
-    function close(code: number | null): void {
-      settle(buildResult(code));
-    }
-
-    const timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-      if (settled) return;
-      postKillDrainTimer = setTimeout(() => {
-        child.stdout?.destroy();
-        child.stderr?.destroy();
-        settle(buildResult(null));
-      }, postKillDrainMs);
-    }, timeoutMs);
-    child.once("error", fail);
-    child.once("close", close);
-  });
-}
-
-function _appendOutput(
-  current: string,
-  chunk: Buffer,
-  preserveStart: boolean
-): string {
-  const next = current + chunk.toString("utf8");
-  if (next.length <= 20_000) return next;
-  if (!preserveStart) return next.slice(-20_000);
-
-  const marker = "\n... SSH output truncated ...\n";
-  const startLength = 10_000;
-  const endLength = 20_000 - startLength - marker.length;
-  return `${next.slice(0, startLength)}${marker}${next.slice(-endLength)}`;
 }

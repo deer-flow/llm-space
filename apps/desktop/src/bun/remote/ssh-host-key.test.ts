@@ -15,11 +15,7 @@ import path from "node:path";
 import type { RemoteHostKeyTrustRequest } from "../../shared/remote-servers";
 
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
-import {
-  OpenSshHostKeyService,
-  parseSshHostKeyOutput,
-  runSshHostKeyCommand,
-} from "./ssh-host-key";
+import { OpenSshHostKeyService, parseSshHostKeyOutput } from "./ssh-host-key";
 
 const CONFIG: Pick<SshRemoteRuntimeConfig, "host" | "port" | "user"> = {
   host: "203.0.113.10",
@@ -107,26 +103,6 @@ devbox ssh-ed25519 ${PUBLIC_KEY}`,
   });
 });
 
-describe("runSshHostKeyCommand", () => {
-  test("settles after a bounded timeout when a descendant keeps stderr open", async () => {
-    const startedAt = performance.now();
-    const result = await _withDeadline(
-      runSshHostKeyCommand(
-        "/bin/sh",
-        ["-c", "(sleep 1) >&2 & while :; do :; done"],
-        { timeoutMs: 20, postKillDrainMs: 40 }
-      ),
-      300
-    );
-
-    expect(result.code).toBeNull();
-    expect(result.stderr).toContain(
-      "SSH host key probe timed out after 20ms."
-    );
-    expect(performance.now() - startedAt).toBeLessThan(300);
-  });
-});
-
 describe("OpenSshHostKeyService", () => {
   for (const kind of ["first-time", "changed"] as const) {
     test(`rejects a ${kind} host when the trust-time key differs from the approved key`, async () => {
@@ -196,6 +172,61 @@ describe("OpenSshHostKeyService", () => {
         expect(existsSync(knownHostsFile)).toBe(false);
       }
     );
+  });
+
+  test("rejects a successful multiplexed probe without approved-key evidence", async () => {
+    await _withFakeOpenSsh(
+      "first-time",
+      async ({ knownHostsFile, service }) => {
+        const request = await _checkForTrust(service);
+        process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
+        process.env.SSH_HOST_KEY_TEST_REUSED_MASTER = "1";
+
+        expect(service.trust(SSH_CONFIG, request)).rejects.toThrow(
+          "approved SSH host key"
+        );
+        expect(existsSync(knownHostsFile)).toBe(false);
+      }
+    );
+  });
+
+  test("forces fresh host-key verification before user SSH options", async () => {
+    await _withFakeOpenSsh("first-time", async ({ home, service }) => {
+      const request = await _checkForTrust(service);
+      const optionsFile = path.join(home, "effective-options");
+      process.env.SSH_HOST_KEY_TEST_PHASE = "trust";
+      process.env.SSH_HOST_KEY_TEST_OPTIONS_FILE = optionsFile;
+      process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY = APPROVED_PUBLIC_KEY;
+      process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT =
+        APPROVED_FINGERPRINT;
+
+      await service.trust(
+        {
+          ...SSH_CONFIG,
+          extraArgs: [
+            "-M",
+            "-S",
+            "/tmp/direct-reused-ssh-master",
+            "-o",
+            "ControlMaster=auto",
+            "-o",
+            "ControlPath=/tmp/reused-ssh-master",
+            "-o",
+            "VerifyHostKeyDNS=yes",
+          ],
+        },
+        request
+      );
+
+      expect(readFileSync(optionsFile, "utf8")).toBe(
+        [
+          "control_master=no",
+          "control_path=none",
+          "verify_host_key_dns=no",
+          "",
+        ].join("\n")
+      );
+    });
   });
 
   test("preserves authentication-failure behavior after verbose diagnostics", async () => {
@@ -296,12 +327,12 @@ async function _withFakeOpenSsh(
     approvedFingerprint: process.env.SSH_HOST_KEY_TEST_APPROVED_FINGERPRINT,
     scanKeyLine: process.env.SSH_HOST_KEY_TEST_SCAN_KEY_LINE,
     presentedPublicKey: process.env.SSH_HOST_KEY_TEST_PRESENTED_PUBLIC_KEY,
-    presentedFingerprint:
-      process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT,
-    upstreamAuthFailure:
-      process.env.SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE,
+    presentedFingerprint: process.env.SSH_HOST_KEY_TEST_PRESENTED_FINGERPRINT,
+    upstreamAuthFailure: process.env.SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE,
     longAuthOutput: process.env.SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT,
     delayedOutput: process.env.SSH_HOST_KEY_TEST_DELAYED_OUTPUT,
+    reusedMaster: process.env.SSH_HOST_KEY_TEST_REUSED_MASTER,
+    optionsFile: process.env.SSH_HOST_KEY_TEST_OPTIONS_FILE,
   };
 
   try {
@@ -328,6 +359,8 @@ async function _withFakeOpenSsh(
     delete process.env.SSH_HOST_KEY_TEST_UPSTREAM_AUTH_FAILURE;
     delete process.env.SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT;
     delete process.env.SSH_HOST_KEY_TEST_DELAYED_OUTPUT;
+    delete process.env.SSH_HOST_KEY_TEST_REUSED_MASTER;
+    delete process.env.SSH_HOST_KEY_TEST_OPTIONS_FILE;
 
     await run({
       home,
@@ -363,10 +396,9 @@ async function _withFakeOpenSsh(
       "SSH_HOST_KEY_TEST_LONG_AUTH_OUTPUT",
       previousEnv.longAuthOutput
     );
-    _restoreEnv(
-      "SSH_HOST_KEY_TEST_DELAYED_OUTPUT",
-      previousEnv.delayedOutput
-    );
+    _restoreEnv("SSH_HOST_KEY_TEST_DELAYED_OUTPUT", previousEnv.delayedOutput);
+    _restoreEnv("SSH_HOST_KEY_TEST_REUSED_MASTER", previousEnv.reusedMaster);
+    _restoreEnv("SSH_HOST_KEY_TEST_OPTIONS_FILE", previousEnv.optionsFile);
     rmSync(home, { recursive: true, force: true });
   }
 }
@@ -384,28 +416,13 @@ function _restoreEnv(name: string, value: string | undefined): void {
   }
 }
 
-async function _withDeadline<T>(
-  promise: Promise<T>,
-  timeoutMs: number
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`Command did not settle within ${timeoutMs}ms.`));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, deadline]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 const FAKE_SSH = `#!/bin/sh
 mode=connect
 strict=
 user_known_hosts=
+control_master=
+control_path=
+verify_host_key_dns=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -G)
@@ -414,9 +431,30 @@ while [ "$#" -gt 0 ]; do
       ;;
     -o)
       case "$2" in
-        StrictHostKeyChecking=*) strict="\${2#*=}" ;;
-        UserKnownHostsFile=*) user_known_hosts="\${2#*=}" ;;
+        StrictHostKeyChecking=*)
+          [ -n "$strict" ] || strict="\${2#*=}"
+          ;;
+        UserKnownHostsFile=*)
+          [ -n "$user_known_hosts" ] || user_known_hosts="\${2#*=}"
+          ;;
+        ControlMaster=*)
+          [ -n "$control_master" ] || control_master="\${2#*=}"
+          ;;
+        ControlPath=*)
+          [ -n "$control_path" ] || control_path="\${2#*=}"
+          ;;
+        VerifyHostKeyDNS=*)
+          [ -n "$verify_host_key_dns" ] || verify_host_key_dns="\${2#*=}"
+          ;;
       esac
+      shift 2
+      ;;
+    -M)
+      control_master=yes
+      shift
+      ;;
+    -S)
+      control_path="$2"
       shift 2
       ;;
     *)
@@ -445,6 +483,16 @@ if [ "$SSH_HOST_KEY_TEST_PHASE" = check ]; then
     printf 'Host key verification failed.\n' >&2
   fi
   exit 255
+fi
+
+if [ -n "$SSH_HOST_KEY_TEST_OPTIONS_FILE" ]; then
+  printf 'control_master=%s\n' "$control_master" > "$SSH_HOST_KEY_TEST_OPTIONS_FILE"
+  printf 'control_path=%s\n' "$control_path" >> "$SSH_HOST_KEY_TEST_OPTIONS_FILE"
+  printf 'verify_host_key_dns=%s\n' "$verify_host_key_dns" >> "$SSH_HOST_KEY_TEST_OPTIONS_FILE"
+fi
+
+if [ "$SSH_HOST_KEY_TEST_REUSED_MASTER" = 1 ]; then
+  exit 0
 fi
 
 if [ "$strict" = yes ]; then
