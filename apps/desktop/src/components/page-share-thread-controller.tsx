@@ -1,8 +1,9 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, useState } from "react";
 
 import { useRegisterCommands } from "@/commands";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { LazyMount } from "./lazy-mount";
 import { createShareThreadCommandHandler } from "./share-thread-command-handler";
 import type { ShareThreadTarget } from "./share-thread-dialog-flow";
 
@@ -29,7 +30,6 @@ export function PageShareThreadController({
     path: "",
     runtimeId: "local",
   });
-  const mounted = useRef(false);
 
   useRegisterCommands({
     shareThread: createShareThreadCommandHandler({
@@ -42,17 +42,14 @@ export function PageShareThreadController({
     }),
   });
 
-  if (open) mounted.current = true;
-  if (!mounted.current) return null;
-
   return (
-    <Suspense fallback={null}>
+    <LazyMount open={open}>
       <ShareThreadDialog
         open={open}
         path={target.path}
         runtimeId={target.runtimeId}
         onOpenChange={setOpen}
       />
-    </Suspense>
+    </LazyMount>
   );
 }

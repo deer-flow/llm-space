@@ -18,7 +18,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileTextIcon, GitBranchIcon } from "lucide-react";
 import {
   lazy,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -42,6 +41,7 @@ import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
+import { LazyMount } from "@/components/lazy-mount";
 import { PageShareThreadController } from "@/components/page-share-thread-controller";
 import { RemoteStatus } from "@/components/remote-status";
 import type { ShareThreadTarget } from "@/components/share-thread-dialog-flow";
@@ -101,21 +101,6 @@ const LazyTracePanel = lazy(() =>
     default: m.TracePanel,
   }))
 );
-
-/**
- * Renders a lazily-loaded overlay only once `open` first becomes true, then
- * keeps it mounted. Deferring the initial mount keeps the overlay's chunk out of
- * first paint; latching it mounted afterwards means its close animation and
- * subsequent opens are instant. The latch is a render-time ref (not an effect)
- * so the lazy `import()` starts in the same render that opens the overlay,
- * without a wasted extra render of the page tree.
- */
-function LazyMount({ open, children }: { open: boolean; children: ReactNode }) {
-  const mounted = useRef(false);
-  if (open) mounted.current = true;
-  if (!mounted.current) return null;
-  return <Suspense fallback={null}>{children}</Suspense>;
-}
 
 function _SidebarModeSwitch({
   mode,
