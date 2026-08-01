@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { renderThreadPromptVariables } from "@llm-space/core/thread";
 import type { ThreadContext } from "@llm-space/core/types";
 
-import { createGenerateProjectPromptPreparer } from "../../../src/components/thread-playground/codegen/generate-project-button";
+import { createGenerateProjectPromptPreparer } from "../../../src/components/thread-playground/codegen/generate-project-prompt-preparer";
 import { createRuntimePromptFiles } from "../../../src/components/thread-playground/runtime-prompt-files";
 import { createThreadStore } from "../../../src/components/thread-playground/stores/thread-store";
 import type { FilesHost } from "../../../src/host/types";
