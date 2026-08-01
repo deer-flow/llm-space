@@ -15,6 +15,7 @@ import type {
   McpTool,
   ModelConfig,
   ModelProviderGroup,
+  ProviderProfilePatch,
   SearchSettings,
   SkillInfo,
   SkillsSettings,
@@ -146,7 +147,8 @@ export interface GeneratorHost {
    */
   resolveEnv(
     providerId: string,
-    envNames: string[]
+    envNames: string[],
+    options?: { profileId?: string; runtimeId?: string }
   ): Promise<{ modelApiKey: string; envValues: Record<string, string> }>;
 }
 
@@ -209,12 +211,19 @@ export interface ModelClient {
     name: string;
     baseUrl: string;
   }): Promise<ModelProviderGroup[]>;
+  addProviderProfile(providerId: string): Promise<ModelProviderGroup[]>;
+  updateProviderProfile(
+    providerId: string,
+    profileId: string,
+    fields: ProviderProfilePatch
+  ): Promise<ModelProviderGroup[]>;
+  removeProviderProfile(
+    providerId: string,
+    profileId: string
+  ): Promise<ModelProviderGroup[]>;
   updateProvider(
     providerId: string,
     fields: {
-      apiKey?: string | null;
-      baseUrl?: string | null;
-      headers?: Record<string, string> | null;
       name?: string | null;
       api?:
         "anthropic-messages" | "openai-completions" | "openai-responses" | null;
@@ -233,7 +242,8 @@ export interface ModelClient {
   testModelConnection(
     providerId: string,
     modelId: string,
-    candidate?: CustomModel
+    candidate?: CustomModel,
+    profileId?: string
   ): Promise<void>;
   removeCustomModel(
     providerId: string,

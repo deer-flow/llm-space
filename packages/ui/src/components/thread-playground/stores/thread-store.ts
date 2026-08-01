@@ -199,6 +199,8 @@ export function createThreadStore(
     resolveModel?: (
       saved: ModelConfig | null | undefined
     ) => ModelConfig | null;
+    /** Resolve the current tab's ephemeral connection choice for a provider. */
+    getProfileId?: (providerId: string) => string | undefined;
     /**
      * Whether a run should automatically execute a model turn's pending tool
      * calls (instead of waiting for the user to click "Call tools"). Read fresh
@@ -1189,6 +1191,7 @@ export function createThreadStore(
                 {
                   signal: abortController.signal,
                   transport: options.transport,
+                  profileId: options.getProfileId?.(model.provider),
                 }
               );
               for await (const chunk of response) {

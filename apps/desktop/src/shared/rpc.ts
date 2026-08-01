@@ -8,6 +8,7 @@ import type {
   ModelConfig,
   ModelProviderGroup,
   NetworkSettings,
+  ProviderProfilePatch,
   SearchSettings,
   SystemProxyDetection,
   Thread,
@@ -49,6 +50,8 @@ import type { UpdateMode, UpdateStatusChangedPayload } from "./updates";
 export interface StreamThreadRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
+  /** Per-tab connection choice; never persisted into the thread. */
+  profileId?: string;
 }
 
 /** A bun→webview chunk of a streaming agent run, keyed by `streamId`. */
@@ -142,12 +145,27 @@ export interface DesktopRPCType {
         };
         response: ModelProviderGroup[];
       };
+      addProviderProfile: {
+        params: RuntimeScopedParams & { providerId: string };
+        response: ModelProviderGroup[];
+      };
+      updateProviderProfile: {
+        params: RuntimeScopedParams & {
+          providerId: string;
+          profileId: string;
+        } & ProviderProfilePatch;
+        response: ModelProviderGroup[];
+      };
+      removeProviderProfile: {
+        params: RuntimeScopedParams & {
+          providerId: string;
+          profileId: string;
+        };
+        response: ModelProviderGroup[];
+      };
       updateProvider: {
         params: RuntimeScopedParams & {
           providerId: string;
-          apiKey?: string | null;
-          baseUrl?: string | null;
-          headers?: Record<string, string> | null;
           name?: string | null;
           api?:
             | "anthropic-messages"
@@ -186,6 +204,7 @@ export interface DesktopRPCType {
       testModelConnection: {
         params: RuntimeScopedParams & {
           providerId: string;
+          profileId?: string;
           modelId: string;
           candidate?: CustomModel;
         };
@@ -306,9 +325,7 @@ export interface DesktopRPCType {
       // `uv` runs. The wizard's "Next" gate on the directory step.
       generatorPrepareDirectory: {
         params: { parentDir: string; projectName: string };
-        response:
-          | { ok: true; dir: string }
-          | { ok: false; error: string };
+        response: { ok: true; dir: string } | { ok: false; error: string };
       };
       // Whether `uv` is installed on the host (+ version), so the renderer can
       // prompt to install it or fall back to instructions in PLAN.md.
@@ -343,7 +360,11 @@ export interface DesktopRPCType {
       // provider API key plus the raw values of named environment variables. Used
       // only after explicit user opt-in to materialize secrets to disk.
       generatorResolveEnv: {
-        params: RuntimeScopedParams & { providerId: string; envNames: string[] };
+        params: RuntimeScopedParams & {
+          providerId: string;
+          profileId?: string;
+          envNames: string[];
+        };
         response: { modelApiKey: string; envValues: Record<string, string> };
       };
       mcpListServers: {
@@ -487,7 +508,10 @@ export interface DesktopRPCType {
       };
       // Import renderer-read Langfuse JSON files into one trace project.
       traceImportLangfuseJson: {
-        params: RuntimeScopedParams & { projectId: string; files: TraceImportFile[] };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          files: TraceImportFile[];
+        };
         response: TraceImportResult;
       };
       // Search a bounded remote Langfuse trace list for explicit user sync.

@@ -31,6 +31,7 @@ const PROVIDERS = [
   {
     id: "z-provider",
     name: "Z Provider",
+    profiles: [],
     models: [
       _model("z-provider", "disabled", "Disabled"),
       _model("z-provider", "z-model", "Z Model"),
@@ -40,6 +41,7 @@ const PROVIDERS = [
   {
     id: "a-provider",
     name: "A Provider",
+    profiles: [],
     models: [_model("a-provider", "a-model", "A Model")],
   },
 ] satisfies ModelProviderGroup[];

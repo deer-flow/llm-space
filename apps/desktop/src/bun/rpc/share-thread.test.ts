@@ -27,6 +27,7 @@ const PROVIDERS = [
   {
     id: "provider",
     name: "Provider",
+    profiles: [],
     models: [_model("provider", "default-model", "Default Model")],
   },
 ] satisfies ModelProviderGroup[];

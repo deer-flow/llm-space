@@ -29,7 +29,6 @@ import { CableIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-
 import {
   CUSTOM_PROVIDER_API_TYPES,
   DEFAULT_CUSTOM_PROVIDER_API,
@@ -94,12 +93,14 @@ export function ModelEditorDialog({
   open,
   onOpenChange,
   providerId,
+  profileId,
   providerApi,
   model,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerId: string;
+  profileId: string;
   providerApi?: CustomProviderApi;
   model?: CustomModel | null;
 }) {
@@ -175,7 +176,7 @@ export function ModelEditorDialog({
     if (!canSave) return;
     setTesting(true);
     try {
-      await testModelConnection(providerId, trimmedId, buildModel());
+      await testModelConnection(providerId, trimmedId, buildModel(), profileId);
       toast.success("Model connected successfully", {
         description: form.name.trim() || trimmedId,
       });

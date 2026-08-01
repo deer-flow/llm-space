@@ -57,6 +57,7 @@ import { Input } from "../../../ui/input";
 import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
+import { useProviderProfileSelection } from "../model/provider-profile-selection-provider";
 import { useThreadStore } from "../stores/thread-store";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
@@ -95,8 +96,10 @@ type WizardStep = "framework" | "target" | "run";
  */
 export function GenerateProjectButton({
   disabled = false,
+  runtimeId,
 }: {
   disabled?: boolean;
+  runtimeId?: string;
 }) {
   const {
     generator,
@@ -114,6 +117,9 @@ export function GenerateProjectButton({
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
+  const { selectedProfileId } = useProviderProfileSelection(
+    model?.provider ?? ""
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>("framework");
@@ -229,7 +235,10 @@ export function GenerateProjectButton({
         const renderedVariableValues: Record<string, string> =
           Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
-          runOneShot: createOneShotRunner({ transport }),
+          runOneShot: createOneShotRunner({
+            transport,
+            profileId: selectedProfileId,
+          }),
           defaultModel: model,
           signal: controller.signal,
           report: (event) => setEvents((prev) => [...prev, event]),
@@ -259,7 +268,7 @@ export function GenerateProjectButton({
           skills: skillList.map((s) => ({ name: s.name, path: s.path })),
           renderedVariableValues,
           model,
-          modelInfo: _resolveModelInfo(providers, model),
+          modelInfo: _resolveModelInfo(providers, model, selectedProfileId),
           searchInfo,
           mcpServers,
           capabilities,
@@ -282,6 +291,7 @@ export function GenerateProjectButton({
       files,
       framework,
       providers,
+      selectedProfileId,
       mcp,
       useMetaUserPrompt,
     ]
@@ -367,7 +377,7 @@ export function GenerateProjectButton({
     }
     setWritingEnv(true);
     try {
-      const modelInfo = _resolveModelInfo(providers, model);
+      const modelInfo = _resolveModelInfo(providers, model, selectedProfileId);
       const usesWebTools = (context?.tools ?? []).some(
         (t) =>
           t.type === "builtin" &&
@@ -390,7 +400,8 @@ export function GenerateProjectButton({
       }
       const { modelApiKey, envValues } = await generator.resolveEnv(
         model.provider,
-        envNames
+        envNames,
+        { profileId: selectedProfileId, runtimeId }
       );
       const resolveKey = (raw: string | undefined) =>
         !raw ? "" : raw.startsWith("$") ? (envValues[raw.slice(1)] ?? "") : raw;
@@ -426,6 +437,8 @@ export function GenerateProjectButton({
     model,
     result,
     providers,
+    selectedProfileId,
+    runtimeId,
     context,
     lastSearch,
     lastMcpServers,
@@ -1225,18 +1238,22 @@ function ProgressLine({ event }: { event: WorkflowEvent }) {
  */
 function _resolveModelInfo(
   providers: ModelProviderGroup[],
-  model: ModelConfig
+  model: ModelConfig,
+  profileId?: string
 ): GeneratorModelInfo {
   const group = providers.find((g) => g.id === model.provider);
   const piModel = group?.models.find((m) => m.id === model.id);
+  const profile =
+    group?.profiles.find((candidate) => candidate.id === profileId) ??
+    group?.profiles[0];
   // `compat.requiresReasoningContentOnAssistantMessages` marks DeepSeek-style
   // reasoning models served over an OpenAI-compatible API.
   const compat = piModel?.compat as
     { requiresReasoningContentOnAssistantMessages?: boolean } | undefined;
   return {
     name: piModel?.name ?? model.id,
-    baseUrl: group?.baseUrl || piModel?.baseUrl || undefined,
-    apiKey: group?.apiKey,
+    baseUrl: profile?.baseUrl || piModel?.baseUrl || undefined,
+    apiKey: profile?.apiKey,
     anthropic: piModel?.api === "anthropic-messages",
     deepseekThinking:
       compat?.requiresReasoningContentOnAssistantMessages === true,

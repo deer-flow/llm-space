@@ -1,6 +1,6 @@
 import type { RuntimeCapability } from "./runtime";
 
-export const REMOTE_RUNTIME_PROTOCOL_VERSION = 1;
+export const REMOTE_RUNTIME_PROTOCOL_VERSION = 2;
 
 export interface RemoteRuntimeHealthResponse {
   ok: true;
@@ -30,6 +30,9 @@ export type RemoteRuntimeRpcMethod =
   | "models.builtinProviders"
   | "models.addProvider"
   | "models.addCustomProvider"
+  | "models.addProviderProfile"
+  | "models.updateProviderProfile"
+  | "models.removeProviderProfile"
   | "models.updateProvider"
   | "models.setModelEnabled"
   | "models.setAllModelsEnabled"

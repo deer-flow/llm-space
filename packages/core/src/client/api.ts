@@ -17,6 +17,8 @@ export async function* streamThread(
     signal?: AbortSignal;
     endpoint?: string;
     transport?: AgentTransport;
+    /** Ephemeral provider profile selection; never written into the thread. */
+    profileId?: string;
   } = {}
 ): AsyncGenerator<AgentEvent> {
   if (!isRunnableConversation(args.context.messages)) {
@@ -35,5 +37,8 @@ export async function* streamThread(
   };
   // Transport is the only HTTP-vs-RPC-specific piece; default to HTTP/SSE.
   const transport = config.transport ?? createHttpTransport(config.endpoint);
-  yield* transport(request, { signal: config.signal });
+  yield* transport(request, {
+    signal: config.signal,
+    profileId: config.profileId,
+  });
 }

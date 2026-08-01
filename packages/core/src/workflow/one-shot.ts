@@ -8,6 +8,8 @@ import type { OneShotRunner } from "./types";
 export interface CreateOneShotRunnerOptions {
   /** The same {@link AgentTransport} the host uses for thread runs. */
   transport: AgentTransport;
+  /** Ephemeral connection profile used by this generated model call. */
+  profileId?: string;
 }
 
 /**
@@ -18,6 +20,7 @@ export interface CreateOneShotRunnerOptions {
  */
 export function createOneShotRunner({
   transport,
+  profileId,
 }: CreateOneShotRunnerOptions): OneShotRunner {
   return async ({ systemPrompt, userPrompt, model, signal }) => {
     const context = {
@@ -36,7 +39,7 @@ export function createOneShotRunner({
 
     const response = streamThread(
       { context, model },
-      { signal, transport }
+      { signal, transport, profileId }
     );
     for await (const event of response) {
       const reduced = reduceMessages(event, { streamingMessage, content });

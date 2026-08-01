@@ -2,6 +2,7 @@ import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-d
 import {
   ModelProvider,
   useModels,
+  useRefreshModels,
 } from "@llm-space/ui/components/model-provider";
 import {
   LOCAL_STORAGE_KEYS,
@@ -279,6 +280,7 @@ function PageWorkspace({
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
   const models = useModels();
+  const refreshModels = useRefreshModels();
   const queryClient = useQueryClient();
   const { tracingEnabled } = useExperimental();
 
@@ -354,6 +356,13 @@ function PageWorkspace({
   }, [sidebarPanelRef]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const handleSettingsOpenChange = useCallback(
+    (open: boolean) => {
+      setSettingsOpen(open);
+      if (!open) void refreshModels();
+    },
+    [refreshModels]
+  );
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   // One event per open transition, no matter which command opened Settings.
   useEffect(() => {
@@ -791,7 +800,7 @@ function PageWorkspace({
         <SettingsDialog
           tab={settingsTab}
           open={settingsOpen}
-          onOpenChange={setSettingsOpen}
+          onOpenChange={handleSettingsOpenChange}
           onTabChange={setSettingsTab}
           onRemoteConnected={(runtimeId) => {
             transitionWorkspaceRuntime(runtimeId);

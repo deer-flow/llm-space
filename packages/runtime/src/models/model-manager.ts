@@ -13,6 +13,9 @@ import {
   ModelConfig,
   type CustomModel,
   type ModelProviderGroup,
+  type ProviderProfile,
+  type ProviderProfilePatch,
+  uuid,
 } from "@llm-space/core";
 import {
   atomicWriteJsonFileSync,
@@ -33,6 +36,7 @@ import {
   type CustomProviderApi,
   type ModelsConfig,
   type ProviderConfig,
+  type ProviderProfileConfig,
 } from "./types";
 
 const CustomModelFileSchema = z.looseObject({
@@ -68,6 +72,13 @@ const CustomModelFileSchema = z.looseObject({
 const ModelConfigFileSchema = z.fromJSONSchema(
   ModelConfig as unknown as Parameters<typeof z.fromJSONSchema>[0]
 );
+const PROVIDER_PROFILE_FILE_SCHEMA = z.object({
+  id: z.string(),
+  name: z.string(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
 const ProviderConfigFileSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -75,6 +86,7 @@ const ProviderConfigFileSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  profiles: z.array(PROVIDER_PROFILE_FILE_SCHEMA).optional(),
   api: z
     .enum(["anthropic-messages", "openai-completions", "openai-responses"])
     .optional(),
@@ -100,16 +112,19 @@ const ModelsConfigFileSchema = z.object({
  * next access.
  */
 export class ModelManager {
+  private readonly _settingsDir: string;
   private readonly _config: ModelsConfig;
   private _models: Models | null = null;
 
-  constructor() {
+  constructor(options: { settingsDir?: string } = {}) {
+    this._settingsDir = options.settingsDir ?? getSettingsDir();
     this._config = this._loadConfig();
     // Keep each provider's `customModels` in sync with its `models` list so the
     // renderer always sees which models are user-added, then persist any change.
     const providersChanged = this._normalizeCustomProviders();
     const modelsChanged = this._normalizeCustomModels();
-    if (providersChanged || modelsChanged) {
+    const profilesChanged = this._normalizeProviderProfiles();
+    if (providersChanged || modelsChanged || profilesChanged) {
       this._saveConfig();
     }
   }
@@ -169,6 +184,7 @@ export class ModelManager {
       id: provider.id,
       name: provider.name,
       models: [],
+      profiles: [],
       apiKeyDetected: detected.includes(provider.id),
       websiteURL: this.getWebsiteLink(provider.id),
     }));
@@ -187,7 +203,13 @@ export class ModelManager {
     this._config.providers.push({
       id,
       builtin: true,
-      ...(apiKey !== undefined ? { apiKey } : {}),
+      profiles: [
+        {
+          id: uuid(),
+          name: "Default",
+          ...(apiKey !== undefined ? { apiKey } : {}),
+        },
+      ],
     });
 
     this._models = null;
@@ -210,7 +232,18 @@ export class ModelManager {
       throw new Error(`Provider already configured: ${id}`);
     }
 
-    this._config.providers.push({ id, name, baseUrl, api });
+    this._config.providers.push({
+      id,
+      name,
+      api,
+      profiles: [
+        {
+          id: uuid(),
+          name: "Default",
+          ...(baseUrl ? { baseUrl } : {}),
+        },
+      ],
+    });
 
     this._models = null;
     this._saveConfig();
@@ -225,16 +258,10 @@ export class ModelManager {
   updateProvider(
     providerId: string,
     {
-      apiKey,
-      baseUrl,
-      headers,
       name,
       api,
       icon,
     }: {
-      apiKey?: string | null;
-      baseUrl?: string | null;
-      headers?: Record<string, string> | null;
       name?: string | null;
       api?: CustomProviderApi | null;
       icon?: string | null;
@@ -245,21 +272,6 @@ export class ModelManager {
     );
     if (!entry) {
       throw new Error(`Provider not configured: ${providerId}`);
-    }
-    if (apiKey !== undefined) {
-      if (apiKey === null) delete entry.apiKey;
-      else entry.apiKey = apiKey;
-    }
-    if (baseUrl !== undefined) {
-      if (baseUrl === null) delete entry.baseUrl;
-      else entry.baseUrl = baseUrl;
-    }
-    if (headers !== undefined) {
-      if (headers === null || Object.keys(headers).length === 0) {
-        delete entry.headers;
-      } else {
-        entry.headers = headers;
-      }
     }
     if (name !== undefined) {
       if (name === null) delete entry.name;
@@ -279,16 +291,109 @@ export class ModelManager {
     this._saveConfig();
   }
 
+  /** Add a named connection profile, cloning the default endpoint and headers. */
+  addProfile(providerId: string): string {
+    const entry = this._providerEntry(providerId);
+    const profiles = this._profilesFor(entry);
+    const first = profiles[0];
+    const id = uuid();
+    profiles.push({
+      id,
+      name: this._nextProfileName(profiles),
+      ...(first.baseUrl ? { baseUrl: first.baseUrl } : {}),
+      ...(first.headers ? { headers: { ...first.headers } } : {}),
+    });
+    this._saveConfig();
+    return id;
+  }
+
+  /** Update one profile without changing its stable identity or position. */
+  updateProfile(
+    providerId: string,
+    profileId: string,
+    fields: ProviderProfilePatch
+  ): void {
+    const entry = this._providerEntry(providerId);
+    const profiles = this._profilesFor(entry);
+    const profile = profiles.find((candidate) => candidate.id === profileId);
+    if (!profile) {
+      throw new Error(
+        `Provider profile not configured: ${providerId}/${profileId}`
+      );
+    }
+    if (fields.name !== undefined) {
+      const name = fields.name.trim();
+      if (!name) {
+        throw new Error("Profile name is required.");
+      }
+      const duplicate = profiles.some(
+        (candidate) =>
+          candidate.id !== profileId &&
+          candidate.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+      );
+      if (duplicate) {
+        throw new Error(`Profile name already exists: ${name}`);
+      }
+      profile.name = name;
+    }
+    if (fields.apiKey !== undefined) {
+      if (fields.apiKey === null) delete profile.apiKey;
+      else profile.apiKey = fields.apiKey;
+    }
+    if (fields.baseUrl !== undefined) {
+      if (fields.baseUrl === null) delete profile.baseUrl;
+      else profile.baseUrl = fields.baseUrl;
+    }
+    if (fields.headers !== undefined) {
+      if (fields.headers === null || Object.keys(fields.headers).length === 0) {
+        delete profile.headers;
+      } else {
+        profile.headers = { ...fields.headers };
+      }
+    }
+    this._models = null;
+    this._saveConfig();
+  }
+
+  /** Remove a non-default profile. The first profile is intentionally fixed. */
+  removeProfile(providerId: string, profileId: string): void {
+    const entry = this._providerEntry(providerId);
+    const profiles = this._profilesFor(entry);
+    const index = profiles.findIndex((profile) => profile.id === profileId);
+    if (index === -1) {
+      throw new Error(
+        `Provider profile not configured: ${providerId}/${profileId}`
+      );
+    }
+    if (index === 0) {
+      throw new Error("The default provider profile cannot be removed.");
+    }
+    profiles.splice(index, 1);
+    this._saveConfig();
+  }
+
+  /** Renderer-safe copies of a provider's profiles in creation order. */
+  getProfiles(providerId: string): ProviderProfile[] {
+    return this._profilesFor(this._providerEntry(providerId)).map(
+      (profile) => ({
+        ...profile,
+        ...(profile.headers ? { headers: { ...profile.headers } } : {}),
+      })
+    );
+  }
+
   /** The custom base URL override for a provider, if configured. */
-  getBaseUrl(providerId: string): string | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.baseUrl;
+  getBaseUrl(providerId: string, profileId?: string): string | undefined {
+    return this._profileFor(providerId, profileId).baseUrl;
   }
 
   /** The extra HTTP headers configured for a provider, if any. */
-  getHeaders(providerId: string): Record<string, string> | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.headers;
+  getHeaders(
+    providerId: string,
+    profileId?: string
+  ): Record<string, string> | undefined {
+    const headers = this._profileFor(providerId, profileId).headers;
+    return headers ? { ...headers } : undefined;
   }
 
   /** The selected API compatibility mode for a custom provider. */
@@ -508,11 +613,10 @@ export class ModelManager {
    */
   async getApiKey(
     providerId: string,
-    resolved = true
+    resolved = true,
+    profileId?: string
   ): Promise<string | undefined> {
-    const apiKey = this._config.providers.find(
-      (entry) => entry.id === providerId
-    )?.apiKey;
+    const apiKey = this._profileFor(providerId, profileId).apiKey;
     if (!resolved) {
       return apiKey;
     }
@@ -584,7 +688,7 @@ export class ModelManager {
       return createCustomProvider({
         id: entry.id,
         name: entry.name ?? entry.id,
-        baseUrl: entry.baseUrl ?? "",
+        baseUrl: this._profilesFor(entry)[0]?.baseUrl ?? "",
         api: entry.api ?? DEFAULT_CUSTOM_PROVIDER_API,
         models: this._customModelsFor(entry),
       });
@@ -607,6 +711,7 @@ export class ModelManager {
    */
   private _customModelsFor(entry: ProviderConfig): Model<Api>[] {
     const base = BUILTIN_PROVIDERS[entry.id];
+    const defaultBaseUrl = this._profilesFor(entry)[0]?.baseUrl;
     return (entry.models ?? []).map((model) => ({
       ...model,
       api:
@@ -614,7 +719,7 @@ export class ModelManager {
           ? model.api
           : (entry.api ?? DEFAULT_CUSTOM_PROVIDER_API),
       provider: entry.id,
-      baseUrl: model.baseUrl ?? base?.baseUrl ?? entry.baseUrl ?? "",
+      baseUrl: model.baseUrl ?? base?.baseUrl ?? defaultBaseUrl ?? "",
     }));
   }
 
@@ -660,8 +765,77 @@ export class ModelManager {
     return changed;
   }
 
+  /** Migrate legacy provider-level connection fields into a first profile. */
+  private _normalizeProviderProfiles(): boolean {
+    let changed = false;
+    for (const entry of this._config.providers) {
+      if (!entry.profiles || entry.profiles.length === 0) {
+        entry.profiles = [{ id: uuid(), name: "Default" }];
+        changed = true;
+      }
+      const first = entry.profiles[0];
+      if (entry.apiKey !== undefined) {
+        first.apiKey = entry.apiKey;
+        delete entry.apiKey;
+        changed = true;
+      }
+      if (entry.baseUrl !== undefined) {
+        first.baseUrl = entry.baseUrl;
+        delete entry.baseUrl;
+        changed = true;
+      }
+      if (entry.headers !== undefined) {
+        first.headers = { ...entry.headers };
+        delete entry.headers;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private _providerEntry(providerId: string): ProviderConfig {
+    const entry = this._config.providers.find(
+      (provider) => provider.id === providerId
+    );
+    if (!entry) {
+      throw new Error(`Provider not configured: ${providerId}`);
+    }
+    return entry;
+  }
+
+  private _profilesFor(entry: ProviderConfig): ProviderProfileConfig[] {
+    return (entry.profiles ??= [{ id: uuid(), name: "Default" }]);
+  }
+
+  private _profileFor(
+    providerId: string,
+    profileId?: string
+  ): ProviderProfileConfig {
+    const profiles = this._profilesFor(this._providerEntry(providerId));
+    const profile = profileId
+      ? profiles.find((candidate) => candidate.id === profileId)
+      : profiles[0];
+    if (!profile) {
+      throw new Error(
+        `Provider profile not configured: ${providerId}/${profileId}`
+      );
+    }
+    return profile;
+  }
+
+  private _nextProfileName(profiles: ProviderProfileConfig[]): string {
+    const names = new Set(
+      profiles.map((profile) => profile.name.toLocaleLowerCase())
+    );
+    let index = profiles.length + 1;
+    while (names.has(`profile ${index}`)) {
+      index += 1;
+    }
+    return `Profile ${index}`;
+  }
+
   private get _configPath(): string {
-    return path.join(getSettingsDir(), "models.json");
+    return path.join(this._settingsDir, "models.json");
   }
 
   private _saveConfig(): void {

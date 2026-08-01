@@ -114,10 +114,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
   resolveGeneratorEnv(
     input: Parameters<RuntimeClient["resolveGeneratorEnv"]>[0]
   ) {
-    return this._rpc<{ modelApiKey: string; envValues: Record<string, string> }>(
-      "models.resolveGeneratorEnv",
-      input
-    );
+    return this._rpc<{
+      modelApiKey: string;
+      envValues: Record<string, string>;
+    }>("models.resolveGeneratorEnv", input);
   }
 
   fsLs(path: string) {
@@ -171,7 +171,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
       const response = await fetch(`${this._baseUrl}/stream`, {
         method: "POST",
         headers: this._headers(),
-        body: JSON.stringify({ request: payload.request }),
+        body: JSON.stringify({
+          request: payload.request,
+          ...(payload.profileId ? { profileId: payload.profileId } : {}),
+        }),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -249,11 +252,29 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }) {
     return this._rpc<ModelProviderGroup[]>("models.addCustomProvider", input);
   }
+  addProviderProfile(providerId: string) {
+    return this._rpc<ModelProviderGroup[]>("models.addProviderProfile", {
+      providerId,
+    });
+  }
+  updateProviderProfile(
+    input: Parameters<RuntimeClient["updateProviderProfile"]>[0]
+  ) {
+    return this._rpc<ModelProviderGroup[]>(
+      "models.updateProviderProfile",
+      input
+    );
+  }
+  removeProviderProfile(
+    input: Parameters<RuntimeClient["removeProviderProfile"]>[0]
+  ) {
+    return this._rpc<ModelProviderGroup[]>(
+      "models.removeProviderProfile",
+      input
+    );
+  }
   updateProvider(input: {
     providerId: string;
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    headers?: Record<string, string> | null;
     name?: string | null;
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
@@ -274,11 +295,9 @@ export class RemoteRuntimeClient implements RuntimeClient {
   setDefaultModel(model: ModelConfig | null) {
     return this._rpc<ModelConfig | null>("models.setDefault", { model });
   }
-  async testModelConnection(input: {
-    providerId: string;
-    modelId: string;
-    candidate?: CustomModel;
-  }) {
+  async testModelConnection(
+    input: Parameters<RuntimeClient["testModelConnection"]>[0]
+  ) {
     await this._rpc<null>("models.testConnection", input);
   }
   removeCustomModel(input: { providerId: string; modelId: string }) {
@@ -406,7 +425,11 @@ export class RemoteRuntimeClient implements RuntimeClient {
       title,
     });
   }
-  async traceWriteWorkbench(projectId: string, traceKey: string, thread: Thread) {
+  async traceWriteWorkbench(
+    projectId: string,
+    traceKey: string,
+    thread: Thread
+  ) {
     await this._rpc<null>("trace.writeWorkbench", {
       projectId,
       traceKey,

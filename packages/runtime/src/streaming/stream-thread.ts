@@ -24,17 +24,21 @@ export class StreamThreadController {
     payload: RuntimeStreamRequestPayload,
     send: (message: RuntimeStreamResponsePayload) => void
   ): Promise<void> {
-    const { streamId, request } = payload;
+    const { streamId, request, profileId } = payload;
     const abortController = new AbortController();
     this._activeStreams.set(streamId, abortController);
     const startedAt = Date.now();
     let outcome: "completed" | "error" | "aborted" = "error";
     try {
+      const connection = await this._connectionFor(
+        request.model.provider,
+        profileId
+      );
       for await (const event of streamAgent(request, {
         models: await this._modelManager.getAvailableModels(),
-        getApiKey: this._modelManager.getApiKey.bind(this._modelManager),
-        getBaseUrl: this._modelManager.getBaseUrl.bind(this._modelManager),
-        getHeaders: this._modelManager.getHeaders.bind(this._modelManager),
+        getApiKey: () => connection.apiKey,
+        getBaseUrl: () => connection.baseUrl,
+        getHeaders: () => connection.headers,
         signal: abortController.signal,
       })) {
         send({ streamId, type: "event", event });
@@ -80,10 +84,12 @@ export class StreamThreadController {
   /** Verify a provider with a minimal completion through the normal agent path. */
   async testModelConnection({
     providerId,
+    profileId,
     modelId,
     candidate,
   }: {
     providerId: string;
+    profileId?: string;
     modelId: string;
     candidate?: CustomModel;
   }): Promise<void> {
@@ -91,6 +97,7 @@ export class StreamThreadController {
       ? this._modelManager.buildModelsWithCandidate(providerId, candidate)
       : await this._modelManager.getAvailableModels();
     const targetId = candidate?.id ?? modelId;
+    const connection = await this._connectionFor(providerId, profileId);
     const abortController = new AbortController();
     try {
       for await (const event of streamAgent(
@@ -110,9 +117,9 @@ export class StreamThreadController {
         },
         {
           models,
-          getApiKey: this._modelManager.getApiKey.bind(this._modelManager),
-          getBaseUrl: this._modelManager.getBaseUrl.bind(this._modelManager),
-          getHeaders: this._modelManager.getHeaders.bind(this._modelManager),
+          getApiKey: () => connection.apiKey,
+          getBaseUrl: () => connection.baseUrl,
+          getHeaders: () => connection.headers,
           signal: abortController.signal,
         }
       )) {
@@ -132,6 +139,15 @@ export class StreamThreadController {
         { cause: error }
       );
     }
+  }
+
+  /** Snapshot connection settings once so mid-run edits affect only later runs. */
+  private async _connectionFor(providerId: string, profileId?: string) {
+    return {
+      apiKey: await this._modelManager.getApiKey(providerId, true, profileId),
+      baseUrl: this._modelManager.getBaseUrl(providerId, profileId),
+      headers: this._modelManager.getHeaders(providerId, profileId),
+    };
   }
 
   private _scrubModelForTelemetry(model: { provider: string; id: string }): {

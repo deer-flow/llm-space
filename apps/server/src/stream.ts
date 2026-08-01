@@ -7,7 +7,7 @@ export function createStreamResponse(
   runtime: RuntimeClient,
   input: unknown
 ): Response {
-  const request = _parseStreamRequest(input);
+  const { request, profileId } = _parseStreamRequest(input);
   const streamId = uuid();
   const encoder = new TextEncoder();
   let abort: (() => void) | null = null;
@@ -19,20 +19,23 @@ export function createStreamResponse(
       controller.enqueue(encoder.encode(_sseData("[START]")));
       void (async () => {
         try {
-          await runtime.streamThread({ streamId, request }, (message) => {
-            if (message.type === "event") {
-              controller.enqueue(encoder.encode(_sseData(message.event)));
-            } else if (message.type === "error") {
-              controller.enqueue(
-                encoder.encode(
-                  _sseData({
-                    type: "error",
-                    message: message.message,
-                  })
-                )
-              );
+          await runtime.streamThread(
+            { streamId, request, profileId },
+            (message) => {
+              if (message.type === "event") {
+                controller.enqueue(encoder.encode(_sseData(message.event)));
+              } else if (message.type === "error") {
+                controller.enqueue(
+                  encoder.encode(
+                    _sseData({
+                      type: "error",
+                      message: message.message,
+                    })
+                  )
+                );
+              }
             }
-          });
+          );
           controller.enqueue(encoder.encode(_sseData("[DONE]")));
           controller.close();
         } catch (error) {
@@ -60,21 +63,31 @@ export function createStreamResponse(
   });
 }
 
-function _parseStreamRequest(input: unknown): AgentStreamRequest {
+function _parseStreamRequest(input: unknown): {
+  request: AgentStreamRequest;
+  profileId?: string;
+} {
   if (!input || typeof input !== "object") {
     throw new ServerError(
       "invalid_request",
       "Stream request must be an object."
     );
   }
-  const request = (input as { request?: unknown }).request;
+  const body = input as { request?: unknown; profileId?: unknown };
+  const request = body.request;
   if (!request || typeof request !== "object") {
     throw new ServerError(
       "invalid_request",
       'Stream request body must include object field "request".'
     );
   }
-  return request as AgentStreamRequest;
+  if (body.profileId !== undefined && typeof body.profileId !== "string") {
+    throw new ServerError("invalid_request", '"profileId" must be a string.');
+  }
+  return {
+    request: request as AgentStreamRequest,
+    ...(body.profileId ? { profileId: body.profileId } : {}),
+  };
 }
 
 function _sseData(value: unknown): string {
