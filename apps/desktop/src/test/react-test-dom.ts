@@ -1,3 +1,12 @@
+/**
+ * Narrow DOM host used by the share-dialog concurrency regression test.
+ * Bun provides no DOM, and this repository intentionally has no jsdom-style
+ * test dependency. Exercising real React 19 `react-dom/client`, Suspense, and
+ * layout-effect commit timing cannot be reproduced by the pure dialog-flow
+ * tests, so this adapter implements only the host primitives that mounted
+ * production components touch. Keep it test-local instead of treating it as a
+ * general browser emulator.
+ */
 /* eslint-disable @typescript-eslint/class-literal-property-style, @typescript-eslint/no-empty-function, @typescript-eslint/no-this-alias, @typescript-eslint/prefer-regexp-exec -- minimal DOM fakes intentionally expose constants, no-op browser APIs, and tree cursors */
 type Listener = (event: TestEvent) => void;
 

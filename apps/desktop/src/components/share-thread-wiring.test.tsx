@@ -131,4 +131,21 @@ describe("real share consumer wiring", () => {
     expect(menuHarness.transactions[0]).toMatchObject(active);
     expect(paletteHarness.transactions[0]).toMatchObject(active);
   });
+
+  test("path-only Page commands use the workspace runtime", () => {
+    const harness = _wiringHarness({
+      workspaceRuntimeId: "remote:workspace",
+      activeThread: {
+        path: "threads/active.json",
+        runtimeId: "remote:active",
+      },
+    });
+
+    harness.pageHandler({ path: "threads/path-only.json" });
+
+    expect(harness.transactions[0]).toMatchObject({
+      path: "threads/path-only.json",
+      runtimeId: "remote:workspace",
+    });
+  });
 });

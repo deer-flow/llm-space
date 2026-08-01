@@ -42,8 +42,8 @@ import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
+import { PageShareThreadController } from "@/components/page-share-thread-controller";
 import { RemoteStatus } from "@/components/remote-status";
-import { createShareThreadCommandHandler } from "@/components/share-thread-command-handler";
 import type { ShareThreadTarget } from "@/components/share-thread-dialog-flow";
 import { SharedImportProvider } from "@/components/shared-import-provider";
 import {
@@ -96,11 +96,6 @@ const StartFromExampleDialog = lazy(() =>
     default: m.StartFromExampleDialog,
   }))
 );
-const ShareThreadDialog = lazy(() =>
-  import("@/components/share-thread-dialog").then((m) => ({
-    default: m.ShareThreadDialog,
-  }))
-);
 const LazyTracePanel = lazy(() =>
   import("@/components/trace-panel").then((m) => ({
     default: m.TracePanel,
@@ -120,47 +115,6 @@ function LazyMount({ open, children }: { open: boolean; children: ReactNode }) {
   if (open) mounted.current = true;
   if (!mounted.current) return null;
   return <Suspense fallback={null}>{children}</Suspense>;
-}
-
-/**
- * Page-owned share command registration and dialog state. Keeping this as one
- * mounted production boundary makes the command target and dialog target the
- * same immutable pair instead of parallel path/runtime state.
- */
-export function PageShareThreadController({
-  workspaceRuntimeId,
-  getActiveThread,
-}: {
-  workspaceRuntimeId: RuntimeId;
-  getActiveThread: () => ShareThreadTarget | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState<ShareThreadTarget>({
-    path: "",
-    runtimeId: "local",
-  });
-
-  useRegisterCommands({
-    shareThread: createShareThreadCommandHandler({
-      getWorkspaceRuntimeId: () => workspaceRuntimeId,
-      getActiveThread,
-      openDialog: (nextTarget) => {
-        setTarget(nextTarget);
-        setOpen(true);
-      },
-    }),
-  });
-
-  return (
-    <LazyMount open={open}>
-      <ShareThreadDialog
-        open={open}
-        path={target.path}
-        runtimeId={target.runtimeId}
-        onOpenChange={setOpen}
-      />
-    </LazyMount>
-  );
 }
 
 function _SidebarModeSwitch({
@@ -311,7 +265,7 @@ function WorkspaceModelScope({
   );
 }
 
-export function PageWorkspace({
+function PageWorkspace({
   workspaceRuntimeId,
   setWorkspaceRuntimeId,
   workspaceRuntimeIdRef,

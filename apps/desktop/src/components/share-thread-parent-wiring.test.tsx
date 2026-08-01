@@ -1,6 +1,5 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
   forwardRef,
@@ -21,11 +20,6 @@ import {
   TestElement,
   TestEvent,
 } from "@/test/react-test-dom";
-
-import type {
-  HostServices,
-  ModelClient,
-} from "../../../../packages/ui/src/host/types";
 
 const SHARE_REQUESTS: {
   runtimeId?: string;
@@ -120,24 +114,9 @@ const WORKSPACE_TABS = {
   reopenClosed: noOp,
 };
 
-const CURRENT_UI_HOST = await import("../../../../packages/ui/src/host/index");
-const CURRENT_MODEL_PROVIDER =
-  await import("../../../../packages/ui/src/components/model-provider");
-const CURRENT_THEME_PROVIDER =
-  await import("../../../../packages/ui/src/components/theme-provider");
-
 await mock.module("@/lib/electrobun", () => ({
   electrobun: { rpc: RPC },
 }));
-await mock.module("@llm-space/ui/host", () => CURRENT_UI_HOST);
-await mock.module(
-  "@llm-space/ui/components/model-provider",
-  () => CURRENT_MODEL_PROVIDER
-);
-await mock.module(
-  "@llm-space/ui/components/theme-provider",
-  () => CURRENT_THEME_PROVIDER
-);
 const TEST_CODE_EDITOR_MODULE = {
   CodeEditor: forwardRef<
     HTMLTextAreaElement,
@@ -150,10 +129,6 @@ const TEST_CODE_EDITOR_MODULE = {
 };
 await mock.module(
   "@llm-space/ui/components/code-editor",
-  () => TEST_CODE_EDITOR_MODULE
-);
-await mock.module(
-  "../../../../packages/ui/src/components/code-editor/index",
   () => TEST_CODE_EDITOR_MODULE
 );
 function _TestMenuItem({
@@ -188,6 +163,7 @@ await mock.module("@llm-space/ui/ui/dropdown-menu", () => ({
   DropdownMenu: _MenuPassThrough,
   DropdownMenuContent: _MenuContainer,
   DropdownMenuItem: _TestMenuItem,
+  DropdownMenuLabel: _MenuContainer,
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuTrigger: _MenuPassThrough,
 }));
@@ -299,48 +275,24 @@ await mock.module("./thread-tabs/trace-tab-pane", () => ({
 }));
 
 const [
-  { PageShareThreadController, PageWorkspace },
+  { PageShareThreadController },
   { ShareThreadDialog },
   { CommandProvider, useCommands, useRegisterCommands },
   { NodeActions },
   { ThreadTabs },
   { GithubAuthProvider },
-  { DesktopHostProvider },
-  { HostServicesProvider, useHostServices },
-  { ModelProvider },
   { ThemeProvider },
   { TooltipProvider },
-  { ThreadPlayground },
 ] = await Promise.all([
-  import("@/app/page"),
+  import("./page-share-thread-controller"),
   import("./share-thread-dialog"),
   import("@/commands"),
   import("./file-system-tree-view/node-actions"),
   import("./thread-tabs/thread-tabs"),
   import("./github-auth-provider"),
-  import("@/host/host-services"),
-  import("../../../../packages/ui/src/host/index"),
-  import("../../../../packages/ui/src/components/model-provider"),
-  import("../../../../packages/ui/src/components/theme-provider"),
-  import("../../../../packages/ui/src/ui/tooltip"),
-  import("../../../../packages/ui/src/components/thread-playground/thread-playground"),
+  import("@llm-space/ui/components/theme-provider"),
+  import("@llm-space/ui/ui/tooltip"),
 ]);
-
-const MODEL_CLIENT: ModelClient = {
-  availableModels: async () => [],
-  builtinProviders: async () => [],
-  getDefaultModel: async () => null,
-  setDefaultModel: async () => null,
-  removeProvider: async () => [],
-  addProvider: async () => [],
-  addCustomProvider: async () => [],
-  updateProvider: async () => [],
-  setModelEnabled: async () => [],
-  setAllModelsEnabled: async () => [],
-  testModelConnection: async () => undefined,
-  removeCustomModel: async () => [],
-  upsertCustomModel: async () => [],
-};
 
 interface MountedTree {
   container: TestElement;
@@ -399,19 +351,13 @@ function _ShareCommandRegistrar({
   return null;
 }
 
-function _HostShareTrigger({ runtimeId }: { runtimeId: RuntimeId }) {
-  const { actions } = useHostServices();
-  return (
-    <button
-      aria-label="Host share"
-      onClick={() =>
-        actions.shareThread({ path: "threads/host.json", runtimeId })
-      }
-    />
-  );
-}
-
-function _CommandShareTrigger({ path }: { path?: string }) {
+function _CommandShareTrigger({
+  path,
+  runtimeId,
+}: {
+  path?: string;
+  runtimeId?: RuntimeId;
+}) {
   const { executeCommand } = useCommands();
   return (
     <button
@@ -419,7 +365,7 @@ function _CommandShareTrigger({ path }: { path?: string }) {
       onClick={() =>
         executeCommand({
           type: "shareThread",
-          args: path ? { path } : {},
+          args: path ? { path, runtimeId } : {},
         })
       }
     />
@@ -533,71 +479,6 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     await _unmount(tree);
   });
 
-  test("ThreadPlayground header sends its owning remote runtime", async () => {
-    const shared: { path: string; runtimeId: string }[] = [];
-    const noOp = () => undefined;
-    const host: HostServices = {
-      presentational: false,
-      transport: null,
-      executeTool: null,
-      skills: {
-        getSettings: async () => ({ discoveryPaths: [] }),
-        listSkills: async () => [],
-      },
-      mcp: {
-        listServers: async () => [],
-        listTools: async () => {
-          throw new Error("MCP tools are not used by this wiring test");
-        },
-      },
-      builtinTools: { list: async () => [], fsReveal: async () => undefined },
-      paths: { ensureRootDir: async () => "" },
-      files: {
-        readText: async () => "",
-        exists: async () => false,
-        directoryExists: async () => false,
-        pickFile: async () => null,
-        pickDirectory: async () => null,
-      },
-      generator: null,
-      actions: {
-        openSettings: noOp,
-        openLink: noOp,
-        shareThread: (input: { path: string; runtimeId: string }) => {
-          shared.push(input);
-        },
-        openVariables: noOp,
-        registerOpenVariables: () => noOp,
-        registerRunThread: () => noOp,
-      },
-    };
-    const tree = await _mount(
-      <_Providers>
-        <ModelProvider client={MODEL_CLIENT}>
-          <HostServicesProvider value={host}>
-            <ThreadPlayground
-              path="threads/playground.json"
-              runtimeId="remote:playground"
-              initialValue={{}}
-            />
-          </HostServicesProvider>
-        </ModelProvider>
-      </_Providers>
-    );
-
-    await act(async () => {
-      tree.container.querySelector("[aria-label=Share thread]")?.click();
-    });
-
-    expect(shared).toEqual([
-      {
-        path: "threads/playground.json",
-        runtimeId: "remote:playground",
-      },
-    ]);
-    await _unmount(tree);
-  });
-
   test("NodeActions sends the selected file runtime through CommandProvider", async () => {
     const received: unknown[] = [];
     const tree = await _mount(
@@ -671,28 +552,29 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     await _unmount(tree);
   });
 
-  test("host action, Page registration, and Dialog request keep one remote target", async () => {
+  test("an explicit command, Page registration, and Dialog request keep one remote target", async () => {
     const tree = await _mount(
       <_Providers>
         <CommandProvider>
-          <DesktopHostProvider>
-            <GithubAuthProvider>
-              <PageShareThreadController
-                workspaceRuntimeId="local"
-                getActiveThread={() => ({
-                  path: "threads/local-active.json",
-                  runtimeId: "local",
-                })}
-              />
-              <_HostShareTrigger runtimeId="remote:integration" />
-            </GithubAuthProvider>
-          </DesktopHostProvider>
+          <GithubAuthProvider>
+            <PageShareThreadController
+              workspaceRuntimeId="local"
+              getActiveThread={() => ({
+                path: "threads/local-active.json",
+                runtimeId: "local",
+              })}
+            />
+            <_CommandShareTrigger
+              path="threads/host.json"
+              runtimeId="remote:integration"
+            />
+          </GithubAuthProvider>
         </CommandProvider>
       </_Providers>
     );
 
     await act(async () => {
-      tree.container.querySelector("[aria-label=Host share]")?.click();
+      tree.container.querySelector("[aria-label=Command share]")?.click();
     });
     const generate = await _findButtonByText("Generate link");
     await act(async () => generate.click());
@@ -713,18 +595,16 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     const tree = await _mount(
       <_Providers>
         <CommandProvider>
-          <DesktopHostProvider>
-            <GithubAuthProvider>
-              <PageShareThreadController
-                workspaceRuntimeId="remote:active"
-                getActiveThread={() => ({
-                  path: "threads/active.json",
-                  runtimeId: "remote:active",
-                })}
-              />
-              <_CommandShareTrigger />
-            </GithubAuthProvider>
-          </DesktopHostProvider>
+          <GithubAuthProvider>
+            <PageShareThreadController
+              workspaceRuntimeId="remote:active"
+              getActiveThread={() => ({
+                path: "threads/active.json",
+                runtimeId: "remote:active",
+              })}
+            />
+            <_CommandShareTrigger />
+          </GithubAuthProvider>
         </CommandProvider>
       </_Providers>
     );
@@ -743,89 +623,4 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     await _unmount(tree);
   });
 
-  test("PageWorkspace passes its real active runtime into the share controller", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const workspaceRuntimeIdRef = {
-      current: "remote:workspace" as RuntimeId,
-    };
-    const tree = await _mount(
-      <_Providers>
-        <QueryClientProvider client={queryClient}>
-          <ModelProvider client={MODEL_CLIENT}>
-            <CommandProvider>
-              <DesktopHostProvider>
-                <GithubAuthProvider>
-                  <PageWorkspace
-                    workspaceRuntimeId="remote:workspace"
-                    setWorkspaceRuntimeId={() => undefined}
-                    workspaceRuntimeIdRef={workspaceRuntimeIdRef}
-                  />
-                  <_CommandShareTrigger />
-                </GithubAuthProvider>
-              </DesktopHostProvider>
-            </CommandProvider>
-          </ModelProvider>
-        </QueryClientProvider>
-      </_Providers>
-    );
-
-    await act(async () => {
-      tree.container.querySelector("[aria-label=Command share]")?.click();
-    });
-    const generate = await _findButtonByText("Generate link");
-    await act(async () => generate.click());
-    await _flush();
-
-    expect(SHARE_REQUESTS[0]).toMatchObject({
-      runtimeId: "remote:workspace",
-      path: "threads/workspace.json",
-    });
-    await _unmount(tree);
-    queryClient.clear();
-  });
-
-  test("PageWorkspace passes its workspace runtime for a path-only command", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const workspaceRuntimeIdRef = {
-      current: "remote:workspace" as RuntimeId,
-    };
-    const tree = await _mount(
-      <_Providers>
-        <QueryClientProvider client={queryClient}>
-          <ModelProvider client={MODEL_CLIENT}>
-            <CommandProvider>
-              <DesktopHostProvider>
-                <GithubAuthProvider>
-                  <PageWorkspace
-                    workspaceRuntimeId="remote:workspace"
-                    setWorkspaceRuntimeId={() => undefined}
-                    workspaceRuntimeIdRef={workspaceRuntimeIdRef}
-                  />
-                  <_CommandShareTrigger path="threads/path-only.json" />
-                </GithubAuthProvider>
-              </DesktopHostProvider>
-            </CommandProvider>
-          </ModelProvider>
-        </QueryClientProvider>
-      </_Providers>
-    );
-
-    await act(async () => {
-      tree.container.querySelector("[aria-label=Command share]")?.click();
-    });
-    const generate = await _findButtonByText("Generate link");
-    await act(async () => generate.click());
-    await _flush();
-
-    expect(SHARE_REQUESTS[0]).toMatchObject({
-      runtimeId: "remote:workspace",
-      path: "threads/path-only.json",
-    });
-    await _unmount(tree);
-    queryClient.clear();
-  });
 });
