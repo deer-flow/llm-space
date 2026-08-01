@@ -50,8 +50,9 @@ import {
   useThreadTabs,
   type AppTab,
 } from "@/components/thread-tabs";
+import { acquireFileMutationForTabs } from "@/components/thread-tabs/pane-file-mutation";
+import type { PaneLifecycleHost } from "@/components/thread-tabs/pane-lifecycle-host";
 import {
-  acquireFileMutationForTabs,
   closeAllTabsIfAllowed,
   closeOtherTabsIfAllowed,
   closeTabIfAllowed,
@@ -275,7 +276,7 @@ function PageWorkspace({
   workspaceRuntimeIdRef: MutableRefObject<RuntimeId>;
 }) {
   const runtimeRunTrackerRef = useRef(new RuntimeRunTracker());
-  useSyncExternalStore(
+  const mutationRevision = useSyncExternalStore(
     runtimeRunTrackerRef.current.subscribe,
     runtimeRunTrackerRef.current.getSnapshot,
     runtimeRunTrackerRef.current.getSnapshot
@@ -778,6 +779,24 @@ function PageWorkspace({
     refreshReservationsRef.current.delete(paneId);
     release();
   }, []);
+  const paneLifecycleHost = useMemo<PaneLifecycleHost>(
+    () => ({
+      acquireMutation: acquireFileMutation,
+      isMutationReserved: isPaneMutationReserved,
+      onPersistenceChange: handlePanePersistenceChange,
+      onRefreshSettled: handlePaneRefreshSettled,
+      onRunSettled: handlePaneRunSettled,
+      onRunStart: handlePaneRunStart,
+    }),
+    [
+      acquireFileMutation,
+      handlePanePersistenceChange,
+      handlePaneRefreshSettled,
+      handlePaneRunSettled,
+      handlePaneRunStart,
+      isPaneMutationReserved,
+    ]
+  );
   useEffect(
     () => () => {
       refreshReservationsRef.current.forEach((release) => release());
@@ -990,12 +1009,8 @@ function PageWorkspace({
               onMove={reconcileFileMove}
               onTraceTitleChange={tabs.handleTraceTitleChange}
               onToggleSidebar={handleToggleSidebar}
-              onRunStart={handlePaneRunStart}
-              onRunSettled={handlePaneRunSettled}
-              onPersistenceChange={handlePanePersistenceChange}
-              onRefreshSettled={handlePaneRefreshSettled}
-              isMutationReserved={isPaneMutationReserved}
-              acquireMutation={acquireFileMutation}
+              lifecycleHost={paneLifecycleHost}
+              mutationRevision={mutationRevision}
               toolbarSlot={<UpdateIndicator />}
             />
           </ResizablePanel>

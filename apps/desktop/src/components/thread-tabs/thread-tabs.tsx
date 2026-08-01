@@ -29,14 +29,8 @@ import {
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
-import type { AcquireFileMutation } from "../file-system-tree-view/file-mutation-guard";
-
+import type { PaneLifecycleHost } from "./pane-lifecycle-host";
 import { RuntimePaneHost } from "./runtime-pane-host";
-import type {
-  PanePersistenceChange,
-  PaneRunSettled,
-  PaneRunStart,
-} from "./runtime-run-tracker";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
@@ -48,6 +42,10 @@ const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
 const MOVE_TO_TRASH_LABEL = _isWindows
   ? "Move to Recycle Bin"
   : "Move to Trash";
+
+function _getPaneKey(tab: AppTab): string {
+  return tab.type === "thread" ? tab.paneId : tab.id;
+}
 
 // Suppress focus on mouse-down so a click doesn't leave these toolbar icons
 // with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
@@ -91,16 +89,8 @@ interface ThreadTabsProps {
     runtimeId: RuntimeId
   ) => void;
   onToggleSidebar?: () => void;
-  onRunStart?: PaneRunStart;
-  onRunSettled?: PaneRunSettled;
-  onPersistenceChange?: PanePersistenceChange;
-  onRefreshSettled?: (paneId: string) => void;
-  isMutationReserved?: (
-    paneId: string,
-    runtimeId: RuntimeId,
-    path?: string
-  ) => boolean;
-  acquireMutation?: AcquireFileMutation;
+  lifecycleHost: PaneLifecycleHost;
+  mutationRevision: number;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
 }
@@ -128,12 +118,8 @@ export function ThreadTabs({
   onMove,
   onTraceTitleChange,
   onToggleSidebar,
-  onRunStart,
-  onRunSettled,
-  onPersistenceChange,
-  onRefreshSettled,
-  isMutationReserved,
-  acquireMutation,
+  lifecycleHost,
+  mutationRevision,
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -254,6 +240,45 @@ export function ThreadTabs({
       if (id !== null && id === pressed) close(id);
     },
     [close]
+  );
+
+  const renderPane = useCallback(
+    (tab: AppTab, active: boolean) =>
+      tab.type === "thread" ? (
+        <ThreadTabPane
+          tabId={tab.id}
+          paneId={tab.paneId}
+          path={tab.path}
+          runtimeId={tab.runtimeId}
+          active={active}
+          lifecycleHost={lifecycleHost}
+          mutationRevision={mutationRevision}
+          refreshNonce={tab.refreshNonce ?? 0}
+          onMove={onMove}
+          onClose={close}
+          consumeDiscardedPane={consumeDiscardedPane}
+        />
+      ) : (
+        <TraceTabPane
+          projectId={tab.projectId}
+          traceKey={tab.traceKey}
+          runtimeId={tab.runtimeId}
+          active={active}
+          lifecycleHost={lifecycleHost}
+          mutationRevision={mutationRevision}
+          refreshNonce={tab.refreshNonce ?? 0}
+          onClose={close}
+          onRenameTitle={onTraceTitleChange}
+        />
+      ),
+    [
+      close,
+      consumeDiscardedPane,
+      lifecycleHost,
+      mutationRevision,
+      onMove,
+      onTraceTitleChange,
+    ]
   );
 
   return (
@@ -404,42 +429,8 @@ export function ThreadTabs({
         <RuntimePaneHost
           tabs={paneTabs}
           activeId={activeId}
-          getPaneKey={(tab) => (tab.type === "thread" ? tab.paneId : tab.id)}
-          renderPane={(tab, active) =>
-            tab.type === "thread" ? (
-              <ThreadTabPane
-                paneId={tab.paneId}
-                path={tab.path}
-                runtimeId={tab.runtimeId}
-                active={active}
-                refreshNonce={tab.refreshNonce ?? 0}
-                onMove={onMove}
-                onClose={() => close(tab.id)}
-                consumeDiscardedPane={consumeDiscardedPane}
-                onRunStart={onRunStart}
-                onRunSettled={onRunSettled}
-                onPersistenceChange={onPersistenceChange}
-                onRefreshSettled={onRefreshSettled}
-                isMutationReserved={isMutationReserved}
-                acquireMutation={acquireMutation}
-              />
-            ) : (
-              <TraceTabPane
-                projectId={tab.projectId}
-                traceKey={tab.traceKey}
-                runtimeId={tab.runtimeId}
-                active={active}
-                refreshNonce={tab.refreshNonce ?? 0}
-                onClose={close}
-                onRunStart={onRunStart}
-                onRunSettled={onRunSettled}
-                onPersistenceChange={onPersistenceChange}
-                onRefreshSettled={onRefreshSettled}
-                isMutationReserved={isMutationReserved}
-                onRenameTitle={onTraceTitleChange}
-              />
-            )
-          }
+          getPaneKey={_getPaneKey}
+          renderPane={renderPane}
         />
       </div>
     </div>

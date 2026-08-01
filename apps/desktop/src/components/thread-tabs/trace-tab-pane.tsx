@@ -21,13 +21,9 @@ import { createRpcTransport, traceClient } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
 
-import {
-  settleStreamingPane,
-  type PanePersistenceChange,
-  type PaneRunSettled,
-  type PaneRunStart,
-} from "./runtime-run-tracker";
+import type { PaneLifecycleHost } from "./pane-lifecycle-host";
 import { SerializedPersistence } from "./serialized-persistence";
+import { settleStreamingPane } from "./settle-streaming-pane";
 import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
 
 interface TraceTabPaneProps {
@@ -35,17 +31,10 @@ interface TraceTabPaneProps {
   traceKey: string;
   runtimeId: RuntimeId;
   active: boolean;
+  lifecycleHost: PaneLifecycleHost;
+  mutationRevision: number;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
-  onRunStart?: PaneRunStart;
-  onRunSettled?: PaneRunSettled;
-  onPersistenceChange?: PanePersistenceChange;
-  onRefreshSettled?: (paneId: string) => void;
-  isMutationReserved?: (
-    paneId: string,
-    runtimeId: RuntimeId,
-    path?: string
-  ) => boolean;
   onRenameTitle?: (
     projectId: string,
     traceKey: string,
@@ -59,13 +48,10 @@ function _TraceTabPane({
   traceKey,
   runtimeId,
   active,
+  lifecycleHost,
+  mutationRevision,
   refreshNonce = 0,
   onClose,
-  onRunStart,
-  onRunSettled,
-  onPersistenceChange,
-  onRefreshSettled,
-  isMutationReserved,
   onRenameTitle,
 }: TraceTabPaneProps) {
   const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
@@ -100,7 +86,7 @@ function _TraceTabPane({
           traceClient.writeWorkbench(projectId, traceKey, next, runtimeId),
         {
           onBusyChange: (busy) =>
-            onPersistenceChange?.(
+            lifecycleHost.onPersistenceChange(
               tabId,
               runtimeId,
               persistenceOwner,
@@ -117,7 +103,7 @@ function _TraceTabPane({
         }
       ),
     [
-      onPersistenceChange,
+      lifecycleHost,
       persistenceOwner,
       projectId,
       runtimeId,
@@ -136,7 +122,7 @@ function _TraceTabPane({
 
   const handleChange = useCallback(
     (next: Thread) => {
-      if (isMutationReserved?.(tabId, runtimeId)) return;
+      if (lifecycleHost.isMutationReserved(tabId, runtimeId)) return;
       persistence.setPending(next);
       if (writeTimer.current) {
         clearTimeout(writeTimer.current);
@@ -145,24 +131,30 @@ function _TraceTabPane({
         void flushPending();
       }, 500);
     },
-    [flushPending, isMutationReserved, persistence, runtimeId, tabId]
+    [flushPending, lifecycleHost, persistence, runtimeId, tabId]
   );
 
-  const handleStreamingStart = useCallback((runId?: string) => {
-    if (!runId) return false;
-    return onRunStart?.(tabId, runtimeId, runId) ?? true;
-  }, [onRunStart, runtimeId, tabId]);
-  const handleStreamingEnd = useCallback((runId?: string) => {
-    if (!runId) return;
-    void settleStreamingPane(flushPending, () => {
-      onRunSettled?.(tabId, runId);
-    }).catch((error) => {
-      toast.error("Failed to save completed run", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
+  const handleStreamingStart = useCallback(
+    (runId?: string) => {
+      if (!runId) return false;
+      return lifecycleHost.onRunStart(tabId, runtimeId, runId);
+    },
+    [lifecycleHost, runtimeId, tabId]
+  );
+  const handleStreamingEnd = useCallback(
+    (runId?: string) => {
+      if (!runId) return;
+      void settleStreamingPane(flushPending, () => {
+        lifecycleHost.onRunSettled(tabId, runId);
+      }).catch((error) => {
+        toast.error("Failed to save completed run", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
       });
-    });
-  }, [flushPending, onRunSettled, tabId]);
+    },
+    [flushPending, lifecycleHost, tabId]
+  );
 
   const handleRenameTitle = useCallback(
     async (title: string): Promise<boolean> => {
@@ -198,7 +190,7 @@ function _TraceTabPane({
     usePaneRefreshAcknowledgement({
       paneId: tabId,
       reloadKey,
-      onSettled: onRefreshSettled,
+      onSettled: lifecycleHost.onRefreshSettled,
     });
   useEffect(() => {
     if (appliedRefreshRef.current === refreshNonce) {
@@ -239,6 +231,13 @@ function _TraceTabPane({
   ]);
 
   const trace = data?.trace;
+  const mutationReserved = useMemo(
+    () => {
+      void mutationRevision;
+      return lifecycleHost.isMutationReserved(tabId, runtimeId);
+    },
+    [lifecycleHost, mutationRevision, runtimeId, tabId]
+  );
 
   return (
     <div className={cn("flex size-full flex-col", !active && "hidden")}>
@@ -250,7 +249,7 @@ function _TraceTabPane({
         title={trace?.title ?? traceKey}
         headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
         initialValue={data?.thread}
-        readonly={isMutationReserved?.(tabId, runtimeId) ?? false}
+        readonly={mutationReserved}
         active={active}
         transport={rpcTransport}
         runtimeId={runtimeId}

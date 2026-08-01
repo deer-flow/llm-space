@@ -4,9 +4,8 @@ import type { RuntimeId } from "@/shared/runtime";
 
 import { RuntimeRunTracker } from "../thread-tabs/runtime-run-tracker";
 
-import * as mutationGuard from "./file-mutation-guard";
-
-const { runFileMutationWithGuard } = mutationGuard;
+import { runFileMutationWithGuard } from "./file-mutation-guard";
+import { runGuardedFileMove } from "./guarded-file-move";
 
 function _deferred() {
   let resolve!: () => void;
@@ -112,22 +111,6 @@ describe("file mutation production guard", () => {
   });
 
   test("move collision inspection happens after acquiring the critical section", async () => {
-    const runGuardedFileMove = (
-      mutationGuard as typeof mutationGuard & {
-        runGuardedFileMove?: (options: {
-          acquireMutation: () => (() => void) | null;
-          action: string;
-          blockedResult: null;
-          confirmConflict: (conflict: string) => Promise<boolean>;
-          detectConflict: () => Promise<string | null>;
-          mutate: (overwrite: boolean) => Promise<string | null>;
-          paths: string[];
-          runtimeId: "local";
-        }) => Promise<string | null>;
-      }
-    ).runGuardedFileMove;
-    expect(runGuardedFileMove).toBeFunction();
-    if (!runGuardedFileMove) return;
     const order: string[] = [];
 
     const result = await runGuardedFileMove({

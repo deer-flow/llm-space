@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { acquireFileMutationForTabs } from "./pane-file-mutation";
 import {
-  acquireFileMutationForTabs,
   closeAllTabsIfAllowed,
   closeOtherTabsIfAllowed,
   closeTabIfAllowed,

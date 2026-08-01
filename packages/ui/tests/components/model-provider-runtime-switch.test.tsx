@@ -186,7 +186,7 @@ function _createRoot(): Root {
   return createRoot(new FakeContainer(fakeDocument) as unknown as Element);
 }
 
-function ModelProbe({
+function _ModelProbe({
   onMount,
   onSnapshot,
   onUnmount,
@@ -208,7 +208,7 @@ function ModelProbe({
   return null;
 }
 
-function RefreshProbe({
+function _RefreshProbe({
   onMount,
   onRefresh,
   onSnapshot,
@@ -222,7 +222,7 @@ function RefreshProbe({
   const refresh = useRefreshModels();
   useEffect(() => onRefresh(refresh), [onRefresh, refresh]);
   return (
-    <ModelProbe
+    <_ModelProbe
       onMount={onMount}
       onSnapshot={onSnapshot}
       onUnmount={onUnmount}
@@ -230,7 +230,7 @@ function RefreshProbe({
   );
 }
 
-function MutationProbe({
+function _MutationProbe({
   onActions,
   onModelId,
 }: {
@@ -257,7 +257,7 @@ function MutationProbe({
 
 const NEVER = new Promise<never>(() => undefined);
 
-function SuspendedProbe(): never {
+function _SuspendedProbe(): never {
   throw NEVER;
 }
 
@@ -286,7 +286,7 @@ describe("ModelProvider runtime switches", () => {
     };
     const onSnapshot = (snapshot: ModelSnapshot) => snapshots.push(snapshot);
     const probe = (
-      <ModelProbe
+      <_ModelProbe
         onMount={onMount}
         onSnapshot={onSnapshot}
         onUnmount={onUnmount}
@@ -382,7 +382,7 @@ describe("ModelProvider runtime switches", () => {
       activeRoot?.render(
         <Suspense fallback={null}>
           <ModelProvider client={localClient}>
-            <RefreshProbe
+            <_RefreshProbe
               onMount={onMount}
               onRefresh={onRefresh}
               onSnapshot={onSnapshot}
@@ -406,7 +406,7 @@ describe("ModelProvider runtime switches", () => {
         activeRoot?.render(
           <Suspense fallback={null}>
             <ModelProvider client={remoteClient}>
-              <SuspendedProbe />
+              <_SuspendedProbe />
             </ModelProvider>
           </Suspense>
         );
@@ -458,7 +458,7 @@ describe("ModelProvider runtime switches", () => {
     const snapshots: ModelSnapshot[] = [];
     let refresh: (() => Promise<void>) | null = null;
     const probe = (
-      <RefreshProbe
+      <_RefreshProbe
         onMount={() => undefined}
         onRefresh={(next) => {
           refresh = next;
@@ -528,7 +528,7 @@ describe("ModelProvider runtime switches", () => {
     );
     const snapshots: ModelSnapshot[] = [];
     const probe = (
-      <ModelProbe
+      <_ModelProbe
         onMount={() => undefined}
         onSnapshot={(snapshot) => snapshots.push(snapshot)}
         onUnmount={() => undefined}
@@ -593,7 +593,7 @@ describe("ModelProvider runtime switches", () => {
     await act(async () => {
       activeRoot?.render(
         <ModelProvider client={client}>
-          <RefreshProbe
+          <_RefreshProbe
             onMount={() => undefined}
             onRefresh={(next) => {
               refresh = next;
@@ -656,7 +656,7 @@ describe("ModelProvider runtime switches", () => {
     await act(async () => {
       activeRoot?.render(
         <ModelProvider client={client}>
-          <MutationProbe
+          <_MutationProbe
             onActions={(next) => {
               actions = next;
             }}
@@ -724,7 +724,7 @@ describe("ModelProvider runtime switches", () => {
     };
     const modelIds: (string | null)[] = [];
     const probe = (
-      <MutationProbe
+      <_MutationProbe
         onActions={(next) => {
           actions = next;
         }}
@@ -783,7 +783,7 @@ describe("ModelProvider runtime switches", () => {
     await act(async () => {
       activeRoot?.render(
         <ModelProvider client={client}>
-          <MutationProbe
+          <_MutationProbe
             onActions={(next) => {
               actions = next;
             }}

@@ -47,9 +47,9 @@ import type { RuntimeId } from "@/shared/runtime";
 
 import {
   runRemoteRuntimeActionIfAllowed,
-  runRemoteTrustContinuationIfAllowed,
   type RemoteRuntimeActionOutcome,
 } from "../remote-runtime-actions";
+import { runRemoteTrustContinuationIfAllowed } from "../remote-trust-continuation";
 
 import {
   canConnectRemoteServer,

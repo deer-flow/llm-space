@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  runRemoteRuntimeActionIfAllowed,
-  runRemoteTrustContinuationIfAllowed,
-} from "./remote-runtime-actions";
+import { runRemoteRuntimeActionIfAllowed } from "./remote-runtime-actions";
+import { runRemoteTrustContinuationIfAllowed } from "./remote-trust-continuation";
 import { RuntimeRunTracker } from "./thread-tabs/runtime-run-tracker";
 
 function _deferred() {

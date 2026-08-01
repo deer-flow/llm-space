@@ -26,9 +26,9 @@ import type { RuntimeId } from "@/shared/runtime";
 
 import {
   runFileMutationWithGuard,
-  runGuardedFileMove,
   type AcquireFileMutation,
 } from "./file-mutation-guard";
+import { runGuardedFileMove } from "./guarded-file-move";
 
 /** Query-key factory for a directory listing. */
 export const fsKeys = {

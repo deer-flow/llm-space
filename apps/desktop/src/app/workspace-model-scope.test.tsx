@@ -8,17 +8,21 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
-import { act, useEffect, useLayoutEffect, useState } from "react";
+import {
+  act,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { runRemoteRuntimeActionIfAllowed } from "@/components/remote-runtime-actions";
 import { RuntimePaneHost } from "@/components/thread-tabs/runtime-pane-host";
-import {
-  RuntimeRunTracker,
-  settleStreamingPane,
-} from "@/components/thread-tabs/runtime-run-tracker";
+import { RuntimeRunTracker } from "@/components/thread-tabs/runtime-run-tracker";
 import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
 import { SerializedPersistence } from "@/components/thread-tabs/serialized-persistence";
+import { settleStreamingPane } from "@/components/thread-tabs/settle-streaming-pane";
 import { usePaneRefreshAcknowledgement } from "@/components/thread-tabs/use-pane-refresh-ack";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -175,7 +179,7 @@ function _event(value: unknown): AgentEvent {
   return value as AgentEvent;
 }
 
-function MountProbe({
+function _MountProbe({
   onMount,
   onUnmount,
 }: {
@@ -194,7 +198,50 @@ interface TestPane {
   runtimeId: RuntimeId;
 }
 
-function StorePane({
+function _RenderCountPane({
+  active,
+  onRender,
+  pane,
+}: {
+  active: boolean;
+  onRender(paneId: string, active: boolean): void;
+  pane: TestPane;
+}) {
+  onRender(pane.id, active);
+  return null;
+}
+
+function _RuntimePaneRenderHarness({
+  activeId,
+  onRender,
+  tabs,
+}: {
+  activeId: string;
+  onRender(paneId: string, active: boolean): void;
+  tabs: TestPane[];
+}) {
+  const getPaneKey = useCallback((pane: TestPane) => pane.id, []);
+  const renderPane = useCallback(
+    (pane: TestPane, active: boolean) => (
+      <_RenderCountPane
+        active={active}
+        onRender={onRender}
+        pane={pane}
+      />
+    ),
+    [onRender]
+  );
+  return (
+    <RuntimePaneHost
+      tabs={tabs}
+      activeId={activeId}
+      getPaneKey={getPaneKey}
+      renderPane={renderPane}
+    />
+  );
+}
+
+function _StorePane({
   pane,
   onMount,
 }: {
@@ -212,7 +259,7 @@ interface QueryTestPane extends TestPane {
   path: string;
 }
 
-function QueryStorePane({
+function _QueryStorePane({
   pane,
   onMount,
   onLoadError,
@@ -239,7 +286,7 @@ function QueryStorePane({
   return null;
 }
 
-function QueryRuntimePaneHost({
+function _QueryRuntimePaneHost({
   initialTabs,
   activeId,
   onMount,
@@ -260,7 +307,7 @@ function QueryRuntimePaneHost({
       activeId={activeId}
       getPaneKey={(pane) => pane.id}
       renderPane={(pane) => (
-        <QueryStorePane
+        <_QueryStorePane
           pane={pane}
           onMount={onMount}
           onLoadError={(id) =>
@@ -273,7 +320,7 @@ function QueryRuntimePaneHost({
   );
 }
 
-function FsQueryProbe({
+function _FsQueryProbe({
   runtimeId,
   read,
 }: {
@@ -289,7 +336,7 @@ function FsQueryProbe({
   return null;
 }
 
-function StoreEventBridge({
+function _StoreEventBridge({
   store,
   callbacks,
   onMount,
@@ -330,7 +377,7 @@ describe("WorkspaceModelScope", () => {
     const onUnmount = () => {
       unmounts += 1;
     };
-    const probe = <MountProbe onMount={onMount} onUnmount={onUnmount} />;
+    const probe = <_MountProbe onMount={onMount} onUnmount={onUnmount} />;
     activeRoot = _createRoot();
 
     await act(async () => {
@@ -374,6 +421,35 @@ describe("WorkspaceModelScope", () => {
 });
 
 describe("RuntimePaneHost", () => {
+  test("switching active panes does not rerender an unrelated hidden pane", async () => {
+    const panes: TestPane[] = [
+      { id: "pane-a", runtimeId: "local" },
+      { id: "pane-b", runtimeId: "remote:server-1" },
+      { id: "pane-c", runtimeId: "remote:server-2" },
+    ];
+    const renderCounts = new Map<string, number>();
+    const onRender = (paneId: string) => {
+      renderCounts.set(paneId, (renderCounts.get(paneId) ?? 0) + 1);
+    };
+    const render = (activeId: string) => (
+      <_RuntimePaneRenderHarness
+        activeId={activeId}
+        onRender={onRender}
+        tabs={panes}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => activeRoot?.render(render("pane-a")));
+    await act(async () => activeRoot?.render(render("pane-b")));
+
+    expect(Object.fromEntries(renderCounts)).toEqual({
+      "pane-a": 2,
+      "pane-b": 2,
+      "pane-c": 1,
+    });
+  });
+
   test("an older settlement leaves a newer run lease active", () => {
     const tracker = new RuntimeRunTracker();
     tracker.beginRun("local-pane", "local", "run-1");
@@ -414,7 +490,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={callbacks}
           onMount={() => () => undefined}
@@ -478,7 +554,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge store={store} callbacks={callbacks} onMount={() => () => undefined} />
+        <_StoreEventBridge store={store} callbacks={callbacks} onMount={() => () => undefined} />
       );
     });
 
@@ -529,7 +605,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={{
             onStreamingStart: (runId) =>
@@ -567,7 +643,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={{
             onStreamingStart: (runId) => {
@@ -607,7 +683,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={{
             onChange: (thread) => persistence.setPending(thread),
@@ -652,7 +728,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={{
             onChange: (thread) => persistence.setPending(thread),
@@ -719,7 +795,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={callbacks}
           onMount={() => () => undefined}
@@ -799,7 +875,7 @@ describe("RuntimePaneHost", () => {
       activeRoot?.render(
         <>
           <RefreshOwner />
-          <StoreEventBridge
+          <_StoreEventBridge
             store={store}
             callbacks={{
               onStreamingStart: (runId) =>
@@ -932,7 +1008,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={{
             onChange: (thread) => {
@@ -992,7 +1068,7 @@ describe("RuntimePaneHost", () => {
           panes.find((pane) => pane.runtimeId === runtimeId)?.id ?? null
         }
         getPaneKey={(pane) => pane.id}
-        renderPane={(pane) => <StorePane pane={pane} onMount={onMount} />}
+        renderPane={(pane) => <_StorePane pane={pane} onMount={onMount} />}
       />
     );
     activeRoot = _createRoot();
@@ -1078,9 +1154,9 @@ describe("RuntimePaneHost", () => {
     };
     const render = (activeId: string) => (
       <QueryClientProvider client={queryClient}>
-        <FsQueryProbe runtimeId="local" read={readFs} />
-        <FsQueryProbe runtimeId="remote:server-1" read={readFs} />
-        <QueryRuntimePaneHost
+        <_FsQueryProbe runtimeId="local" read={readFs} />
+        <_FsQueryProbe runtimeId="remote:server-1" read={readFs} />
+        <_QueryRuntimePaneHost
           initialTabs={panes}
           activeId={activeId}
           onMount={onMount}
@@ -1236,7 +1312,7 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <StoreEventBridge
+        <_StoreEventBridge
           store={store}
           callbacks={callbacks}
           onMount={onMount}

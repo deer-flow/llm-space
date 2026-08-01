@@ -6,6 +6,7 @@ import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -17,26 +18,22 @@ import { toast } from "sonner";
 import { createFileSystemClient, createRpcTransport } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 
-import {
-  runFileMutationWithGuard,
-  type AcquireFileMutation,
-} from "../file-system-tree-view/file-mutation-guard";
+import { runFileMutationWithGuard } from "../file-system-tree-view/file-mutation-guard";
 
-import {
-  settleStreamingPane,
-  type PanePersistenceChange,
-  type PaneRunSettled,
-  type PaneRunStart,
-} from "./runtime-run-tracker";
+import type { PaneLifecycleHost } from "./pane-lifecycle-host";
 import { SerializedPersistence } from "./serialized-persistence";
+import { settleStreamingPane } from "./settle-streaming-pane";
 import { isFatalThreadLoadError } from "./thread-load-state";
 import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
 
 interface ThreadTabPaneProps {
+  tabId: string;
   paneId: string;
   path: string;
   runtimeId: RuntimeId;
   active: boolean;
+  lifecycleHost: PaneLifecycleHost;
+  mutationRevision: number;
   /**
    * Bumped by the tab "Refresh" action to reload this thread from disk,
    * discarding any un-saved in-memory edits.
@@ -44,19 +41,9 @@ interface ThreadTabPaneProps {
   refreshNonce?: number;
   onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
   /** Close this pane's tab, e.g. after its thread fails to load. */
-  onClose?: (path: string) => void;
+  onClose: (tabId: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
   consumeDiscardedPane?: (paneId: string) => boolean;
-  onRunStart?: PaneRunStart;
-  onRunSettled?: PaneRunSettled;
-  onPersistenceChange?: PanePersistenceChange;
-  onRefreshSettled?: (paneId: string) => void;
-  isMutationReserved?: (
-    paneId: string,
-    runtimeId: RuntimeId,
-    path?: string
-  ) => boolean;
-  acquireMutation?: AcquireFileMutation;
 }
 
 /**
@@ -64,21 +51,18 @@ interface ThreadTabPaneProps {
  * mounted while inactive (hidden via CSS) so its store, undo history, and any
  * in-progress streaming run survive tab switches.
  */
-export function ThreadTabPane({
+function _ThreadTabPane({
+  tabId,
   paneId,
   path,
   runtimeId,
   active,
+  lifecycleHost,
+  mutationRevision,
   refreshNonce = 0,
   onMove,
   onClose,
   consumeDiscardedPane,
-  onRunStart,
-  onRunSettled,
-  onPersistenceChange,
-  onRefreshSettled,
-  isMutationReserved,
-  acquireMutation,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
@@ -116,8 +100,8 @@ export function ThreadTabPane({
       description:
         error instanceof Error ? error.message : `File not found: ${path}`,
     });
-    onClose?.(path);
-  }, [loadError, error, path, onClose]);
+    onClose(tabId);
+  }, [loadError, error, onClose, path, tabId]);
 
   // Persist edits back to the same path, debounced so we don't write per keystroke.
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,7 +119,7 @@ export function ThreadTabPane({
         (next) => fs.write(pathRef.current, { ...next, runtimeId }),
         {
           onBusyChange: (busy) =>
-            onPersistenceChange?.(
+            lifecycleHost.onPersistenceChange(
               paneId,
               runtimeId,
               persistenceOwner,
@@ -152,7 +136,7 @@ export function ThreadTabPane({
           },
         }
       ),
-    [fs, onPersistenceChange, paneId, persistenceOwner, runtimeId]
+    [fs, lifecycleHost, paneId, persistenceOwner, runtimeId]
   );
 
   const flushPending = useCallback(async () => {
@@ -165,31 +149,50 @@ export function ThreadTabPane({
 
   const handleChange = useCallback(
     (next: Thread) => {
-      if (isMutationReserved?.(paneId, runtimeId, pathRef.current)) return;
+      if (
+        lifecycleHost.isMutationReserved(
+          paneId,
+          runtimeId,
+          pathRef.current
+        )
+      ) {
+        return;
+      }
       persistence.setPending(next);
       if (writeTimer.current) clearTimeout(writeTimer.current);
       writeTimer.current = setTimeout(() => {
         void flushPending();
       }, 500);
     },
-    [flushPending, isMutationReserved, paneId, persistence, runtimeId]
+    [flushPending, lifecycleHost, paneId, persistence, runtimeId]
   );
 
-  const handleStreamingStart = useCallback((runId?: string) => {
-    if (!runId) return false;
-    return onRunStart?.(paneId, runtimeId, runId, pathRef.current) ?? true;
-  }, [onRunStart, paneId, runtimeId]);
-  const handleStreamingEnd = useCallback((runId?: string) => {
-    if (!runId) return;
-    void settleStreamingPane(flushPending, () => {
-      onRunSettled?.(paneId, runId);
-    }).catch((error) => {
-      toast.error("Failed to save completed run", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
+  const handleStreamingStart = useCallback(
+    (runId?: string) => {
+      if (!runId) return false;
+      return lifecycleHost.onRunStart(
+        paneId,
+        runtimeId,
+        runId,
+        pathRef.current
+      );
+    },
+    [lifecycleHost, paneId, runtimeId]
+  );
+  const handleStreamingEnd = useCallback(
+    (runId?: string) => {
+      if (!runId) return;
+      void settleStreamingPane(flushPending, () => {
+        lifecycleHost.onRunSettled(paneId, runId);
+      }).catch((error) => {
+        toast.error("Failed to save completed run", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
       });
-    });
-  }, [flushPending, onRunSettled, paneId]);
+    },
+    [flushPending, lifecycleHost, paneId]
+  );
 
   // Flush pending edits on a normal close. An editor displaced by an overwrite
   // instead drops them so stale destination content cannot replace the moved file.
@@ -214,7 +217,7 @@ export function ThreadTabPane({
     usePaneRefreshAcknowledgement({
       paneId,
       reloadKey,
-      onSettled: onRefreshSettled,
+      onSettled: lifecycleHost.onRefreshSettled,
     });
   useEffect(() => {
     if (appliedRefreshRef.current === refreshNonce) {
@@ -263,7 +266,7 @@ export function ThreadTabPane({
       }
 
       return runFileMutationWithGuard({
-        acquireMutation,
+        acquireMutation: lifecycleHost.acquireMutation,
         paths: [from, to],
         runtimeId,
         action: "renaming this thread",
@@ -289,7 +292,15 @@ export function ThreadTabPane({
           renamed ? onMove?.(from, to, runtimeId) : undefined,
       });
     },
-    [acquireMutation, flushPending, fs, onMove, qc, runtimeId]
+    [flushPending, fs, lifecycleHost, onMove, qc, runtimeId]
+  );
+
+  const mutationReserved = useMemo(
+    () => {
+      void mutationRevision;
+      return lifecycleHost.isMutationReserved(paneId, runtimeId, path);
+    },
+    [lifecycleHost, mutationRevision, paneId, path, runtimeId]
   );
 
   if (loadError) {
@@ -313,9 +324,7 @@ export function ThreadTabPane({
         loading={isLoading}
         path={path}
         initialValue={thread}
-        readonly={
-          isMutationReserved?.(paneId, runtimeId, pathRef.current) ?? false
-        }
+        readonly={mutationReserved}
         active={active}
         transport={rpcTransport}
         runtimeId={runtimeId}
@@ -327,3 +336,5 @@ export function ThreadTabPane({
     </div>
   );
 }
+
+export const ThreadTabPane = memo(_ThreadTabPane);
