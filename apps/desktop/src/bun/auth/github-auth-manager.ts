@@ -41,8 +41,6 @@ export interface GitHubAuthManagerOptions {
   onChange: (state: GithubAuthState) => void;
   /** Device Flow request implementation; defaults to the GitHub HTTP helpers. */
   deviceFlow?: GitHubDeviceFlow;
-  /** Creates per-flow cancellation controllers; defaults to AbortController. */
-  createAbortController?: () => AbortController;
 }
 
 export interface GitHubDeviceFlow {
@@ -66,7 +64,6 @@ const GITHUB_DEVICE_FLOW: GitHubDeviceFlow = {
  */
 export class GitHubAuthManager {
   private _config: AuthConfig | null;
-  private readonly _createAbortController: () => AbortController;
   private readonly _deviceFlow: GitHubDeviceFlow;
   private readonly _onChange: (state: GithubAuthState) => void;
   /** Non-null while a Device Flow is in progress; aborts the token poll. */
@@ -75,8 +72,6 @@ export class GitHubAuthManager {
   private _pending: { userCode: string; verificationUri: string } | null = null;
 
   constructor(options: GitHubAuthManagerOptions) {
-    this._createAbortController =
-      options.createAbortController ?? (() => new AbortController());
     this._deviceFlow = options.deviceFlow ?? GITHUB_DEVICE_FLOW;
     this._onChange = options.onChange;
     this._config = this._loadConfig();
@@ -115,7 +110,7 @@ export class GitHubAuthManager {
       return;
     }
 
-    const controller = this._createAbortController();
+    const controller = new AbortController();
     this._signInController = controller;
     this._emit();
 
