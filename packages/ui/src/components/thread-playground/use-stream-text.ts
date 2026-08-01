@@ -206,17 +206,3 @@ export function useStreamText({
 
   return { text, error, streaming, run, abort };
 }
-
-/** System-prompt generation adapter used by {@link SystemPromptEditor}. */
-export function useSystemPromptGeneration(
-  args: UseStreamTextArgs
-): UseStreamTextResult {
-  return useStreamText(args);
-}
-
-/** Function-tool generation adapter used by {@link ToolEditorDialog}. */
-export function useToolDefinitionGeneration(
-  args: UseStreamTextArgs
-): UseStreamTextResult {
-  return useStreamText(args);
-}

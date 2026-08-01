@@ -13,7 +13,7 @@ import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
-import { useSystemPromptGeneration } from "../use-stream-text";
+import { useStreamText } from "../use-stream-text";
 import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
 
 interface SystemPromptEditorProps {
@@ -47,7 +47,7 @@ function _SystemPromptEditor({
     text: generated,
     streaming,
     run: generate,
-  } = useSystemPromptGeneration({
+  } = useStreamText({
     systemPrompt: metaPrompt,
     reasoning: "off",
     // Use the thread's own model (id/provider only) when it has one.

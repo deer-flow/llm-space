@@ -100,21 +100,18 @@ await mock.module("@/lib/electrobun", () => ({
   electrobun: { rpc: RPC },
 }));
 
-const modelProviderPath = new URL(
+const MODEL_PROVIDER_PATH = new URL(
   "../../../../packages/ui/src/components/model-provider.tsx",
   import.meta.url
 ).pathname;
-await mock.module(modelProviderPath, () => ({
+await mock.module(MODEL_PROVIDER_PATH, () => ({
   useDefaultTextGenerationModel: () => null,
 }));
 
 const { CommandProvider } = await import("@/commands");
 const { DesktopHostProvider } = await import("./host-services");
 const { useHostServices } = await import("@llm-space/ui/host");
-const {
-  useSystemPromptGeneration,
-  useToolDefinitionGeneration,
-} = await import(
+const { useStreamText } = await import(
   "../../../../packages/ui/src/components/thread-playground/use-stream-text"
 );
 const { bindProjectGenerationRuntime } = await import(
@@ -164,7 +161,7 @@ function _captureTextGeneration(
   const model = _model(`${runtimeId}-${workflow}`);
 
   function PromptHarness() {
-    captured = useSystemPromptGeneration({
+    captured = useStreamText({
       systemPrompt: "Generate a system prompt",
       model,
     });
@@ -172,7 +169,7 @@ function _captureTextGeneration(
   }
 
   function ToolHarness() {
-    captured = useToolDefinitionGeneration({
+    captured = useStreamText({
       systemPrompt: "Generate a function tool",
       model,
     });
