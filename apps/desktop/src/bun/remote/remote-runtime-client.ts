@@ -201,7 +201,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
           send({ streamId: payload.streamId, type: "event", event });
         }
       }
-      send({ streamId: payload.streamId, type: "done" });
+      throw new Error("Remote runtime stream ended before [DONE].");
     } finally {
       this._activeStreams.delete(payload.streamId);
     }

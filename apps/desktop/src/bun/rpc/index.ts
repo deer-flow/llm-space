@@ -442,7 +442,7 @@ export function createMainWindowRPC({
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
           // messages. `rpc` is initialized by the time this handler runs.
           void forwardStreamThread(
-            getRuntime(payload.runtimeId),
+            () => getRuntime(payload.runtimeId),
             payload,
             (message) => rpc.send.receiveStreamThreadResponse(message)
           );

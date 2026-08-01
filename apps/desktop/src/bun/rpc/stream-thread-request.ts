@@ -6,11 +6,12 @@ import type {
 } from "../../shared/rpc";
 
 export async function forwardStreamThread(
-  runtime: RuntimeClient,
+  getRuntime: () => RuntimeClient,
   payload: StreamThreadRequestPayload,
   send: (message: StreamThreadResponsePayload) => void
 ): Promise<void> {
   try {
+    const runtime = getRuntime();
     await runtime.streamThread(payload, send);
   } catch (error) {
     if (_isAbortError(error)) {

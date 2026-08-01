@@ -19,19 +19,69 @@ function _createRuntime(error: Error): Pick<RuntimeClient, "streamThread"> {
 }
 
 describe("forwardStreamThread", () => {
+  test("emits a terminal error when runtime lookup fails", async () => {
+    const responses: StreamThreadResponsePayload[] = [];
+    await forwardStreamThread(
+      () => {
+        throw new Error("Runtime not found: remote:stale");
+      },
+      { streamId: "stream-1", request: REQUEST },
+      (message) => responses.push(message)
+    );
+
+    expect(responses).toEqual([
+      {
+        streamId: "stream-1",
+        type: "error",
+        message: "Runtime not found: remote:stale",
+      },
+    ]);
+  });
+
   test.each([
     ["network rejection", new Error("fetch failed")],
     ["malformed SSE JSON", new SyntaxError("Unexpected token '<'")],
   ])("emits one terminal error for a %s", async (_kind, error) => {
     const responses: StreamThreadResponsePayload[] = [];
     await forwardStreamThread(
-      _createRuntime(error) as RuntimeClient,
+      () => _createRuntime(error) as RuntimeClient,
       { streamId: "stream-1", request: REQUEST },
       (message) => responses.push(message)
     );
 
     expect(responses).toEqual([
       { streamId: "stream-1", type: "error", message: error.message },
+    ]);
+  });
+
+  test("emits an error when a remote stream ends before done", async () => {
+    const responses: StreamThreadResponsePayload[] = [];
+    await _withLiveSseServer(
+      async ({ baseUrl, closeStream, streamStarted }) => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl,
+          token: "secret",
+        });
+        const completion = forwardStreamThread(
+          () => client,
+          { streamId: "stream-1", request: REQUEST },
+          (message) => responses.push(message)
+        );
+        await streamStarted;
+
+        closeStream();
+        await completion;
+      }
+    );
+
+    expect(responses).toEqual([
+      {
+        streamId: "stream-1",
+        type: "error",
+        message: "Remote runtime stream ended before [DONE].",
+      },
     ]);
   });
 
@@ -46,7 +96,7 @@ describe("forwardStreamThread", () => {
           token: "secret",
         });
         const completion = forwardStreamThread(
-          client,
+          () => client,
           { streamId: "stream-1", request: REQUEST },
           (message) => responses.push(message)
         );
