@@ -1,5 +1,6 @@
 import { electrobun } from "@/lib/electrobun";
 import type {
+  RemoteDisconnectResult,
   RemoteServerDraft,
   RemoteServerStatusChangedPayload,
   RemoteServerView,
@@ -100,7 +101,7 @@ export function rejectRemoteServerHostKey(
 
 export function disconnectRemoteServer(
   serverId: string
-): Promise<RemoteServerView[]> {
+): Promise<RemoteDisconnectResult> {
   return _notifyAfter(_rpc().request.remoteDisconnectServer({ serverId }));
 }
 

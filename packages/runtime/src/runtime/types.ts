@@ -136,6 +136,10 @@ export interface RuntimeClient {
   fsRead(path: string): Promise<Thread>;
   fsWrite(path: string, thread: Thread): Promise<void>;
   fsRealpath(path: string): Promise<string>;
+  /** Read arbitrary prompt text (`~` expands on this runtime). */
+  readTextFile(path: string): Promise<string>;
+  /** Whether prompt text is a readable regular file on this runtime. */
+  textFileExists(path: string): Promise<boolean>;
 
   mcpListServers(): McpServerView[] | Promise<McpServerView[]>;
   mcpAddServer(

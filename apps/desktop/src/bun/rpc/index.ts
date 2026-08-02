@@ -1,8 +1,4 @@
-import {
-  readUserTextFile,
-  userDirectoryExists,
-  userTextFileExists,
-} from "@llm-space/core/server";
+import { userDirectoryExists } from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
 import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
@@ -30,7 +26,9 @@ import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
+import { createPromptFileRpcHandlers } from "./prompt-files";
 import { createShareThreadHandler } from "./share-thread";
+import { forwardStreamThread } from "./stream-thread-request";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -73,6 +71,7 @@ export function createMainWindowRPC({
   updater,
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
+  const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
   const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
@@ -212,13 +211,8 @@ export function createMainWindowRPC({
         fsRealpath: async ({ runtimeId, path }) => ({
           path: await getRuntime(runtimeId).fsRealpath(path),
         }),
-        // Unconfined text read for the prompt `@include` macro (any path + `~`).
-        fsReadText: async ({ path }) => ({
-          text: await readUserTextFile(path),
-        }),
-        fsTextFileExists: async ({ path }) => ({
-          exists: await userTextFileExists(path),
-        }),
+        // Unconfined prompt-file access (any path + `~`) stays on its owner.
+        ...promptFileRequests,
         fsDirectoryExists: async ({ path }) => ({
           exists: await userDirectoryExists(path),
         }),
@@ -417,8 +411,10 @@ export function createMainWindowRPC({
         sendStreamThreadRequest: (payload) => {
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
           // messages. `rpc` is initialized by the time this handler runs.
-          void getRuntime(payload.runtimeId).streamThread(payload, (message) =>
-            rpc.send.receiveStreamThreadResponse(message)
+          void forwardStreamThread(
+            () => getRuntime(payload.runtimeId),
+            payload,
+            (message) => rpc.send.receiveStreamThreadResponse(message)
           );
         },
         abortStreamThread: (payload) =>

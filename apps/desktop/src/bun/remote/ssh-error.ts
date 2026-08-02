@@ -57,8 +57,7 @@ function _formatRemotePortInUse(output: string): string | null {
   if (!failure) return null;
   return [
     `Remote runtime port ${failure.port} is already in use.`,
-    "LLM Space will try to stop a stale llm-space-server process on that SSH host and retry once.",
-    "If the port belongs to another process, stop that process manually or choose a different remote server port.",
+    "LLM Space will retry with a different per-connection port without stopping the existing listener.",
   ].join(" ");
 }
 

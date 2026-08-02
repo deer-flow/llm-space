@@ -520,6 +520,7 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
               paneId: "pane-tabs",
             },
           ]}
+          paneTabs={[]}
           activeId={tabId}
           activate={() => undefined}
           refresh={() => undefined}
@@ -532,6 +533,15 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
           share={(path, runtimeId) => shared.push({ path, runtimeId })}
           copyFile={() => undefined}
           reorder={() => undefined}
+          lifecycleHost={{
+            acquireMutation: () => () => undefined,
+            isMutationReserved: () => false,
+            onPersistenceChange: () => undefined,
+            onRefreshSettled: () => undefined,
+            onRunSettled: () => undefined,
+            onRunStart: () => true,
+          }}
+          mutationRevision={0}
         />
       </_Providers>
     );

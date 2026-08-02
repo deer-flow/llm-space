@@ -21,7 +21,7 @@ const CAPABILITIES: RuntimeCapability[] = [
 const HEALTH_BODY = {
   ok: true,
   version: currentDesktopVersion(),
-  protocolVersion: 1,
+  protocolVersion: 2,
   capabilities: CAPABILITIES,
   homePath: "/tmp/remote",
   workspacePath: "/tmp/remote/workspace",
@@ -131,6 +131,10 @@ describe("RemoteRuntimeClient", () => {
 
   test("rejects incompatible protocol, version, and capabilities", async () => {
     await _expectConnectError(
+      { ...HEALTH_BODY, protocolVersion: 1 },
+      "Remote runtime protocol mismatch"
+    );
+    await _expectConnectError(
       { ...HEALTH_BODY, protocolVersion: 999 },
       "Remote runtime protocol mismatch"
     );
@@ -193,6 +197,45 @@ describe("RemoteRuntimeClient", () => {
     ]);
   });
 
+  test("uses remote prompt-file operations without a local fallback", async () => {
+    const requests: { method: string; params?: unknown }[] = [];
+    await _withFetch(
+      async (request) => {
+        const body = (await request.json()) as {
+          method: string;
+          params?: unknown;
+        };
+        requests.push(body);
+        const result =
+          body.method === "fs.readText"
+            ? "REMOTE CONTENT"
+            : body.method === "fs.textFileExists";
+        return Response.json({ id: "1", ok: true, result });
+      },
+      async () => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl: "http://remote.test",
+          token: "secret",
+        });
+
+        expect(await client.readTextFile("~/prompt.md")).toBe(
+          "REMOTE CONTENT"
+        );
+        expect(await client.textFileExists("/remote-only.md")).toBe(true);
+      }
+    );
+
+    expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
+      { method: "fs.readText", params: { path: "~/prompt.md" } },
+      {
+        method: "fs.textFileExists",
+        params: { path: "/remote-only.md" },
+      },
+    ]);
+  });
+
   test("parses SSE stream events", async () => {
     const events: AgentEvent[] = [];
     await _withFetch(
@@ -232,7 +275,86 @@ describe("RemoteRuntimeClient", () => {
 
     expect(events).toEqual([{ type: "agent_start" }]);
   });
+
+  test("does not complete after a remote stream error", async () => {
+    const messages: unknown[] = [];
+    await _withSseServer(
+      [
+        "data: [START]\n\n",
+        'data: {"type":"error","message":"Remote failed"}\n\n',
+        "data: [DONE]\n\n",
+      ],
+      async (baseUrl) => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl,
+          token: "secret",
+        });
+        await client.streamThread(
+          { streamId: "s1", request: {} as AgentStreamRequest },
+          (message) => messages.push(message)
+        );
+      }
+    );
+
+    expect(messages).toEqual([
+      { streamId: "s1", type: "error", message: "Remote failed" },
+    ]);
+  });
+
+  test("rejects malformed SSE JSON", async () => {
+    await _withSseServer(
+      ["data: [START]\n\n", "data: {not valid JSON}\n\n"],
+      async (baseUrl) => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl,
+          token: "secret",
+        });
+        let rejection: unknown;
+        try {
+          await client.streamThread(
+            { streamId: "s1", request: {} as AgentStreamRequest },
+            () => undefined
+          );
+        } catch (error) {
+          rejection = error;
+        }
+        expect(rejection).toBeInstanceOf(SyntaxError);
+      }
+    );
+  });
 });
+
+async function _withSseServer(
+  chunks: string[],
+  run: (baseUrl: string) => Promise<void>
+): Promise<void> {
+  const server = Bun.serve({
+    port: 0,
+    fetch() {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+  });
+  try {
+    await run(`http://127.0.0.1:${server.port}`);
+  } finally {
+    await server.stop(true);
+  }
+}
 
 async function _withFetch(
   handler: (request: Request) => Response | Promise<Response>,

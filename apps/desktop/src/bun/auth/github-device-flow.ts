@@ -157,7 +157,8 @@ export async function pollForAccessToken(
 
 /** Fetch the authenticated user's public profile with a bearer token. */
 export async function fetchGithubUser(
-  accessToken: string
+  accessToken: string,
+  signal: AbortSignal
 ): Promise<GithubUser> {
   const response = await fetch(USER_URL, {
     headers: {
@@ -166,6 +167,7 @@ export async function fetchGithubUser(
       "User-Agent": USER_AGENT,
       "X-GitHub-Api-Version": "2022-11-28",
     },
+    signal,
   });
   if (!response.ok) {
     throw new DeviceFlowError(
@@ -180,7 +182,7 @@ export async function fetchGithubUser(
   const email =
     typeof data.email === "string" && data.email
       ? data.email
-      : await _fetchPrimaryEmail(accessToken);
+      : await _fetchPrimaryEmail(accessToken, signal);
   return {
     login,
     name: typeof data.name === "string" ? data.name : null,
@@ -191,7 +193,10 @@ export async function fetchGithubUser(
 }
 
 /** The user's primary (or first verified) email, best-effort; null on failure. */
-async function _fetchPrimaryEmail(accessToken: string): Promise<string | null> {
+async function _fetchPrimaryEmail(
+  accessToken: string,
+  signal: AbortSignal
+): Promise<string | null> {
   try {
     const response = await fetch(USER_EMAILS_URL, {
       headers: {
@@ -200,6 +205,7 @@ async function _fetchPrimaryEmail(accessToken: string): Promise<string | null> {
         "User-Agent": USER_AGENT,
         "X-GitHub-Api-Version": "2022-11-28",
       },
+      signal,
     });
     if (!response.ok) {
       return null;
@@ -214,7 +220,10 @@ async function _fetchPrimaryEmail(accessToken: string): Promise<string | null> {
       emails.find((e) => e.verified) ??
       emails[0];
     return typeof chosen?.email === "string" ? chosen.email : null;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     return null;
   }
 }

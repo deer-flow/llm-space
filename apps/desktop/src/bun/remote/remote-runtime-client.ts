@@ -141,6 +141,14 @@ export class RemoteRuntimeClient implements RuntimeClient {
     return result.path;
   }
 
+  readTextFile(path: string) {
+    return this._rpc<string>("fs.readText", { path });
+  }
+
+  textFileExists(path: string) {
+    return this._rpc<boolean>("fs.textFileExists", { path });
+  }
+
   mcpListServers() {
     return this._rpc<McpServerView[]>("mcp.listServers");
   }
@@ -196,11 +204,12 @@ export class RemoteRuntimeClient implements RuntimeClient {
             type: "error",
             message: event.message,
           });
+          return;
         } else {
           send({ streamId: payload.streamId, type: "event", event });
         }
       }
-      send({ streamId: payload.streamId, type: "done" });
+      throw new Error("Remote runtime stream ended before [DONE].");
     } finally {
       this._activeStreams.delete(payload.streamId);
     }

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getMessageText,
   type McpServerView,
   type ModelConfig,
   type ModelProviderGroup,
@@ -19,7 +18,6 @@ import {
   type GeneratorModelInfo,
   type GeneratorResult,
 } from "@llm-space/core/generator";
-import { renderThreadPromptVariables } from "@llm-space/core/thread";
 import {
   createOneShotRunner,
   createWorkflowContext,
@@ -57,8 +55,16 @@ import { Input } from "../../../ui/input";
 import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
-import { useThreadStore } from "../stores/thread-store";
-import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
+import {
+  useThreadStore,
+  useThreadStoreApi,
+} from "../stores/thread-store";
+
+import { createGenerateProjectPromptPreparer } from "./generate-project-prompt-preparer";
+import {
+  bindProjectGenerationRuntime,
+  type ProjectGenerationRuntime,
+} from "./project-generation-runtime";
 
 /** The generator to run. V1 ships only LangGraph. */
 const GENERATOR_ID = "langgraph";
@@ -100,7 +106,7 @@ export function GenerateProjectButton({
 }) {
   const {
     generator,
-    transport,
+    createTransport,
     skills,
     files,
     builtinTools,
@@ -108,12 +114,18 @@ export function GenerateProjectButton({
     actions,
     presentational,
   } = useHostServices();
+  const store = useThreadStoreApi();
   const context = useThreadStore((s) => s.thread.context);
+  const runtimeId = useThreadStore((s) => s.runtimeId);
   const savedModel = useThreadStore((s) => s.thread.model);
   const title = useThreadStore((s) => s.thread.title);
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
+  const preparePromptContext = useMemo(
+    () => createGenerateProjectPromptPreparer({ files, store }),
+    [files, store]
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>("framework");
@@ -135,6 +147,7 @@ export function GenerateProjectButton({
 
   // Run step.
   const abortRef = useRef<AbortController | null>(null);
+  const generationRuntimeRef = useRef<ProjectGenerationRuntime | null>(null);
   const [uvMissing, setUvMissing] = useState(false);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
@@ -174,6 +187,7 @@ export function GenerateProjectButton({
     setLastMcpServers([]);
     setEnvConfirmOpen(false);
     setWritingEnv(false);
+    generationRuntimeRef.current = null;
   }, [open, title, metaUserPromptSuggested]);
 
   const targetPreview = useMemo(
@@ -183,9 +197,20 @@ export function GenerateProjectButton({
 
   const runGeneration = useCallback(
     async (targetDir: string) => {
-      if (!generator || !transport || !model) {
+      if (!generator || !runtimeId || !model) {
         return;
       }
+      const generationRuntime = bindProjectGenerationRuntime({
+        runtimeId,
+        createTransport,
+        skills,
+        mcp,
+        generator,
+      });
+      if (!generationRuntime) {
+        return;
+      }
+      generationRuntimeRef.current = generationRuntime;
       setRunning(true);
       setEvents([]);
       setError(null);
@@ -206,30 +231,20 @@ export function GenerateProjectButton({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const skillList = await listEnabledPromptVariableSkills(skills);
-        const rendered = await renderThreadPromptVariables({
-          context: context ?? {},
-          loadSkills: () => Promise.resolve(skillList),
-          loadFile: (path) => files.readText(path),
-          fileExists: (path) => files.exists(path),
+        const skillList = await generationRuntime.listEnabledSkills();
+        const {
+          rendered,
+          systemPromptTemplate,
+          firstUserMessageTemplate,
+          renderedVariableValues,
+        } = await preparePromptContext({
+          skillList,
+          useMetaUserPrompt,
         });
-        // Ship the raw prompt (variables live at runtime), with `@include`
-        // macros expanded now since the generated project renders with Jinja2.
-        const systemPromptTemplate = await _expandIncludes(
-          context?.systemPrompt ?? "",
-          (path) => files.readText(path)
-        );
-        const firstMessage = context?.messages?.[0];
-        const firstUserMessageTemplate =
-          useMetaUserPrompt && firstMessage?.role === "user"
-            ? await _expandIncludes(getMessageText(firstMessage), (path) =>
-                files.readText(path)
-              )
-            : undefined;
-        const renderedVariableValues: Record<string, string> =
-          Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
-          runOneShot: createOneShotRunner({ transport }),
+          runOneShot: createOneShotRunner({
+            transport: generationRuntime.transport,
+          }),
           defaultModel: model,
           signal: controller.signal,
           report: (event) => setEvents((prev) => [...prev, event]),
@@ -240,14 +255,17 @@ export function GenerateProjectButton({
         }
         // Best-effort: the user's search settings seed the project's .env when
         // it ships web tools. A failure here shouldn't abort generation.
-        const searchInfo = await generator
+        const searchInfo = await generationRuntime
           .getSearchSettings()
           .catch(() => undefined);
         setLastSearch(searchInfo);
         // Resolve the thread's MCP tools to their server configs (transport,
         // command/URL) from settings so the generated project connects for real.
         // Best-effort — a failure here shouldn't abort generation.
-        const mcpServers = await _resolveMcpServers(context, mcp);
+        const mcpServers = await _resolveMcpServers(
+          context,
+          () => generationRuntime.listMcpServers()
+        );
         setLastMcpServers(mcpServers);
         const outcome = await definition.run(workflow, {
           targetDir,
@@ -275,11 +293,12 @@ export function GenerateProjectButton({
     },
     [
       generator,
-      transport,
+      createTransport,
+      runtimeId,
       model,
       context,
       skills,
-      files,
+      preparePromptContext,
       framework,
       providers,
       mcp,
@@ -362,7 +381,8 @@ export function GenerateProjectButton({
   // Opt-in: write a real `.env` into the generated project, resolving the
   // model + search keys to their actual values (following `$ENV` references).
   const createEnvFile = useCallback(async () => {
-    if (!generator || !model || !result) {
+    const generationRuntime = generationRuntimeRef.current;
+    if (!generator || !generationRuntime || !model || !result) {
       return;
     }
     setWritingEnv(true);
@@ -388,7 +408,7 @@ export function GenerateProjectButton({
           }
         }
       }
-      const { modelApiKey, envValues } = await generator.resolveEnv(
+      const { modelApiKey, envValues } = await generationRuntime.resolveEnv(
         model.provider,
         envNames
       );
@@ -432,7 +452,7 @@ export function GenerateProjectButton({
     openGeneratedProject,
   ]);
 
-  if (presentational || !generator || !transport) {
+  if (presentational || !generator || !runtimeId) {
     return null;
   }
 
@@ -1158,42 +1178,6 @@ function _shellQuote(path: string): string {
     : `'${path.replace(/'/g, "'\\''")}'`;
 }
 
-/** `{{@include("path")}}` macro with a single quoted path argument. */
-const INCLUDE_MACRO_RE = /\{\{\s*@include\(\s*(['"])([\s\S]*?)\1\s*\)\s*\}\}/g;
-
-/**
- * Expand LLM Space's `@include(...)` macro by inlining the referenced files,
- * so the generated project (which renders with plain Jinja2) doesn't need it.
- * Bounded recursion guards against include cycles.
- */
-async function _expandIncludes(
-  text: string,
-  readText: (path: string) => Promise<string>,
-  depth = 0
-): Promise<string> {
-  if (depth > 10 || !text.includes("@include")) {
-    return text;
-  }
-  const matches = [...text.matchAll(INCLUDE_MACRO_RE)];
-  if (matches.length === 0) {
-    return text;
-  }
-  let out = "";
-  let last = 0;
-  for (const match of matches) {
-    out += text.slice(last, match.index);
-    let content: string;
-    try {
-      content = await readText(match[2]);
-    } catch {
-      content = "";
-    }
-    out += await _expandIncludes(content, readText, depth + 1);
-    last = (match.index ?? 0) + match[0].length;
-  }
-  return out + text.slice(last);
-}
-
 function ProgressLine({ event }: { event: WorkflowEvent }) {
   if (event.type === "phase") {
     return (
@@ -1252,7 +1236,7 @@ function _resolveModelInfo(
  */
 async function _resolveMcpServers(
   context: ThreadContext | undefined,
-  mcp: { listServers(): Promise<McpServerView[]> }
+  listServers: () => Promise<McpServerView[]>
 ): Promise<GeneratorMcpServer[]> {
   const usedServerIds = new Set(
     (context?.tools ?? []).flatMap((t) =>
@@ -1263,7 +1247,7 @@ async function _resolveMcpServers(
     return [];
   }
   try {
-    const servers = await mcp.listServers();
+    const servers = await listServers();
     return servers
       .filter((s) => usedServerIds.has(s.id))
       .map((s) => ({
