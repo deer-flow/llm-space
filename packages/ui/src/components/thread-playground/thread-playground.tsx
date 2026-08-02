@@ -6,7 +6,6 @@ import {
   HistoryIcon,
   PlayIcon,
   Redo2Icon,
-  Share2Icon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -66,6 +65,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
+import { ThreadShareButton } from "./thread-share-button";
 import { ToolListView } from "./tool/tool-list-view";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
@@ -195,6 +195,7 @@ function ThreadPlaygroundContent({
   title: titleFromProps,
   headerDetails,
   headerActions,
+  runtimeId,
   onRenameTitle,
   validateTitle,
   readonly: readonlyFromProps = false,
@@ -336,15 +337,12 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
               <Tooltip content="Share thread">
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Share thread"
+                <ThreadShareButton
+                  path={path}
+                  runtimeId={runtimeId}
                   disabled={status !== "idle"}
-                  onClick={() => actions.shareThread(path)}
-                >
-                  <Share2Icon className="size-4" />
-                </Button>
+                  onShare={(input) => actions.shareThread(input)}
+                />
               </Tooltip>
               <GenerateProjectButton disabled={status !== "idle"} />
             </div>

@@ -6,6 +6,7 @@ import {
   chooseActiveTabForRuntime,
   filterTabsForRuntime,
   removeTabsForRuntime,
+  resolveShareThreadTarget,
 } from "./tab-runtime-scope";
 
 interface TestTab {
@@ -74,5 +75,50 @@ describe("tab runtime scope", () => {
       "thread:local:same.json",
       "thread:remote:server-2:same.json",
     ]);
+  });
+});
+
+describe("share target runtime scope", () => {
+  test("retains an explicit remote owner even while local is visible", () => {
+    expect(
+      resolveShareThreadTarget(
+        { path: "threads/same.json", runtimeId: "remote:server-1" },
+        "local",
+        { path: "threads/local.json", runtimeId: "local" }
+      )
+    ).toEqual({
+      path: "threads/same.json",
+      runtimeId: "remote:server-1",
+    });
+  });
+
+  test("resolves the active remote tab for menu and palette entry points", () => {
+    expect(
+      resolveShareThreadTarget({}, "remote:server-1", {
+        path: "threads/active.json",
+        runtimeId: "remote:server-1",
+      })
+    ).toEqual({
+      path: "threads/active.json",
+      runtimeId: "remote:server-1",
+    });
+  });
+
+  test("preserves local active-thread sharing", () => {
+    expect(
+      resolveShareThreadTarget({}, "local", {
+        path: "threads/local.json",
+        runtimeId: "local",
+      })
+    ).toEqual({ path: "threads/local.json", runtimeId: "local" });
+  });
+
+  test("does not substitute an active tab owned by another runtime", () => {
+    expect(
+      resolveShareThreadTarget({ runtimeId: "remote:server-1" }, "local", {
+        path: "threads/local.json",
+        runtimeId: "local",
+      })
+    ).toBeNull();
   });
 });

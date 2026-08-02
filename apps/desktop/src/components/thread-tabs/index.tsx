@@ -3,6 +3,7 @@ export {
   chooseActiveTabForRuntime,
   filterTabsForRuntime,
   removeTabsForRuntime,
+  resolveShareThreadTarget,
 } from "./tab-runtime-scope";
 export { useThreadTabs, tabLabel } from "./use-thread-tabs";
 export type {

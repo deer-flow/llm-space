@@ -35,6 +35,7 @@ import { electrobun } from "@/lib/electrobun";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { createDesktopShareThreadAction } from "./share-thread-action";
 function _rpc() {
   if (!electrobun.rpc) {
     throw new Error("Electrobun RPC is not initialized");
@@ -158,8 +159,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
             args: { tab: tab as SettingsTab },
           }),
         openLink: (url) => executeCommand({ type: "openLink", args: { url } }),
-        shareThread: (path) =>
-          executeCommand({ type: "shareThread", args: { path } }),
+        shareThread: createDesktopShareThreadAction(executeCommand),
         openVariables: (variableName) =>
           executeCommand({ type: "openVariables", args: { variableName } }),
         registerOpenVariables: (handler) =>

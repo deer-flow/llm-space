@@ -1,4 +1,7 @@
+import type { Thread } from "@llm-space/core";
+
 import { electrobun } from "@/lib/electrobun";
+import type { RuntimeId } from "@/shared/runtime";
 
 function _rpc() {
   if (!electrobun.rpc) {
@@ -19,6 +22,14 @@ export interface ShareThreadMeta {
   description?: string;
 }
 
+/** Read the thread selected for sharing from its owning runtime. */
+export function readShareThread(
+  runtimeId: RuntimeId,
+  path: string
+): Promise<Thread> {
+  return _rpc().request.fsRead({ runtimeId, path });
+}
+
 /**
  * Publish a workspace thread as a secret GitHub Gist and return its shareable
  * web link. Requires GitHub sign-in (the bun side throws otherwise); each call
@@ -26,10 +37,12 @@ export interface ShareThreadMeta {
  * viewer metadata.
  */
 export async function shareThread(
+  runtimeId: RuntimeId,
   path: string,
   meta?: ShareThreadMeta
 ): Promise<ShareThreadResult> {
   return _rpc().request.shareThread({
+    runtimeId,
     path,
     title: meta?.title,
     description: meta?.description,

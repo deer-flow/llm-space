@@ -15,7 +15,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileTextIcon, GitBranchIcon } from "lucide-react";
 import {
   lazy,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -24,7 +23,6 @@ import {
   useSyncExternalStore,
   type Dispatch,
   type MutableRefObject,
-  type ReactNode,
   type SetStateAction,
 } from "react";
 import { flushSync } from "react-dom";
@@ -41,7 +39,10 @@ import { FileSystemTreeView } from "@/components/file-system-tree-view";
 import { GithubAuthProvider } from "@/components/github-auth-provider";
 import { GithubDeviceDialog } from "@/components/github-device-dialog";
 import { GithubStarReminder } from "@/components/github-star-reminder";
+import { LazyMount } from "@/components/lazy-mount";
+import { PageShareThreadController } from "@/components/page-share-thread-controller";
 import { RemoteStatus } from "@/components/remote-status";
+import type { ShareThreadTarget } from "@/components/share-thread-dialog-flow";
 import { SharedImportProvider } from "@/components/shared-import-provider";
 import {
   chooseActiveTabForRuntime,
@@ -78,6 +79,7 @@ import {
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
+import { buildShareThreadCommand } from "@/shared/share";
 import type { TraceRecord } from "@/shared/traces";
 
 import { invalidateRuntimeSwitchQueries } from "./runtime-switch-queries";
@@ -107,31 +109,11 @@ const StartFromExampleDialog = lazy(() =>
     default: m.StartFromExampleDialog,
   }))
 );
-const ShareThreadDialog = lazy(() =>
-  import("@/components/share-thread-dialog").then((m) => ({
-    default: m.ShareThreadDialog,
-  }))
-);
 const LazyTracePanel = lazy(() =>
   import("@/components/trace-panel").then((m) => ({
     default: m.TracePanel,
   }))
 );
-
-/**
- * Renders a lazily-loaded overlay only once `open` first becomes true, then
- * keeps it mounted. Deferring the initial mount keeps the overlay's chunk out of
- * first paint; latching it mounted afterwards means its close animation and
- * subsequent opens are instant. The latch is a render-time ref (not an effect)
- * so the lazy `import()` starts in the same render that opens the overlay,
- * without a wasted extra render of the page tree.
- */
-function LazyMount({ open, children }: { open: boolean; children: ReactNode }) {
-  const mounted = useRef(false);
-  if (open) mounted.current = true;
-  if (!mounted.current) return null;
-  return <Suspense fallback={null}>{children}</Suspense>;
-}
 
 function _SidebarModeSwitch({
   mode,
@@ -317,6 +299,12 @@ function PageWorkspace({
       chooseActiveTabForRuntime(tabs.tabs, tabs.activeId, workspaceRuntimeId),
     [tabs.activeId, tabs.tabs, workspaceRuntimeId]
   );
+  const getActiveShareThread = useCallback((): ShareThreadTarget | null => {
+    const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
+    return activeTab?.type === "thread"
+      ? { path: activeTab.path, runtimeId: activeTab.runtimeId }
+      : null;
+  }, [visibleActiveId, visibleTabs]);
   // The visible active tab is read through a ref so command handlers never go
   // stale or accidentally target a tab from another runtime.
   const activeTabIdRef = useRef(visibleActiveId);
@@ -474,9 +462,6 @@ function PageWorkspace({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  // The thread path being shared (a specific file, or the resolved active tab).
-  const shareTargetRef = useRef("");
   const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
   // Which folder a chosen example's thread is created into (default: root).
   const examplesParentRef = useRef("");
@@ -682,22 +667,6 @@ function PageWorkspace({
       examplesParentRef.current = parent;
       setExamplesOpen(true);
     },
-    // Share a specific thread, or the active thread when no path is given (the
-    // header button / native menu / palette). Thread tab ids are
-    // `thread:{runtimeId}:{path}`.
-    shareThread: ({ path, runtimeId }) => {
-      const targetRuntimeId = runtimeId ?? workspaceRuntimeId;
-      if (targetRuntimeId !== workspaceRuntimeId) return;
-      const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
-      const target =
-        path ??
-        (activeTab?.type === "thread" && activeTab.runtimeId === targetRuntimeId
-          ? activeTab.path
-          : undefined);
-      if (!target) return;
-      shareTargetRef.current = target;
-      setShareOpen(true);
-    },
     importFiles: ({ parent = "", files, runtimeId }) => {
       const targetRuntimeId = runtimeId ?? workspaceRuntimeIdRef.current;
       if (targetRuntimeId !== workspaceRuntimeIdRef.current) return;
@@ -828,7 +797,7 @@ function PageWorkspace({
   );
   const handleShareThread = useCallback(
     (path: string, runtimeId: RuntimeId) =>
-      executeCommand({ type: "shareThread", args: { path, runtimeId } }),
+      executeCommand(buildShareThreadCommand(path, runtimeId)),
     [executeCommand]
   );
   // Copy the thread file to the OS clipboard as a file reference. The bun-side
@@ -1020,6 +989,10 @@ function PageWorkspace({
       <GithubDeviceDialog />
       <GithubStarReminder />
       <FeatureReminderDialog />
+      <PageShareThreadController
+        workspaceRuntimeId={workspaceRuntimeId}
+        getActiveThread={getActiveShareThread}
+      />
       <LazyMount open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}
@@ -1045,13 +1018,6 @@ function PageWorkspace({
       </LazyMount>
       <LazyMount open={onboardOpen}>
         <OnboardDialog open={onboardOpen} onOpenChange={setOnboardOpen} />
-      </LazyMount>
-      <LazyMount open={shareOpen}>
-        <ShareThreadDialog
-          open={shareOpen}
-          path={shareTargetRef.current}
-          onOpenChange={setShareOpen}
-        />
       </LazyMount>
       <LazyMount open={examplesOpen}>
         <StartFromExampleDialog

@@ -3,7 +3,53 @@ import type {
   ModelProviderGroup,
   Thread,
 } from "@llm-space/core";
+import {
+  GIST_CONNECTOR_ID,
+  type GistThreadWriter,
+} from "@llm-space/core/storage";
 import { resolveModelConfig } from "@llm-space/core/thread";
+import type { RuntimeClient, RuntimeId } from "@llm-space/runtime/runtime";
+
+import { buildWebShareUrl } from "../../shared/share";
+
+interface ShareThreadInput {
+  runtimeId: RuntimeId;
+  path: string;
+  title?: string;
+  description?: string;
+}
+
+interface ShareThreadHandlerDependencies {
+  getRuntime: (runtimeId: RuntimeId) => RuntimeClient;
+  gistWriter: Pick<GistThreadWriter, "write">;
+}
+
+/**
+ * Create the Bun RPC handler that publishes a thread from exactly one runtime.
+ * Runtime resolution happens once, before any filesystem or model reads.
+ */
+export function createShareThreadHandler({
+  getRuntime,
+  gistWriter,
+}: ShareThreadHandlerDependencies) {
+  return async ({ runtimeId, path, title, description }: ShareThreadInput) => {
+    const runtime = getRuntime(runtimeId);
+    if (runtime.info().status !== "connected") {
+      throw new Error(`Runtime is not connected: ${runtimeId}`);
+    }
+    const [thread, providers, defaultModel] = await Promise.all([
+      runtime.fsRead(path),
+      runtime.availableModels(),
+      runtime.getDefaultModel(),
+    ]);
+    const shared = buildSharedThread(thread, providers, defaultModel, title);
+    const locator = await gistWriter.write(shared, undefined, { description });
+    return {
+      gistId: locator.id,
+      shareUrl: buildWebShareUrl(GIST_CONNECTOR_ID, locator.id),
+    };
+  };
+}
 
 /**
  * Build the copy published by sharing without mutating the local thread.

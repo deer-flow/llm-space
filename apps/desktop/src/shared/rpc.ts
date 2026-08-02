@@ -255,7 +255,12 @@ export interface DesktopRPCType {
       // description). Throws when signed out or the gist API fails; the renderer
       // maps the error to friendly copy.
       shareThread: {
-        params: { path: string; title?: string; description?: string };
+        params: {
+          runtimeId: RuntimeId;
+          path: string;
+          title?: string;
+          description?: string;
+        };
         response: { shareUrl: string; gistId: string };
       };
       // Open an absolute directory itself, or reveal an absolute file selected
