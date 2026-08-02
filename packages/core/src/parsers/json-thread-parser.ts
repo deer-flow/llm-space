@@ -1,12 +1,21 @@
-import { Compile } from "typebox/compile";
+import { z } from "zod";
 
-import { Message, Thread, type Tool, type ToolCall } from "../types";
-import { parseJSON, uuid } from "../utils";
+import {
+  Message,
+  RecoverableThreadZodSchema,
+  ThreadZodSchema,
+  type Thread,
+  type Tool,
+  type ToolCall,
+} from "../types";
+import { parseJSON, parseJsonWithSchema, uuid } from "../utils";
 
 import { normalizeToThread } from "./normalize-thread";
-import type { ThreadParseContext, ThreadParser } from "./thread-parser";
-
-const _threadValidator = Compile(Thread);
+import type {
+  ThreadParseContext,
+  ThreadParseDiagnostic,
+  ThreadParser,
+} from "./thread-parser";
 
 /**
  * Parses a `.json` thread file. Content that already matches our internal
@@ -20,17 +29,59 @@ export class JsonThreadParser implements ThreadParser {
     raw: string,
     context?: ThreadParseContext
   ): Promise<Thread | undefined> {
-    return Promise.resolve(_parse(raw, context));
+    return this.parseDetailed(raw, context).then((result) =>
+      result.status === "parsed" ? result.thread : undefined
+    );
+  }
+
+  parseDetailed(
+    raw: string,
+    context?: ThreadParseContext
+  ): Promise<ThreadParseDiagnostic> {
+    return Promise.resolve(_parseDetailed(raw, context));
   }
 }
 
-function _parse(raw: string, context?: ThreadParseContext): Thread | undefined {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return undefined;
+function _parseDetailed(
+  raw: string,
+  context?: ThreadParseContext
+): ThreadParseDiagnostic {
+  const parsed = parseJsonWithSchema(raw, z.unknown(), {
+    recovery: "best-effort",
+  });
+  if (parsed.status === "invalid-json" || parsed.status === "invalid-shape") {
+    return {
+      status: parsed.status,
+      message: "The file does not contain valid JSON.",
+    };
   }
+  const thread = _parseData(parsed.value, context);
+  if (!thread) {
+    return {
+      status: "invalid-shape",
+      message: "The JSON does not contain a recognized thread.",
+    };
+  }
+  const validated = (
+    parsed.status === "recovered" ? RecoverableThreadZodSchema : ThreadZodSchema
+  ).safeParse(thread);
+  if (!validated.success) {
+    return {
+      status: "invalid-shape",
+      message: "The recovered thread has invalid or incomplete fields.",
+    };
+  }
+  return {
+    status: "parsed",
+    thread: validated.data,
+    recovered: parsed.status === "recovered",
+  };
+}
+
+function _parseData(
+  data: unknown,
+  context?: ThreadParseContext
+): Thread | undefined {
   if (data === null || typeof data !== "object") {
     return undefined;
   }
@@ -41,10 +92,25 @@ function _parse(raw: string, context?: ThreadParseContext): Thread | undefined {
   // under `context`). Guarding on that prevents a foreign `{ messages: [...] }`
   // dump — which validates as an *empty* Thread since all fields are optional
   // and extra keys are allowed — from short-circuiting and dropping its data.
-  if (!_looksForeign(data) && _threadValidator.Check(data)) {
-    return data;
+  if (!_looksForeign(data) && _looksNative(data)) {
+    const native = ThreadZodSchema.safeParse(data);
+    if (native.success) return native.data;
   }
   return normalizeToThread(data, context);
+}
+
+function _looksNative(data: object): boolean {
+  return [
+    "title",
+    "model",
+    "context",
+    "runHistory",
+    "evaluations",
+    "evaluationRubrics",
+    "modelName",
+    "runtimeId",
+    "originalURL",
+  ].some((key) => key in data);
 }
 
 function _looksForeign(data: object): boolean {

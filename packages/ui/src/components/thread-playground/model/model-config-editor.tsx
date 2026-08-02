@@ -1,6 +1,9 @@
 "use client";
 
-import { useModel, useResolveModelConfig } from "@llm-space/ui/components/model-provider";
+import {
+  useModel,
+  useResolveModelConfig,
+} from "@llm-space/ui/components/model-provider";
 import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 
@@ -8,6 +11,7 @@ import { useThreadStore } from "../stores";
 
 import { ModelParamsPopover } from "./model-params-popover";
 import { ModelSelector } from "./model-selector";
+import { ProviderProfileSelector } from "./provider-profile-selector";
 
 export function ModelConfigEditor({
   className,
@@ -59,7 +63,15 @@ export function ModelConfigEditor({
               {modelName ?? savedModel?.id ?? "(No model)"}
             </span>
           ) : (
-            <ModelSelector value={model ?? null} readonly={readonly} />
+            <div className="flex items-center gap-2">
+              <ModelSelector value={model ?? null} readonly={readonly} />
+              {model ? (
+                <ProviderProfileSelector
+                  providerId={model.provider}
+                  readonly={readonly}
+                />
+              ) : null}
+            </div>
           )}
         </div>
         {paramSummary.length > 0 ? (

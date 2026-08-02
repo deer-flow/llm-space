@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
 import { PostHog } from "posthog-node";
+import { z } from "zod";
 
 import electrobunConfig from "../../../electrobun.config";
 import type {
@@ -35,6 +39,12 @@ interface PersistedAnalytics extends AnalyticsSettings {
    */
   anonymousId: string;
 }
+
+const PersistedAnalyticsFileSchema: z.ZodType<Partial<PersistedAnalytics>> =
+  z.object({
+    anonymousId: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+  });
 
 /**
  * Anonymous, behaviour-only product analytics — the single network egress for
@@ -141,12 +151,7 @@ export class Analytics {
   }
 
   private _writeConfig(config: PersistedAnalytics): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(config, null, 2)}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, config);
   }
 
   /**
@@ -158,36 +163,23 @@ export class Analytics {
     persisted: PersistedAnalytics;
     isFirstRun: boolean;
   } {
-    let parsed: Partial<PersistedAnalytics> = {};
-    try {
-      parsed = JSON.parse(
-        readFileSync(this._configPath, "utf8")
-      ) as Partial<PersistedAnalytics>;
-    } catch {
-      // Missing, corrupt, or unreadable - treat as empty and reseed below.
+    const result = readJsonFileSync<Partial<PersistedAnalytics>>(
+      this._configPath,
+      {
+        schema: PersistedAnalyticsFileSchema,
+        recovery: "best-effort",
+        fallback: (): Partial<PersistedAnalytics> => ({}),
+        seedMissing: true,
+      }
+    );
+    const isFirstRun = !result.value.anonymousId;
+    const persisted: PersistedAnalytics = {
+      anonymousId: result.value.anonymousId ?? randomUUID(),
+      enabled: result.value.enabled ?? DEFAULT_ANALYTICS_SETTINGS.enabled,
+    };
+    if (isFirstRun || result.source !== "strict") {
+      this._writeConfig(persisted);
     }
-
-    // Honour a persisted opt-out independently of the install id: a partial
-    // file (e.g. a hand-edited or truncated one that lost its id) must never
-    // silently re-enroll a user who turned analytics off.
-    const enabled =
-      typeof parsed.enabled === "boolean"
-        ? parsed.enabled
-        : DEFAULT_ANALYTICS_SETTINGS.enabled;
-
-    if (parsed.anonymousId) {
-      return {
-        persisted: { anonymousId: parsed.anonymousId, enabled },
-        isFirstRun: false,
-      };
-    }
-
-    const seeded: PersistedAnalytics = { anonymousId: randomUUID(), enabled };
-    try {
-      this._writeConfig(seeded);
-    } catch {
-      // Non-fatal: we'll just mint a fresh id again next launch.
-    }
-    return { persisted: seeded, isFirstRun: true };
+    return { persisted, isFirstRun };
   }
 }

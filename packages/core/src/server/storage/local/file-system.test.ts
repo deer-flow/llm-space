@@ -3,7 +3,6 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-
 import type { Thread } from "../../../types";
 
 import { LocalFileSystem } from "./file-system";
@@ -32,9 +31,9 @@ describe("LocalFileSystem.mv", () => {
       "destination already exists"
     );
 
-    expect(fs.readFile(fileSystem.realpath("alpha.json"), "utf8")).resolves.toBe(
-      "alpha"
-    );
+    expect(
+      fs.readFile(fileSystem.realpath("alpha.json"), "utf8")
+    ).resolves.toBe("alpha");
     expect(fs.readFile(fileSystem.realpath("beta.json"), "utf8")).resolves.toBe(
       "beta"
     );
@@ -138,5 +137,42 @@ describe("LocalFileSystem.write", () => {
     expect(Object.keys(raw.blobs as Record<string, string>)).toHaveLength(1);
     expect(JSON.stringify(raw).match(/blob:sha256:/g)).toHaveLength(2);
     expect(await fileSystem.read("thread.json")).toEqual(thread);
+  });
+});
+
+describe("LocalFileSystem.read recovery", () => {
+  test("backs up and repairs a truncated native thread", async () => {
+    const fileSystem = await _createFileSystem();
+    const filePath = fileSystem.realpath("recovered.json");
+    await fs.writeFile(
+      filePath,
+      '{"title":"Recovered","context":{"messages":[]}'
+    );
+
+    expect(await fileSystem.read("recovered.json")).toMatchObject({
+      title: "Recovered",
+      context: { messages: [] },
+    });
+    const repaired = await fs.readFile(filePath, "utf8");
+    expect(() => {
+      JSON.parse(repaired);
+    }).not.toThrow();
+    expect(
+      (await fs.readdir(fileSystem.realpath(""))).some((name) =>
+        name.startsWith("recovered.json.corrupt-")
+      )
+    ).toBe(true);
+  });
+
+  test("does not overwrite a thread whose recovered shape is invalid", async () => {
+    const fileSystem = await _createFileSystem();
+    const filePath = fileSystem.realpath("invalid.json");
+    const original = '{"context":{"messages":[{"role":"user"}]}}';
+    await fs.writeFile(filePath, original);
+
+    expect(fileSystem.read("invalid.json")).rejects.toThrow(
+      "invalid data shape"
+    );
+    expect(await fs.readFile(filePath, "utf8")).toBe(original);
   });
 });

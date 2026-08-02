@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  formatProviderProfileLabel,
   getArkImageModelDefinitions,
   type ArkImageGenerationConfig,
   type CustomModel,
   type ModelProviderGroup,
+  type ProviderProfile,
   type SeedreamImageModelDefinition,
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
@@ -12,14 +14,17 @@ import { Link } from "@llm-space/ui/components/link";
 import {
   useAddCustomProvider,
   useAddProvider,
+  useAddProviderProfile,
   useFetchBuiltinProviders,
   useModels,
   useRemoveCustomModel,
   useRemoveProvider,
+  useRemoveProviderProfile,
   useSetAllModelsEnabled,
   useSetModelEnabled,
   useTestModelConnection,
   useUpdateProvider,
+  useUpdateProviderProfile,
 } from "@llm-space/ui/components/model-provider";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
@@ -60,6 +65,7 @@ import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -452,12 +458,15 @@ function ProviderListItem({
 
 function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const updateProvider = useUpdateProvider();
+  const addProviderProfile = useAddProviderProfile();
+  const removeProviderProfile = useRemoveProviderProfile();
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
   const [iconDraft, setIconDraft] = useState(provider?.icon ?? "");
-  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
-    Boolean(provider?.baseUrl)
+  const [selectedProfileId, setSelectedProfileId] = useState(
+    provider?.profiles[0]?.id ?? ""
   );
+  const [removeProfileOpen, setRemoveProfileOpen] = useState(false);
   const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
     "all"
   );
@@ -492,18 +501,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   useEffect(() => {
     setApiValue(provider?.api ?? DEFAULT_CUSTOM_PROVIDER_API);
   }, [provider?.api, provider?.id]);
-
-  // Persist on blur, but only when the value actually changed. An empty field
-  // clears the key (stored as `null`).
-  const handleApiKeyBlur = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (!provider) return;
-    const value = event.target.value.trim();
-    const next = value === "" ? null : value;
-    const current = provider.apiKey ?? null;
-    if (next !== current) {
-      void updateProvider(provider.id, { apiKey: next });
-    }
-  };
 
   const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
     if (!provider) return;
@@ -543,26 +540,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     }
   };
 
-  // Persist the custom base URL on blur when changed. Empty ⇒ use the default.
-  const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (!provider) return;
-    const value = event.target.value.trim();
-    const next = value === "" ? null : value;
-    const current = provider.baseUrl ?? null;
-    if (next !== current) {
-      void updateProvider(provider.id, { baseUrl: next });
-    }
-  };
-
-  // The switch reveals/hides the base URL input; turning it off clears the
-  // stored value (⇒ use the provider default).
-  const handleBaseUrlToggle = (enabled: boolean) => {
-    setBaseUrlEnabled(enabled);
-    if (!enabled && provider) {
-      void updateProvider(provider.id, { baseUrl: null });
-    }
-  };
-
   if (!provider) {
     return (
       <div className="text-muted-foreground flex min-w-0 grow items-center justify-center text-sm">
@@ -582,6 +559,35 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     return true;
   });
   const isBuiltin = provider.builtin === true;
+  const selectedProfile =
+    provider.profiles.find((profile) => profile.id === selectedProfileId) ??
+    provider.profiles[0];
+  const selectedProfileIndex = provider.profiles.findIndex(
+    (profile) => profile.id === selectedProfile.id
+  );
+
+  const handleAddProfile = async () => {
+    try {
+      setSelectedProfileId(await addProviderProfile(provider.id));
+    } catch (error) {
+      toast.error("Failed to add connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const handleRemoveProfile = async () => {
+    try {
+      await removeProviderProfile(provider.id, selectedProfile.id);
+      setSelectedProfileId(provider.profiles[0].id);
+    } catch (error) {
+      toast.error("Failed to remove connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
 
   // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
   // providers are recognized by their models' API; custom providers follow the
@@ -589,10 +595,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const usesAnthropicApi = isBuiltin
     ? provider.models.some((model) => model.api === "anthropic-messages")
     : apiValue === "anthropic-messages";
-  const baseUrlPlaceholder = usesAnthropicApi
-    ? "https://api.example.com"
-    : "https://api.example.com/v1";
-
   return (
     <div className="flex min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
@@ -621,7 +623,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           {!isBuiltin && (
             <>
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Name</span>
+                <span className="text-sm font-medium">Provider name</span>
                 <Input
                   defaultValue={provider.name}
                   placeholder="Custom provider"
@@ -645,11 +647,13 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CUSTOM_PROVIDER_API_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {CUSTOM_PROVIDER_API_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -686,78 +690,70 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
-          {provider.id !== "openai-codex" && (
-            <ApiKeyField
-              label="API key"
-              getKeyUrl={provider.websiteLink}
-              defaultValue={provider.apiKey ?? ""}
-              placeholder={`Input API Key for ${provider.name}.`}
-              aria-label={`${provider.name} API key`}
-              onBlur={handleApiKeyBlur}
-              description={
-                <div className="text-muted-foreground pl-5 text-xs">
-                  <div className="list-item">
-                    {
-                      'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
-                    }
-                  </div>
-                  <div className="list-item">
-                    Leave it blank to use the official {provider.name}{" "}
-                    environment variable
-                  </div>
-                </div>
-              }
-            />
-          )}
-
-          {isBuiltin ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Custom base URL</span>
-                <Switch
-                  aria-label={
-                    baseUrlEnabled
-                      ? `Disable custom base URL for ${provider.name}`
-                      : `Enable custom base URL for ${provider.name}`
-                  }
-                  checked={baseUrlEnabled}
-                  onCheckedChange={handleBaseUrlToggle}
-                />
-              </div>
-              {baseUrlEnabled && (
-                <>
-                  <Input
-                    defaultValue={provider.baseUrl ?? ""}
-                    placeholder={baseUrlPlaceholder}
-                    aria-label={`${provider.name} custom base URL`}
-                    onBlur={handleBaseUrlBlur}
-                  />
-                  <div className="text-muted-foreground text-xs">
-                    Leave empty to use the default endpoint.
-                    {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
-                  </div>
-                </>
-              )}
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">Connection profiles</span>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedProfile.id}
+                onValueChange={setSelectedProfileId}
+              >
+                <SelectTrigger
+                  className="min-w-0 grow"
+                  aria-label={`${provider.name} connection profile`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {provider.profiles.map((profile, index) => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {formatProviderProfileLabel(profile, index)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Tooltip content="Add connection profile">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Add connection profile"
+                  onClick={() => void handleAddProfile()}
+                >
+                  <Plus data-icon="inline-start" />
+                </Button>
+              </Tooltip>
+              <Tooltip
+                content={
+                  selectedProfileIndex === 0
+                    ? "The default profile cannot be removed"
+                    : `Remove ${selectedProfile.name}`
+                }
+              >
+                <span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label={`Remove ${selectedProfile.name} connection profile`}
+                    disabled={selectedProfileIndex === 0}
+                    onClick={() => setRemoveProfileOpen(true)}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                  </Button>
+                </span>
+              </Tooltip>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Base URL</span>
-              <Input
-                required
-                defaultValue={provider.baseUrl ?? ""}
-                placeholder={baseUrlPlaceholder}
-                aria-label={`${provider.name} base URL`}
-                onBlur={handleBaseUrlBlur}
-              />
-              {usesAnthropicApi && (
-                <div className="text-muted-foreground text-xs">
-                  {ANTHROPIC_BASE_URL_HINT}
-                </div>
-              )}
-            </div>
-          )}
+          </div>
 
-          {!isBuiltin && <ProviderHeadersEditor provider={provider} />}
+          <_ProviderProfileEditor
+            key={selectedProfile.id}
+            provider={provider}
+            profile={selectedProfile}
+            isBuiltin={isBuiltin}
+            usesAnthropicApi={usesAnthropicApi}
+          />
 
           {provider.id === "ark" && (
             <ArkImageGenerationEditor provider={provider} />
@@ -847,6 +843,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                     key={model.id}
                     providerId={provider.id}
                     providerName={provider.name}
+                    profileId={selectedProfile.id}
                     model={model}
                     enabled={!disabledModels.has(model.id)}
                     isCustom={customModels.has(model.id)}
@@ -866,8 +863,174 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
         open={editorOpen}
         onOpenChange={setEditorOpen}
         providerId={provider.id}
+        profileId={selectedProfile.id}
         providerApi={isBuiltin ? undefined : apiValue}
         model={editingModel}
+      />
+      <ConfirmDialog
+        open={removeProfileOpen}
+        onOpenChange={setRemoveProfileOpen}
+        title={`Remove ${selectedProfile.name}?`}
+        description={`This permanently removes the connection profile "${selectedProfile.name}" from ${provider.name}.`}
+        confirmLabel="Remove"
+        dimBackground={false}
+        onConfirm={() => {
+          setRemoveProfileOpen(false);
+          void handleRemoveProfile();
+        }}
+      />
+    </div>
+  );
+}
+
+function _ProviderProfileEditor({
+  provider,
+  profile,
+  isBuiltin,
+  usesAnthropicApi,
+}: {
+  provider: ModelProviderGroup;
+  profile: ProviderProfile;
+  isBuiltin: boolean;
+  usesAnthropicApi: boolean;
+}) {
+  const updateProviderProfile = useUpdateProviderProfile();
+  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
+    Boolean(profile.baseUrl)
+  );
+  const baseUrlPlaceholder = usesAnthropicApi
+    ? "https://api.example.com"
+    : "https://api.example.com/v1";
+
+  const update = (
+    fields: Parameters<ReturnType<typeof useUpdateProviderProfile>>[2]
+  ) => updateProviderProfile(provider.id, profile.id, fields);
+
+  const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    if (!value || value === profile.name) {
+      event.target.value = profile.name;
+      return;
+    }
+    void update({ name: value }).catch((error) => {
+      event.target.value = profile.name;
+      toast.error("Failed to rename connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  };
+
+  const handleApiKeyBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    const next = value === "" ? null : value;
+    if (next !== (profile.apiKey ?? null)) {
+      void update({ apiKey: next });
+    }
+  };
+
+  const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    const next = value === "" ? null : value;
+    if (next !== (profile.baseUrl ?? null)) {
+      void update({ baseUrl: next });
+    }
+  };
+
+  const handleBaseUrlToggle = (enabled: boolean) => {
+    setBaseUrlEnabled(enabled);
+    if (!enabled) {
+      void update({ baseUrl: null });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">Profile name</span>
+        <Input
+          defaultValue={profile.name}
+          placeholder="Profile name"
+          aria-label={`${provider.name} profile name`}
+          onBlur={handleNameBlur}
+        />
+      </div>
+
+      {provider.id !== "openai-codex" ? (
+        <ApiKeyField
+          label="API key"
+          getKeyUrl={provider.websiteLink}
+          defaultValue={profile.apiKey ?? ""}
+          placeholder={`Input API Key for ${provider.name}.`}
+          aria-label={`${profile.name} API key`}
+          onBlur={handleApiKeyBlur}
+          description={
+            <div className="text-muted-foreground pl-5 text-xs">
+              <div className="list-item">
+                {
+                  'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
+                }
+              </div>
+              <div className="list-item">
+                Leave it blank to use the official {provider.name} environment
+                variable
+              </div>
+            </div>
+          }
+        />
+      ) : null}
+
+      {isBuiltin ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Custom base URL</span>
+            <Switch
+              aria-label={
+                baseUrlEnabled
+                  ? `Disable custom base URL for ${profile.name}`
+                  : `Enable custom base URL for ${profile.name}`
+              }
+              checked={baseUrlEnabled}
+              onCheckedChange={handleBaseUrlToggle}
+            />
+          </div>
+          {baseUrlEnabled ? (
+            <>
+              <Input
+                defaultValue={profile.baseUrl ?? ""}
+                placeholder={baseUrlPlaceholder}
+                aria-label={`${profile.name} custom base URL`}
+                onBlur={handleBaseUrlBlur}
+              />
+              <div className="text-muted-foreground text-xs">
+                Leave empty to use the default endpoint.
+                {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Base URL</span>
+          <Input
+            required
+            defaultValue={profile.baseUrl ?? ""}
+            placeholder={baseUrlPlaceholder}
+            aria-label={`${profile.name} base URL`}
+            onBlur={handleBaseUrlBlur}
+          />
+          {usesAnthropicApi ? (
+            <div className="text-muted-foreground text-xs">
+              {ANTHROPIC_BASE_URL_HINT}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <_ProviderHeadersEditor
+        providerId={provider.id}
+        providerName={provider.name}
+        profile={profile}
       />
     </div>
   );
@@ -1152,14 +1315,22 @@ function ImageModelListItem({
 }
 
 /**
- * Key-value editor for a custom provider's extra HTTP headers. Rows live in
- * local state so half-typed entries survive re-renders; only rows with a
- * non-empty name are persisted, on blur or row removal.
+ * Key-value editor for a profile's extra HTTP headers. Rows live in local state
+ * so half-typed entries survive re-renders; only rows with a non-empty name are
+ * persisted, on blur or row removal.
  */
-function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
-  const updateProvider = useUpdateProvider();
+function _ProviderHeadersEditor({
+  providerId,
+  providerName,
+  profile,
+}: {
+  providerId: string;
+  providerName: string;
+  profile: ProviderProfile;
+}) {
+  const updateProviderProfile = useUpdateProviderProfile();
   const [rows, setRows] = useState<{ key: string; value: string }[]>(() =>
-    Object.entries(provider.headers ?? {}).map(([key, value]) => ({
+    Object.entries(profile.headers ?? {}).map(([key, value]) => ({
       key,
       value,
     }))
@@ -1177,13 +1348,13 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
       const key = row.key.trim();
       if (key !== "") headers[key] = row.value;
     }
-    const current = provider.headers ?? {};
+    const current = profile.headers ?? {};
     const currentKeys = Object.keys(current);
     const same =
       Object.keys(headers).length === currentKeys.length &&
       currentKeys.every((key) => headers[key] === current[key]);
     if (same) return;
-    void updateProvider(provider.id, {
+    void updateProviderProfile(providerId, profile.id, {
       headers: Object.keys(headers).length > 0 ? headers : null,
     });
   };
@@ -1202,14 +1373,14 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
           <Input
             value={row.key}
             placeholder="X-Header-Name"
-            aria-label={`${provider.name} header ${index + 1} name`}
+            aria-label={`${providerName} header ${index + 1} name`}
             onChange={(e) => setRow(index, { ...row, key: e.target.value })}
             onBlur={() => persist(rows)}
           />
           <Input
             value={row.value}
             placeholder="Value"
-            aria-label={`${provider.name} header ${index + 1} value`}
+            aria-label={`${providerName} header ${index + 1} value`}
             onChange={(e) => setRow(index, { ...row, value: e.target.value })}
             onBlur={() => persist(rows)}
           />
@@ -1235,7 +1406,7 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
         <Plus /> Add header
       </Button>
       <div className="text-muted-foreground text-xs">
-        Sent with every request to this provider.
+        Sent with every request made through this profile.
       </div>
     </div>
   );
@@ -1249,6 +1420,7 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
 function ModelListItem({
   providerId,
   providerName,
+  profileId,
   model,
   enabled,
   isCustom,
@@ -1257,6 +1429,7 @@ function ModelListItem({
 }: {
   providerId: string;
   providerName: string;
+  profileId: string;
   model: ModelProviderGroup["models"][number];
   enabled: boolean;
   isCustom: boolean;
@@ -1271,7 +1444,7 @@ function ModelListItem({
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      await testModelConnection(providerId, model.id);
+      await testModelConnection(providerId, model.id, undefined, profileId);
       toast.success("Model connected successfully", {
         description: model.name,
       });

@@ -135,6 +135,12 @@ export function createMainWindowRPC({
           });
           return groups;
         },
+        addProviderProfile: ({ runtimeId, providerId }) =>
+          getRuntime(runtimeId).addProviderProfile(providerId),
+        updateProviderProfile: (input) =>
+          getRuntime(input.runtimeId).updateProviderProfile(input),
+        removeProviderProfile: (input) =>
+          getRuntime(input.runtimeId).removeProviderProfile(input),
         updateProvider: (input) =>
           getRuntime(input.runtimeId).updateProvider(input),
         setModelEnabled: (input) =>
@@ -148,11 +154,13 @@ export function createMainWindowRPC({
         testModelConnection: async ({
           runtimeId,
           providerId,
+          profileId,
           modelId,
           candidate,
         }) => {
           await getRuntime(runtimeId).testModelConnection({
             providerId,
+            profileId,
             modelId,
             candidate,
           });
@@ -291,8 +299,12 @@ export function createMainWindowRPC({
           await removeProjectFile(rootDir, relativePath);
           return null;
         },
-        generatorResolveEnv: ({ runtimeId, providerId, envNames }) =>
-          getRuntime(runtimeId).resolveGeneratorEnv({ providerId, envNames }),
+        generatorResolveEnv: ({ runtimeId, providerId, profileId, envNames }) =>
+          getRuntime(runtimeId).resolveGeneratorEnv({
+            providerId,
+            profileId,
+            envNames,
+          }),
         mcpListServers: ({ runtimeId }) =>
           getRuntime(runtimeId).mcpListServers(),
         mcpAddServer: async ({ runtimeId, server }) => {

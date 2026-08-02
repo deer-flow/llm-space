@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ManagedProcess } from "./process-utils";
-import { currentDesktopVersion } from "./server-package";
+import {
+  currentDesktopVersion,
+  expectedProtocolVersion,
+} from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import { startSshRemoteRuntime } from "./ssh-remote-runtime";
 
@@ -228,7 +231,7 @@ async function _withFetch(run: () => Promise<void>): Promise<void> {
     Response.json({
       ok: true,
       version: currentDesktopVersion(),
-      protocolVersion: 1,
+      protocolVersion: expectedProtocolVersion(),
       capabilities: [
         "streamThread",
         "filesystem",

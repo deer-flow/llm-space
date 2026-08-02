@@ -1,7 +1,11 @@
 import type { Thread } from "../types";
 
 import { JsonThreadParser } from "./json-thread-parser";
-import type { ThreadParseContext, ThreadParser } from "./thread-parser";
+import type {
+  ThreadParseContext,
+  ThreadParseDiagnostic,
+  ThreadParser,
+} from "./thread-parser";
 
 /**
  * Dispatches raw file content to a registered {@link ThreadParser} based on the
@@ -52,6 +56,27 @@ export class ThreadParserRegistry {
       return undefined;
     }
     return parser.parse(raw, context);
+  }
+
+  async parseDetailed(
+    fileName: string,
+    raw: string,
+    context?: ThreadParseContext
+  ): Promise<ThreadParseDiagnostic> {
+    const parser = this.getByExtension(_extensionOf(fileName));
+    if (!parser) {
+      return {
+        status: "unsupported",
+        message: `Unsupported thread file type: ${fileName}`,
+      };
+    }
+    if (parser.parseDetailed) {
+      return parser.parseDetailed(raw, context);
+    }
+    const thread = await parser.parse(raw, context);
+    return thread
+      ? { status: "parsed", thread, recovered: false }
+      : { status: "invalid-shape", message: "Unrecognized thread data." };
   }
 }
 

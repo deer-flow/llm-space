@@ -16,7 +16,7 @@ const EVENT_COMPACTION_THRESHOLD = 1024;
  * `receiveStreamThreadResponse` messages into an async iterator of events.
  */
 export function createRpcTransport(runtimeId?: RuntimeId): AgentTransport {
-  return async function* rpcTransport(request, { signal }) {
+  return async function* rpcTransport(request, { signal, profileId }) {
     const rpc = electrobun.rpc;
     if (!rpc) {
       throw new Error("Electrobun RPC is not initialized");
@@ -68,6 +68,7 @@ export function createRpcTransport(runtimeId?: RuntimeId): AgentTransport {
         ...runtimeScope(runtimeId),
         streamId,
         request,
+        profileId,
       });
       while (true) {
         while (eventHead < events.length) {

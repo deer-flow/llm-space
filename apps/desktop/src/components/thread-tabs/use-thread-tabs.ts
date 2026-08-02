@@ -9,6 +9,7 @@ import {
 } from "@llm-space/ui/lib/local-storage";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 
 import { createFileSystemClient, traceClient } from "@/client";
 import { listRuntimes } from "@/client/remote-servers";
@@ -51,6 +52,28 @@ type PersistedTab =
       title?: string;
       runtimeId?: RuntimeId;
     };
+
+const RuntimeIdSchema: z.ZodType<RuntimeId> = z.union([
+  z.literal("local"),
+  z.templateLiteral(["remote:", z.string()]),
+]);
+const PersistedTabsSchema: z.ZodType<PersistedTab[]> = z.array(
+  z.discriminatedUnion("type", [
+    z.object({
+      type: z.literal("thread"),
+      path: z.string(),
+      runtimeId: RuntimeIdSchema.optional(),
+    }),
+    z.object({
+      type: z.literal("trace"),
+      projectId: z.string(),
+      traceKey: z.string(),
+      title: z.string().optional(),
+      runtimeId: RuntimeIdSchema.optional(),
+    }),
+  ])
+);
+const LegacyTabsSchema = z.array(z.string());
 
 /** Derive a tab label from an app tab. */
 export function tabLabel(tab: AppTab): string {
@@ -209,30 +232,18 @@ function _loadPersistedTabs(): AppTab[] {
   try {
     const raw = readLocalStorage(LOCAL_STORAGE_KEYS.openAppTabs);
     if (raw !== null) {
-      const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
+      const parsed = PersistedTabsSchema.parse(JSON.parse(raw));
       return _dedupeTabs(
         parsed
-          .map((item): PersistedTab | null => {
-            if (!item || typeof item !== "object") return null;
-            const t = item as PersistedTab;
-            return t.type === "thread" || t.type === "trace" ? t : null;
-          })
-          .map((item) => (item ? _fromPersisted(item) : null))
+          .map((item) => _fromPersisted(item))
           .filter((tab): tab is AppTab => tab !== null)
       );
     }
 
     const legacyRaw = readLocalStorage(LOCAL_STORAGE_KEYS.legacyOpenTabs);
     if (legacyRaw === null) return [];
-    const legacy: unknown = JSON.parse(legacyRaw);
-    return Array.isArray(legacy)
-      ? _dedupeTabs(
-          legacy
-            .filter((path): path is string => typeof path === "string")
-            .map((path) => _createThreadTab(path, "local"))
-        )
-      : [];
+    const legacy = LegacyTabsSchema.parse(JSON.parse(legacyRaw));
+    return _dedupeTabs(legacy.map((path) => _createThreadTab(path, "local")));
   } catch {
     return [];
   }

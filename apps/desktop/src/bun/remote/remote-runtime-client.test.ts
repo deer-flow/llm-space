@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentStreamRequest } from "@llm-space/core";
+import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
 import type { RuntimeCapability } from "@llm-space/runtime/runtime";
 
 import { RemoteRuntimeClient } from "./remote-runtime-client";
@@ -21,7 +22,7 @@ const CAPABILITIES: RuntimeCapability[] = [
 const HEALTH_BODY = {
   ok: true,
   version: currentDesktopVersion(),
-  protocolVersion: 1,
+  protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
   capabilities: CAPABILITIES,
   homePath: "/tmp/remote",
   workspacePath: "/tmp/remote/workspace",
@@ -211,8 +212,10 @@ describe("RemoteRuntimeClient", () => {
 
   test("parses SSE stream events", async () => {
     const events: AgentEvent[] = [];
+    let requestBody: unknown;
     await _withFetch(
-      () => {
+      async (request) => {
+        requestBody = await request.json();
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
             const encoder = new TextEncoder();
@@ -236,7 +239,11 @@ describe("RemoteRuntimeClient", () => {
           token: "secret",
         });
         await client.streamThread(
-          { streamId: "s1", request: {} as AgentStreamRequest },
+          {
+            streamId: "s1",
+            request: {} as AgentStreamRequest,
+            profileId: "profile-work",
+          },
           (message) => {
             if (message.type === "event") {
               events.push(message.event);
@@ -247,6 +254,10 @@ describe("RemoteRuntimeClient", () => {
     );
 
     expect(events).toEqual([{ type: "agent_start" }]);
+    expect(requestBody).toEqual({
+      request: {},
+      profileId: "profile-work",
+    });
   });
 });
 

@@ -1,4 +1,3 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -7,7 +6,20 @@ import {
   type NetworkSettings,
   type SystemProxyDetection,
 } from "@llm-space/core";
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
+import { z } from "zod";
+
+const NetworkSettingsFileSchema = z.object({
+  enabled: z.boolean().optional(),
+  useSystemProxy: z.boolean().optional(),
+  httpProxy: z.string().optional(),
+  httpsProxy: z.string().optional(),
+  noProxy: z.string().optional(),
+});
 
 /**
  * Proxy environment variables we own. Both cases are managed because Bun's
@@ -63,12 +75,7 @@ export class NetworkSettingsManager {
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(this._settings, null, 2)}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, this._settings);
   }
 
   /**
@@ -78,24 +85,13 @@ export class NetworkSettingsManager {
    * silently forced direct by the new authoritative-off behavior.
    */
   private _loadConfig(): NetworkSettings {
-    try {
-      const parsed = JSON.parse(
-        readFileSync(this._configPath, "utf8")
-      ) as Partial<NetworkSettings>;
-      return this._normalize(parsed);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-      const seeded = this._seedFromEnv();
-      mkdirSync(getSettingsDir(), { recursive: true });
-      writeFileSync(
-        this._configPath,
-        `${JSON.stringify(seeded, null, 2)}\n`,
-        "utf8"
-      );
-      return seeded;
-    }
+    const result = readJsonFileSync(this._configPath, {
+      schema: NetworkSettingsFileSchema,
+      recovery: "best-effort",
+      fallback: () => this._seedFromEnv(),
+      seedMissing: true,
+    });
+    return this._normalize(result.value);
   }
 
   private _normalize(input: Partial<NetworkSettings>): NetworkSettings {

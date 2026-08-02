@@ -1,6 +1,7 @@
-import * as fs from "node:fs/promises";
+import * as z from "zod";
 
-import { getSettingsDir, getWindowStatePath } from "../paths";
+import { atomicWriteJsonFile, readJsonFile } from "../json-file";
+import { getWindowStatePath } from "../paths";
 
 export interface WindowFrame {
   x: number;
@@ -12,13 +13,24 @@ export interface WindowFrame {
 /** Persisted desktop window state (`settings/window.json`). */
 export interface WindowState {
   frame?: WindowFrame;
-  /** Whether the main window was maximized when last closed. */
   isMaximized?: boolean;
-  /** Whether the main window was in OS fullscreen when last closed. */
   isFullScreen?: boolean;
-  /** WebKit page zoom level (1.0 = 100%). */
   zoom?: number;
 }
+
+const WindowFrameSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().positive(),
+  height: z.number().finite().positive(),
+});
+
+export const WindowStateSchema: z.ZodType<WindowState> = z.object({
+  frame: WindowFrameSchema.optional(),
+  isMaximized: z.boolean().optional(),
+  isFullScreen: z.boolean().optional(),
+  zoom: z.number().finite().positive().optional(),
+});
 
 export const DEFAULT_WINDOW_FRAME: WindowFrame = {
   x: 80,
@@ -27,23 +39,8 @@ export const DEFAULT_WINDOW_FRAME: WindowFrame = {
   height: 800,
 };
 
-function isWindowFrame(value: unknown): value is WindowFrame {
-  if (typeof value !== "object" || value === null) return false;
-  const frame = value as WindowFrame;
-  return (
-    typeof frame.x === "number" &&
-    typeof frame.y === "number" &&
-    typeof frame.width === "number" &&
-    typeof frame.height === "number" &&
-    Number.isFinite(frame.x) &&
-    Number.isFinite(frame.y) &&
-    frame.width > 0 &&
-    frame.height > 0
-  );
-}
-
 export function getWindowFrame(state: WindowState): WindowFrame | undefined {
-  return isWindowFrame(state.frame) ? state.frame : undefined;
+  return state.frame;
 }
 
 export function getWindowMaximized(state: WindowState): boolean {
@@ -55,56 +52,53 @@ export function getWindowFullScreen(state: WindowState): boolean {
 }
 
 export function getWindowZoom(state: WindowState): number | undefined {
-  const zoom = state.zoom;
-  return typeof zoom === "number" && Number.isFinite(zoom) && zoom > 0
-    ? zoom
-    : undefined;
+  return state.zoom;
 }
 
-export async function loadWindowState(): Promise<WindowState> {
-  try {
-    const text = await fs.readFile(getWindowStatePath(), "utf8");
-    return JSON.parse(text) as WindowState;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return {};
-    }
-    throw error;
+/**
+ * Process-local source of truth for window state. Updates merge synchronously
+ * in memory and publish serially so closely spaced frame and zoom events cannot
+ * overwrite one another through competing read-modify-write cycles.
+ */
+export class WindowStateStore {
+  private _state: WindowState;
+  private _writeQueue: Promise<void> = Promise.resolve();
+
+  private constructor(initial: WindowState) {
+    this._state = initial;
   }
-}
 
-async function writeWindowState(next: WindowState): Promise<void> {
-  await fs.mkdir(getSettingsDir(), { recursive: true });
-  await fs.writeFile(
-    getWindowStatePath(),
-    `${JSON.stringify(next, null, 2)}\n`,
-    "utf8"
-  );
-}
+  static async load(): Promise<WindowStateStore> {
+    const result = await readJsonFile(getWindowStatePath(), {
+      schema: WindowStateSchema,
+      recovery: "best-effort",
+      fallback: () => ({}),
+      repair: true,
+      seedMissing: false,
+    });
+    if (result.source !== "strict" && result.source !== "missing") {
+      console.warn(
+        `Recovered window state from ${result.source}; backup: ${result.backupPath}`
+      );
+    }
+    return new WindowStateStore(result.value);
+  }
 
-export async function saveWindowFrame(frame: WindowFrame): Promise<void> {
-  const state = await loadWindowState();
-  await writeWindowState({
-    ...state,
-    frame,
-    isMaximized: false,
-    isFullScreen: false,
-  });
-}
+  get state(): WindowState {
+    return this._state;
+  }
 
-export async function saveWindowMaximized(isMaximized: boolean): Promise<void> {
-  const state = await loadWindowState();
-  await writeWindowState({ ...state, isMaximized, isFullScreen: false });
-}
+  update(patch: Partial<WindowState>): Promise<void> {
+    this._state = WindowStateSchema.parse({ ...this._state, ...patch });
+    const snapshot = this._state;
+    const write = this._writeQueue
+      .catch(() => undefined)
+      .then(() => atomicWriteJsonFile(getWindowStatePath(), snapshot));
+    this._writeQueue = write;
+    return write;
+  }
 
-export async function saveWindowFullScreen(
-  isFullScreen: boolean
-): Promise<void> {
-  const state = await loadWindowState();
-  await writeWindowState({ ...state, isFullScreen });
-}
-
-export async function saveWindowZoom(zoom: number): Promise<void> {
-  const state = await loadWindowState();
-  await writeWindowState({ ...state, zoom });
+  flush(): Promise<void> {
+    return this._writeQueue;
+  }
 }

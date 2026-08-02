@@ -2,6 +2,7 @@ import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-d
 import {
   ModelProvider,
   useModels,
+  useRefreshModels,
 } from "@llm-space/ui/components/model-provider";
 import {
   LOCAL_STORAGE_KEYS,
@@ -279,6 +280,7 @@ function PageWorkspace({
   const tabs = useThreadTabs();
   const { executeCommand } = useCommands();
   const models = useModels();
+  const refreshModels = useRefreshModels();
   const queryClient = useQueryClient();
   const { tracingEnabled } = useExperimental();
 
@@ -354,6 +356,13 @@ function PageWorkspace({
   }, [sidebarPanelRef]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const handleSettingsOpenChange = useCallback(
+    (open: boolean) => {
+      setSettingsOpen(open);
+      if (!open) void refreshModels();
+    },
+    [refreshModels]
+  );
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   // One event per open transition, no matter which command opened Settings.
   useEffect(() => {
@@ -437,7 +446,7 @@ function PageWorkspace({
     ) => {
       const list = [...files];
       if (list.length === 0) return;
-      const { created, total } =
+      const { created, total, recovered, warnings } =
         list[0] instanceof File
           ? await importThreadFiles(parent, list as File[], models, runtimeId)
           : await importThreadFileRecords(
@@ -447,7 +456,9 @@ function PageWorkspace({
               runtimeId
             );
       if (created.length === 0) {
-        toast.error("No threads could be imported from the selected files.");
+        toast.error("No threads could be imported from the selected files.", {
+          description: warnings[0],
+        });
         return;
       }
       executeCommand({ type: "refreshTree", args: { runtimeId } });
@@ -455,7 +466,19 @@ function PageWorkspace({
       const skipped = total - created.length;
       toast.success(
         `Imported ${created.length} thread${created.length === 1 ? "" : "s"}`,
-        skipped > 0 ? { description: `${skipped} file(s) skipped` } : undefined
+        skipped > 0 || recovered > 0
+          ? {
+              description: [
+                skipped > 0 ? `${skipped} file(s) skipped` : "",
+                recovered > 0
+                  ? `${recovered} recovered from truncated JSON`
+                  : "",
+                warnings[0] ?? "",
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }
+          : undefined
       );
     },
     [models, executeCommand, openTab, workspaceRuntimeIdRef]
@@ -777,7 +800,7 @@ function PageWorkspace({
         <SettingsDialog
           tab={settingsTab}
           open={settingsOpen}
-          onOpenChange={setSettingsOpen}
+          onOpenChange={handleSettingsOpenChange}
           onTabChange={setSettingsTab}
           onRemoteConnected={(runtimeId) => {
             transitionWorkspaceRuntime(runtimeId);

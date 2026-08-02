@@ -1,7 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFile,
+  getSettingsDir,
+  readJsonFile,
+} from "@llm-space/core/server";
+import { z } from "zod";
 
 import type { FeatureReminder } from "../../shared/feature-reminders";
 import { FEATURE_REMINDERS } from "../../shared/feature-reminders";
@@ -33,6 +37,18 @@ interface RemindersState {
 }
 
 const STATE_PATH = join(getSettingsDir(), "reminders.json");
+const RemindersStateSchema: z.ZodType<RemindersState> = z.object({
+  githubStar: z
+    .object({
+      openCount: z.number().optional(),
+      lastShownDate: z.number().optional(),
+      shownCount: z.number().optional(),
+      dismissedForever: z.boolean().optional(),
+    })
+    .optional(),
+  featureRemindersSeen: z.array(z.string()).optional(),
+});
+let stateQueue: Promise<unknown> = Promise.resolve();
 
 /** Show the star nudge at most once every 2 days. */
 const REMINDER_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
@@ -40,25 +56,35 @@ const REMINDER_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SHOWN_COUNT = 3;
 
 async function _load(): Promise<RemindersState> {
-  try {
-    return JSON.parse(await readFile(STATE_PATH, "utf8")) as RemindersState;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-    throw error;
-  }
+  return (
+    await readJsonFile(STATE_PATH, {
+      schema: RemindersStateSchema,
+      recovery: "best-effort",
+      fallback: () => ({}),
+      seedMissing: false,
+    })
+  ).value;
 }
 
-/** Merge a patch over the top-level state and persist it. */
-async function _patchState(patch: Partial<RemindersState>): Promise<void> {
-  const state = await _load();
-  const next: RemindersState = { ...state, ...patch };
-  await mkdir(getSettingsDir(), { recursive: true });
-  await writeFile(STATE_PATH, JSON.stringify(next, null, 2));
+function _update<T>(
+  mutate: (state: RemindersState) => { state: RemindersState; result: T }
+): Promise<T> {
+  const operation = stateQueue
+    .catch(() => undefined)
+    .then(async () => {
+      const update = mutate(await _load());
+      await atomicWriteJsonFile(STATE_PATH, update.state);
+      return update.result;
+    });
+  stateQueue = operation;
+  return operation;
 }
 
 async function _saveGithubStar(patch: GithubStarReminder): Promise<void> {
-  const state = await _load();
-  await _patchState({ githubStar: { ...state.githubStar, ...patch } });
+  await _update((state) => ({
+    state: { ...state, githubStar: { ...state.githubStar, ...patch } },
+    result: undefined,
+  }));
 }
 
 /** Whether the reminder should appear on this open (pure; no side effects). */
@@ -86,23 +112,24 @@ function _shouldShow(
  * - Retire permanently once the user clicks through, or after 3 shows.
  */
 export async function resolveGithubStarReminder(): Promise<{ show: boolean }> {
-  const star = (await _load()).githubStar ?? {};
-  const now = Date.now();
-  const openCount = (star.openCount ?? 0) + 1;
-  const show = _shouldShow(star, openCount, now);
-
-  await _saveGithubStar(
-    show
+  return _update((state) => {
+    const star = state.githubStar ?? {};
+    const now = Date.now();
+    const openCount = (star.openCount ?? 0) + 1;
+    const show = _shouldShow(star, openCount, now);
+    const patch = show
       ? {
           openCount,
           lastShownDate: now,
           shownCount: (star.shownCount ?? 0) + 1,
           dismissedForever: (star.shownCount ?? 0) + 1 >= MAX_SHOWN_COUNT,
         }
-      : { openCount }
-  );
-
-  return { show };
+      : { openCount };
+    return {
+      state: { ...state, githubStar: { ...star, ...patch } },
+      result: { show },
+    };
+  });
 }
 
 /** Retire the star reminder for good (the user clicked through to GitHub). */
@@ -124,8 +151,12 @@ export async function getNextFeatureReminder(): Promise<FeatureReminder | null> 
 
 /** Record a feature reminder as seen so it never appears again. */
 export async function markFeatureReminderSeen(id: string): Promise<void> {
-  const seen = new Set((await _load()).featureRemindersSeen ?? []);
-  if (seen.has(id)) return;
-  seen.add(id);
-  await _patchState({ featureRemindersSeen: [...seen] });
+  await _update((state) => {
+    const seen = new Set(state.featureRemindersSeen ?? []);
+    seen.add(id);
+    return {
+      state: { ...state, featureRemindersSeen: [...seen] },
+      result: undefined,
+    };
+  });
 }

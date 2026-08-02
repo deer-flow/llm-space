@@ -5,7 +5,10 @@ import {
   buildInstallCommand,
   installRemoteServerPackage,
 } from "./remote-server-installer";
-import { currentDesktopVersion } from "./server-package";
+import {
+  currentDesktopVersion,
+  expectedProtocolVersion,
+} from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 
 const CONFIG: SshRemoteRuntimeConfig = {
@@ -33,7 +36,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: expectedProtocolVersion(),
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -70,7 +73,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: expectedProtocolVersion(),
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -139,7 +142,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: expectedProtocolVersion(),
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -312,7 +315,7 @@ describe("remote server installer", () => {
             stdout: JSON.stringify({
               name: "llm-space-server",
               version: currentDesktopVersion(),
-              protocolVersion: 1,
+              protocolVersion: expectedProtocolVersion(),
               os: "linux",
               arch: "x64",
               entrypoint: "bin/llm-space-server",

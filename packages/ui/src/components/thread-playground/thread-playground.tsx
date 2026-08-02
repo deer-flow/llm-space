@@ -52,6 +52,11 @@ import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
+import {
+  ProviderProfileSelectionProvider,
+  useGetProviderProfileId,
+  useProviderProfileSelections,
+} from "./model/provider-profile-selection-provider";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
 import {
@@ -96,6 +101,8 @@ export interface ThreadPlaygroundProps {
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
   runtimeId?: string;
+  /** Recreate only the thread store while preserving per-tab UI selections. */
+  storeKey?: string | number;
 
   onChange?: (thread: Thread) => void;
   onRenameTitle?: (title: string) => Promise<boolean>;
@@ -128,7 +135,17 @@ export function ThreadPlayground({
   );
 }
 
-function _ThreadPlayground({
+function _ThreadPlayground({ storeKey, ...props }: ThreadPlaygroundProps) {
+  const providers = useModels();
+  const profileSelections = useProviderProfileSelections(providers);
+  return (
+    <ProviderProfileSelectionProvider value={profileSelections}>
+      <_ThreadPlaygroundStore key={storeKey} {...props} />
+    </ProviderProfileSelectionProvider>
+  );
+}
+
+function _ThreadPlaygroundStore({
   initialValue,
   transport,
   runtimeId,
@@ -143,6 +160,7 @@ function _ThreadPlayground({
   const providers = useModels();
   const providersRef = useRef(providers);
   providersRef.current = providers;
+  const getProfileId = useGetProviderProfileId();
   const defaultModel = useDefaultModel();
   const defaultModelRef = useRef(defaultModel);
   defaultModelRef.current = defaultModel;
@@ -156,6 +174,7 @@ function _ThreadPlayground({
           saved,
           defaultModelRef.current
         ),
+      getProfileId,
       getAutoRunTools,
       getReactLoop,
       runtimeId,
@@ -193,6 +212,7 @@ function ThreadPlaygroundContent({
   readonly: readonlyFromProps = false,
   active = false,
   compactImages = false,
+  runtimeId,
 }: Omit<
   ThreadPlaygroundProps,
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
@@ -339,7 +359,10 @@ function ThreadPlaygroundContent({
                   <Share2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <GenerateProjectButton disabled={status === "running"} />
+              <GenerateProjectButton
+                disabled={status === "running"}
+                runtimeId={runtimeId}
+              />
             </div>
             <div className="flex items-center gap-1 px-3">
               <ButtonGroup

@@ -7,9 +7,7 @@ import {
   type Thread,
   type Tool,
 } from "@llm-space/core";
-import {
-  LOCAL_STORAGE_KEYS,
-} from "@llm-space/ui/lib/local-storage";
+import { LOCAL_STORAGE_KEYS } from "@llm-space/ui/lib/local-storage";
 import {
   basename,
   joinPath,
@@ -21,6 +19,7 @@ import {
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { createFileSystemClient } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
@@ -36,6 +35,7 @@ export const fsKeys = {
  * Level 1 is a direct child of the root, level 2 its child, and so on.
  */
 const MAX_PERSISTED_DEPTH = 5;
+const PersistedExpandedPathsSchema = z.array(z.string());
 
 /** Path depth (segment count), used to order ancestors before descendants. */
 function _depth(path: string): number {
@@ -56,11 +56,8 @@ function _loadPersistedExpanded(runtimeId: RuntimeId): string[] {
   try {
     const raw = window.localStorage.getItem(_persistedExpandedKey(runtimeId));
     if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((p): p is string => typeof p === "string")
-      .sort((a, b) => _depth(a) - _depth(b));
+    const parsed = PersistedExpandedPathsSchema.parse(JSON.parse(raw));
+    return parsed.sort((a, b) => _depth(a) - _depth(b));
   } catch {
     return [];
   }

@@ -9,6 +9,11 @@ import type {
   VersionedThreadStorage,
 } from "../../types/storage/thread-storage";
 import { normalizeThread, type Thread } from "../../types/threads/thread";
+import {
+  RecoverableThreadZodSchema,
+  ThreadZodSchema,
+} from "../../types/threads/thread-zod";
+import { parseJsonWithSchema } from "../../utils";
 
 import {
   GITHUB_API_BASE,
@@ -84,12 +89,9 @@ export class GistThreadReader
       { token }
     );
 
-    const file =
-      gist.files?.[locator.filename] ?? selectThreadFile(gist.files);
+    const file = gist.files?.[locator.filename] ?? selectThreadFile(gist.files);
     if (!file) {
-      throw new Error(
-        `Gist ${locator.id} has no file "${locator.filename}".`
-      );
+      throw new Error(`Gist ${locator.id} has no file "${locator.filename}".`);
     }
 
     return normalizeThread(await this._readThreadFile(file));
@@ -158,9 +160,15 @@ export class GistThreadReader
 }
 
 function _parseThread(content: string): Thread {
-  try {
-    return JSON.parse(content) as Thread;
-  } catch {
-    throw new Error("Gist content is not a valid thread file.");
+  const result = parseJsonWithSchema(content, ThreadZodSchema, {
+    recovery: "best-effort",
+    recoverySchema: RecoverableThreadZodSchema,
+  });
+  if (result.status === "strict" || result.status === "recovered") {
+    if (result.status === "recovered") {
+      console.warn("Recovered shared thread from truncated gist JSON.");
+    }
+    return result.value;
   }
+  throw new Error("Gist content is not a valid thread file.");
 }

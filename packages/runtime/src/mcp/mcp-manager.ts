@@ -1,4 +1,3 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { uuid } from "@llm-space/core";
@@ -21,7 +20,11 @@ import {
   type McpToolSummary,
   type McpToolView,
 } from "@llm-space/core";
-import { getSettingsDir } from "@llm-space/core/server";
+import {
+  atomicWriteJsonFileSync,
+  getSettingsDir,
+  readJsonFileSync,
+} from "@llm-space/core/server";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
@@ -729,47 +732,26 @@ export class McpManager {
   }
 
   private _saveConfig(): void {
-    mkdirSync(getSettingsDir(), { recursive: true });
-    writeFileSync(
-      this._configPath,
-      `${JSON.stringify(this._config, null, 2)}\n`,
-      "utf8"
-    );
+    atomicWriteJsonFileSync(this._configPath, this._config);
   }
 
   private _loadConfig(): McpServersConfig {
-    try {
-      const parsed = serversConfigSchema.parse(
-        JSON.parse(readFileSync(this._configPath, "utf8"))
-      );
-      return {
-        servers: parsed.servers.map((server) => ({
-          ...server,
-          createdAt: server.createdAt ?? Date.now(),
-          updatedAt: server.updatedAt ?? Date.now(),
-          readiness: server.readiness
-            ? _normalizeReadiness(server.readiness)
-            : undefined,
-        })),
-      };
-    } catch (error) {
-      if (!(
-        error instanceof z.ZodError ||
-        (error as NodeJS.ErrnoException).code === "ENOENT"
-      )) {
-        throw error;
-      }
-      const empty: McpServersConfig = { servers: [] };
-      if (!existsSync(this._configPath)) {
-        mkdirSync(getSettingsDir(), { recursive: true });
-        writeFileSync(
-          this._configPath,
-          `${JSON.stringify(empty, null, 2)}\n`,
-          "utf8"
-        );
-      }
-      return empty;
-    }
+    const parsed = readJsonFileSync(this._configPath, {
+      schema: serversConfigSchema,
+      recovery: "best-effort",
+      fallback: (): McpServersConfig => ({ servers: [] }),
+      seedMissing: true,
+    }).value;
+    return {
+      servers: parsed.servers.map((server) => ({
+        ...server,
+        createdAt: server.createdAt ?? Date.now(),
+        updatedAt: server.updatedAt ?? Date.now(),
+        readiness: server.readiness
+          ? _normalizeReadiness(server.readiness)
+          : undefined,
+      })),
+    };
   }
 }
 

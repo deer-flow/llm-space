@@ -12,7 +12,7 @@ import type { AgentStreamRequest } from "../types/agent";
  */
 export type AgentTransport = (
   request: AgentStreamRequest,
-  options: { signal?: AbortSignal }
+  options: { signal?: AbortSignal; profileId?: string }
 ) => AsyncIterable<AgentEvent>;
 
 /**

@@ -1,29 +1,43 @@
-import {
-  saveWindowFrame,
-  saveWindowFullScreen,
-  saveWindowMaximized,
-  saveWindowZoom,
-} from "@llm-space/core/server";
-import { app, type BrowserWindow } from "electrobun/bun";
+import { type WindowStateStore } from "@llm-space/core/server";
+import { type BrowserWindow } from "electrobun/bun";
 
 const SAVE_DEBOUNCE_MS = 300;
 
-function persistWindowState(win: BrowserWindow) {
+let activeStore: WindowStateStore | undefined;
+let activeWindow: BrowserWindow | undefined;
+let frameTimer: ReturnType<typeof setTimeout> | undefined;
+
+function persistWindowState(win: BrowserWindow): Promise<void> {
+  const store = activeStore;
+  if (!store) return Promise.resolve();
   // In fullscreen/maximized the frame reflects the expanded bounds, so we only
   // record the flag and leave the last real frame untouched for restore.
   if (win.isFullScreen()) {
-    void saveWindowFullScreen(true);
+    return store.update({ isFullScreen: true });
   } else if (win.isMaximized()) {
-    void saveWindowMaximized(true);
-  } else {
-    void saveWindowFrame(win.getFrame());
+    return store.update({ isMaximized: true, isFullScreen: false });
   }
+  return store.update({
+    frame: win.getFrame(),
+    isMaximized: false,
+    isFullScreen: false,
+  });
+}
+
+function reportWindowStateError(error: unknown) {
+  console.error("Failed to persist window state:", error);
 }
 
 function attachWindowStatePersistence(
   win: BrowserWindow,
-  options?: { isMaximized?: boolean; isFullScreen?: boolean },
+  options: {
+    store: WindowStateStore;
+    isMaximized?: boolean;
+    isFullScreen?: boolean;
+  }
 ) {
+  activeStore = options.store;
+  activeWindow = win;
   if (options?.isFullScreen) {
     win.setFullScreen(true);
   } else if (options?.isMaximized) {
@@ -31,18 +45,14 @@ function attachWindowStatePersistence(
   }
 
   win.on("close", () => {
-    persistWindowState(win);
+    clearTimeout(frameTimer);
+    void persistWindowState(win).catch(reportWindowStateError);
   });
 
-  app.on("before-quit", () => {
-    persistWindowState(win);
-  });
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
   const scheduleSave = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      persistWindowState(win);
+    clearTimeout(frameTimer);
+    frameTimer = setTimeout(() => {
+      void persistWindowState(win).catch(reportWindowStateError);
     }, SAVE_DEBOUNCE_MS);
   };
 
@@ -58,7 +68,7 @@ function attachWindowStatePersistence(
  */
 function attachFullScreenSync(
   win: BrowserWindow,
-  onChange: (fullScreen: boolean) => void,
+  onChange: (fullScreen: boolean) => void
 ) {
   let last = win.isFullScreen();
   onChange(last);
@@ -96,13 +106,15 @@ function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
 export function attachWindowStates(
   win: BrowserWindow,
   options: {
+    store: WindowStateStore;
     isMaximized?: boolean;
     isFullScreen?: boolean;
     zoom?: number;
     onFullScreenChange: (fullScreen: boolean) => void;
-  },
+  }
 ) {
   attachWindowStatePersistence(win, {
+    store: options.store,
     isMaximized: options.isMaximized,
     isFullScreen: options.isFullScreen,
   });
@@ -115,6 +127,20 @@ export function saveZoom(zoom: number) {
   desiredZoom = zoom;
   clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => {
-    void saveWindowZoom(desiredZoom);
+    const store = activeStore;
+    if (store) {
+      void store.update({ zoom: desiredZoom }).catch(reportWindowStateError);
+    }
   }, SAVE_DEBOUNCE_MS);
+}
+
+/** Capture the final window state and wait until every queued write settles. */
+export async function flushWindowState(): Promise<void> {
+  clearTimeout(frameTimer);
+  clearTimeout(zoomTimer);
+  if (activeWindow && activeStore) {
+    await persistWindowState(activeWindow);
+    await activeStore.update({ zoom: desiredZoom });
+    await activeStore.flush();
+  }
 }

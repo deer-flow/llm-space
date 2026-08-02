@@ -15,6 +15,17 @@ export interface ThreadParseContext {
   availableModels?: readonly ModelProviderGroup[];
 }
 
+export type ThreadParseDiagnostic =
+  | {
+      status: "parsed";
+      thread: Thread;
+      recovered: boolean;
+    }
+  | {
+      status: "invalid-json" | "invalid-shape" | "unsupported";
+      message: string;
+    };
+
 /**
  * A parser that turns the raw content of a thread file (some source format)
  * into our internal {@link Thread} shape. Implementations are selected by file
@@ -34,8 +45,11 @@ export interface ThreadParser {
    * shape). Returning `undefined` lets a registry fall through to other
    * parsers.
    */
-  parse(
+  parse(raw: string, context?: ThreadParseContext): Promise<Thread | undefined>;
+
+  /** Parse with enough diagnostics for batch-import feedback. */
+  parseDetailed?(
     raw: string,
     context?: ThreadParseContext
-  ): Promise<Thread | undefined>;
+  ): Promise<ThreadParseDiagnostic>;
 }

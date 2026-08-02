@@ -1,6 +1,7 @@
 import * as pi from "@earendil-works/pi-ai";
 
 import type { ArkImageGenerationConfig } from "./image-generation";
+import type { ProviderProfile } from "./provider-profile";
 
 /**
  * A model as surfaced to the renderer: a pi model plus an optional `icon` — a
@@ -15,12 +16,9 @@ export interface ModelProviderGroup {
   name: string;
   builtin?: boolean;
   models: readonly ProviderGroupModel[];
+  /** Connection profiles in creation order. The first profile is the default. */
+  profiles: readonly ProviderProfile[];
   apiKeyDetected?: boolean;
-  apiKey?: string;
-  /** Custom base URL override. Empty/absent means the provider default. */
-  baseUrl?: string;
-  /** Extra HTTP headers sent with every request to this provider. */
-  headers?: Record<string, string>;
   /** API compatibility mode for a custom provider. */
   api?: "anthropic-messages" | "openai-completions" | "openai-responses";
   /** Model ids the user has disabled. Everything not listed is enabled. */

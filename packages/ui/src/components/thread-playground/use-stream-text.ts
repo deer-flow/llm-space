@@ -15,6 +15,7 @@ import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 
 import { useDefaultTextGenerationModel } from "../model-provider";
 
+import { useGetProviderProfileId } from "./model/provider-profile-selection-provider";
 import { PREVIEW_THROTTLE_MS } from "./streaming-preview";
 
 const MAX_TOKENS = 10240;
@@ -70,6 +71,7 @@ export function useStreamText({
   const transportRef = useRef(transport);
 
   const defaultModel = useDefaultTextGenerationModel();
+  const getProfileId = useGetProviderProfileId();
 
   // Keep the latest inputs/model in refs so `run` has a stable identity but
   // always reads current values.
@@ -95,104 +97,111 @@ export function useStreamText({
   // Abort any in-flight run on unmount.
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  const run = useCallback(async (overrides?: Partial<UseStreamTextArgs>) => {
-    const { systemPrompt, messages, userPrompt, reasoning, model } = {
-      ...argsRef.current,
-      ...overrides,
-    };
-    // An explicit `model` overrides the default text-generation model.
-    const base = model ?? defaultModelRef.current;
-    if (!base) {
-      setError("No model available");
-      return;
-    }
-
-    // Supersede any in-flight run.
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-
-    setText("");
-    setError(null);
-    setStreaming(true);
-
-    let streamingMessage: AssistantMessage | null = null;
-    let content: ReducedMessageContent[] = [];
-    const lastText = () => {
-      const parts = streamingMessage?.content;
-      return parts?.[parts.length - 1]?.text ?? "";
-    };
-
-    // Throttle text updates (frame-aligned, at most one per
-    // PREVIEW_THROTTLE_MS) — see createFrameThrottle.
-    const preview = createFrameThrottle(() => {
-      if (controllerRef.current === controller) {
-        setText(lastText());
+  const run = useCallback(
+    async (overrides?: Partial<UseStreamTextArgs>) => {
+      const { systemPrompt, messages, userPrompt, reasoning, model } = {
+        ...argsRef.current,
+        ...overrides,
+      };
+      // An explicit `model` overrides the default text-generation model.
+      const base = model ?? defaultModelRef.current;
+      if (!base) {
+        setError("No model available");
+        return;
       }
-    }, PREVIEW_THROTTLE_MS);
 
-    const context = {
-      systemPrompt,
-      messages: [
-        ...(messages ?? []),
-        ...(userPrompt === undefined
-          ? []
-          : [
-              {
-                id: uuid(),
-                role: "user" as const,
-                content: [{ type: "text" as const, text: userPrompt }],
-              },
-            ]),
-      ],
-    };
-    const runModel = {
-      ...base,
-      params: {
-        ...base.params,
-        maxTokens: MAX_TOKENS,
-        ...(reasoning === undefined ? {} : { reasoning }),
-      },
-    };
+      // Supersede any in-flight run.
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
 
-    const transport = transportRef.current;
-    if (!transport) {
-      setError("Text generation is not available here.");
-      setStreaming(false);
-      controllerRef.current = null;
-      return;
-    }
-    try {
-      const response = streamThread(
-        { context, model: runModel },
-        { signal: controller.signal, transport }
-      );
-      for await (const chunk of response) {
-        const reduced = reduceMessages(chunk, { streamingMessage, content });
-        if (!reduced) {
-          continue;
-        }
-        streamingMessage = reduced.message;
-        content = reduced.content;
-        preview.schedule();
-      }
-    } catch (e) {
-      if (!controller.signal.aborted) {
-        preview.cancel();
+      setText("");
+      setError(null);
+      setStreaming(true);
+
+      let streamingMessage: AssistantMessage | null = null;
+      let content: ReducedMessageContent[] = [];
+      const lastText = () => {
+        const parts = streamingMessage?.content;
+        return parts?.[parts.length - 1]?.text ?? "";
+      };
+
+      // Throttle text updates (frame-aligned, at most one per
+      // PREVIEW_THROTTLE_MS) — see createFrameThrottle.
+      const preview = createFrameThrottle(() => {
         if (controllerRef.current === controller) {
-          setError(e instanceof Error ? e.message : String(e));
+          setText(lastText());
         }
-      }
-    } finally {
-      preview.cancel();
-      if (controllerRef.current === controller) {
-        // Emit the final text directly so a dropped frame can't leave it stale.
-        setText(lastText());
+      }, PREVIEW_THROTTLE_MS);
+
+      const context = {
+        systemPrompt,
+        messages: [
+          ...(messages ?? []),
+          ...(userPrompt === undefined
+            ? []
+            : [
+                {
+                  id: uuid(),
+                  role: "user" as const,
+                  content: [{ type: "text" as const, text: userPrompt }],
+                },
+              ]),
+        ],
+      };
+      const runModel = {
+        ...base,
+        params: {
+          ...base.params,
+          maxTokens: MAX_TOKENS,
+          ...(reasoning === undefined ? {} : { reasoning }),
+        },
+      };
+
+      const transport = transportRef.current;
+      if (!transport) {
+        setError("Text generation is not available here.");
         setStreaming(false);
         controllerRef.current = null;
+        return;
       }
-    }
-  }, []);
+      try {
+        const response = streamThread(
+          { context, model: runModel },
+          {
+            signal: controller.signal,
+            transport,
+            profileId: getProfileId(runModel.provider),
+          }
+        );
+        for await (const chunk of response) {
+          const reduced = reduceMessages(chunk, { streamingMessage, content });
+          if (!reduced) {
+            continue;
+          }
+          streamingMessage = reduced.message;
+          content = reduced.content;
+          preview.schedule();
+        }
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          preview.cancel();
+          if (controllerRef.current === controller) {
+            setError(e instanceof Error ? e.message : String(e));
+          }
+        }
+      } finally {
+        preview.cancel();
+        if (controllerRef.current === controller) {
+          // Emit the final text directly so a dropped frame can't leave it stale.
+          setText(lastText());
+          setStreaming(false);
+          controllerRef.current = null;
+        }
+      }
+    },
+    [getProfileId]
+  );
 
   return { text, error, streaming, run };
 }

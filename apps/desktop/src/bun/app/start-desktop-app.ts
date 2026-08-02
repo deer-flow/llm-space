@@ -36,6 +36,7 @@ import { UpdaterService } from "../updates";
 
 import { createShutdownCoordinator } from "./shutdown-coordinator";
 import { createMainWindow } from "./window";
+import { flushWindowState } from "./window-state";
 
 export interface DesktopAppRuntime {
   stop(): Promise<void>;
@@ -150,6 +151,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const runtime: DesktopAppRuntime = {
     stop() {
       stopPromise ??= _stopDesktopApp([
+        ["window state", () => flushWindowState()],
         ["updater", () => updater.stop()],
         ["remote runtime", () => remoteRuntime?.stop()],
         ["remote servers", () => remoteServerManager.shutdown()],
