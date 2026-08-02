@@ -390,7 +390,10 @@ function ThreadPlaygroundContent({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="border-none pr-1.5 pl-0.5 active:translate-y-0!"
+                      className={cn(
+                        "border-none pr-1.5 pl-0.5 active:translate-y-0!",
+                        status === "running" && "disabled:opacity-100"
+                      )}
                       aria-label="Run settings"
                       disabled={
                         readonlyFromProps ||
