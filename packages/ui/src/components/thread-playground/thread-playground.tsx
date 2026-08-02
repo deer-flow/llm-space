@@ -53,6 +53,7 @@ import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
 import {
+  GENERATE_IMAGE_PROFILE_SELECTION_SCOPE,
   ProviderProfileSelectionProvider,
   useGetProviderProfileId,
   useProviderProfileSelections,
@@ -179,7 +180,18 @@ function _ThreadPlaygroundStore({
       getReactLoop,
       runtimeId,
       executeTool: executeTool
-        ? (tool, args) => executeTool(tool, args, { runtimeId })
+        ? (tool, args) =>
+            executeTool(tool, args, {
+              runtimeId,
+              ...(tool.type === "builtin" && tool.name === "generate_image"
+                ? {
+                    profileId: getProfileId(
+                      "ark",
+                      GENERATE_IMAGE_PROFILE_SELECTION_SCOPE
+                    ),
+                  }
+                : {}),
+            })
         : undefined,
       loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
       loadFile: (path) => files.readText(path),

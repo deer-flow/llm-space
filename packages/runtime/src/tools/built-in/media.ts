@@ -13,6 +13,7 @@ export interface MediaBuiltInToolsDependencies {
     model: string;
     size: SeedreamImageSize;
     watermark: boolean;
+    profileId?: string;
   }): Promise<{
     data: string;
     mimeType: string;
@@ -57,7 +58,8 @@ export function createMediaBuiltInTools(
       tool: generateImageTool,
       async execute(
         args: Record<string, unknown>,
-        configValue?: Record<string, unknown>
+        configValue?: Record<string, unknown>,
+        context = {}
       ) {
         const prompt = args.prompt;
         if (typeof prompt !== "string" || !prompt.trim()) {
@@ -76,6 +78,7 @@ export function createMediaBuiltInTools(
           model: config.model,
           size: (size as SeedreamImageSize | undefined) ?? config.size,
           watermark: config.watermark,
+          profileId: context.profileId,
         });
         return createToolCallResponse([
           {

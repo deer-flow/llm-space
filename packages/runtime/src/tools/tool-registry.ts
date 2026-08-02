@@ -5,8 +5,14 @@ export interface ToolEntry {
   execute(
     this: void,
     args: Record<string, unknown>,
-    config?: Record<string, unknown>
+    config?: Record<string, unknown>,
+    context?: ToolExecutionContext
   ): Promise<unknown>;
+}
+
+export interface ToolExecutionContext {
+  /** Ephemeral provider profile selected for this invocation. */
+  profileId?: string;
 }
 
 export interface ToolContribution {
@@ -101,16 +107,18 @@ export class ToolRegistry {
     name,
     arguments: args,
     config,
+    profileId,
   }: {
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
+    profileId?: string;
   }): Promise<ToolCallResponse> {
     const entry = this._entriesByName.get(name);
     if (!entry) {
       throw new Error(`Built-in tool not found: ${name}`);
     }
-    const result = await entry.execute(args, config);
+    const result = await entry.execute(args, config, { profileId });
     if (_isToolCallResponse(result)) {
       return { content: result.content };
     }

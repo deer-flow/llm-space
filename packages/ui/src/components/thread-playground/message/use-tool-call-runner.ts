@@ -5,6 +5,10 @@ import { useCallback, useMemo } from "react";
 import { useHostServices } from "@llm-space/ui/host";
 import { isFirecrawlLimitError } from "@llm-space/ui/lib/firecrawl";
 
+import {
+  GENERATE_IMAGE_PROFILE_SELECTION_SCOPE,
+  useGetProviderProfileId,
+} from "../model/provider-profile-selection-provider";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 export interface ToolCallOutcome {
@@ -22,6 +26,7 @@ export function useToolCallRunner(messageId: string) {
   const { executeTool } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
   const runtimeId = useThreadStore((state) => state.runtimeId);
+  const getProfileId = useGetProviderProfileId();
   const { updateToolCallOutput, updateToolCallOutputText } =
     useThreadStoreActions();
 
@@ -44,7 +49,17 @@ export function useToolCallRunner(messageId: string) {
         const { content, isError } = await executeTool(
           tool,
           toolCall.input.arguments,
-          { runtimeId }
+          {
+            runtimeId,
+            ...(tool.type === "builtin" && tool.name === "generate_image"
+              ? {
+                  profileId: getProfileId(
+                    "ark",
+                    GENERATE_IMAGE_PROFILE_SELECTION_SCOPE
+                  ),
+                }
+              : {}),
+          }
         );
         updateToolCallOutput(messageId, toolCall.id, content, isError);
         const text = getToolResultText(content);
@@ -61,6 +76,7 @@ export function useToolCallRunner(messageId: string) {
     },
     [
       executeTool,
+      getProfileId,
       messageId,
       resolveTool,
       runtimeId,

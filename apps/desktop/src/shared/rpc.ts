@@ -413,6 +413,7 @@ export interface DesktopRPCType {
           name: string;
           arguments: Record<string, unknown>;
           config?: Record<string, unknown>;
+          profileId?: string;
         };
         response: BuiltinToolCallResponse;
       };

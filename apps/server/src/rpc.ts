@@ -176,6 +176,7 @@ async function _dispatch(
         name: _stringParam(params, "name"),
         arguments: _recordParam(params, "arguments"),
         config: _optionalRecordParam(params, "config"),
+        profileId: _optionalStringParam(params, "profileId"),
       });
     case "search.get":
       return runtime.getSearchSettings();

@@ -178,6 +178,7 @@ describe("RemoteRuntimeClient", () => {
           name: "generate_image",
           arguments: { prompt: "fixture" },
           config: { model: "seedream-fixture" },
+          profileId: "profile-work",
         });
         await client.mcpListTools("server-1");
         await client.mcpCallTool({
@@ -207,6 +208,7 @@ describe("RemoteRuntimeClient", () => {
       name: "generate_image",
       arguments: { prompt: "fixture" },
       config: { model: "seedream-fixture" },
+      profileId: "profile-work",
     });
   });
 

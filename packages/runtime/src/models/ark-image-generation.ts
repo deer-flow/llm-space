@@ -25,9 +25,9 @@ type FetchLike = (
 
 export interface ArkImageGenerationDependencies {
   getConfig(): ArkImageGenerationConfig | undefined;
-  getApiKey(): Promise<string | undefined>;
-  getBaseUrl(): string | undefined;
-  getHeaders(): Record<string, string> | undefined;
+  getApiKey(profileId?: string): Promise<string | undefined>;
+  getBaseUrl(profileId?: string): string | undefined;
+  getHeaders(profileId?: string): Record<string, string> | undefined;
   fetch?: FetchLike;
 }
 
@@ -36,6 +36,7 @@ export interface ArkImageGenerationInput {
   model: string;
   size: SeedreamImageSize;
   watermark: boolean;
+  profileId?: string;
   signal?: AbortSignal;
 }
 
@@ -106,7 +107,7 @@ export function createArkImageGenerator(
         `${modelDefinition.name} does not support the ${input.size} size preset.`
       );
     }
-    const apiKey = await dependencies.getApiKey();
+    const apiKey = await dependencies.getApiKey(input.profileId);
     if (!apiKey) {
       throw new Error(
         "Configure an Ark API key in Settings → Models → VolcEngine Ark before calling generate_image."
@@ -116,7 +117,7 @@ export function createArkImageGenerator(
     const imagesModels = createImagesModels();
     imagesModels.setProvider(
       _createArkImagesProvider({
-        baseUrl: dependencies.getBaseUrl() ?? ARK_BASE_URL,
+        baseUrl: dependencies.getBaseUrl(input.profileId) ?? ARK_BASE_URL,
         config,
         fetch: fetchImpl,
       })
@@ -130,7 +131,7 @@ export function createArkImageGenerator(
       { input: [{ type: "text", text: prompt }] },
       {
         apiKey,
-        headers: dependencies.getHeaders(),
+        headers: dependencies.getHeaders(input.profileId),
         metadata: { size: input.size, watermark: input.watermark },
         signal: input.signal,
       }

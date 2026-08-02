@@ -35,15 +35,19 @@ export async function createServerRuntime(
   const modelManager = new ModelManager();
   const generateImage = createArkImageGenerator({
     getConfig: () => modelManager.getArkImageGenerationConfig(),
-    getApiKey: async () => {
+    getApiKey: async (profileId) => {
       // Match the desktop's credential precedence for remote/headless calls.
-      const configured = await modelManager.getApiKey("ark", false);
+      const configured = await modelManager.getApiKey(
+        "ark",
+        false,
+        profileId
+      );
       return configured === undefined
         ? process.env.ARK_API_KEY
-        : modelManager.getApiKey("ark");
+        : modelManager.getApiKey("ark", true, profileId);
     },
-    getBaseUrl: () => modelManager.getBaseUrl("ark"),
-    getHeaders: () => modelManager.getHeaders("ark"),
+    getBaseUrl: (profileId) => modelManager.getBaseUrl("ark", profileId),
+    getHeaders: (profileId) => modelManager.getHeaders("ark", profileId),
   });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager();

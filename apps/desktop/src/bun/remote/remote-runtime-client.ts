@@ -347,6 +347,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
+    profileId?: string;
   }) {
     return this._rpc<Awaited<ReturnType<RuntimeClient["builtInCallTool"]>>>(
       "builtinTools.call",

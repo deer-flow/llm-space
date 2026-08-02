@@ -2,6 +2,7 @@
 
 import { formatProviderProfileLabel } from "@llm-space/core";
 
+import { cn } from "../../../lib/utils";
 import {
   Select,
   SelectContent,
@@ -17,13 +18,17 @@ import { useProviderProfileSelection } from "./provider-profile-selection-provid
 export function ProviderProfileSelector({
   providerId,
   readonly,
+  className,
+  selectionScope,
 }: {
   providerId: string;
   readonly?: boolean;
+  className?: string;
+  selectionScope?: string;
 }) {
   const provider = useModels().find((candidate) => candidate.id === providerId);
   const { selectedProfileId, selectProfile } =
-    useProviderProfileSelection(providerId);
+    useProviderProfileSelection(providerId, selectionScope);
   const profiles = provider?.profiles ?? [];
   if (profiles.length <= 1) {
     return null;
@@ -36,16 +41,18 @@ export function ProviderProfileSelector({
     <Select
       value={value}
       disabled={readonly}
-      onValueChange={(profileId) => selectProfile(providerId, profileId)}
+      onValueChange={(profileId) =>
+        selectProfile(providerId, profileId, selectionScope)
+      }
     >
       <SelectTrigger
+        className={cn("max-w-40", className)}
         size="sm"
-        className="max-w-40"
         aria-label={`${provider?.name ?? providerId} connection profile`}
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
         <SelectGroup>
           {profiles.map((profile, index) => (
             <SelectItem key={profile.id} value={profile.id}>

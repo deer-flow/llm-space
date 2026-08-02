@@ -54,16 +54,20 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const modelManager = new ModelManager();
   const generateImage = createArkImageGenerator({
     getConfig: () => modelManager.getArkImageGenerationConfig(),
-    getApiKey: async () => {
+    getApiKey: async (profileId) => {
       // An explicitly configured `$ENV_NAME` remains authoritative even when
       // unset; only a truly blank setting falls back to Ark's official env key.
-      const configured = await modelManager.getApiKey("ark", false);
+      const configured = await modelManager.getApiKey(
+        "ark",
+        false,
+        profileId
+      );
       return configured === undefined
         ? process.env.ARK_API_KEY
-        : modelManager.getApiKey("ark");
+        : modelManager.getApiKey("ark", true, profileId);
     },
-    getBaseUrl: () => modelManager.getBaseUrl("ark"),
-    getHeaders: () => modelManager.getHeaders("ark"),
+    getBaseUrl: (profileId) => modelManager.getBaseUrl("ark", profileId),
+    getHeaders: (profileId) => modelManager.getHeaders("ark", profileId),
   });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager({

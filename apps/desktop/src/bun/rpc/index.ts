@@ -328,11 +328,18 @@ export function createMainWindowRPC({
           }),
         builtInListTools: ({ runtimeId }) =>
           Promise.resolve(getRuntime(runtimeId).builtInListTools()),
-        builtInCallTool: ({ runtimeId, name, arguments: args, config }) =>
+        builtInCallTool: ({
+          runtimeId,
+          name,
+          arguments: args,
+          config,
+          profileId,
+        }) =>
           getRuntime(runtimeId).builtInCallTool({
             name,
             arguments: args,
             config,
+            profileId,
           }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>

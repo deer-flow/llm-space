@@ -39,6 +39,9 @@ import {
 } from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { GENERATE_IMAGE_PROFILE_SELECTION_SCOPE } from "../model/provider-profile-selection-provider";
+import { ProviderProfileSelector } from "../model/provider-profile-selector";
+
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
@@ -107,10 +110,12 @@ function _BuiltInToolImportDialog({
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
+  const arkProvider = useMemo(
+    () => providers.find((provider) => provider.id === "ark"),
+    [providers]
+  );
   const enabledImageModels = useMemo(() => {
-    const config = providers.find(
-      (provider) => provider.id === "ark"
-    )?.imageGeneration;
+    const config = arkProvider?.imageGeneration;
     if (!config) {
       return [];
     }
@@ -118,7 +123,7 @@ function _BuiltInToolImportDialog({
     return getArkImageModelDefinitions(config).filter(
       (model) => !disabled.has(model.id)
     );
-  }, [providers]);
+  }, [arkProvider]);
 
   const loadTools = useCallback(async () => {
     try {
@@ -375,6 +380,9 @@ function _BuiltInToolImportDialog({
                           <GenerateImageConfigFields
                             config={generateImageConfig}
                             enabledModels={enabledImageModels}
+                            showProfileSelector={
+                              (arkProvider?.profiles.length ?? 0) > 1
+                            }
                             selectedModel={configuredImageModel}
                             onChange={handleGenerateImageConfigChange}
                           />
@@ -407,11 +415,13 @@ export const BuiltInToolImportDialog = memo(_BuiltInToolImportDialog);
 function GenerateImageConfigFields({
   config,
   enabledModels,
+  showProfileSelector,
   selectedModel,
   onChange,
 }: {
   config: GenerateImageToolConfig | null;
   enabledModels: readonly SeedreamImageModelDefinition[];
+  showProfileSelector: boolean;
   selectedModel?: SeedreamImageModelDefinition;
   onChange: (config: GenerateImageToolConfig) => void;
 }) {
@@ -431,7 +441,14 @@ function GenerateImageConfigFields({
   };
 
   return (
-    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem_auto] gap-3">
+    <div
+      className={cn(
+        "mt-3 grid gap-3",
+        showProfileSelector
+          ? "grid-cols-[minmax(0,1fr)_8rem_7rem_auto]"
+          : "grid-cols-[minmax(0,1fr)_7rem_auto]"
+      )}
+    >
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-muted-foreground text-xs">Model</span>
         <Select
@@ -440,12 +457,15 @@ function GenerateImageConfigFields({
           onValueChange={handleModelChange}
         >
           <SelectTrigger
-            className="h-8 w-full"
+            className="w-full"
+            size="sm"
             aria-label="Generate image model"
           >
             <SelectValue placeholder="Choose model" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
             {enabledModels.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.name}
@@ -454,6 +474,17 @@ function GenerateImageConfigFields({
           </SelectContent>
         </Select>
       </div>
+
+      {showProfileSelector ? (
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-muted-foreground text-xs">Profile</span>
+          <ProviderProfileSelector
+            providerId="ark"
+            className="max-w-none"
+            selectionScope={GENERATE_IMAGE_PROFILE_SELECTION_SCOPE}
+          />
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-1">
         <span className="text-muted-foreground text-xs">Default size</span>
@@ -466,10 +497,10 @@ function GenerateImageConfigFields({
             }
           }}
         >
-          <SelectTrigger className="h-8 w-full" aria-label="Default image size">
+          <SelectTrigger size="sm" aria-label="Default image size">
             <SelectValue placeholder="Size" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {selectedModel?.supportedSizes.map((size) => (
               <SelectItem key={size} value={size}>
                 {size}
@@ -481,10 +512,7 @@ function GenerateImageConfigFields({
 
       <div className="flex flex-col gap-1">
         <span className="text-muted-foreground text-xs">Watermark</span>
-        <div className="flex h-8 items-center justify-between gap-2 rounded-md border px-2">
-          <span className="text-xs">
-            {config?.watermark === false ? "Disabled" : "Enabled"}
-          </span>
+        <div className="flex h-7 items-center justify-between gap-2">
           <Switch
             size="sm"
             checked={config?.watermark ?? true}
@@ -500,11 +528,11 @@ function GenerateImageConfigFields({
       </div>
 
       {enabledModels.length === 0 ? (
-        <p className="text-destructive col-span-3 text-xs">
+        <p className="text-destructive col-span-full text-xs">
           Enable an Ark image model in Settings before adding this tool.
         </p>
       ) : !config || !selectedModel ? (
-        <p className="text-destructive col-span-3 text-xs">
+        <p className="text-destructive col-span-full text-xs">
           Choose an enabled image model for this tool.
         </p>
       ) : null}

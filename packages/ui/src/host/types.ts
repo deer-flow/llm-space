@@ -32,7 +32,10 @@ export interface RuntimeScopedHostOptions {
   runtimeId?: string;
 }
 
-export interface ExecuteToolOptions extends RuntimeScopedHostOptions {}
+export interface ExecuteToolOptions extends RuntimeScopedHostOptions {
+  /** Ephemeral provider profile used by provider-backed built-in tools. */
+  profileId?: string;
+}
 
 /** Invoke an executable tool (built-in or MCP). */
 export type ExecuteTool = (

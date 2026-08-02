@@ -24,7 +24,7 @@ export interface ToolCallResult extends BuiltinToolCallResponse {
 export async function executeTool(
   tool: McpTool | BuiltinTool,
   args: Record<string, unknown>,
-  options: { runtimeId?: string } = {}
+  options: { runtimeId?: string; profileId?: string } = {}
 ): Promise<ToolCallResult> {
   const runtimeId = options.runtimeId as RuntimeId | undefined;
   if (tool.type === "mcp") {
@@ -42,7 +42,12 @@ export async function executeTool(
     };
   }
   const result = await callBuiltInTool(
-    { name: tool.name, arguments: args, config: tool.config },
+    {
+      name: tool.name,
+      arguments: args,
+      config: tool.config,
+      profileId: options.profileId,
+    },
     runtimeId
   );
   return {

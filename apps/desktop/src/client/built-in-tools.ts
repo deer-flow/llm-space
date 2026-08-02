@@ -23,6 +23,7 @@ export async function callBuiltInTool(
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
+    profileId?: string;
   },
   runtimeId?: RuntimeId
 ): Promise<BuiltinToolCallResponse> {

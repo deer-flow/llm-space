@@ -92,6 +92,7 @@ describe("built-in tools module", () => {
           size: "2K",
           watermark: true,
         },
+        profileId: "profile-work",
       })
     ).toEqual({
       content: [
@@ -107,6 +108,7 @@ describe("built-in tools module", () => {
       model: "seedream-fixture",
       size: "2K",
       watermark: true,
+      profileId: "profile-work",
     });
     expect(
       tools.call({

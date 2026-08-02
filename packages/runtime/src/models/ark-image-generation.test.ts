@@ -87,6 +87,34 @@ describe("Ark image generation", () => {
     });
   });
 
+  test("resolves credentials and endpoint settings from the selected profile", async () => {
+    const resolved: string[] = [];
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getApiKey: (profileId) => {
+          resolved.push(`key:${profileId}`);
+          return Promise.resolve("work-key");
+        },
+        getBaseUrl: (profileId) => {
+          resolved.push(`url:${profileId}`);
+          return "https://work.example/api/v3/";
+        },
+        getHeaders: (profileId) => {
+          resolved.push(`headers:${profileId}`);
+          return { "X-Profile": "work" };
+        },
+      })
+    );
+
+    await generate({ ...DEFAULT_INPUT, profileId: "profile-work" });
+
+    expect(resolved).toEqual([
+      "key:profile-work",
+      "url:profile-work",
+      "headers:profile-work",
+    ]);
+  });
+
   test("fails before fetch when Ark image settings are missing", () => {
     let calls = 0;
     const generate = createArkImageGenerator(

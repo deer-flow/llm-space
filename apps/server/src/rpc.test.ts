@@ -171,6 +171,33 @@ describe("handleRuntimeRpc", () => {
     ).toMatchObject({ id: "1", ok: true, result: { name: "Test" } });
   });
 
+  test("forwards an ephemeral profile to built-in tool calls", async () => {
+    const runtime = createRuntime();
+    let received: Parameters<RuntimeClient["builtInCallTool"]>[0] | undefined;
+    runtime.builtInCallTool = (input) => {
+      received = input;
+      return Promise.resolve({ content: [] });
+    };
+
+    await handleRuntimeRpc(runtime, {
+      id: "1",
+      method: "builtinTools.call",
+      params: {
+        name: "generate_image",
+        arguments: { prompt: "fixture" },
+        config: { model: "seedream-fixture" },
+        profileId: "profile-work",
+      },
+    });
+
+    expect(received).toEqual({
+      name: "generate_image",
+      arguments: { prompt: "fixture" },
+      config: { model: "seedream-fixture" },
+      profileId: "profile-work",
+    });
+  });
+
   test("returns method_not_found for unknown methods", async () => {
     expect(
       await handleRuntimeRpc(createRuntime(), {

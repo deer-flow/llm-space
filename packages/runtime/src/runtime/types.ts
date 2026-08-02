@@ -175,6 +175,7 @@ export interface RuntimeClient {
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
+    profileId?: string;
   }): Promise<BuiltinToolCallResponse>;
 
   getSearchSettings(): MaybePromise<SearchSettings>;

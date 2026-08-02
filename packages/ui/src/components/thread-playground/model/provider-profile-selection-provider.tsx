@@ -12,48 +12,70 @@ import {
 } from "react";
 
 interface ProviderProfileSelectionValue {
-  selectedProfileIds: Readonly<Record<string, string>>;
-  selectProfile: (providerId: string, profileId: string) => void;
-  getProfileId: (providerId: string) => string | undefined;
+  selectedProfileIdsByScope: Readonly<Record<string, string>>;
+  selectProfile: (
+    providerId: string,
+    profileId: string,
+    selectionScope?: string
+  ) => void;
+  getProfileId: (
+    providerId: string,
+    selectionScope?: string
+  ) => string | undefined;
 }
+
+const MODEL_PROFILE_SELECTION_SCOPE = "model";
+
+export const GENERATE_IMAGE_PROFILE_SELECTION_SCOPE = "generate_image";
 
 const PROVIDER_PROFILE_SELECTION_CONTEXT =
   createContext<ProviderProfileSelectionValue | null>(null);
 
+function _selectionKey(providerId: string, selectionScope?: string): string {
+  return `${selectionScope ?? MODEL_PROFILE_SELECTION_SCOPE}:${providerId}`;
+}
+
 export function useProviderProfileSelections(
   providers: ModelProviderGroup[]
 ): ProviderProfileSelectionValue {
-  const [selectedProfileIds, setSelectedProfileIds] = useState<
+  const [selectedProfileIdsByScope, setSelectedProfileIdsByScope] = useState<
     Record<string, string>
   >({});
   const providersRef = useRef(providers);
   providersRef.current = providers;
-  const selectedRef = useRef(selectedProfileIds);
-  selectedRef.current = selectedProfileIds;
+  const selectedRef = useRef(selectedProfileIdsByScope);
+  selectedRef.current = selectedProfileIdsByScope;
 
-  const selectProfile = useCallback((providerId: string, profileId: string) => {
-    setSelectedProfileIds((current) => ({
-      ...current,
-      [providerId]: profileId,
-    }));
-  }, []);
+  const selectProfile = useCallback(
+    (providerId: string, profileId: string, selectionScope?: string) => {
+      setSelectedProfileIdsByScope((current) => ({
+        ...current,
+        [_selectionKey(providerId, selectionScope)]: profileId,
+      }));
+    },
+    []
+  );
 
-  const getProfileId = useCallback((providerId: string) => {
-    const selected = selectedRef.current[providerId];
-    if (!selected) {
-      return undefined;
-    }
-    const provider = providersRef.current.find(
-      (candidate) => candidate.id === providerId
-    );
-    return provider?.profiles.some((profile) => profile.id === selected)
-      ? selected
-      : undefined;
-  }, []);
+  const getProfileId = useCallback(
+    (providerId: string, selectionScope?: string) => {
+      const selected =
+        selectedRef.current[_selectionKey(providerId, selectionScope)];
+      if (!selected) {
+        return undefined;
+      }
+      const provider = providersRef.current.find(
+        (candidate) => candidate.id === providerId
+      );
+      return provider?.profiles.some((profile) => profile.id === selected)
+        ? selected
+        : undefined;
+    },
+    []
+  );
 
   return useMemo(
-    () => ({ selectedProfileIds, selectProfile, getProfileId }),
-    [getProfileId, selectProfile, selectedProfileIds]
+    () => ({ selectedProfileIdsByScope, selectProfile, getProfileId }),
+    [getProfileId, selectProfile, selectedProfileIdsByScope]
   );
 }
 
@@ -83,15 +105,19 @@ function _useProviderProfileSelectionContext(): ProviderProfileSelectionValue {
 
 /** Resolve the latest valid transient profile for a provider at run time. */
 export function useGetProviderProfileId(): (
-  providerId: string
+  providerId: string,
+  selectionScope?: string
 ) => string | undefined {
   return _useProviderProfileSelectionContext().getProfileId;
 }
 
-export function useProviderProfileSelection(providerId: string) {
+export function useProviderProfileSelection(
+  providerId: string,
+  selectionScope?: string
+) {
   const context = _useProviderProfileSelectionContext();
   return {
-    selectedProfileId: context.getProfileId(providerId),
+    selectedProfileId: context.getProfileId(providerId, selectionScope),
     selectProfile: context.selectProfile,
   };
 }
