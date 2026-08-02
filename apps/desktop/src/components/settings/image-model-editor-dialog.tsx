@@ -141,7 +141,7 @@ export function ImageModelEditorDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <Field label="Model ID">
+          <_Field label="Model ID">
             <Input
               value={form.id}
               placeholder="ep-20260731-example"
@@ -156,9 +156,9 @@ export function ImageModelEditorDialog({
                 This model ID is already in use.
               </p>
             )}
-          </Field>
+          </_Field>
 
-          <Field label="Model name">
+          <_Field label="Model name">
             <Input
               value={form.name}
               placeholder="Seedream endpoint"
@@ -170,9 +170,9 @@ export function ImageModelEditorDialog({
                 }))
               }
             />
-          </Field>
+          </_Field>
 
-          <Field label="Icon">
+          <_Field label="Icon">
             <div className="flex items-center gap-2">
               <ModelAvatar
                 id={id || "image-model"}
@@ -191,9 +191,9 @@ export function ImageModelEditorDialog({
                 }
               />
             </div>
-          </Field>
+          </_Field>
 
-          <Field label="Supported sizes">
+          <_Field label="Supported sizes">
             <div className="grid grid-cols-2 gap-2">
               {SEEDREAM_IMAGE_SIZES.map((size) => (
                 <div
@@ -212,9 +212,9 @@ export function ImageModelEditorDialog({
                 </div>
               ))}
             </div>
-          </Field>
+          </_Field>
 
-          <Field label="Default size">
+          <_Field label="Default size">
             <Select
               value={form.defaultSize}
               disabled={form.supportedSizes.length === 0}
@@ -236,7 +236,7 @@ export function ImageModelEditorDialog({
                 ))}
               </SelectContent>
             </Select>
-          </Field>
+          </_Field>
         </div>
 
         <DialogFooter>
@@ -253,7 +253,7 @@ export function ImageModelEditorDialog({
 }
 
 /** Label one image-model editor field and keep helper content grouped. */
-function Field({
+function _Field({
   label,
   children,
 }: {

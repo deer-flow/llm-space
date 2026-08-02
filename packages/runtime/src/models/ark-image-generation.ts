@@ -11,9 +11,11 @@ import {
   getArkImageModelDefinitions,
   isArkImageSizeSupported,
   type ArkImageGenerationConfig,
+  type ProviderConnectionRef,
   type SeedreamImageSize,
 } from "@llm-space/core";
 
+import type { ModelManager, ResolvedProviderConnection } from "./model-manager";
 import { ARK_BASE_URL } from "./providers/ark";
 
 const ARK_IMAGES_API = "ark-images";
@@ -25,9 +27,9 @@ type FetchLike = (
 
 export interface ArkImageGenerationDependencies {
   getConfig(): ArkImageGenerationConfig | undefined;
-  getApiKey(profileId?: string): Promise<string | undefined>;
-  getBaseUrl(profileId?: string): string | undefined;
-  getHeaders(profileId?: string): Record<string, string> | undefined;
+  resolveConnection(
+    connection: ProviderConnectionRef
+  ): Promise<ResolvedProviderConnection>;
   fetch?: FetchLike;
 }
 
@@ -36,7 +38,7 @@ export interface ArkImageGenerationInput {
   model: string;
   size: SeedreamImageSize;
   watermark: boolean;
-  profileId?: string;
+  connection?: ProviderConnectionRef;
   signal?: AbortSignal;
 }
 
@@ -107,7 +109,14 @@ export function createArkImageGenerator(
         `${modelDefinition.name} does not support the ${input.size} size preset.`
       );
     }
-    const apiKey = await dependencies.getApiKey(input.profileId);
+    const connectionRef = input.connection ?? { providerId: "ark" };
+    if (connectionRef.providerId !== "ark") {
+      throw new Error(
+        `Ark image generation cannot use provider: ${connectionRef.providerId}`
+      );
+    }
+    const connection = await dependencies.resolveConnection(connectionRef);
+    const apiKey = connection.apiKey;
     if (!apiKey) {
       throw new Error(
         "Configure an Ark API key in Settings → Models → VolcEngine Ark before calling generate_image."
@@ -117,7 +126,7 @@ export function createArkImageGenerator(
     const imagesModels = createImagesModels();
     imagesModels.setProvider(
       _createArkImagesProvider({
-        baseUrl: dependencies.getBaseUrl(input.profileId) ?? ARK_BASE_URL,
+        baseUrl: connection.baseUrl ?? ARK_BASE_URL,
         config,
         fetch: fetchImpl,
       })
@@ -131,7 +140,7 @@ export function createArkImageGenerator(
       { input: [{ type: "text", text: prompt }] },
       {
         apiKey,
-        headers: dependencies.getHeaders(input.profileId),
+        headers: connection.headers,
         metadata: { size: input.size, watermark: input.watermark },
         signal: input.signal,
       }
@@ -150,6 +159,23 @@ export function createArkImageGenerator(
       size: generated.generatedSize ?? input.size,
     };
   };
+}
+
+/** Bind Ark generation to the shared model connection resolver. */
+export function createConfiguredArkImageGenerator({
+  modelManager,
+  env,
+}: {
+  modelManager: ModelManager;
+  env: Record<string, string | undefined>;
+}) {
+  return createArkImageGenerator({
+    getConfig: () => modelManager.getArkImageGenerationConfig(),
+    resolveConnection: (connection) =>
+      modelManager.resolveConnection(connection, {
+        fallbackApiKey: env.ARK_API_KEY,
+      }),
+  });
 }
 
 /** Build the pi-ai image provider around Ark's native generation endpoint. */

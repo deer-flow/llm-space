@@ -2,6 +2,7 @@ import type {
   BuiltinTool,
   BuiltinToolCallResponse,
   McpTool,
+  ProviderConnectionRef,
 } from "@llm-space/core";
 
 import { callBuiltInTool } from "@/client/built-in-tools";
@@ -24,7 +25,7 @@ export interface ToolCallResult extends BuiltinToolCallResponse {
 export async function executeTool(
   tool: McpTool | BuiltinTool,
   args: Record<string, unknown>,
-  options: { runtimeId?: string; profileId?: string } = {}
+  options: { runtimeId?: string; connection?: ProviderConnectionRef } = {}
 ): Promise<ToolCallResult> {
   const runtimeId = options.runtimeId as RuntimeId | undefined;
   if (tool.type === "mcp") {
@@ -46,7 +47,7 @@ export async function executeTool(
       name: tool.name,
       arguments: args,
       config: tool.config,
-      profileId: options.profileId,
+      connection: options.connection,
     },
     runtimeId
   );

@@ -11,6 +11,7 @@ import type {
   ModelConfig,
   ModelProviderGroup,
   NetworkSettings,
+  ProviderConnectionRef,
   SearchSettings,
   SkillContent,
   SkillInfo,
@@ -174,7 +175,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
         headers: this._headers(),
         body: JSON.stringify({
           request: payload.request,
-          ...(payload.profileId ? { profileId: payload.profileId } : {}),
+          ...(payload.connection ? { connection: payload.connection } : {}),
         }),
         signal: controller.signal,
       });
@@ -347,7 +348,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
-    profileId?: string;
+    connection?: ProviderConnectionRef;
   }) {
     return this._rpc<Awaited<ReturnType<RuntimeClient["builtInCallTool"]>>>(
       "builtinTools.call",

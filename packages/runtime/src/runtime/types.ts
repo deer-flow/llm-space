@@ -14,6 +14,7 @@ import type {
   ModelProviderGroup,
   NetworkSettings,
   ProviderProfilePatch,
+  ProviderConnectionRef,
   SearchSettings,
   SkillContent,
   SkillInfo,
@@ -64,7 +65,7 @@ export interface RuntimeScopedParams {
 export interface RuntimeStreamRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
-  profileId?: string;
+  connection?: ProviderConnectionRef;
 }
 
 export interface UpdateProviderProfileInput extends ProviderProfilePatch {
@@ -175,7 +176,7 @@ export interface RuntimeClient {
     name: string;
     arguments: Record<string, unknown>;
     config?: Record<string, unknown>;
-    profileId?: string;
+    connection?: ProviderConnectionRef;
   }): Promise<BuiltinToolCallResponse>;
 
   getSearchSettings(): MaybePromise<SearchSettings>;

@@ -1,4 +1,8 @@
-import { uuid, type AgentStreamRequest } from "@llm-space/core";
+import {
+  uuid,
+  type AgentStreamRequest,
+  type ProviderConnectionRef,
+} from "@llm-space/core";
 import type { RuntimeClient } from "@llm-space/runtime/runtime";
 
 import { ServerError } from "./errors";
@@ -7,7 +11,7 @@ export function createStreamResponse(
   runtime: RuntimeClient,
   input: unknown
 ): Response {
-  const { request, profileId } = _parseStreamRequest(input);
+  const { request, connection } = _parseStreamRequest(input);
   const streamId = uuid();
   const encoder = new TextEncoder();
   let abort: (() => void) | null = null;
@@ -20,7 +24,7 @@ export function createStreamResponse(
       void (async () => {
         try {
           await runtime.streamThread(
-            { streamId, request, profileId },
+            { streamId, request, connection },
             (message) => {
               if (message.type === "event") {
                 controller.enqueue(encoder.encode(_sseData(message.event)));
@@ -65,7 +69,7 @@ export function createStreamResponse(
 
 function _parseStreamRequest(input: unknown): {
   request: AgentStreamRequest;
-  profileId?: string;
+  connection?: ProviderConnectionRef;
 } {
   if (!input || typeof input !== "object") {
     throw new ServerError(
@@ -73,7 +77,7 @@ function _parseStreamRequest(input: unknown): {
       "Stream request must be an object."
     );
   }
-  const body = input as { request?: unknown; profileId?: unknown };
+  const body = input as { request?: unknown; connection?: unknown };
   const request = body.request;
   if (!request || typeof request !== "object") {
     throw new ServerError(
@@ -81,12 +85,41 @@ function _parseStreamRequest(input: unknown): {
       'Stream request body must include object field "request".'
     );
   }
-  if (body.profileId !== undefined && typeof body.profileId !== "string") {
-    throw new ServerError("invalid_request", '"profileId" must be a string.');
-  }
+  const connection = _parseProviderConnection(body.connection);
   return {
     request: request as AgentStreamRequest,
-    ...(body.profileId ? { profileId: body.profileId } : {}),
+    ...(connection ? { connection } : {}),
+  };
+}
+
+function _parseProviderConnection(
+  input: unknown
+): ProviderConnectionRef | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ServerError("invalid_request", '"connection" must be an object.');
+  }
+  const { providerId, profileId } = input as {
+    providerId?: unknown;
+    profileId?: unknown;
+  };
+  if (typeof providerId !== "string" || !providerId) {
+    throw new ServerError(
+      "invalid_request",
+      '"connection.providerId" must be a string.'
+    );
+  }
+  if (profileId !== undefined && (typeof profileId !== "string" || !profileId)) {
+    throw new ServerError(
+      "invalid_request",
+      '"connection.profileId" must be a string.'
+    );
+  }
+  return {
+    providerId,
+    ...(typeof profileId === "string" ? { profileId } : {}),
   };
 }
 

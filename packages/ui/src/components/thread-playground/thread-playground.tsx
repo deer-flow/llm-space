@@ -53,7 +53,6 @@ import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
 import {
-  GENERATE_IMAGE_PROFILE_SELECTION_SCOPE,
   ProviderProfileSelectionProvider,
   useGetProviderProfileId,
   useProviderProfileSelections,
@@ -72,6 +71,7 @@ import {
   useThreadStoreActions,
 } from "./stores";
 import { ToolListView } from "./tool/tool-list-view";
+import { useToolExecutor } from "./tool/use-tool-executor";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
 import { listEnabledPromptVariableSkills } from "./variable/prompt-variable-skills";
@@ -165,7 +165,8 @@ function _ThreadPlaygroundStore({
   const defaultModel = useDefaultModel();
   const defaultModelRef = useRef(defaultModel);
   defaultModelRef.current = defaultModel;
-  const { executeTool, skills, files } = useHostServices();
+  const { skills, files } = useHostServices();
+  const toolExecutor = useToolExecutor(runtimeId);
   const [store] = useState(() =>
     createThreadStore(initialValue, {
       transport,
@@ -179,20 +180,7 @@ function _ThreadPlaygroundStore({
       getAutoRunTools,
       getReactLoop,
       runtimeId,
-      executeTool: executeTool
-        ? (tool, args) =>
-            executeTool(tool, args, {
-              runtimeId,
-              ...(tool.type === "builtin" && tool.name === "generate_image"
-                ? {
-                    profileId: getProfileId(
-                      "ark",
-                      GENERATE_IMAGE_PROFILE_SELECTION_SCOPE
-                    ),
-                  }
-                : {}),
-            })
-        : undefined,
+      executeTool: toolExecutor ?? undefined,
       loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
       loadFile: (path) => files.readText(path),
       fileExists: (path) => files.exists(path),

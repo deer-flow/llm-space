@@ -18,6 +18,7 @@ import {
   type ArkImageGenerationConfig,
   type CustomModel,
   type ModelProviderGroup,
+  type ProviderConnectionRef,
   type ProviderProfile,
   type ProviderProfilePatch,
   type SeedreamImageModelDefinition,
@@ -118,6 +119,12 @@ const ModelsConfigFileSchema = z.object({
   providers: z.array(ProviderConfigFileSchema),
   defaultModel: ModelConfigFileSchema.optional(),
 });
+
+export interface ResolvedProviderConnection {
+  apiKey?: string;
+  baseUrl?: string;
+  headers?: Record<string, string>;
+}
 
 /**
  * Owns `settings/models.json`: the single in-memory source of truth for the
@@ -420,6 +427,28 @@ export class ModelManager {
         ...(profile.headers ? { headers: { ...profile.headers } } : {}),
       })
     );
+  }
+
+  /** Resolve one immutable connection snapshot for a model or tool invocation. */
+  async resolveConnection(
+    connection: ProviderConnectionRef,
+    options: { fallbackApiKey?: string } = {}
+  ): Promise<ResolvedProviderConnection> {
+    const { providerId, profileId } = connection;
+    const configuredApiKey = await this.getApiKey(
+      providerId,
+      false,
+      profileId
+    );
+    const apiKey =
+      configuredApiKey === undefined
+        ? options.fallbackApiKey
+        : await this.getApiKey(providerId, true, profileId);
+    return {
+      apiKey,
+      baseUrl: this.getBaseUrl(providerId, profileId),
+      headers: this.getHeaders(providerId, profileId),
+    };
   }
 
   /** The custom base URL override for a provider, if configured. */

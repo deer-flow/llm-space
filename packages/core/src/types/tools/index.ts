@@ -75,6 +75,12 @@ const BuiltinTool = Type.Intersect([
      * the trusted built-in runtime implementation.
      */
     config: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    /** Provider connection required by this built-in tool, if any. */
+    connection: Type.Optional(
+      Type.Object({
+        providerId: Type.String(),
+      })
+    ),
     /**
      * When `true`, the tool always ends the run and can never be auto-executed —
      * its result must be supplied by a human (e.g. `ask_user_question`). It is

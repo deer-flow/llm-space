@@ -1,6 +1,7 @@
 import { reduceMessages, streamThread } from "../client";
 import type { AgentTransport, ReducedMessageContent } from "../client";
 import type { AssistantMessage } from "../types";
+import type { ProviderConnectionRef } from "../types";
 import { uuid } from "../utils";
 
 import type { OneShotRunner } from "./types";
@@ -8,8 +9,8 @@ import type { OneShotRunner } from "./types";
 export interface CreateOneShotRunnerOptions {
   /** The same {@link AgentTransport} the host uses for thread runs. */
   transport: AgentTransport;
-  /** Ephemeral connection profile used by this generated model call. */
-  profileId?: string;
+  /** Ephemeral provider connection used by this generated model call. */
+  connection?: ProviderConnectionRef;
 }
 
 /**
@@ -20,7 +21,7 @@ export interface CreateOneShotRunnerOptions {
  */
 export function createOneShotRunner({
   transport,
-  profileId,
+  connection,
 }: CreateOneShotRunnerOptions): OneShotRunner {
   return async ({ systemPrompt, userPrompt, model, signal }) => {
     const context = {
@@ -39,7 +40,7 @@ export function createOneShotRunner({
 
     const response = streamThread(
       { context, model },
-      { signal, transport, profileId }
+      { signal, transport, connection }
     );
     for await (const event of response) {
       const reduced = reduceMessages(event, { streamingMessage, content });

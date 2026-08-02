@@ -1,7 +1,7 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
 import type { AgentStreamRequest } from "../types/agent";
-import type { ModelConfig } from "../types/models";
+import type { ModelConfig, ProviderConnectionRef } from "../types/models";
 import type { ThreadContext } from "../types/threads";
 
 import { convertToPiContext } from "./converters";
@@ -18,7 +18,7 @@ export async function* streamThread(
     endpoint?: string;
     transport?: AgentTransport;
     /** Ephemeral provider profile selection; never written into the thread. */
-    profileId?: string;
+    connection?: ProviderConnectionRef;
   } = {}
 ): AsyncGenerator<AgentEvent> {
   if (!isRunnableConversation(args.context.messages)) {
@@ -39,6 +39,6 @@ export async function* streamThread(
   const transport = config.transport ?? createHttpTransport(config.endpoint);
   yield* transport(request, {
     signal: config.signal,
-    profileId: config.profileId,
+    connection: config.connection,
   });
 }

@@ -139,11 +139,12 @@ export class LocalRuntimeClient implements RuntimeClient {
     input: Parameters<RuntimeClient["resolveGeneratorEnv"]>[0]
   ) {
     const modelApiKey =
-      (await this._deps.modelManager.getApiKey(
-        input.providerId,
-        true,
-        input.profileId
-      )) ?? "";
+      (
+        await this._deps.modelManager.resolveConnection({
+          providerId: input.providerId,
+          profileId: input.profileId,
+        })
+      ).apiKey ?? "";
     const envValues: Record<string, string> = {};
     for (const name of input.envNames) {
       envValues[name] = process.env[name] ?? "";

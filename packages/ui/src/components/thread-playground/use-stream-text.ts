@@ -165,13 +165,17 @@ export function useStreamText({
         controllerRef.current = null;
         return;
       }
+      const profileId = getProfileId(runModel.provider);
       try {
         const response = streamThread(
           { context, model: runModel },
           {
             signal: controller.signal,
             transport,
-            profileId: getProfileId(runModel.provider),
+            connection: {
+              providerId: runModel.provider,
+              ...(profileId ? { profileId } : {}),
+            },
           }
         );
         for await (const chunk of response) {

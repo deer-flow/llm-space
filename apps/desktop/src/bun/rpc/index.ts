@@ -333,13 +333,13 @@ export function createMainWindowRPC({
           name,
           arguments: args,
           config,
-          profileId,
+          connection,
         }) =>
           getRuntime(runtimeId).builtInCallTool({
             name,
             arguments: args,
             config,
-            profileId,
+            connection,
           }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>

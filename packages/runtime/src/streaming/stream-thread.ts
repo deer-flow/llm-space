@@ -24,15 +24,22 @@ export class StreamThreadController {
     payload: RuntimeStreamRequestPayload,
     send: (message: RuntimeStreamResponsePayload) => void
   ): Promise<void> {
-    const { streamId, request, profileId } = payload;
+    const { streamId, request } = payload;
     const abortController = new AbortController();
     this._activeStreams.set(streamId, abortController);
     const startedAt = Date.now();
     let outcome: "completed" | "error" | "aborted" = "error";
     try {
-      const connection = await this._connectionFor(
-        request.model.provider,
-        profileId
+      const connectionRef = payload.connection ?? {
+        providerId: request.model.provider,
+      };
+      if (connectionRef.providerId !== request.model.provider) {
+        throw new Error(
+          `Model ${request.model.provider}/${request.model.id} cannot use provider connection ${connectionRef.providerId}.`
+        );
+      }
+      const connection = await this._modelManager.resolveConnection(
+        connectionRef
       );
       for await (const event of streamAgent(request, {
         models: await this._modelManager.getAvailableModels(),
@@ -97,7 +104,10 @@ export class StreamThreadController {
       ? this._modelManager.buildModelsWithCandidate(providerId, candidate)
       : await this._modelManager.getAvailableModels();
     const targetId = candidate?.id ?? modelId;
-    const connection = await this._connectionFor(providerId, profileId);
+    const connection = await this._modelManager.resolveConnection({
+      providerId,
+      profileId,
+    });
     const abortController = new AbortController();
     try {
       for await (const event of streamAgent(
@@ -141,15 +151,7 @@ export class StreamThreadController {
     }
   }
 
-  /** Snapshot connection settings once so mid-run edits affect only later runs. */
-  private async _connectionFor(providerId: string, profileId?: string) {
-    return {
-      apiKey: await this._modelManager.getApiKey(providerId, true, profileId),
-      baseUrl: this._modelManager.getBaseUrl(providerId, profileId),
-      headers: this._modelManager.getHeaders(providerId, profileId),
-    };
-  }
-
+  /** Keep telemetry useful without recording custom provider or model names. */
   private _scrubModelForTelemetry(model: { provider: string; id: string }): {
     provider: string;
     model: string;

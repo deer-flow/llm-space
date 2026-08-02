@@ -10,6 +10,7 @@ import type {
   ModelProviderGroup,
   NetworkSettings,
   ProviderProfilePatch,
+  ProviderConnectionRef,
   SearchSettings,
   SystemProxyDetection,
   Thread,
@@ -52,7 +53,7 @@ export interface StreamThreadRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
   /** Per-tab connection choice; never persisted into the thread. */
-  profileId?: string;
+  connection?: ProviderConnectionRef;
 }
 
 /** A bun→webview chunk of a streaming agent run, keyed by `streamId`. */
@@ -413,7 +414,7 @@ export interface DesktopRPCType {
           name: string;
           arguments: Record<string, unknown>;
           config?: Record<string, unknown>;
-          profileId?: string;
+          connection?: ProviderConnectionRef;
         };
         response: BuiltinToolCallResponse;
       };

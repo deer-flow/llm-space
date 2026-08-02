@@ -71,6 +71,10 @@ describe("built-in tools module", () => {
       "ask_user_question",
     ]);
     expect(
+      tools.listTools().find((tool) => tool.name === "generate_image")
+        ?.connection
+    ).toEqual({ providerId: "ark" });
+    expect(
       await tools.call({
         name: "skill",
         arguments: { name: "fixture" },
@@ -92,7 +96,7 @@ describe("built-in tools module", () => {
           size: "2K",
           watermark: true,
         },
-        profileId: "profile-work",
+        connection: { providerId: "ark", profileId: "profile-work" },
       })
     ).toEqual({
       content: [
@@ -108,7 +112,7 @@ describe("built-in tools module", () => {
       model: "seedream-fixture",
       size: "2K",
       watermark: true,
-      profileId: "profile-work",
+      connection: { providerId: "ark", profileId: "profile-work" },
     });
     expect(
       tools.call({

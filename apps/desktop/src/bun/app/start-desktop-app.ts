@@ -18,7 +18,7 @@ import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
-import { createArkImageGenerator, ModelManager } from "../models";
+import { createConfiguredArkImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
 import {
   RemoteServerManager,
@@ -52,22 +52,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
-  const generateImage = createArkImageGenerator({
-    getConfig: () => modelManager.getArkImageGenerationConfig(),
-    getApiKey: async (profileId) => {
-      // An explicitly configured `$ENV_NAME` remains authoritative even when
-      // unset; only a truly blank setting falls back to Ark's official env key.
-      const configured = await modelManager.getApiKey(
-        "ark",
-        false,
-        profileId
-      );
-      return configured === undefined
-        ? process.env.ARK_API_KEY
-        : modelManager.getApiKey("ark", true, profileId);
-    },
-    getBaseUrl: (profileId) => modelManager.getBaseUrl("ark", profileId),
-    getHeaders: (profileId) => modelManager.getHeaders("ark", profileId),
+  const generateImage = createConfiguredArkImageGenerator({
+    modelManager,
+    env: process.env,
   });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager({

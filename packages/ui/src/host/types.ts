@@ -16,6 +16,7 @@ import type {
   McpTool,
   ModelConfig,
   ModelProviderGroup,
+  ProviderConnectionRef,
   ProviderProfilePatch,
   SearchSettings,
   SkillInfo,
@@ -33,8 +34,8 @@ export interface RuntimeScopedHostOptions {
 }
 
 export interface ExecuteToolOptions extends RuntimeScopedHostOptions {
-  /** Ephemeral provider profile used by provider-backed built-in tools. */
-  profileId?: string;
+  /** Ephemeral provider connection used by provider-backed built-in tools. */
+  connection?: ProviderConnectionRef;
 }
 
 /** Invoke an executable tool (built-in or MCP). */

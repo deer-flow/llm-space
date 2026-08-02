@@ -75,7 +75,9 @@ const TURN: AgentEvent = { type: "turn_start" };
 function _startIterator(signal?: AbortSignal, profileId?: string) {
   const iterator = createRpcTransport()(REQUEST, {
     signal,
-    profileId,
+    connection: profileId
+      ? { providerId: REQUEST.model.provider, profileId }
+      : undefined,
   })[Symbol.asyncIterator]();
   const next = iterator.next();
   const streamId = RPC.starts.at(-1)?.streamId;
@@ -117,7 +119,7 @@ describe("createRpcTransport", () => {
     const { next, streamId } = _startIterator(undefined, "profile-work");
     expect(RPC.starts[0]).toMatchObject({
       streamId,
-      profileId: "profile-work",
+      connection: { providerId: "test", profileId: "profile-work" },
       request: REQUEST,
     });
     RPC.emit({ streamId, type: "done" });

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import {
   createBuiltInToolsModule,
-  createArkImageGenerator,
+  createConfiguredArkImageGenerator,
   createLocalFileSystem,
   LocalRuntimeClient,
   McpManager,
@@ -33,21 +33,9 @@ export async function createServerRuntime(
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
-  const generateImage = createArkImageGenerator({
-    getConfig: () => modelManager.getArkImageGenerationConfig(),
-    getApiKey: async (profileId) => {
-      // Match the desktop's credential precedence for remote/headless calls.
-      const configured = await modelManager.getApiKey(
-        "ark",
-        false,
-        profileId
-      );
-      return configured === undefined
-        ? process.env.ARK_API_KEY
-        : modelManager.getApiKey("ark", true, profileId);
-    },
-    getBaseUrl: (profileId) => modelManager.getBaseUrl("ark", profileId),
-    getHeaders: (profileId) => modelManager.getHeaders("ark", profileId),
+  const generateImage = createConfiguredArkImageGenerator({
+    modelManager,
+    env: process.env,
   });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager();

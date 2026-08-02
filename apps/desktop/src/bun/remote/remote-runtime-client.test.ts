@@ -178,7 +178,7 @@ describe("RemoteRuntimeClient", () => {
           name: "generate_image",
           arguments: { prompt: "fixture" },
           config: { model: "seedream-fixture" },
-          profileId: "profile-work",
+          connection: { providerId: "ark", profileId: "profile-work" },
         });
         await client.mcpListTools("server-1");
         await client.mcpCallTool({
@@ -208,7 +208,7 @@ describe("RemoteRuntimeClient", () => {
       name: "generate_image",
       arguments: { prompt: "fixture" },
       config: { model: "seedream-fixture" },
-      profileId: "profile-work",
+      connection: { providerId: "ark", profileId: "profile-work" },
     });
   });
 
@@ -244,7 +244,10 @@ describe("RemoteRuntimeClient", () => {
           {
             streamId: "s1",
             request: {} as AgentStreamRequest,
-            profileId: "profile-work",
+            connection: {
+              providerId: "test",
+              profileId: "profile-work",
+            },
           },
           (message) => {
             if (message.type === "event") {
@@ -258,7 +261,7 @@ describe("RemoteRuntimeClient", () => {
     expect(events).toEqual([{ type: "agent_start" }]);
     expect(requestBody).toEqual({
       request: {},
-      profileId: "profile-work",
+      connection: { providerId: "test", profileId: "profile-work" },
     });
   });
 });

@@ -20,6 +20,13 @@ export interface ProviderProfilePatch {
   headers?: Record<string, string> | null;
 }
 
+/** Ephemeral reference to one provider connection. Never persisted in a thread. */
+export interface ProviderConnectionRef {
+  providerId: string;
+  /** Omitted selects the provider's fixed first/default profile. */
+  profileId?: string;
+}
+
 /** Show the fixed first profile as the default without duplicating its name. */
 export function formatProviderProfileLabel(
   profile: ProviderProfile,

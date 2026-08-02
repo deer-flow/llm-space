@@ -1,4 +1,4 @@
-import type { Thread } from "@llm-space/core";
+import type { ProviderConnectionRef, Thread } from "@llm-space/core";
 import type { RuntimeClient } from "@llm-space/runtime/runtime";
 
 import { ServerError, toServerError } from "./errors";
@@ -176,7 +176,7 @@ async function _dispatch(
         name: _stringParam(params, "name"),
         arguments: _recordParam(params, "arguments"),
         config: _optionalRecordParam(params, "config"),
-        profileId: _optionalStringParam(params, "profileId"),
+        connection: _optionalProviderConnectionParam(params),
       });
     case "search.get":
       return runtime.getSearchSettings();
@@ -345,4 +345,18 @@ function _optionalRecordParam(
   name: string
 ): Record<string, unknown> | undefined {
   return params[name] === undefined ? undefined : _recordParam(params, name);
+}
+
+function _optionalProviderConnectionParam(
+  params: Record<string, unknown>
+): ProviderConnectionRef | undefined {
+  const connection = _optionalRecordParam(params, "connection");
+  if (!connection) {
+    return undefined;
+  }
+  const profileId = _optionalStringParam(connection, "profileId");
+  return {
+    providerId: _stringParam(connection, "providerId"),
+    ...(profileId ? { profileId } : {}),
+  };
 }

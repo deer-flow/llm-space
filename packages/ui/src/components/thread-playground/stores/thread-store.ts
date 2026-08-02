@@ -1201,6 +1201,7 @@ export function createThreadStore(
               promptSnapshot = context.snapshot;
               const now = options.now ?? (() => performance.now());
               const turnStartedAt = now();
+              const profileId = options.getProfileId?.(model.provider);
               const response = streamThread(
                 {
                   context,
@@ -1209,7 +1210,10 @@ export function createThreadStore(
                 {
                   signal: abortController.signal,
                   transport: options.transport,
-                  profileId: options.getProfileId?.(model.provider),
+                  connection: {
+                    providerId: model.provider,
+                    ...(profileId ? { profileId } : {}),
+                  },
                 }
               );
               for await (const chunk of response) {

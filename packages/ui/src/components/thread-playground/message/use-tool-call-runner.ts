@@ -2,14 +2,10 @@ import { isExecutableTool, type Tool, type ToolCall } from "@llm-space/core";
 import { getToolResultText } from "@llm-space/core/thread";
 import { useCallback, useMemo } from "react";
 
-import { useHostServices } from "@llm-space/ui/host";
 import { isFirecrawlLimitError } from "@llm-space/ui/lib/firecrawl";
 
-import {
-  GENERATE_IMAGE_PROFILE_SELECTION_SCOPE,
-  useGetProviderProfileId,
-} from "../model/provider-profile-selection-provider";
 import { useThreadStore, useThreadStoreActions } from "../stores";
+import { useToolExecutor } from "../tool/use-tool-executor";
 
 export interface ToolCallOutcome {
   isError: boolean;
@@ -23,10 +19,9 @@ export interface ToolCallOutcome {
  * stays at the call site — only detection and plumbing are shared here.
  */
 export function useToolCallRunner(messageId: string) {
-  const { executeTool } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
   const runtimeId = useThreadStore((state) => state.runtimeId);
-  const getProfileId = useGetProviderProfileId();
+  const executeTool = useToolExecutor(runtimeId);
   const { updateToolCallOutput, updateToolCallOutputText } =
     useThreadStoreActions();
 
@@ -48,18 +43,7 @@ export function useToolCallRunner(messageId: string) {
       try {
         const { content, isError } = await executeTool(
           tool,
-          toolCall.input.arguments,
-          {
-            runtimeId,
-            ...(tool.type === "builtin" && tool.name === "generate_image"
-              ? {
-                  profileId: getProfileId(
-                    "ark",
-                    GENERATE_IMAGE_PROFILE_SELECTION_SCOPE
-                  ),
-                }
-              : {}),
-          }
+          toolCall.input.arguments
         );
         updateToolCallOutput(messageId, toolCall.id, content, isError);
         const text = getToolResultText(content);
@@ -76,10 +60,8 @@ export function useToolCallRunner(messageId: string) {
     },
     [
       executeTool,
-      getProfileId,
       messageId,
       resolveTool,
-      runtimeId,
       updateToolCallOutput,
       updateToolCallOutputText,
     ]

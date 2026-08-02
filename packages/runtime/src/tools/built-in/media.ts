@@ -2,6 +2,7 @@ import {
   SEEDREAM_IMAGE_SIZES,
   type BuiltinTool,
   type GenerateImageToolConfig,
+  type ProviderConnectionRef,
   type SeedreamImageSize,
 } from "@llm-space/core";
 
@@ -13,7 +14,7 @@ export interface MediaBuiltInToolsDependencies {
     model: string;
     size: SeedreamImageSize;
     watermark: boolean;
-    profileId?: string;
+    connection?: ProviderConnectionRef;
   }): Promise<{
     data: string;
     mimeType: string;
@@ -26,6 +27,7 @@ export const generateImageTool: BuiltinTool = {
   type: "builtin",
   name: "generate_image",
   icon: "image",
+  connection: { providerId: "ark" },
   description:
     "Generate one image with this tool's selected Ark image model. Use the configured default size unless the user requests a supported 1K, 2K, 3K, or 4K preset.",
   strict: true,
@@ -78,7 +80,7 @@ export function createMediaBuiltInTools(
           model: config.model,
           size: (size as SeedreamImageSize | undefined) ?? config.size,
           watermark: config.watermark,
-          profileId: context.profileId,
+          connection: context.connection,
         });
         return createToolCallResponse([
           {

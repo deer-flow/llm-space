@@ -26,8 +26,6 @@ interface ProviderProfileSelectionValue {
 
 const MODEL_PROFILE_SELECTION_SCOPE = "model";
 
-export const GENERATE_IMAGE_PROFILE_SELECTION_SCOPE = "generate_image";
-
 const PROVIDER_PROFILE_SELECTION_CONTEXT =
   createContext<ProviderProfileSelectionValue | null>(null);
 

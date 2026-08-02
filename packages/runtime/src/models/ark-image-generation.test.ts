@@ -23,9 +23,12 @@ function _dependencies(
   const config: ArkImageGenerationConfig = {};
   return {
     getConfig: () => config,
-    getApiKey: () => Promise.resolve("test-key"),
-    getBaseUrl: () => "https://ark.example/api/v3/",
-    getHeaders: () => ({ "X-Fixture": "fixture" }),
+    resolveConnection: () =>
+      Promise.resolve({
+        apiKey: "test-key",
+        baseUrl: "https://ark.example/api/v3/",
+        headers: { "X-Fixture": "fixture" },
+      }),
     fetch: () =>
       Promise.resolve(
         Response.json({
@@ -91,28 +94,25 @@ describe("Ark image generation", () => {
     const resolved: string[] = [];
     const generate = createArkImageGenerator(
       _dependencies({
-        getApiKey: (profileId) => {
-          resolved.push(`key:${profileId}`);
-          return Promise.resolve("work-key");
-        },
-        getBaseUrl: (profileId) => {
-          resolved.push(`url:${profileId}`);
-          return "https://work.example/api/v3/";
-        },
-        getHeaders: (profileId) => {
-          resolved.push(`headers:${profileId}`);
-          return { "X-Profile": "work" };
+        resolveConnection: (connection) => {
+          resolved.push(
+            `${connection.providerId}:${connection.profileId ?? "default"}`
+          );
+          return Promise.resolve({
+            apiKey: "work-key",
+            baseUrl: "https://work.example/api/v3/",
+            headers: { "X-Profile": "work" },
+          });
         },
       })
     );
 
-    await generate({ ...DEFAULT_INPUT, profileId: "profile-work" });
+    await generate({
+      ...DEFAULT_INPUT,
+      connection: { providerId: "ark", profileId: "profile-work" },
+    });
 
-    expect(resolved).toEqual([
-      "key:profile-work",
-      "url:profile-work",
-      "headers:profile-work",
-    ]);
+    expect(resolved).toEqual(["ark:profile-work"]);
   });
 
   test("fails before fetch when Ark image settings are missing", () => {

@@ -39,10 +39,13 @@ import {
 } from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
 
-import { GENERATE_IMAGE_PROFILE_SELECTION_SCOPE } from "../model/provider-profile-selection-provider";
 import { ProviderProfileSelector } from "../model/provider-profile-selector";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
+import {
+  getToolConnectionProviderId,
+  toolProfileSelectionScope,
+} from "./tool-executor";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
 type BuiltInToolCategoryId = "fileSystem" | "web" | "media" | "misc";
@@ -110,12 +113,16 @@ function _BuiltInToolImportDialog({
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
-  const arkProvider = useMemo(
-    () => providers.find((provider) => provider.id === "ark"),
-    [providers]
+  const generateImageTool = tools.find((tool) => tool.name === "generate_image");
+  const imageProviderId = generateImageTool
+    ? getToolConnectionProviderId(generateImageTool)
+    : undefined;
+  const imageProvider = useMemo(
+    () => providers.find((provider) => provider.id === imageProviderId),
+    [imageProviderId, providers]
   );
   const enabledImageModels = useMemo(() => {
-    const config = arkProvider?.imageGeneration;
+    const config = imageProvider?.imageGeneration;
     if (!config) {
       return [];
     }
@@ -123,7 +130,7 @@ function _BuiltInToolImportDialog({
     return getArkImageModelDefinitions(config).filter(
       (model) => !disabled.has(model.id)
     );
-  }, [arkProvider]);
+  }, [imageProvider]);
 
   const loadTools = useCallback(async () => {
     try {
@@ -377,12 +384,13 @@ function _BuiltInToolImportDialog({
                           </div>
                         ) : null}
                         {tool.name === "generate_image" && (
-                          <GenerateImageConfigFields
+                          <_GenerateImageConfigFields
                             config={generateImageConfig}
                             enabledModels={enabledImageModels}
                             showProfileSelector={
-                              (arkProvider?.profiles.length ?? 0) > 1
+                              (imageProvider?.profiles.length ?? 0) > 1
                             }
+                            providerId={imageProviderId}
                             selectedModel={configuredImageModel}
                             onChange={handleGenerateImageConfigChange}
                           />
@@ -412,16 +420,18 @@ function _BuiltInToolImportDialog({
 export const BuiltInToolImportDialog = memo(_BuiltInToolImportDialog);
 
 /** Configure the user-owned defaults persisted with one generate_image tool. */
-function GenerateImageConfigFields({
+function _GenerateImageConfigFields({
   config,
   enabledModels,
   showProfileSelector,
+  providerId,
   selectedModel,
   onChange,
 }: {
   config: GenerateImageToolConfig | null;
   enabledModels: readonly SeedreamImageModelDefinition[];
   showProfileSelector: boolean;
+  providerId?: string;
   selectedModel?: SeedreamImageModelDefinition;
   onChange: (config: GenerateImageToolConfig) => void;
 }) {
@@ -475,13 +485,13 @@ function GenerateImageConfigFields({
         </Select>
       </div>
 
-      {showProfileSelector ? (
+      {showProfileSelector && providerId ? (
         <div className="flex min-w-0 flex-col gap-1">
           <span className="text-muted-foreground text-xs">Profile</span>
           <ProviderProfileSelector
-            providerId="ark"
+            providerId={providerId}
             className="max-w-none"
-            selectionScope={GENERATE_IMAGE_PROFILE_SELECTION_SCOPE}
+            selectionScope={toolProfileSelectionScope("generate_image")}
           />
         </div>
       ) : null}

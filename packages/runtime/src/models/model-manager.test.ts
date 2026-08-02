@@ -242,4 +242,57 @@ describe("ModelManager provider profiles", () => {
       "Provider profile not configured"
     );
   });
+
+  test("resolves one immutable provider connection snapshot", async () => {
+    const manager = new ModelManager({ settingsDir: _emptySettingsDir() });
+    manager.addBuiltInProvider({ id: "minimax" });
+    const secondId = manager.addProfile("minimax");
+    manager.updateProfile("minimax", secondId, {
+      apiKey: "work-key",
+      baseUrl: "https://work.example/v1",
+      headers: { "X-Tenant": "work" },
+    });
+
+    const connection = await manager.resolveConnection({
+      providerId: "minimax",
+      profileId: secondId,
+    });
+    manager.updateProfile("minimax", secondId, {
+      headers: { "X-Tenant": "changed" },
+    });
+
+    expect(connection).toEqual({
+      apiKey: "work-key",
+      baseUrl: "https://work.example/v1",
+      headers: { "X-Tenant": "work" },
+    });
+  });
+
+  test("uses a provider fallback only when the profile has no key setting", async () => {
+    const manager = new ModelManager({ settingsDir: _emptySettingsDir() });
+    manager.addBuiltInProvider({ id: "minimax" });
+    const defaultProfile = manager.getProfiles("minimax")[0];
+
+    expect(
+      (
+        await manager.resolveConnection(
+          { providerId: "minimax" },
+          { fallbackApiKey: "fallback-key" }
+        )
+      ).apiKey
+    ).toBe("fallback-key");
+
+    manager.updateProfile("minimax", defaultProfile.id, {
+      apiKey: "$LLM_SPACE_MISSING_PROFILE_TEST_KEY",
+    });
+    delete process.env.LLM_SPACE_MISSING_PROFILE_TEST_KEY;
+    expect(
+      (
+        await manager.resolveConnection(
+          { providerId: "minimax" },
+          { fallbackApiKey: "fallback-key" }
+        )
+      ).apiKey
+    ).toBeUndefined();
+  });
 });

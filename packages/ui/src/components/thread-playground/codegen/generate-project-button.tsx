@@ -237,7 +237,10 @@ export function GenerateProjectButton({
         const workflow = createWorkflowContext({
           runOneShot: createOneShotRunner({
             transport,
-            profileId: selectedProfileId,
+            connection: {
+              providerId: model.provider,
+              ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
+            },
           }),
           defaultModel: model,
           signal: controller.signal,

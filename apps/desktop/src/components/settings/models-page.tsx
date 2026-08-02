@@ -765,7 +765,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                   </CardHeader>
                   <CardContent>
                     <_ProviderProfileEditor
-                      isDefault={index===0}
                       provider={provider}
                       profile={profile}
                       isBuiltin={isBuiltin}
@@ -876,7 +875,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           </div>
 
           {provider.id === "ark" && (
-            <ArkImageGenerationEditor provider={provider} />
+            <_ArkImageGenerationEditor provider={provider} />
           )}
         </div>
       </ScrollArea>
@@ -909,13 +908,11 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
 }
 
 function _ProviderProfileEditor({
-  isDefault,
   provider,
   profile,
   isBuiltin,
   usesAnthropicApi,
 }: {
-  isDefault: boolean;
   provider: ModelProviderGroup;
   profile: ProviderProfile;
   isBuiltin: boolean;
@@ -973,7 +970,7 @@ function _ProviderProfileEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      {!isDefault && <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Profile name</span>
         <Input
           defaultValue={profile.name}
@@ -981,7 +978,7 @@ function _ProviderProfileEditor({
           aria-label={`${provider.name} profile name`}
           onBlur={handleNameBlur}
         />
-      </div>}
+      </div>
 
       {provider.id !== "openai-codex" ? (
         <ApiKeyField
@@ -1064,7 +1061,7 @@ function _ProviderProfileEditor({
 }
 
 /** Chat-model-parity inventory management for Ark image models. */
-function ArkImageGenerationEditor({
+function _ArkImageGenerationEditor({
   provider,
 }: {
   provider: ModelProviderGroup;
@@ -1231,7 +1228,7 @@ function ArkImageGenerationEditor({
             </div>
           ) : (
             visibleModels.map((model) => (
-              <ImageModelListItem
+              <_ImageModelListItem
                 key={model.id}
                 providerName={provider.name}
                 model={model}
@@ -1261,7 +1258,7 @@ function ArkImageGenerationEditor({
 }
 
 /** Image-model row matching the existing Chat model management interaction. */
-function ImageModelListItem({
+function _ImageModelListItem({
   providerName,
   model,
   enabled,
