@@ -21,11 +21,13 @@ export function ProviderProfileSelector({
   readonly,
   className,
   selectionScope,
+  variant = "default",
 }: {
   providerId: string;
   readonly?: boolean;
   className?: string;
   selectionScope?: string;
+  variant?: "default" | "compact";
 }) {
   const provider = useModels().find((candidate) => candidate.id === providerId);
   const { selectedProfileId, selectProfile } = useProviderProfileSelection(
@@ -54,13 +56,21 @@ export function ProviderProfileSelector({
       }
     >
       <SelectTrigger
-        className={cn("ml-auto max-w-40 shrink-0", className)}
+        className={cn(
+          "max-w-40",
+          variant === "compact" && "ml-auto shrink-0",
+          className
+        )}
         size="sm"
         aria-label={`${provider?.name ?? providerId} connection profile: ${selectedProfile?.name ?? "Default"}`}
       >
-        <SelectValue>
-          {isDefaultProfile ? <CableIcon /> : selectedProfile?.name}
-        </SelectValue>
+        {variant === "compact" ? (
+          <SelectValue>
+            {isDefaultProfile ? <CableIcon /> : selectedProfile?.name}
+          </SelectValue>
+        ) : (
+          <SelectValue />
+        )}
       </SelectTrigger>
       <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
         <SelectGroup>

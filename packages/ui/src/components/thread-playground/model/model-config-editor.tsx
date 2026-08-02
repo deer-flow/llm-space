@@ -69,6 +69,7 @@ export function ModelConfigEditor({
                 <ProviderProfileSelector
                   providerId={model.provider}
                   readonly={readonly}
+                  variant="compact"
                 />
               ) : null}
             </div>
