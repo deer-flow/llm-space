@@ -48,6 +48,7 @@ export interface RemoteHostKeyTrustRequest {
   target: string;
   host: string;
   resolvedHost?: string;
+  hostKeyAlias?: string;
   port?: number;
   user?: string;
   keyType: string;

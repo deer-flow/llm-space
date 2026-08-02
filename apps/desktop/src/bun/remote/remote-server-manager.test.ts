@@ -719,6 +719,60 @@ describe("RemoteServerManager", () => {
     expect(connected[0]?.status).toBe("connected");
   });
 
+  test("does not start ssh runtime when host-key trust fails closed", async () => {
+    let startCount = 0;
+    const manager = _manager(
+      (config) => {
+        startCount += 1;
+        return Promise.resolve({
+          client: _remoteRuntime(config.id),
+          stop: () => Promise.resolve(),
+        });
+      },
+      undefined,
+      undefined,
+      {
+        check: () =>
+          Promise.resolve({
+            status: "first-time",
+            request: {
+              requestId: "trust-changed",
+              kind: "first-time",
+              target: "user@host",
+              host: "host",
+              user: "user",
+              keyType: "ssh-ed25519",
+              fingerprint: "SHA256:approved",
+              publicKeyLine: "host ssh-ed25519 APPROVED",
+            },
+          }),
+        trust: () =>
+          Promise.reject(new Error("SSH host key changed during trust.")),
+      }
+    );
+
+    const [server] = manager.addServer({
+      name: "host",
+      host: "host",
+      user: "user",
+    });
+    await manager.connectServer(server.id);
+
+    let trustError: unknown;
+    try {
+      await manager.trustServerHostKey(server.id, "trust-changed");
+    } catch (error) {
+      trustError = error;
+    }
+
+    expect(trustError).toBeInstanceOf(Error);
+    expect((trustError as Error).message).toBe(
+      "SSH host key changed during trust."
+    );
+    expect(startCount).toBe(0);
+    expect(manager.listServers()[0]?.status).toBe("trust-required");
+  });
+
   test("rejecting a changed host key does not start ssh runtime", async () => {
     let startCount = 0;
     let trustCount = 0;
