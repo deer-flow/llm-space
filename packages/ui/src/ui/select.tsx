@@ -33,11 +33,13 @@ function SelectValue({
 
 function SelectTrigger({
   className,
+  noIcon = false,
   size = "default",
   children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: "sm" | "default";
+  noIcon?: boolean;
 }) {
   return (
     <SelectPrimitive.Trigger
@@ -50,9 +52,7 @@ function SelectTrigger({
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="text-muted-foreground pointer-events-none size-3.5" />
-      </SelectPrimitive.Icon>
+      {!noIcon && <SelectPrimitive.Icon asChild><ChevronDownIcon className="text-muted-foreground pointer-events-none size-3.5" /></SelectPrimitive.Icon>}
     </SelectPrimitive.Trigger>
   );
 }

@@ -58,10 +58,11 @@ export function ProviderProfileSelector({
       <SelectTrigger
         className={cn(
           "max-w-40",
-          variant === "compact" && "ml-auto shrink-0",
+          variant === "compact" && "border-0 bg-transparent! ml-auto shrink-0",
           className
         )}
         size="sm"
+        noIcon={ variant=== "compact" }
         aria-label={`${provider?.name ?? providerId} connection profile: ${selectedProfile?.name ?? "Default"}`}
       >
         {variant === "compact" ? (

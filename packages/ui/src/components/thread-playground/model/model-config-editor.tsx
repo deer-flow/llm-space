@@ -67,6 +67,7 @@ export function ModelConfigEditor({
               <ModelSelector value={model ?? null} readonly={readonly} />
               {model ? (
                 <ProviderProfileSelector
+                  className="-mt-1"
                   providerId={model.provider}
                   readonly={readonly}
                   variant="compact"

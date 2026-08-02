@@ -206,21 +206,17 @@ function _ToolCallListItem({
       <hr />
       <div className="flex w-full flex-col gap-1">
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
-          <Marker role="status" className="gap-1">
-            <MarkerContent className="flex items-center text-xs">
-              <Tooltip content="Preview response">
-                <Button
-                  className="invisible shrink-0 group-hover/message:visible"
-                  size="xs"
-                  variant="ghost"
-                  disabled={outputText === ""}
-                  onClick={() => setPreviewOpen(true)}
-                >
-                  <EyeIcon className="size-3" />
-                </Button>
-              </Tooltip>
-            </MarkerContent>
-          </Marker>
+          <Tooltip content="Preview response">
+            <Button
+              className="invisible shrink-0 group-hover/message:visible"
+              size="xs"
+              variant="ghost"
+              disabled={outputText === ""}
+              onClick={() => setPreviewOpen(true)}
+            >
+              <EyeIcon className="size-3" />
+            </Button>
+          </Tooltip>
           {!presentational && (
             <div className="flex items-center">
               <Button
