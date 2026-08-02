@@ -33,6 +33,13 @@ import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@llm-space/ui/ui/card";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -72,6 +79,12 @@ import {
 } from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@llm-space/ui/ui/tabs";
+import {
   Ban,
   CableIcon,
   Check,
@@ -83,6 +96,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -466,7 +480,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const [selectedProfileId, setSelectedProfileId] = useState(
     provider?.profiles[0]?.id ?? ""
   );
-  const [removeProfileOpen, setRemoveProfileOpen] = useState(false);
+  const [removeProfileId, setRemoveProfileId] = useState<string | null>(null);
   const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
     "all"
   );
@@ -562,8 +576,8 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const selectedProfile =
     provider.profiles.find((profile) => profile.id === selectedProfileId) ??
     provider.profiles[0];
-  const selectedProfileIndex = provider.profiles.findIndex(
-    (profile) => profile.id === selectedProfile.id
+  const profilePendingRemoval = provider.profiles.find(
+    (profile) => profile.id === removeProfileId
   );
 
   const handleAddProfile = async () => {
@@ -577,10 +591,12 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     }
   };
 
-  const handleRemoveProfile = async () => {
+  const handleRemoveProfile = async (profile: ProviderProfile) => {
     try {
-      await removeProviderProfile(provider.id, selectedProfile.id);
-      setSelectedProfileId(provider.profiles[0].id);
+      await removeProviderProfile(provider.id, profile.id);
+      if (selectedProfile.id === profile.id) {
+        setSelectedProfileId(provider.profiles[0].id);
+      }
     } catch (error) {
       toast.error("Failed to remove connection profile", {
         description:
@@ -690,74 +706,76 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Connection profiles</span>
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedProfile.id}
-                onValueChange={setSelectedProfileId}
-              >
-                <SelectTrigger
-                  className="min-w-0 grow"
-                  aria-label={`${provider.name} connection profile`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {provider.profiles.map((profile, index) => (
-                      <SelectItem key={profile.id} value={profile.id}>
+          <Tabs
+            value={selectedProfile.id}
+            onValueChange={setSelectedProfileId}
+            className="gap-3"
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <TabsList variant="line" className="h-8! min-w-0 grow flex-row! justify-start overflow-x-auto">
+                  {provider.profiles.map((profile, index) => (
+                    <div
+                      key={profile.id}
+                      className="flex shrink-0 items-center"
+                    >
+                      <TabsTrigger value={profile.id} className="w-auto!">
                         {formatProviderProfileLabel(profile, index)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Tooltip content="Add connection profile">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Add connection profile"
-                  onClick={() => void handleAddProfile()}
-                >
-                  <Plus data-icon="inline-start" />
-                </Button>
-              </Tooltip>
-              <Tooltip
-                content={
-                  selectedProfileIndex === 0
-                    ? "The default profile cannot be removed"
-                    : `Remove ${selectedProfile.name}`
-                }
-              >
-                <span>
+                      </TabsTrigger>
+                      {index > 0 ? (
+                        <Tooltip content={`Remove ${profile.name}`}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`Remove ${profile.name} connection profile`}
+                            onClick={() => setRemoveProfileId(profile.id)}
+                          >
+                            <X data-icon="inline-start" />
+                          </Button>
+                        </Tooltip>
+                      ) : null}
+                    </div>
+                  ))}
+                </TabsList>
+                <Tooltip content="Add connection profile">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    aria-label={`Remove ${selectedProfile.name} connection profile`}
-                    disabled={selectedProfileIndex === 0}
-                    onClick={() => setRemoveProfileOpen(true)}
+                    aria-label="Add connection profile"
+                    onClick={() => void handleAddProfile()}
                   >
-                    <Trash2 data-icon="inline-start" />
+                    <Plus data-icon="inline-start" />
                   </Button>
-                </span>
-              </Tooltip>
+                </Tooltip>
+              </div>
             </div>
-          </div>
 
-          <_ProviderProfileEditor
-            key={selectedProfile.id}
-            provider={provider}
-            profile={selectedProfile}
-            isBuiltin={isBuiltin}
-            usesAnthropicApi={usesAnthropicApi}
-          />
-
-          {provider.id === "ark" && (
-            <ArkImageGenerationEditor provider={provider} />
-          )}
+            {provider.profiles.map((profile, index) => (
+              <TabsContent key={profile.id} value={profile.id}>
+                <Card size="sm" className="bg-muted/30">
+                  <CardHeader className="border-b">
+                    <CardTitle>
+                      {formatProviderProfileLabel(profile, index)}
+                    </CardTitle>
+                    <CardDescription>
+                      API key, base URL, and headers for this connection.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <_ProviderProfileEditor
+                      isDefault={index===0}
+                      provider={provider}
+                      profile={profile}
+                      isBuiltin={isBuiltin}
+                      usesAnthropicApi={usesAnthropicApi}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -856,6 +874,10 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               )}
             </div>
           </div>
+
+          {provider.id === "ark" && (
+            <ArkImageGenerationEditor provider={provider} />
+          )}
         </div>
       </ScrollArea>
 
@@ -868,15 +890,18 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
         model={editingModel}
       />
       <ConfirmDialog
-        open={removeProfileOpen}
-        onOpenChange={setRemoveProfileOpen}
-        title={`Remove ${selectedProfile.name}?`}
-        description={`This permanently removes the connection profile "${selectedProfile.name}" from ${provider.name}.`}
+        open={profilePendingRemoval !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setRemoveProfileId(null);
+        }}
+        title={`Remove ${profilePendingRemoval?.name ?? "profile"}?`}
+        description={`This permanently removes the connection profile "${profilePendingRemoval?.name ?? "profile"}" from ${provider.name}.`}
         confirmLabel="Remove"
         dimBackground={false}
         onConfirm={() => {
-          setRemoveProfileOpen(false);
-          void handleRemoveProfile();
+          const profile = profilePendingRemoval;
+          setRemoveProfileId(null);
+          if (profile) void handleRemoveProfile(profile);
         }}
       />
     </div>
@@ -884,11 +909,13 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
 }
 
 function _ProviderProfileEditor({
+  isDefault,
   provider,
   profile,
   isBuiltin,
   usesAnthropicApi,
 }: {
+  isDefault: boolean;
   provider: ModelProviderGroup;
   profile: ProviderProfile;
   isBuiltin: boolean;
@@ -946,7 +973,7 @@ function _ProviderProfileEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
+      {!isDefault && <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Profile name</span>
         <Input
           defaultValue={profile.name}
@@ -954,7 +981,7 @@ function _ProviderProfileEditor({
           aria-label={`${provider.name} profile name`}
           onBlur={handleNameBlur}
         />
-      </div>
+      </div>}
 
       {provider.id !== "openai-codex" ? (
         <ApiKeyField
