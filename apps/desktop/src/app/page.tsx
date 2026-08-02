@@ -868,7 +868,7 @@ function PageWorkspace({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".json,application/json"
+        accept=".json,.jsonl,application/json,application/x-ndjson"
         aria-label="Import thread files"
         className="hidden"
         onChange={(e) => {

@@ -278,7 +278,7 @@ Thread 文件保存在：
 
 # 支持导入的 schema
 
-当前导入入口按文件扩展名选择解析器；已支持 `.json`。导入 JSON 时，LLM Space 会尝试识别并归一化以下格式：
+当前导入入口按文件扩展名选择解析器；已支持 `.json` 和 `.jsonl`。LLM Space 会尝试识别并归一化以下格式：
 
 | 格式 | 说明 |
 | --- | --- |
@@ -286,5 +286,6 @@ Thread 文件保存在：
 | OpenAI Chat Completions 风格 JSON | 包含 `messages`、`role`、`content`、`tool_calls` 等字段的聊天导出。 |
 | Anthropic Messages 风格 JSON | 包含 `system`、`messages`、内容块、`tool_use`、`tool_result`、`input_schema` 等字段的聊天导出。 |
 | Aurora 风格 JSON | 包含 `Messages` 和 `Tools` 的 Aurora 线程导出。 |
+| DeerFlow run-event JSONL | 包含用户、助手和工具消息的持久化运行事件。 |
 
 导入后，外部格式会转换为 LLM Space 的 Thread 结构，并写入当前工作区目录下的新 `.json` 文件。无法解析出消息、System Prompt、Tools 或模型信息的文件会被跳过。

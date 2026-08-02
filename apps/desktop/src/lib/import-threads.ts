@@ -17,12 +17,12 @@ export interface ThreadImportFile {
 }
 
 /**
- * Parse each file payload (OpenAI ChatCompletion / Anthropic Messages / native thread
- * JSON) and write the ones that yield a thread into `parent` as new `.json`
- * files, mirroring the "New File" naming/creation. Files that don't parse into
- * a thread are skipped. Returns the created workspace-relative paths and the
- * total number of files processed. The on-disk title is normalized to the file
- * name by the scoped filesystem client, same as New File.
+ * Parse each supported thread file and write the ones that yield a thread into
+ * `parent` as new `.json` files, mirroring the "New File" naming/creation.
+ * Files that don't parse into a thread are skipped. Returns the created
+ * workspace-relative paths and the total number of files processed. The on-disk
+ * title is normalized to the file name by the scoped filesystem client, same as
+ * New File.
  */
 export async function importThreadFileRecords(
   parent: string,

@@ -1,5 +1,6 @@
 import type { Thread } from "../types";
 
+import { DeerFlowJsonlThreadParser } from "./deerflow-jsonl-thread-parser";
 import { JsonThreadParser } from "./json-thread-parser";
 import type {
   ThreadParseContext,
@@ -84,7 +85,10 @@ export class ThreadParserRegistry {
  * A registry pre-registered with the built-in parsers.
  */
 export function createDefaultThreadParserRegistry(): ThreadParserRegistry {
-  return new ThreadParserRegistry([new JsonThreadParser()]);
+  return new ThreadParserRegistry([
+    new JsonThreadParser(),
+    new DeerFlowJsonlThreadParser(),
+  ]);
 }
 
 /** Lowercase and ensure a single leading dot, e.g. `"JSON"` → `".json"`. */

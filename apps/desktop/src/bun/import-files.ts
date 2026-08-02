@@ -28,7 +28,7 @@ export async function importFilesWithNativePicker(
   const paths = _normalizeSelectedPaths(
     await Utils.openFileDialog({
       startingFolder: Utils.paths.documents,
-      allowedFileTypes: "json",
+      allowedFileTypes: "json,jsonl",
       canChooseFiles: true,
       canChooseDirectory: false,
       allowsMultipleSelection: true,
