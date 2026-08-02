@@ -465,7 +465,7 @@ function ThreadPlaygroundContent({
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Models
                     </div>
-                    <div className="flex grow items-center">
+                    <div className="flex min-w-0 grow items-center">
                       <ModelConfigEditor readonly={readonly} />
                     </div>
                   </div>

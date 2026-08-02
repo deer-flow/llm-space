@@ -1,6 +1,7 @@
 "use client";
 
 import { formatProviderProfileLabel } from "@llm-space/core";
+import { CableIcon } from "lucide-react";
 
 import { cn } from "../../../lib/utils";
 import {
@@ -27,15 +28,22 @@ export function ProviderProfileSelector({
   selectionScope?: string;
 }) {
   const provider = useModels().find((candidate) => candidate.id === providerId);
-  const { selectedProfileId, selectProfile } =
-    useProviderProfileSelection(providerId, selectionScope);
+  const { selectedProfileId, selectProfile } = useProviderProfileSelection(
+    providerId,
+    selectionScope
+  );
   const profiles = provider?.profiles ?? [];
   if (profiles.length <= 1) {
     return null;
   }
-  const value = profiles.some((profile) => profile.id === selectedProfileId)
-    ? selectedProfileId
-    : profiles[0].id;
+  const requestedProfileIndex = profiles.findIndex(
+    (profile) => profile.id === selectedProfileId
+  );
+  const selectedProfileIndex =
+    requestedProfileIndex >= 0 ? requestedProfileIndex : 0;
+  const selectedProfile = profiles[selectedProfileIndex];
+  const value = selectedProfile.id;
+  const isDefaultProfile = selectedProfileIndex === 0;
 
   return (
     <Select
@@ -46,11 +54,13 @@ export function ProviderProfileSelector({
       }
     >
       <SelectTrigger
-        className={cn("max-w-40", className)}
+        className={cn("ml-auto max-w-40 shrink-0", className)}
         size="sm"
-        aria-label={`${provider?.name ?? providerId} connection profile`}
+        aria-label={`${provider?.name ?? providerId} connection profile: ${selectedProfile?.name ?? "Default"}`}
       >
-        <SelectValue />
+        <SelectValue>
+          {isDefaultProfile ? <CableIcon /> : selectedProfile?.name}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
         <SelectGroup>

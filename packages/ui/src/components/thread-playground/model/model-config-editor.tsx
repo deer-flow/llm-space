@@ -53,7 +53,7 @@ export function ModelConfigEditor({
   }
 
   return (
-    <div className={cn("group flex w-full", className)}>
+    <div className={cn("group flex w-full min-w-0", className)}>
       <div className="flex min-w-0 grow flex-col gap-2">
         <div className="flex cursor-default items-center text-sm">
           {presentational ? (
@@ -63,7 +63,7 @@ export function ModelConfigEditor({
               {modelName ?? savedModel?.id ?? "(No model)"}
             </span>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full min-w-0 items-center gap-2">
               <ModelSelector value={model ?? null} readonly={readonly} />
               {model ? (
                 <ProviderProfileSelector
