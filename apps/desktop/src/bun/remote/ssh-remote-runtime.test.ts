@@ -8,7 +8,8 @@ import { startSshRemoteRuntime } from "./ssh-remote-runtime";
 let scenario:
   | "missing-runtime-binary"
   | "non-runtime-failure"
-  | "port-in-use";
+  | "port-in-use"
+  | "success";
 let installCalls = 0;
 let serverSpawnCalls = 0;
 let stopCalls = 0;
@@ -16,12 +17,20 @@ let diagnosticCalls = 0;
 let remoteExecCalls: string[] = [];
 let serverPorts: number[] = [];
 let tunnelPorts: number[] = [];
+let spawnCalls: {
+  label: string;
+  command: string;
+  args: string[];
+  options?: { collectOutput?: boolean; stdinInput?: string };
+}[] = [];
+
+const SENTINEL_TOKEN = "sentinel-runtime-token-do-not-leak";
 
 const CONFIG: SshRemoteRuntimeConfig = {
   id: "remote:test",
   name: "test",
   host: "host",
-  extraArgs: [],
+  extraArgs: ["-tt"],
   remoteRepo: "",
   remoteInstallDir: "~/.llm-space/remote-runtime",
   remoteHome: "~/.llm-space-server",
@@ -30,6 +39,7 @@ const CONFIG: SshRemoteRuntimeConfig = {
 };
 
 const TEST_DEPENDENCIES = {
+  generateToken: () => SENTINEL_TOKEN,
   findFreePort: () => Promise.resolve(40000),
   installRemoteServerPackage: () => {
     installCalls += 1;
@@ -53,7 +63,13 @@ const TEST_DEPENDENCIES = {
       stderr: "",
     });
   },
-  spawnManagedProcess: (label: string, _command: string, args: string[]) => {
+  spawnManagedProcess: (
+    label: string,
+    command: string,
+    args: string[],
+    options?: { collectOutput?: boolean; stdinInput?: string }
+  ) => {
+    spawnCalls.push({ label, command, args, options });
     const attempt = installCalls;
     if (label === "remote server") {
       serverSpawnCalls += 1;
@@ -105,16 +121,63 @@ beforeEach(() => {
   remoteExecCalls = [];
   serverPorts = [];
   tunnelPorts = [];
+  spawnCalls = [];
 });
 
 describe("startSshRemoteRuntime", () => {
+  test.each(["installed", "source"] as const)(
+    "passes the %s runtime token only through a closed stdin payload",
+    async (mode) => {
+      scenario = "success";
+      const originalMode = process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+      if (mode === "source") {
+        process.env.LLM_SPACE_REMOTE_SERVER_MODE = "source";
+      } else {
+        delete process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+      }
+
+      try {
+        await _withFetch(async () => {
+          const handle = await startSshRemoteRuntime(CONFIG, {
+            dependencies: TEST_DEPENDENCIES,
+          });
+          await handle.stop();
+        });
+      } finally {
+        if (originalMode === undefined) {
+          delete process.env.LLM_SPACE_REMOTE_SERVER_MODE;
+        } else {
+          process.env.LLM_SPACE_REMOTE_SERVER_MODE = originalMode;
+        }
+      }
+
+      const serverSpawn = spawnCalls.find(
+        (call) => call.label === "remote server"
+      );
+      expect(serverSpawn).toBeDefined();
+      expect(serverSpawn?.command).toBe("ssh");
+      expect(serverSpawn?.args.join("\0")).not.toContain(SENTINEL_TOKEN);
+      const userTtyIndex = serverSpawn?.args.indexOf("-tt") ?? -1;
+      const disableTtyIndex = serverSpawn?.args.indexOf("-T") ?? -1;
+      const targetIndex = serverSpawn?.args.indexOf(CONFIG.host) ?? -1;
+      expect(disableTtyIndex).toBeGreaterThan(userTtyIndex);
+      expect(disableTtyIndex).toBeLessThan(targetIndex);
+      expect(serverSpawn?.args.at(-1)).not.toContain("--token ");
+      expect(serverSpawn?.args.at(-1)).toContain("--token-stdin");
+      expect(serverSpawn?.options?.stdinInput).toBe(`${SENTINEL_TOKEN}\n`);
+    }
+  );
+
   test("does not reinstall when the runtime binary is missing", async () => {
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
       (error) => {
         expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).not.toContain(SENTINEL_TOKEN);
         expect((error as Error).message).toContain(
           "Remote runtime binary is missing"
         );
@@ -132,7 +195,9 @@ describe("startSshRemoteRuntime", () => {
   test("does not reinstall for non-runtime startup failures", async () => {
     scenario = "non-runtime-failure";
 
-    await startSshRemoteRuntime(CONFIG, { dependencies: TEST_DEPENDENCIES }).then(
+    await startSshRemoteRuntime(CONFIG, {
+      dependencies: TEST_DEPENDENCIES,
+    }).then(
       () => {
         throw new Error("connect should fail");
       },
@@ -164,6 +229,14 @@ describe("startSshRemoteRuntime", () => {
     expect(serverPorts[1]).not.toBe(serverPorts[0]);
     expect(tunnelPorts).toEqual([serverPorts[1]]);
     expect(remoteExecCalls).toEqual([]);
+    const serverSpawns = spawnCalls.filter(
+      (call) => call.label === "remote server"
+    );
+    expect(serverSpawns).toHaveLength(2);
+    for (const spawn of serverSpawns) {
+      expect(spawn.args.join("\0")).not.toContain(SENTINEL_TOKEN);
+      expect(spawn.options?.stdinInput).toBe(`${SENTINEL_TOKEN}\n`);
+    }
     expect(stopCalls).toBeGreaterThanOrEqual(1);
   });
 
@@ -321,7 +394,7 @@ describe("startSshRemoteRuntime", () => {
           .find((process) => process.exitCode === null);
 
         expect(sourceRetry?.command).toContain(
-          "exec bun --filter @llm-space/server dev --"
+          "exec bun apps/server/src/index.ts"
         );
         expect(sourceRetry?.remotePort).toBe(endpoint.remotePort);
         expect(endpoint.remotePort).not.toBe(CONFIG.remoteServerPort);
@@ -400,8 +473,10 @@ class StatefulSshFake {
 
   private _nextLocalPort = 41000;
   private _nextProcessId = 1;
+  private _nextToken = 1;
 
   readonly dependencies = {
+    generateToken: () => `stateful-token-${this._nextToken++}`,
     findFreePort: () => Promise.resolve(this._nextLocalPort++),
     installRemoteServerPackage: () =>
       Promise.resolve({
@@ -419,8 +494,9 @@ class StatefulSshFake {
     spawnManagedProcess: (
       label: string,
       _executable: string,
-      args: string[]
-    ) => this._spawn(label, args),
+      args: string[],
+      options?: { collectOutput?: boolean; stdinInput?: string }
+    ) => this._spawn(label, args, options),
   };
 
   start(config: SshRemoteRuntimeConfig = CONFIG) {
@@ -467,9 +543,13 @@ class StatefulSshFake {
     return this.processes.filter((process) => process.label === "ssh tunnel");
   }
 
-  private _spawn(label: string, args: string[]): ManagedProcess {
+  private _spawn(
+    label: string,
+    args: string[],
+    options?: { collectOutput?: boolean; stdinInput?: string }
+  ): ManagedProcess {
     if (label === "remote server") {
-      return this._spawnServer(args);
+      return this._spawnServer(args, options);
     }
     if (label === "ssh tunnel") {
       return this._spawnTunnel(args);
@@ -477,10 +557,19 @@ class StatefulSshFake {
     throw new Error(`Unexpected managed process: ${label}`);
   }
 
-  private _spawnServer(args: string[]): ManagedProcess {
+  private _spawnServer(
+    args: string[],
+    options?: { collectOutput?: boolean; stdinInput?: string }
+  ): ManagedProcess {
     const command = args.at(-1) ?? "";
     const remotePort = _serverPort(args);
-    const token = _commandValue(command, "token");
+    const token = options?.stdinInput?.trim();
+    if (!token) {
+      throw new Error("Missing remote runtime token stdin payload.");
+    }
+    if (args.join("\0").includes(token)) {
+      throw new Error("Remote runtime token leaked into SSH argv.");
+    }
     const activeServer = this.processes.some(
       (process) =>
         process.label === "remote server" &&
@@ -637,12 +726,6 @@ class StatefulSshFake {
     }
     return Promise.resolve(new Response("not found", { status: 404 }));
   };
-}
-
-function _commandValue(command: string, flag: string): string {
-  const match = new RegExp(`--${flag}\\s+'([^']+)'`).exec(command);
-  if (!match) throw new Error(`Missing --${flag} in ${command}`);
-  return match[1];
 }
 
 function _healthResponse() {

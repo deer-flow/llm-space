@@ -7,14 +7,23 @@ export interface ManagedProcess {
   stop(): Promise<void>;
 }
 
+export interface ManagedProcessOptions {
+  collectOutput?: boolean;
+  stdinInput?: string;
+}
+
 export function spawnManagedProcess(
   label: string,
   command: string,
   args: string[],
-  options: { collectOutput?: boolean } = {}
+  options: ManagedProcessOptions = {}
 ): ManagedProcess {
   const child = spawn(command, args, {
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: [
+      options.stdinInput === undefined ? "ignore" : "pipe",
+      "pipe",
+      "pipe",
+    ],
   });
   let output = "";
   const append = (chunk: Buffer) => {
@@ -27,6 +36,13 @@ export function spawnManagedProcess(
     child.stdout?.on("data", append);
   }
   child.stderr?.on("data", append);
+  if (options.stdinInput !== undefined) {
+    child.stdin?.on("error", () => {
+      // The child exit/output path reports startup failures. Handling EPIPE
+      // here prevents a closed remote stdin from becoming an uncaught error.
+    });
+    child.stdin?.end(options.stdinInput);
+  }
 
   return {
     label,

@@ -4,7 +4,8 @@ import path from "node:path";
 export interface ServerArgs {
   host: string;
   port: number;
-  token: string;
+  token?: string;
+  tokenStdin: boolean;
   home: string;
   help: boolean;
 }
@@ -18,6 +19,7 @@ export function parseArgs(argv: string[]): ServerArgs {
     port: DEFAULT_PORT,
     home: path.join(os.homedir(), ".llm-space-server"),
     help: false,
+    tokenStdin: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -38,6 +40,10 @@ export function parseArgs(argv: string[]): ServerArgs {
       parsed.token = _requireValue(argv, ++index, arg);
       continue;
     }
+    if (arg === "--token-stdin") {
+      parsed.tokenStdin = true;
+      continue;
+    }
     if (arg === "--home") {
       parsed.home = _resolveHome(_requireValue(argv, ++index, arg));
       continue;
@@ -49,15 +55,34 @@ export function parseArgs(argv: string[]): ServerArgs {
     parsed.home ?? path.join(os.homedir(), ".llm-space-server")
   );
 
-  if (!parsed.help && !parsed.token) {
+  if (!parsed.help && !parsed.token && !parsed.tokenStdin) {
     throw new Error("--token is required.");
+  }
+  if (!parsed.help && parsed.token && parsed.tokenStdin) {
+    throw new Error(
+      "Choose exactly one token source: --token or --token-stdin."
+    );
   }
 
   return parsed as ServerArgs;
 }
 
+export async function resolveServerToken(
+  args: ServerArgs,
+  readStdin: () => Promise<string> = () => Bun.stdin.text()
+): Promise<string> {
+  if (args.token !== undefined) return args.token;
+  const input = await readStdin();
+  const token = input.endsWith("\n") ? input.slice(0, -1) : input;
+  const normalized = token.endsWith("\r") ? token.slice(0, -1) : token;
+  if (!normalized) {
+    throw new Error("Bearer token from standard input is empty.");
+  }
+  return normalized;
+}
+
 export function helpText(): string {
-  return `Usage: llm-space-server --token <token> [options]\n\nOptions:\n  --host <host>    Host to bind. Defaults to 127.0.0.1.\n  --port <port>    Port to bind. Defaults to 39123.\n  --token <token>  Bearer token required by every endpoint.\n  --home <path>    Server home. Defaults to ~/.llm-space-server.\n  --help           Show this help.\n`;
+  return `Usage: llm-space-server (--token <token> | --token-stdin) [options]\n\nOptions:\n  --host <host>    Host to bind. Defaults to 127.0.0.1.\n  --port <port>    Port to bind. Defaults to 39123.\n  --token <token>  Bearer token required by every endpoint.\n  --token-stdin    Read the bearer token from standard input.\n  --home <path>    Server home. Defaults to ~/.llm-space-server.\n  --help           Show this help.\n`;
 }
 
 function _requireValue(argv: string[], index: number, flag: string): string {

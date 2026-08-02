@@ -29,6 +29,8 @@ import {
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
+import type { PaneLifecycleHost } from "./pane-lifecycle-host";
+import { RuntimePaneHost } from "./runtime-pane-host";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
@@ -40,6 +42,10 @@ const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
 const MOVE_TO_TRASH_LABEL = _isWindows
   ? "Move to Recycle Bin"
   : "Move to Trash";
+
+function _getPaneKey(tab: AppTab): string {
+  return tab.type === "thread" ? tab.paneId : tab.id;
+}
 
 // Suppress focus on mouse-down so a click doesn't leave these toolbar icons
 // with the focus-visible ring stuck; keyboard focus (Tab) still rings them.
@@ -56,7 +62,9 @@ function _tabIdFromEventTarget(target: EventTarget | null): string | null {
 
 interface ThreadTabsProps {
   className?: string;
+  emptyState?: ReactNode;
   tabs: AppTab[];
+  paneTabs: AppTab[];
   activeId: string | null;
   sidebarOpen?: boolean;
   fullScreen?: boolean;
@@ -81,13 +89,17 @@ interface ThreadTabsProps {
     runtimeId: RuntimeId
   ) => void;
   onToggleSidebar?: () => void;
+  lifecycleHost: PaneLifecycleHost;
+  mutationRevision: number;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
 }
 
 export function ThreadTabs({
   className,
+  emptyState,
   tabs,
+  paneTabs,
   activeId,
   sidebarOpen = true,
   fullScreen = false,
@@ -106,6 +118,8 @@ export function ThreadTabs({
   onMove,
   onTraceTitleChange,
   onToggleSidebar,
+  lifecycleHost,
+  mutationRevision,
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -228,6 +242,45 @@ export function ThreadTabs({
     [close]
   );
 
+  const renderPane = useCallback(
+    (tab: AppTab, active: boolean) =>
+      tab.type === "thread" ? (
+        <ThreadTabPane
+          tabId={tab.id}
+          paneId={tab.paneId}
+          path={tab.path}
+          runtimeId={tab.runtimeId}
+          active={active}
+          lifecycleHost={lifecycleHost}
+          mutationRevision={mutationRevision}
+          refreshNonce={tab.refreshNonce ?? 0}
+          onMove={onMove}
+          onClose={close}
+          consumeDiscardedPane={consumeDiscardedPane}
+        />
+      ) : (
+        <TraceTabPane
+          projectId={tab.projectId}
+          traceKey={tab.traceKey}
+          runtimeId={tab.runtimeId}
+          active={active}
+          lifecycleHost={lifecycleHost}
+          mutationRevision={mutationRevision}
+          refreshNonce={tab.refreshNonce ?? 0}
+          onClose={close}
+          onRenameTitle={onTraceTitleChange}
+        />
+      ),
+    [
+      close,
+      consumeDiscardedPane,
+      lifecycleHost,
+      mutationRevision,
+      onMove,
+      onTraceTitleChange,
+    ]
+  );
+
   return (
     <div
       ref={containerRef}
@@ -236,7 +289,10 @@ export function ThreadTabs({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className="bg-tabs relative flex w-full"
+            className={cn(
+              "bg-tabs relative flex w-full",
+              tabs.length === 0 && "hidden"
+            )}
             onContextMenu={handleContextMenu}
             onMouseDownCapture={handleMouseDownCapture}
             onMouseUp={handleMouseUp}
@@ -364,33 +420,18 @@ export function ThreadTabs({
           </ContextMenuContent>
         ) : null}
       </ContextMenu>
-      <div className="relative min-h-0 flex-1">
-        {tabs.map((tab) =>
-          tab.type === "thread" ? (
-            <ThreadTabPane
-              key={tab.paneId}
-              paneId={tab.paneId}
-              path={tab.path}
-              runtimeId={tab.runtimeId}
-              active={tab.id === activeId}
-              refreshNonce={tab.refreshNonce ?? 0}
-              onMove={onMove}
-              onClose={() => close(tab.id)}
-              consumeDiscardedPane={consumeDiscardedPane}
-            />
-          ) : (
-            <TraceTabPane
-              key={tab.id}
-              projectId={tab.projectId}
-              traceKey={tab.traceKey}
-              runtimeId={tab.runtimeId}
-              active={tab.id === activeId}
-              refreshNonce={tab.refreshNonce ?? 0}
-              onClose={close}
-              onRenameTitle={onTraceTitleChange}
-            />
-          )
-        )}
+      {tabs.length === 0 ? (
+        <div className="min-h-0 flex-1">{emptyState}</div>
+      ) : null}
+      <div
+        className={cn("relative min-h-0 flex-1", tabs.length === 0 && "hidden")}
+      >
+        <RuntimePaneHost
+          tabs={paneTabs}
+          activeId={activeId}
+          getPaneKey={_getPaneKey}
+          renderPane={renderPane}
+        />
       </div>
     </div>
   );

@@ -16,8 +16,7 @@ import { getOrDownloadServerPackage } from "./server-package-cache";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import {
   buildRemoteServerArgs,
-  buildSourceRemoteServerCommand,
-  buildSshBaseArgs,
+  buildSourceRemoteServerArgs,
   buildTunnelArgs,
   joinRemotePath,
   shellPath,
@@ -51,6 +50,7 @@ export interface SshRemoteRuntimeOptions {
 }
 
 interface SshRemoteRuntimeDependencies {
+  generateToken: typeof _generateToken;
   findFreePort: typeof findFreePort;
   installRemoteServerPackage: typeof installRemoteServerPackage;
   getOrDownloadServerPackage: typeof getOrDownloadServerPackage;
@@ -60,6 +60,7 @@ interface SshRemoteRuntimeDependencies {
 }
 
 const DEFAULT_DEPENDENCIES: SshRemoteRuntimeDependencies = {
+  generateToken: _generateToken,
   findFreePort,
   installRemoteServerPackage,
   getOrDownloadServerPackage,
@@ -76,8 +77,8 @@ export async function startSshRemoteRuntime(
   config: SshRemoteRuntimeConfig,
   options: SshRemoteRuntimeOptions = {}
 ): Promise<SshRemoteRuntimeHandle> {
-  const token = _generateToken();
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...options.dependencies };
+  const token = dependencies.generateToken();
   const localPort = config.localPort ?? (await dependencies.findFreePort());
   const allProcesses: ManagedProcess[] = [];
 
@@ -212,22 +213,12 @@ async function _startInstalledRuntimeOnce(input: {
       "remote server",
       "ssh",
       process.env.LLM_SPACE_REMOTE_SERVER_MODE === "source"
-        ? [
-            ...buildSshBaseArgs(input.config),
-            buildSourceRemoteServerCommand({
-              remoteRepo: input.config.remoteRepo,
-              host: "127.0.0.1",
-              port: input.remotePort,
-              token: input.token,
-              home: input.config.remoteHome,
-            }),
-          ]
+        ? buildSourceRemoteServerArgs({ config: connectionConfig })
         : buildRemoteServerArgs({
             config: connectionConfig,
-            token: input.token,
             entrypoint: input.install.entrypoint,
           }),
-      { collectOutput: false }
+      { collectOutput: false, stdinInput: `${input.token}\n` }
     );
     processes.push(serverProcess);
     await _waitForProcessAlive(serverProcess, "server-start", input.config);

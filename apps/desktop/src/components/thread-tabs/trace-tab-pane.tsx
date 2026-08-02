@@ -7,18 +7,32 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 import type { TraceRecord } from "@/shared/traces";
 
+import type { PaneLifecycleHost } from "./pane-lifecycle-host";
+import { SerializedPersistence } from "./serialized-persistence";
+import { settleStreamingPane } from "./settle-streaming-pane";
+import { usePaneRefreshAcknowledgement } from "./use-pane-refresh-ack";
+
 interface TraceTabPaneProps {
   projectId: string;
   traceKey: string;
   runtimeId: RuntimeId;
   active: boolean;
+  lifecycleHost: PaneLifecycleHost;
+  mutationRevision: number;
   refreshNonce?: number;
   onClose?: (tabId: string) => void;
   onRenameTitle?: (
@@ -34,6 +48,8 @@ function _TraceTabPane({
   traceKey,
   runtimeId,
   active,
+  lifecycleHost,
+  mutationRevision,
   refreshNonce = 0,
   onClose,
   onRenameTitle,
@@ -62,23 +78,52 @@ function _TraceTabPane({
   }, [error, isError, onClose, tabId]);
 
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<Thread | null>(null);
+  const [persistenceOwner] = useState<object>(() => ({}));
+  const persistence = useMemo(
+    () =>
+      new SerializedPersistence<Thread>(
+        (next) =>
+          traceClient.writeWorkbench(projectId, traceKey, next, runtimeId),
+        {
+          onBusyChange: (busy) =>
+            lifecycleHost.onPersistenceChange(
+              tabId,
+              runtimeId,
+              persistenceOwner,
+              busy
+            ),
+          onWriteError: (writeError) => {
+            toast.error("Failed to save trace workbench; retrying", {
+              description:
+                writeError instanceof Error
+                  ? writeError.message
+                  : "Storage is temporarily unavailable.",
+            });
+          },
+        }
+      ),
+    [
+      lifecycleHost,
+      persistenceOwner,
+      projectId,
+      runtimeId,
+      tabId,
+      traceKey,
+    ]
+  );
 
   const flushPending = useCallback(async () => {
     if (writeTimer.current) {
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    const thread = pending.current;
-    pending.current = null;
-    if (thread !== null) {
-      await traceClient.writeWorkbench(projectId, traceKey, thread, runtimeId);
-    }
-  }, [projectId, runtimeId, traceKey]);
+    await persistence.flush();
+  }, [persistence]);
 
   const handleChange = useCallback(
     (next: Thread) => {
-      pending.current = next;
+      if (lifecycleHost.isMutationReserved(tabId, runtimeId)) return;
+      persistence.setPending(next);
       if (writeTimer.current) {
         clearTimeout(writeTimer.current);
       }
@@ -86,7 +131,29 @@ function _TraceTabPane({
         void flushPending();
       }, 500);
     },
-    [flushPending]
+    [flushPending, lifecycleHost, persistence, runtimeId, tabId]
+  );
+
+  const handleStreamingStart = useCallback(
+    (runId?: string) => {
+      if (!runId) return false;
+      return lifecycleHost.onRunStart(tabId, runtimeId, runId);
+    },
+    [lifecycleHost, runtimeId, tabId]
+  );
+  const handleStreamingEnd = useCallback(
+    (runId?: string) => {
+      if (!runId) return;
+      void settleStreamingPane(flushPending, () => {
+        lifecycleHost.onRunSettled(tabId, runId);
+      }).catch((error) => {
+        toast.error("Failed to save completed run", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      });
+    },
+    [flushPending, lifecycleHost, tabId]
   );
 
   const handleRenameTitle = useCallback(
@@ -119,6 +186,12 @@ function _TraceTabPane({
 
   const [reloadKey, setReloadKey] = useState(0);
   const appliedRefreshRef = useRef(refreshNonce);
+  const { markCommitPending, settleWithoutCommit } =
+    usePaneRefreshAcknowledgement({
+      paneId: tabId,
+      reloadKey,
+      onSettled: lifecycleHost.onRefreshSettled,
+    });
   useEffect(() => {
     if (appliedRefreshRef.current === refreshNonce) {
       return;
@@ -128,24 +201,43 @@ function _TraceTabPane({
       clearTimeout(writeTimer.current);
       writeTimer.current = null;
     }
-    pending.current = null;
+    persistence.discardPending();
     void (async () => {
       try {
+        await persistence.flush();
         await qc.refetchQueries({
           queryKey: ["trace", runtimeId, "workbench", projectId, traceKey],
           exact: true,
         });
+        markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
         toast.error("Error", {
           description:
             error instanceof Error ? error.message : "Failed to refresh trace",
         });
+        settleWithoutCommit();
       }
     })();
-  }, [projectId, qc, refreshNonce, runtimeId, traceKey]);
+  }, [
+    markCommitPending,
+    persistence,
+    projectId,
+    qc,
+    refreshNonce,
+    runtimeId,
+    settleWithoutCommit,
+    traceKey,
+  ]);
 
   const trace = data?.trace;
+  const mutationReserved = useMemo(
+    () => {
+      void mutationRevision;
+      return lifecycleHost.isMutationReserved(tabId, runtimeId);
+    },
+    [lifecycleHost, mutationRevision, runtimeId, tabId]
+  );
 
   return (
     <div className={cn("flex size-full flex-col", !active && "hidden")}>
@@ -157,10 +249,13 @@ function _TraceTabPane({
         title={trace?.title ?? traceKey}
         headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
         initialValue={data?.thread}
+        readonly={mutationReserved}
         active={active}
         transport={rpcTransport}
         runtimeId={runtimeId}
         onChange={handleChange}
+        onStreamingStart={handleStreamingStart}
+        onStreamingEnd={handleStreamingEnd}
         onRenameTitle={handleRenameTitle}
         validateTitle={_validateTraceTitle}
       />
