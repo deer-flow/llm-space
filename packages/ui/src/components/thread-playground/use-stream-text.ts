@@ -16,6 +16,7 @@ import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 import { useDefaultTextGenerationModel } from "../model-provider";
 
 import { useGetProviderProfileId } from "./model/provider-profile-selection-provider";
+import { useThreadStore } from "./stores/thread-store";
 import { PREVIEW_THROTTLE_MS } from "./streaming-preview";
 
 const MAX_TOKENS = 10240;
@@ -49,6 +50,8 @@ export interface UseStreamTextResult {
    * without waiting for a re-render (e.g. a prompt captured at click time).
    */
   run: (overrides?: Partial<UseStreamTextArgs>) => Promise<void>;
+  /** Abort the currently active run, if any. */
+  abort: () => void;
 }
 
 /**
@@ -67,8 +70,10 @@ export function useStreamText({
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
 
-  const { transport } = useHostServices();
-  const transportRef = useRef(transport);
+  const { createTransport } = useHostServices();
+  const runtimeId = useThreadStore((state) => state.runtimeId);
+  const createTransportRef = useRef(createTransport);
+  const runtimeIdRef = useRef(runtimeId);
 
   const defaultModel = useDefaultTextGenerationModel();
   const getProfileId = useGetProviderProfileId();
@@ -89,13 +94,15 @@ export function useStreamText({
   useEffect(() => {
     argsRef.current = { systemPrompt, messages, userPrompt, reasoning, model };
     defaultModelRef.current = defaultModel;
-    transportRef.current = transport;
+    createTransportRef.current = createTransport;
+    runtimeIdRef.current = runtimeId;
   });
 
   const controllerRef = useRef<AbortController | null>(null);
+  const abort = useCallback(() => controllerRef.current?.abort(), []);
 
   // Abort any in-flight run on unmount.
-  useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(() => abort, [abort]);
 
   const run = useCallback(
     async (overrides?: Partial<UseStreamTextArgs>) => {
@@ -111,7 +118,7 @@ export function useStreamText({
       }
 
       // Supersede any in-flight run.
-      controllerRef.current?.abort();
+      abort();
       const controller = new AbortController();
       controllerRef.current = controller;
 
@@ -158,7 +165,10 @@ export function useStreamText({
         },
       };
 
-      const transport = transportRef.current;
+      const owningRuntimeId = runtimeIdRef.current;
+      const transport = owningRuntimeId
+        ? createTransportRef.current(owningRuntimeId)
+        : null;
       if (!transport) {
         setError("Text generation is not available here.");
         setStreaming(false);
@@ -204,8 +214,8 @@ export function useStreamText({
         }
       }
     },
-    [getProfileId]
+    [abort, getProfileId]
   );
 
-  return { text, error, streaming, run };
+  return { text, error, streaming, run, abort };
 }

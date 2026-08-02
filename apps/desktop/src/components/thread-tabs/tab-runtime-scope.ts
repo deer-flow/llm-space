@@ -5,6 +5,22 @@ interface RuntimeScopedTab {
   runtimeId: RuntimeId;
 }
 
+interface ActiveThreadTarget {
+  path: string;
+  runtimeId: RuntimeId;
+}
+
+/** Resolve the path and owner behind a Share command without runtime fallback. */
+export function resolveShareThreadTarget(
+  command: { path?: string; runtimeId?: RuntimeId },
+  workspaceRuntimeId: RuntimeId,
+  activeThread: ActiveThreadTarget | null
+): ActiveThreadTarget | null {
+  const runtimeId = command.runtimeId ?? workspaceRuntimeId;
+  if (command.path) return { path: command.path, runtimeId };
+  return activeThread?.runtimeId === runtimeId ? activeThread : null;
+}
+
 /** Return only the tabs that belong to the currently visible workspace runtime. */
 export function filterTabsForRuntime<T extends RuntimeScopedTab>(
   tabs: readonly T[],

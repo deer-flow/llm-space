@@ -6,7 +6,6 @@ import {
   HistoryIcon,
   PlayIcon,
   Redo2Icon,
-  Share2Icon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -59,6 +58,7 @@ import {
 } from "./model/provider-profile-selection-provider";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
+import { createRuntimePromptFiles } from "./runtime-prompt-files";
 import {
   canRedo,
   canUndo,
@@ -70,6 +70,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
+import { ThreadShareButton } from "./thread-share-button";
 import { ToolListView } from "./tool/tool-list-view";
 import { useToolExecutor } from "./tool/use-tool-executor";
 import { useShortcuts } from "./use-shortcuts";
@@ -108,8 +109,8 @@ export interface ThreadPlaygroundProps {
   onChange?: (thread: Thread) => void;
   onRenameTitle?: (title: string) => Promise<boolean>;
   validateTitle?: TitleValidator;
-  onStreamingStart?: () => void;
-  onStreamingEnd?: () => void;
+  onStreamingStart?: (runId: string) => boolean | void;
+  onStreamingEnd?: (runId: string) => void;
 }
 
 export function ThreadPlayground({
@@ -155,20 +156,22 @@ function _ThreadPlaygroundStore({
   onStreamingEnd,
   ...props
 }: ThreadPlaygroundProps) {
+  const [ownerRuntimeId] = useState(() => runtimeId ?? "local");
   // Keep live refs to the provider list and default model so the store can
   // resolve a thread's model (its own, else the default/first available) at
   // run/edit time without being recreated.
   const providers = useModels();
   const providersRef = useRef(providers);
   providersRef.current = providers;
-  const getProfileId = useGetProviderProfileId();
   const defaultModel = useDefaultModel();
   const defaultModelRef = useRef(defaultModel);
   defaultModelRef.current = defaultModel;
+  const getProfileId = useGetProviderProfileId();
   const { skills, files } = useHostServices();
-  const toolExecutor = useToolExecutor(runtimeId);
-  const [store] = useState(() =>
-    createThreadStore(initialValue, {
+  const toolExecutor = useToolExecutor(ownerRuntimeId);
+  const [store] = useState(() => {
+    const promptFiles = createRuntimePromptFiles(files, ownerRuntimeId);
+    return createThreadStore(initialValue, {
       transport,
       resolveModel: (saved) =>
         resolveModelConfig(
@@ -176,16 +179,19 @@ function _ThreadPlaygroundStore({
           saved,
           defaultModelRef.current
         ),
-      getProfileId,
       getAutoRunTools,
       getReactLoop,
-      runtimeId,
+      getProfileId,
+      runtimeId: ownerRuntimeId,
       executeTool: toolExecutor ?? undefined,
-      loadSkills: () => listEnabledPromptVariableSkills(skills, { runtimeId }),
-      loadFile: (path) => files.readText(path),
-      fileExists: (path) => files.exists(path),
-    })
-  );
+      loadSkills: () =>
+        listEnabledPromptVariableSkills(skills, {
+          runtimeId: ownerRuntimeId,
+        }),
+      loadFile: promptFiles.loadFile,
+      fileExists: promptFiles.fileExists,
+    });
+  });
   useThreadPlaygroundEvents(store, {
     onChange,
     onStreamingStart,
@@ -193,7 +199,7 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent runtimeId={runtimeId} {...props} />
+      <ThreadPlaygroundContent runtimeId={ownerRuntimeId} {...props} />
     </ThreadStoreContext.Provider>
   );
 }
@@ -207,12 +213,12 @@ function ThreadPlaygroundContent({
   title: titleFromProps,
   headerDetails,
   headerActions,
+  runtimeId,
   onRenameTitle,
   validateTitle,
   readonly: readonlyFromProps = false,
   active = false,
   compactImages = false,
-  runtimeId,
 }: Omit<
   ThreadPlaygroundProps,
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
@@ -238,7 +244,7 @@ function ThreadPlaygroundContent({
   }, [syncTitle, title]);
   const { presentational } = useHostServices();
   const readonly = useMemo(() => {
-    return readonlyFromProps || presentational || status === "running";
+    return readonlyFromProps || presentational || status !== "idle";
   }, [readonlyFromProps, presentational, status]);
   const handleRun = useCallback(async () => {
     await run();
@@ -250,7 +256,7 @@ function ThreadPlaygroundContent({
   useEffect(() => {
     if (!active) return;
     return actions.registerRunThread(() => {
-      if (status !== "running") void run();
+      if (status === "idle") void run();
     });
   }, [actions, active, run, status]);
   const handleStop = useCallback(() => {
@@ -342,27 +348,21 @@ function ThreadPlaygroundContent({
                     historyOpen ? "Hide run history" : "View run history"
                   }
                   aria-expanded={historyOpen}
-                  disabled={status === "running"}
+                  disabled={status !== "idle"}
                   onClick={toggleHistory}
                 >
                   <HistoryIcon className="size-4" />
                 </Button>
               </Tooltip>
               <Tooltip content="Share thread">
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Share thread"
-                  disabled={status === "running"}
-                  onClick={() => actions.shareThread(path)}
-                >
-                  <Share2Icon className="size-4" />
-                </Button>
+                <ThreadShareButton
+                  path={path}
+                  runtimeId={runtimeId}
+                  disabled={status !== "idle"}
+                  onShare={(input) => actions.shareThread(input)}
+                />
               </Tooltip>
-              <GenerateProjectButton
-                disabled={status === "running"}
-                runtimeId={runtimeId}
-              />
+              <GenerateProjectButton disabled={status !== "idle"} />
             </div>
             <div className="flex items-center gap-1 px-3">
               <ButtonGroup
@@ -376,7 +376,9 @@ function ThreadPlaygroundContent({
                     <div>
                       {status === "running"
                         ? "Stop running"
-                        : "Run this thread"}
+                        : status === "preparing"
+                          ? "Preparing thread"
+                          : "Run this thread"}
                     </div>
                   }
                 >
@@ -385,28 +387,39 @@ function ThreadPlaygroundContent({
                     aria-label={
                       status === "running"
                         ? "Stop running thread"
-                        : "Run thread"
+                        : status === "preparing"
+                          ? "Preparing thread"
+                          : "Run thread"
                     }
                     disabled={
-                      readonlyFromProps || (status !== "running" && !hasModel)
+                      readonlyFromProps ||
+                      status === "preparing" ||
+                      (status === "idle" && !hasModel)
                     }
                     onClick={status === "running" ? handleStop : handleRun}
                   >
-                    {status === "running" ? (
+                    {status !== "idle" ? (
                       <Spinner className="size-3" />
                     ) : (
                       <PlayIcon className="size-3" />
                     )}
-                    {status === "running" ? "Stop" : "Run"}
+                    {status === "running"
+                      ? "Stop"
+                      : status === "preparing"
+                        ? "Preparing"
+                        : "Run"}
                   </Button>
                 </Tooltip>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="border-none pr-1.5 pl-0.5 active:translate-y-0!"
+                      className={cn(
+                        "border-none pr-1.5 pl-0.5 active:translate-y-0!",
+                        status === "running" && "disabled:opacity-100"
+                      )}
                       aria-label="Run settings"
                       disabled={
-                        readonlyFromProps || (status !== "running" && !hasModel)
+                        readonlyFromProps || status !== "idle" || !hasModel
                       }
                     >
                       <ChevronDownIcon className="size-3" />
@@ -465,7 +478,7 @@ function ThreadPlaygroundContent({
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Models
                     </div>
-                    <div className="flex min-w-0 grow items-center">
+                    <div className="flex grow items-center">
                       <ModelConfigEditor readonly={readonly} />
                     </div>
                   </div>

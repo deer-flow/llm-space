@@ -235,9 +235,10 @@ export interface OpenOnboardCommand extends GenericCommand<"openOnboard"> {}
 export interface RunThreadCommand extends GenericCommand<"runThread"> {}
 
 /**
- * Open the Share dialog for a thread. `path` targets a specific thread file
- * (tree/tab context menus); omitting it shares the active thread (header button,
- * native menu). No-op when there is no active thread tab. Webview only.
+ * Open the Share dialog for a thread. `path` + `runtimeId` target a specific
+ * thread file (tree/tab context menus and playground header); omitting them
+ * shares the active thread (native menu and command palette). No-op when there
+ * is no active thread tab. Webview only.
  */
 export interface ShareThreadCommand extends GenericCommand<
   "shareThread",

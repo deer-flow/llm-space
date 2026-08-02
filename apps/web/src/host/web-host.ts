@@ -8,11 +8,12 @@ function unavailable(): never {
 /**
  * A display-only {@link HostServices}: `presentational` hides all edit/run
  * chrome, and every capability is a no-op (or throws if somehow invoked). No
- * transport / tool execution / model client, so nothing reaches a backend.
+ * Generation transport / tool execution / model client are unavailable, so
+ * nothing reaches a backend.
  */
 export const webHost: HostServices = {
   presentational: true,
-  transport: null,
+  createTransport: () => null,
   executeTool: null,
   skills: {
     getSettings: () => Promise.resolve({ discoveryPaths: [] }),

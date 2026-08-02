@@ -13,14 +13,20 @@ import {
 import type { RemoteServerView } from "@/shared/remote-servers";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { runRemoteRuntimeActionIfAllowed } from "./remote-runtime-actions";
+
 export function RemoteStatus({
   runtimeId,
+  canDisconnect,
+  acquireDisconnect,
   onDisconnecting,
   onDisconnected,
 }: {
   runtimeId: RuntimeId;
+  canDisconnect?: (runtimeId: RuntimeId) => boolean;
+  acquireDisconnect?: (runtimeId: RuntimeId) => (() => void) | null;
   onDisconnecting?: (runtimeId: RuntimeId) => void;
-  onDisconnected: (runtimeId: RuntimeId) => void;
+  onDisconnected: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
   const [server, setServer] = useState<RemoteServerView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,19 +63,32 @@ export function RemoteStatus({
   }
 
   const disconnect = async () => {
-    setBusy(true);
-    onDisconnecting?.(runtimeId);
-    try {
-      await disconnectRemoteServer(server.id);
-      onDisconnected(runtimeId);
-    } catch (error) {
-      toast.error("Failed to disconnect remote", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    } finally {
-      setBusy(false);
-    }
+    await runRemoteRuntimeActionIfAllowed({
+      allowed: () => canDisconnect?.(runtimeId) ?? true,
+      acquire: acquireDisconnect
+        ? () => acquireDisconnect(runtimeId)
+        : undefined,
+      beforeAction: () => onDisconnecting?.(runtimeId),
+      action: async () => {
+        setBusy(true);
+        try {
+          const result = await disconnectRemoteServer(server.id);
+          return result.status === "applied-with-error"
+            ? { applied: true, error: new Error(result.error) }
+            : true;
+        } catch (error) {
+          return { applied: false, error };
+        } finally {
+          setBusy(false);
+        }
+      },
+      afterAction: () => onDisconnected(runtimeId),
+      onError: (error) =>
+        toast.error("Failed to disconnect remote", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        }),
+    });
   };
 
   return (

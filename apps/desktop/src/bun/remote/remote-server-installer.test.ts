@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
+
 import {
   buildInstallFromArchiveCommand,
   buildInstallCommand,
   installRemoteServerPackage,
 } from "./remote-server-installer";
-import {
-  currentDesktopVersion,
-  expectedProtocolVersion,
-} from "./server-package";
+import { currentDesktopVersion } from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 
 const CONFIG: SshRemoteRuntimeConfig = {
@@ -26,38 +25,43 @@ const CONFIG: SshRemoteRuntimeConfig = {
 describe("remote server installer", () => {
   test("skips download when matching manifest is already installed", async () => {
     const commands: string[] = [];
-    const result = await installRemoteServerPackage(CONFIG, (_config, command) => {
-      commands.push(command);
-      if (command.includes("uname")) {
-        return Promise.resolve({ stdout: "Linux\nx86_64\n", stderr: "" });
+    const result = await installRemoteServerPackage(
+      CONFIG,
+      (_config, command) => {
+        commands.push(command);
+        if (command.includes("uname")) {
+          return Promise.resolve({ stdout: "Linux\nx86_64\n", stderr: "" });
+        }
+        if (command.startsWith("cat ")) {
+          return Promise.resolve({
+            stdout: JSON.stringify({
+              name: "llm-space-server",
+              version: currentDesktopVersion(),
+              protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
+              os: "linux",
+              arch: "x64",
+              entrypoint: "bin/llm-space-server",
+              createdAt: "2026-07-21T00:00:00.000Z",
+            }),
+            stderr: "",
+          });
+        }
+        if (command.includes("ln -sfn")) {
+          return Promise.resolve({ stdout: "", stderr: "" });
+        }
+        if (command.startsWith("test -x ")) {
+          return Promise.resolve({ stdout: "", stderr: "" });
+        }
+        throw new Error(`unexpected command: ${command}`);
       }
-      if (command.startsWith("cat ")) {
-        return Promise.resolve({
-          stdout: JSON.stringify({
-            name: "llm-space-server",
-            version: currentDesktopVersion(),
-            protocolVersion: expectedProtocolVersion(),
-            os: "linux",
-            arch: "x64",
-            entrypoint: "bin/llm-space-server",
-            createdAt: "2026-07-21T00:00:00.000Z",
-          }),
-          stderr: "",
-        });
-      }
-      if (command.includes("ln -sfn")) {
-        return Promise.resolve({ stdout: "", stderr: "" });
-      }
-      if (command.startsWith("test -x ")) {
-        return Promise.resolve({ stdout: "", stderr: "" });
-      }
-      throw new Error(`unexpected command: ${command}`);
-    });
+    );
 
     expect(result.entrypoint).toBe(
       `/opt/llm space/runtime/versions/${currentDesktopVersion()}/bin/llm-space-server`
     );
-    expect(commands.some((command) => command.includes("curl -fL"))).toBe(false);
+    expect(commands.some((command) => command.includes("curl -fL"))).toBe(
+      false
+    );
   });
 
   test("repairs matching manifests with a missing entrypoint", async () => {
@@ -73,7 +77,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: expectedProtocolVersion(),
+            protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -119,7 +123,6 @@ describe("remote server installer", () => {
     expect(command).not.toContain("/home/user/.llm-space-server");
   });
 
-
   test("expands tilde install directories on the remote shell", async () => {
     const tildeConfig = {
       ...CONFIG,
@@ -142,7 +145,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: expectedProtocolVersion(),
+            protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -153,7 +156,9 @@ describe("remote server installer", () => {
       }
       if (command.includes("curl -fL")) {
         expect(command).toContain('INSTALL_DIR="$HOME"/');
-        expect(command).not.toContain("INSTALL_DIR='~/.llm-space/remote-runtime'");
+        expect(command).not.toContain(
+          "INSTALL_DIR='~/.llm-space/remote-runtime'"
+        );
         return Promise.resolve({ stdout: "", stderr: "" });
       }
       if (command.startsWith("test -x ")) {
@@ -168,9 +173,9 @@ describe("remote server installer", () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    expect(commands.some((command) => command.includes('INSTALL_DIR="$HOME"/'))).toBe(
-      true
-    );
+    expect(
+      commands.some((command) => command.includes('INSTALL_DIR="$HOME"/'))
+    ).toBe(true);
   });
 
   test("builds install-from-archive command without network access", () => {
@@ -181,36 +186,39 @@ describe("remote server installer", () => {
       packageDir: "/opt/llm space/it's/versions/4.2.0",
     });
 
-    expect(command).toContain("test -f \"$ARCHIVE\"");
-    expect(command).toContain("tar -xzf \"$ARCHIVE\"");
-    expect(command).toContain(
-      "test -x \"$TMP_PACKAGE/bin/llm-space-server\""
-    );
+    expect(command).toContain('test -f "$ARCHIVE"');
+    expect(command).toContain('tar -xzf "$ARCHIVE"');
+    expect(command).toContain('test -x "$TMP_PACKAGE/bin/llm-space-server"');
     expect(command).toContain(
       'if [ -e "$PACKAGE_DIR" ]; then mv "$PACKAGE_DIR" "$OLD_PACKAGE"; fi'
     );
-    expect(command).not.toContain("rm -rf '/opt/llm space/it'\\''s/versions/4.2.0'");
+    expect(command).not.toContain(
+      "rm -rf '/opt/llm space/it'\\''s/versions/4.2.0'"
+    );
     expect(command).not.toContain("curl");
     expect(command).not.toContain("wget");
     expect(command).not.toContain("ASSET_URL");
   });
 
   test("describes package download timeouts with remote network probe", async () => {
-    const promise = installRemoteServerPackage(CONFIG, (_config, command, timeoutMs) => {
-      if (command.includes("uname")) {
-        return Promise.resolve({ stdout: "Linux\nx86_64\n", stderr: "" });
+    const promise = installRemoteServerPackage(
+      CONFIG,
+      (_config, command, timeoutMs) => {
+        if (command.includes("uname")) {
+          return Promise.resolve({ stdout: "Linux\nx86_64\n", stderr: "" });
+        }
+        if (command.startsWith("cat ")) {
+          return Promise.reject(new Error("missing manifest"));
+        }
+        if (command.includes("curl -fL")) {
+          expect(timeoutMs).toBe(300_000);
+          return Promise.reject(
+            new Error("Remote command timed out after 300000ms.")
+          );
+        }
+        throw new Error(`unexpected command: ${command}`);
       }
-      if (command.startsWith("cat ")) {
-        return Promise.reject(new Error("missing manifest"));
-      }
-      if (command.includes("curl -fL")) {
-        expect(timeoutMs).toBe(300_000);
-        return Promise.reject(
-          new Error("Remote command timed out after 300000ms.")
-        );
-      }
-      throw new Error(`unexpected command: ${command}`);
-    });
+    );
 
     try {
       await promise;
@@ -273,7 +281,9 @@ describe("remote server installer", () => {
       }
       if (command.includes("curl -fL")) {
         return Promise.reject(
-          new Error("Remote command failed with exit code 28: % Total noisy curl progress")
+          new Error(
+            "Remote command failed with exit code 28: % Total noisy curl progress"
+          )
         );
       }
       throw new Error(`unexpected command: ${command}`);
@@ -286,7 +296,9 @@ describe("remote server installer", () => {
       expect(error).toBeInstanceOf(Error);
       const message = (error as Error).message;
       const urlIndex = message.indexOf("Package URL:");
-      const outputIndex = message.indexOf("Remote command failed with exit code 28");
+      const outputIndex = message.indexOf(
+        "Remote command failed with exit code 28"
+      );
       expect(urlIndex).toBeGreaterThanOrEqual(0);
       expect(outputIndex).toBeGreaterThan(urlIndex);
       expect(message).toContain(
@@ -315,7 +327,7 @@ describe("remote server installer", () => {
             stdout: JSON.stringify({
               name: "llm-space-server",
               version: currentDesktopVersion(),
-              protocolVersion: expectedProtocolVersion(),
+              protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
               os: "linux",
               arch: "x64",
               entrypoint: "bin/llm-space-server",
@@ -330,7 +342,7 @@ describe("remote server installer", () => {
             new Error("Remote command failed with exit code 28: curl timeout")
           );
         }
-        if (command.includes("test -f \"$ARCHIVE\"")) {
+        if (command.includes('test -f "$ARCHIVE"')) {
           timeouts.push(timeoutMs ?? 0);
           manifestInstalled = true;
           return Promise.resolve({ stdout: "", stderr: "" });
@@ -364,7 +376,8 @@ describe("remote server installer", () => {
     expect(
       commands.some(
         (command) =>
-          command.includes("test -f \"$ARCHIVE\"") && !command.includes("curl -fL")
+          command.includes('test -f "$ARCHIVE"') &&
+          !command.includes("curl -fL")
       )
     ).toBe(true);
   });

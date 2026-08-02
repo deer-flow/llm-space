@@ -35,11 +35,7 @@ import { electrobun } from "@/lib/electrobun";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 
-// One transport for the app: stream agent runs over Electrobun RPC to the bun
-// process. It multiplexes concurrent runs by internal `streamId`, so a single
-// module-level instance is safe.
-const transport = createRpcTransport();
-
+import { createDesktopShareThreadAction } from "./share-thread-action";
 function _rpc() {
   if (!electrobun.rpc) {
     throw new Error("Electrobun RPC is not initialized");
@@ -122,7 +118,8 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
   const value = useMemo<HostServices>(
     () => ({
       presentational: false,
-      transport,
+      createTransport: (runtimeId: string) =>
+        createRpcTransport(runtimeId as RuntimeId),
       executeTool,
       skills: {
         getSettings: (options) =>
@@ -143,8 +140,10 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       },
       paths: { ensureRootDir },
       files: {
-        readText: readTextFile,
-        exists: textFileExists,
+        readText: (path, options) =>
+          readTextFile(path, options.runtimeId as RuntimeId),
+        exists: (path, options) =>
+          textFileExists(path, options.runtimeId as RuntimeId),
         directoryExists,
         pickFile,
         pickDirectory,
@@ -156,13 +155,18 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         runUv,
         writeFile: writeProjectFile,
         removeFile: removeProjectFile,
-        getSearchSettings,
-        resolveEnv: (providerId, envNames, options) =>
+        getSearchSettings: (options: { runtimeId: string }) =>
+          getSearchSettings(options.runtimeId as RuntimeId),
+        resolveEnv: (
+          providerId: string,
+          envNames: string[],
+          options: { runtimeId: string; profileId?: string }
+        ) =>
           resolveGeneratorEnv(
             providerId,
             envNames,
-            options?.profileId,
-            options?.runtimeId as RuntimeId | undefined
+            options.profileId,
+            options.runtimeId as RuntimeId
           ),
       },
       actions: {
@@ -172,8 +176,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
             args: { tab: tab as SettingsTab },
           }),
         openLink: (url) => executeCommand({ type: "openLink", args: { url } }),
-        shareThread: (path) =>
-          executeCommand({ type: "shareThread", args: { path } }),
+        shareThread: createDesktopShareThreadAction(executeCommand),
         openVariables: (variableName) =>
           executeCommand({ type: "openVariables", args: { variableName } }),
         registerOpenVariables: (handler) =>

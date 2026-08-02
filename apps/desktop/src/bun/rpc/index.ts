@@ -1,18 +1,9 @@
-import {
-  readUserTextFile,
-  userDirectoryExists,
-  userTextFileExists,
-} from "@llm-space/core/server";
-import type { LocalFileSystem } from "@llm-space/core/server";
-import {
-  GIST_CONNECTOR_ID,
-  type GistThreadWriter,
-} from "@llm-space/core/storage";
+import { userDirectoryExists } from "@llm-space/core/server";
+import type { GistThreadWriter } from "@llm-space/core/storage";
 import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
-import { buildWebShareUrl } from "../../shared/share";
 import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
 import {
@@ -35,7 +26,9 @@ import type { UpdaterService } from "../updates";
 
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
-import { buildSharedThread } from "./share-thread";
+import { createPromptFileRpcHandlers } from "./prompt-files";
+import { createShareThreadHandler } from "./share-thread";
+import { forwardStreamThread } from "./stream-thread-request";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -56,7 +49,6 @@ export interface MainWindowRPCDependencies {
   /** Publishes a thread as a secret gist for the `shareThread` request. */
   gistWriter: GistThreadWriter;
   homePath: string;
-  localFs: LocalFileSystem;
   runtimeRouter: RuntimeRouter;
   remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
@@ -73,13 +65,13 @@ export function createMainWindowRPC({
   getMainWindow,
   gistWriter,
   homePath,
-  localFs,
   runtimeRouter,
   remoteServerManager,
   skillsManager,
   updater,
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
+  const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
   const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
@@ -219,23 +211,7 @@ export function createMainWindowRPC({
         // out or on a gist API failure; the error propagates to the renderer,
         // which maps it to friendly copy. Each call creates a fresh gist (no id
         // reuse), so a re-share yields a new link.
-        shareThread: async ({ path, title, description }) => {
-          const thread = await localFs.read(path);
-          const localRuntime = getRuntime("local");
-          const shared = buildSharedThread(
-            thread,
-            await localRuntime.availableModels(),
-            await localRuntime.getDefaultModel(),
-            title
-          );
-          const locator = await gistWriter.write(shared, undefined, {
-            description,
-          });
-          return {
-            gistId: locator.id,
-            shareUrl: buildWebShareUrl(GIST_CONNECTOR_ID, locator.id),
-          };
-        },
+        shareThread: createShareThreadHandler({ getRuntime, gistWriter }),
         fsReveal: async ({ path }) => {
           await fsReveal(path, { skillsManager });
           return null;
@@ -243,13 +219,8 @@ export function createMainWindowRPC({
         fsRealpath: async ({ runtimeId, path }) => ({
           path: await getRuntime(runtimeId).fsRealpath(path),
         }),
-        // Unconfined text read for the prompt `@include` macro (any path + `~`).
-        fsReadText: async ({ path }) => ({
-          text: await readUserTextFile(path),
-        }),
-        fsTextFileExists: async ({ path }) => ({
-          exists: await userTextFileExists(path),
-        }),
+        // Unconfined prompt-file access (any path + `~`) stays on its owner.
+        ...promptFileRequests,
         fsDirectoryExists: async ({ path }) => ({
           exists: await userDirectoryExists(path),
         }),
@@ -468,8 +439,10 @@ export function createMainWindowRPC({
         sendStreamThreadRequest: (payload) => {
           // Fire-and-forget: stream events back as `receiveStreamThreadResponse`
           // messages. `rpc` is initialized by the time this handler runs.
-          void getRuntime(payload.runtimeId).streamThread(payload, (message) =>
-            rpc.send.receiveStreamThreadResponse(message)
+          void forwardStreamThread(
+            () => getRuntime(payload.runtimeId),
+            payload,
+            (message) => rpc.send.receiveStreamThreadResponse(message)
           );
         },
         abortStreamThread: (payload) =>

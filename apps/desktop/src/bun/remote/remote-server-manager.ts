@@ -16,6 +16,7 @@ import { z } from "zod";
 import type {
   RemoteConnectionStage,
   RemoteConnectionStepView,
+  RemoteDisconnectResult,
   RemoteHostKeyTrustRequest,
   RemoteServerConfig,
   RemoteServerDraft,
@@ -53,6 +54,8 @@ type PersistedRemoteServerConfig = RemoteServerConfig & {
 };
 
 const REMOTE_SERVERS_CONFIG_VERSION = 2;
+
+class RemoteDisconnectAppliedError extends Error {}
 
 const RemoteServersConfigFileSchema = z.object({
   version: z.number().optional(),
@@ -224,8 +227,22 @@ export class RemoteServerManager {
     }
   }
 
-  async disconnectServer(id: string): Promise<RemoteServerView[]> {
-    return this._enqueue(() => this._disconnectServer(id));
+  async disconnectServer(id: string): Promise<RemoteDisconnectResult> {
+    return this._enqueue(async () => {
+      try {
+        return {
+          status: "applied",
+          servers: await this._disconnectServer(id),
+        };
+      } catch (error) {
+        if (!(error instanceof RemoteDisconnectAppliedError)) throw error;
+        return {
+          status: "applied-with-error",
+          servers: this.listServers(),
+          error: error.message,
+        };
+      }
+    });
   }
 
   async trustServerHostKey(
@@ -290,9 +307,11 @@ export class RemoteServerManager {
       this._emitStatusChanged();
     }
     if (stopError) {
-      throw stopError instanceof Error
-        ? stopError
-        : new Error("Remote server stop failed.");
+      throw new RemoteDisconnectAppliedError(
+        stopError instanceof Error
+          ? stopError.message
+          : "Remote server stop failed."
+      );
     }
     return this.listServers();
   }

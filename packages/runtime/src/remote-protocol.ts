@@ -25,6 +25,8 @@ export type RemoteRuntimeRpcMethod =
   | "fs.read"
   | "fs.write"
   | "fs.realpath"
+  | "fs.readText"
+  | "fs.textFileExists"
   | "models.available"
   | "models.removeProvider"
   | "models.builtinProviders"

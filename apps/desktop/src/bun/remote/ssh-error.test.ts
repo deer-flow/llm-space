@@ -135,7 +135,8 @@ Offending ECDSA key in /Users/bytedance/.ssh/known_hosts:6`;
     });
 
     expect(message).toContain("Remote runtime port 39123 is already in use");
-    expect(message).toContain("stale llm-space-server process");
+    expect(message).toContain("different per-connection port");
+    expect(message).toContain("without stopping the existing listener");
   });
 
   test("classifies authentication failures", () => {

@@ -32,7 +32,6 @@ import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Input } from "@llm-space/ui/ui/input";
-import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";

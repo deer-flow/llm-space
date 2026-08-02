@@ -1,4 +1,5 @@
 import { electrobun } from "@/lib/electrobun";
+import type { RuntimeId } from "@/shared/runtime";
 
 function _rpc() {
   if (!electrobun.rpc) {
@@ -26,14 +27,32 @@ export async function getWorkspacePath(): Promise<string> {
  * Read an arbitrary text file (any path, `~` expands to home) for the prompt
  * `@include` macro. Resolves to `""` for a missing/unreadable path.
  */
-export async function readTextFile(path: string): Promise<string> {
-  const { text } = await _rpc().request.fsReadText({ path });
+export async function readTextFile(
+  path: string,
+  runtimeId: RuntimeId
+): Promise<string> {
+  if (!runtimeId) {
+    throw new Error("Prompt file runtimeId is required.");
+  }
+  const { text } = await _rpc().request.fsReadText({
+    runtimeId,
+    path,
+  });
   return text;
 }
 
 /** Whether a path points to a readable regular file (`~` expands to home). */
-export async function textFileExists(path: string): Promise<boolean> {
-  const { exists } = await _rpc().request.fsTextFileExists({ path });
+export async function textFileExists(
+  path: string,
+  runtimeId: RuntimeId
+): Promise<boolean> {
+  if (!runtimeId) {
+    throw new Error("Prompt file runtimeId is required.");
+  }
+  const { exists } = await _rpc().request.fsTextFileExists({
+    runtimeId,
+    path,
+  });
   return exists;
 }
 

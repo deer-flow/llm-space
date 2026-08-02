@@ -28,6 +28,7 @@ const MODEL_PROFILE_SELECTION_SCOPE = "model";
 
 const PROVIDER_PROFILE_SELECTION_CONTEXT =
   createContext<ProviderProfileSelectionValue | null>(null);
+const DEFAULT_PROFILE_ID_RESOLVER = () => undefined;
 
 function _selectionKey(providerId: string, selectionScope?: string): string {
   return `${selectionScope ?? MODEL_PROFILE_SELECTION_SCOPE}:${providerId}`;
@@ -106,7 +107,10 @@ export function useGetProviderProfileId(): (
   providerId: string,
   selectionScope?: string
 ) => string | undefined {
-  return _useProviderProfileSelectionContext().getProfileId;
+  return (
+    useContext(PROVIDER_PROFILE_SELECTION_CONTEXT)?.getProfileId ??
+    DEFAULT_PROFILE_ID_RESOLVER
+  );
 }
 
 export function useProviderProfileSelection(

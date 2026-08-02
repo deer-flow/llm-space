@@ -29,6 +29,7 @@ import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
 import type { FeatureReminder } from "./feature-reminders";
 import type {
+  RemoteDisconnectResult,
   RemoteServerDraft,
   RemoteServerStatusChangedPayload,
   RemoteServerView,
@@ -108,7 +109,7 @@ export interface DesktopRPCType {
       };
       remoteDisconnectServer: {
         params: { serverId: string };
-        response: RemoteServerView[];
+        response: RemoteDisconnectResult;
       };
       remoteSetDefaultRuntime: {
         params: { runtimeId: RuntimeId };
@@ -276,7 +277,12 @@ export interface DesktopRPCType {
       // description). Throws when signed out or the gist API fails; the renderer
       // maps the error to friendly copy.
       shareThread: {
-        params: { path: string; title?: string; description?: string };
+        params: {
+          runtimeId: RuntimeId;
+          path: string;
+          title?: string;
+          description?: string;
+        };
         response: { shareUrl: string; gistId: string };
       };
       // Open an absolute directory itself, or reveal an absolute file selected
@@ -291,11 +297,14 @@ export interface DesktopRPCType {
       // Read an arbitrary text file (NOT confined to the workspace) for the
       // prompt `@include` macro. A leading `~` expands to the user's home.
       // Returns "" for a missing/unreadable path so includes degrade quietly.
-      fsReadText: { params: { path: string }; response: { text: string } };
+      fsReadText: {
+        params: { runtimeId: RuntimeId; path: string };
+        response: { text: string };
+      };
       // Whether a path points to a readable regular file for template
       // `exists(path)` conditions. A leading `~` expands to the user's home.
       fsTextFileExists: {
-        params: { path: string };
+        params: { runtimeId: RuntimeId; path: string };
         response: { exists: boolean };
       };
       // Whether a path points to an existing directory. A leading `~` expands

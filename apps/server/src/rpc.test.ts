@@ -16,6 +16,8 @@ function createRuntime(): RuntimeClient {
     fsMkdir: () => Promise.resolve(),
     fsLs: () => Promise.resolve([]),
     fsRead: () => Promise.resolve({ title: "Read" }),
+    readTextFile: (path: string) => Promise.resolve(`remote:${path}`),
+    textFileExists: (path: string) => Promise.resolve(path === "/remote.md"),
     fsWrite: () => Promise.resolve(),
     fsRealpath: (path) => Promise.resolve(`/tmp/${path}`),
     availableModels: () => Promise.resolve([]),
@@ -209,5 +211,39 @@ describe("handleRuntimeRpc", () => {
       ok: false,
       error: { code: "method_not_found" },
     });
+  });
+
+  test("dispatches prompt text reads and readable-file checks", async () => {
+    expect(
+      await handleRuntimeRpc(createRuntime(), {
+        id: "read",
+        method: "fs.readText",
+        params: { path: "/same/path.md" },
+      })
+    ).toEqual({ id: "read", ok: true, result: "remote:/same/path.md" });
+
+    expect(
+      await handleRuntimeRpc(createRuntime(), {
+        id: "exists",
+        method: "fs.textFileExists",
+        params: { path: "/remote.md" },
+      })
+    ).toEqual({ id: "exists", ok: true, result: true });
+  });
+
+  test("validates prompt-file paths before dispatch", async () => {
+    for (const method of ["fs.readText", "fs.textFileExists"]) {
+      expect(
+        await handleRuntimeRpc(createRuntime(), {
+          id: method,
+          method,
+          params: { path: 123 },
+        })
+      ).toMatchObject({
+        id: method,
+        ok: false,
+        error: { code: "invalid_params" },
+      });
+    }
   });
 });
