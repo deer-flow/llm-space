@@ -77,9 +77,9 @@ export interface PathsHost {
 /** Arbitrary text-file reads + native file picking for prompt variables. */
 export interface FilesHost {
   /** Read a file's UTF-8 contents (`~` expands to home); `""` when missing. */
-  readText(path: string): Promise<string>;
+  readText(path: string, options: RuntimeOwnedHostOptions): Promise<string>;
   /** Whether a path points to a readable regular file (`~` expands to home). */
-  exists(path: string): Promise<boolean>;
+  exists(path: string, options: RuntimeOwnedHostOptions): Promise<boolean>;
   /**
    * Whether a path points to an existing directory. `null` when the host cannot
    * inspect the local filesystem (e.g. the display-only web viewer).

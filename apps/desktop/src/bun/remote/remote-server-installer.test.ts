@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
+
 import {
   buildInstallFromArchiveCommand,
   buildInstallCommand,
@@ -33,7 +35,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -70,7 +72,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -139,7 +141,7 @@ describe("remote server installer", () => {
           stdout: JSON.stringify({
             name: "llm-space-server",
             version: currentDesktopVersion(),
-            protocolVersion: 1,
+            protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
             os: "linux",
             arch: "x64",
             entrypoint: "bin/llm-space-server",
@@ -312,7 +314,7 @@ describe("remote server installer", () => {
             stdout: JSON.stringify({
               name: "llm-space-server",
               version: currentDesktopVersion(),
-              protocolVersion: 1,
+              protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
               os: "linux",
               arch: "x64",
               entrypoint: "bin/llm-space-server",

@@ -123,8 +123,10 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       },
       paths: { ensureRootDir },
       files: {
-        readText: readTextFile,
-        exists: textFileExists,
+        readText: (path, options) =>
+          readTextFile(path, options.runtimeId as RuntimeId),
+        exists: (path, options) =>
+          textFileExists(path, options.runtimeId as RuntimeId),
         directoryExists,
         pickFile,
         pickDirectory,

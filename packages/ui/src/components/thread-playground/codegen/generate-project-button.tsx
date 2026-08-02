@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getMessageText,
   type McpServerView,
   type ModelConfig,
   type ModelProviderGroup,
@@ -19,7 +18,6 @@ import {
   type GeneratorModelInfo,
   type GeneratorResult,
 } from "@llm-space/core/generator";
-import { renderThreadPromptVariables } from "@llm-space/core/thread";
 import {
   createOneShotRunner,
   createWorkflowContext,
@@ -57,8 +55,12 @@ import { Input } from "../../../ui/input";
 import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
-import { useThreadStore } from "../stores/thread-store";
+import {
+  useThreadStore,
+  useThreadStoreApi,
+} from "../stores/thread-store";
 
+import { createGenerateProjectPromptPreparer } from "./generate-project-prompt-preparer";
 import {
   bindProjectGenerationRuntime,
   type ProjectGenerationRuntime,
@@ -112,6 +114,7 @@ export function GenerateProjectButton({
     actions,
     presentational,
   } = useHostServices();
+  const store = useThreadStoreApi();
   const context = useThreadStore((s) => s.thread.context);
   const runtimeId = useThreadStore((s) => s.runtimeId);
   const savedModel = useThreadStore((s) => s.thread.model);
@@ -119,6 +122,10 @@ export function GenerateProjectButton({
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
+  const preparePromptContext = useMemo(
+    () => createGenerateProjectPromptPreparer({ files, store }),
+    [files, store]
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>("framework");
@@ -225,27 +232,15 @@ export function GenerateProjectButton({
       abortRef.current = controller;
       try {
         const skillList = await generationRuntime.listEnabledSkills();
-        const rendered = await renderThreadPromptVariables({
-          context: context ?? {},
-          loadSkills: () => Promise.resolve(skillList),
-          loadFile: (path) => files.readText(path),
-          fileExists: (path) => files.exists(path),
+        const {
+          rendered,
+          systemPromptTemplate,
+          firstUserMessageTemplate,
+          renderedVariableValues,
+        } = await preparePromptContext({
+          skillList,
+          useMetaUserPrompt,
         });
-        // Ship the raw prompt (variables live at runtime), with `@include`
-        // macros expanded now since the generated project renders with Jinja2.
-        const systemPromptTemplate = await _expandIncludes(
-          context?.systemPrompt ?? "",
-          (path) => files.readText(path)
-        );
-        const firstMessage = context?.messages?.[0];
-        const firstUserMessageTemplate =
-          useMetaUserPrompt && firstMessage?.role === "user"
-            ? await _expandIncludes(getMessageText(firstMessage), (path) =>
-                files.readText(path)
-              )
-            : undefined;
-        const renderedVariableValues: Record<string, string> =
-          Object.fromEntries(rendered.variables.map((v) => [v.name, v.value]));
         const workflow = createWorkflowContext({
           runOneShot: createOneShotRunner({
             transport: generationRuntime.transport,
@@ -303,7 +298,7 @@ export function GenerateProjectButton({
       model,
       context,
       skills,
-      files,
+      preparePromptContext,
       framework,
       providers,
       mcp,
@@ -1181,42 +1176,6 @@ function _shellQuote(path: string): string {
   return /^[A-Za-z0-9_./~-]+$/.test(path)
     ? path
     : `'${path.replace(/'/g, "'\\''")}'`;
-}
-
-/** `{{@include("path")}}` macro with a single quoted path argument. */
-const INCLUDE_MACRO_RE = /\{\{\s*@include\(\s*(['"])([\s\S]*?)\1\s*\)\s*\}\}/g;
-
-/**
- * Expand LLM Space's `@include(...)` macro by inlining the referenced files,
- * so the generated project (which renders with plain Jinja2) doesn't need it.
- * Bounded recursion guards against include cycles.
- */
-async function _expandIncludes(
-  text: string,
-  readText: (path: string) => Promise<string>,
-  depth = 0
-): Promise<string> {
-  if (depth > 10 || !text.includes("@include")) {
-    return text;
-  }
-  const matches = [...text.matchAll(INCLUDE_MACRO_RE)];
-  if (matches.length === 0) {
-    return text;
-  }
-  let out = "";
-  let last = 0;
-  for (const match of matches) {
-    out += text.slice(last, match.index);
-    let content: string;
-    try {
-      content = await readText(match[2]);
-    } catch {
-      content = "";
-    }
-    out += await _expandIncludes(content, readText, depth + 1);
-    last = (match.index ?? 0) + match[0].length;
-  }
-  return out + text.slice(last);
 }
 
 function ProgressLine({ event }: { event: WorkflowEvent }) {

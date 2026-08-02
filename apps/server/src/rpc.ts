@@ -77,6 +77,10 @@ async function _dispatch(
       return null;
     case "fs.realpath":
       return { path: await runtime.fsRealpath(_stringParam(params, "path")) };
+    case "fs.readText":
+      return runtime.readTextFile(_stringParam(params, "path"));
+    case "fs.textFileExists":
+      return runtime.textFileExists(_stringParam(params, "path"));
     case "models.available":
       return runtime.availableModels();
     case "models.removeProvider":

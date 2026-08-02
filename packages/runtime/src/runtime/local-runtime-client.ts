@@ -1,4 +1,8 @@
-import type { LocalFileSystem } from "@llm-space/core/server";
+import {
+  readUserTextFile,
+  userTextFileExists,
+  type LocalFileSystem,
+} from "@llm-space/core/server";
 
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
@@ -185,6 +189,14 @@ export class LocalRuntimeClient implements RuntimeClient {
 
   fsRealpath(path: string) {
     return Promise.resolve(this._deps.localFs.realpath(path));
+  }
+
+  readTextFile(path: string) {
+    return readUserTextFile(path);
+  }
+
+  textFileExists(path: string) {
+    return userTextFileExists(path);
   }
 
   mcpListServers() {
