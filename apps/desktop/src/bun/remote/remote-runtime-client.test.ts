@@ -275,7 +275,86 @@ describe("RemoteRuntimeClient", () => {
 
     expect(events).toEqual([{ type: "agent_start" }]);
   });
+
+  test("does not complete after a remote stream error", async () => {
+    const messages: unknown[] = [];
+    await _withSseServer(
+      [
+        "data: [START]\n\n",
+        'data: {"type":"error","message":"Remote failed"}\n\n',
+        "data: [DONE]\n\n",
+      ],
+      async (baseUrl) => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl,
+          token: "secret",
+        });
+        await client.streamThread(
+          { streamId: "s1", request: {} as AgentStreamRequest },
+          (message) => messages.push(message)
+        );
+      }
+    );
+
+    expect(messages).toEqual([
+      { streamId: "s1", type: "error", message: "Remote failed" },
+    ]);
+  });
+
+  test("rejects malformed SSE JSON", async () => {
+    await _withSseServer(
+      ["data: [START]\n\n", "data: {not valid JSON}\n\n"],
+      async (baseUrl) => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl,
+          token: "secret",
+        });
+        let rejection: unknown;
+        try {
+          await client.streamThread(
+            { streamId: "s1", request: {} as AgentStreamRequest },
+            () => undefined
+          );
+        } catch (error) {
+          rejection = error;
+        }
+        expect(rejection).toBeInstanceOf(SyntaxError);
+      }
+    );
+  });
 });
+
+async function _withSseServer(
+  chunks: string[],
+  run: (baseUrl: string) => Promise<void>
+): Promise<void> {
+  const server = Bun.serve({
+    port: 0,
+    fetch() {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+  });
+  try {
+    await run(`http://127.0.0.1:${server.port}`);
+  } finally {
+    await server.stop(true);
+  }
+}
 
 async function _withFetch(
   handler: (request: Request) => Response | Promise<Response>,

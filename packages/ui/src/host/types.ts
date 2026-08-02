@@ -30,7 +30,7 @@ export interface RuntimeScopedHostOptions {
   runtimeId?: string;
 }
 
-/** Scope for operations that must never fall through to a default runtime. */
+/** A runtime scope that must be present for ownership-sensitive operations. */
 export interface RuntimeOwnedHostOptions {
   runtimeId: string;
 }
@@ -143,7 +143,7 @@ export interface GeneratorHost {
   /** Delete a file under an authorized project directory; no-op when missing. */
   removeFile(rootDir: string, relativePath: string): Promise<void>;
   /** The user's web-search settings, written into a generated project's `.env`. */
-  getSearchSettings(): Promise<SearchSettings>;
+  getSearchSettings(options: RuntimeOwnedHostOptions): Promise<SearchSettings>;
   /**
    * Resolve the model provider's real API key plus the values of the named
    * environment variables — used to write a `.env` with the user's actual
@@ -151,7 +151,8 @@ export interface GeneratorHost {
    */
   resolveEnv(
     providerId: string,
-    envNames: string[]
+    envNames: string[],
+    options: RuntimeOwnedHostOptions
   ): Promise<{ modelApiKey: string; envValues: Record<string, string> }>;
 }
 
@@ -178,14 +179,18 @@ export interface HostActions {
 }
 
 /**
- * The full set of host capabilities. `transport`/`executeTool` are `null` in a
- * display-only (`presentational`) host; the playground gates edit/run chrome on
- * `presentational`.
+ * The full set of host capabilities. `createTransport` returns `null` and
+ * `executeTool` is `null` in a display-only (`presentational`) host; the
+ * playground gates edit/run chrome on `presentational`.
  */
 export interface HostServices {
   /** Display-only: hide all action chrome and non-Preview dialogs. */
   presentational: boolean;
-  transport: AgentTransport | null;
+  /**
+   * Create an immutable transport bound to the runtime that owns a generation.
+   * Call once when a run starts so later workspace switches cannot reroute it.
+   */
+  createTransport: (runtimeId: string) => AgentTransport | null;
   executeTool: ExecuteTool | null;
   skills: SkillsHost;
   mcp: McpHost;

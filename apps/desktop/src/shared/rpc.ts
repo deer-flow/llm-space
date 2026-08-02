@@ -26,6 +26,7 @@ import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
 import type { FeatureReminder } from "./feature-reminders";
 import type {
+  RemoteDisconnectResult,
   RemoteServerDraft,
   RemoteServerStatusChangedPayload,
   RemoteServerView,
@@ -103,7 +104,7 @@ export interface DesktopRPCType {
       };
       remoteDisconnectServer: {
         params: { serverId: string };
-        response: RemoteServerView[];
+        response: RemoteDisconnectResult;
       };
       remoteSetDefaultRuntime: {
         params: { runtimeId: RuntimeId };

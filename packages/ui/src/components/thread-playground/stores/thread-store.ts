@@ -97,7 +97,7 @@ const _noFileExists = (): Promise<boolean> => Promise.resolve(false);
  */
 const MAX_AUTO_TOOL_TURNS = 50;
 
-export type ThreadStoreStatus = "idle" | "running";
+export type ThreadStoreStatus = "idle" | "preparing" | "running";
 export interface ThreadState {
   thread: Thread;
   runtimeId?: string;
@@ -978,15 +978,39 @@ export function createThreadStore(
           });
         },
         async run(fromMessageId?: string) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             throw new Error("Thread is already running");
           }
+          const runId = uuid();
+          const isPreparingRun = () =>
+            get().status === "preparing" && get().activeRunId === runId;
+          const finishPreparingRun = () => {
+            if (isPreparingRun()) {
+              set({ status: "idle", activeRunId: null });
+            }
+          };
+          // Claim the run lifecycle before any async prompt-variable work. A
+          // host can now prevent the pane from being torn down while preflight
+          // is still awaiting skills/files and before a transport exists.
+          set({ status: "preparing", activeRunId: runId });
+          if (!isPreparingRun()) return;
           // Resolve the model to run with: the thread's own when available,
           // else the default/first available. A thread with no resolvable model
           // cannot run.
-          const model = options.resolveModel?.(get().thread.model) ?? null;
+          let model: ModelConfig | null = null;
+          try {
+            model = options.resolveModel?.(get().thread.model) ?? null;
+          } catch (error) {
+            toast.error("Unable to resolve a model", {
+              description:
+                error instanceof Error ? error.message : "Please try again.",
+            });
+            finishPreparingRun();
+            return;
+          }
           if (!model) {
             toast.error("Select a model to run");
+            finishPreparingRun();
             return;
           }
           // Pre-flight: resolve the message list the run would use (including
@@ -1004,7 +1028,13 @@ export function createThreadStore(
           }
           const runValidationIssue = getRunValidationIssue(messages);
           if (runValidationIssue) {
-            set({ runValidationIssue });
+            if (isPreparingRun()) {
+              set({
+                runValidationIssue,
+                status: "idle",
+                activeRunId: null,
+              });
+            }
             return;
           }
           set({ runValidationIssue: null });
@@ -1021,16 +1051,18 @@ export function createThreadStore(
             preparedContext = rendered.context;
             promptSnapshot = rendered.snapshot;
           } catch (error) {
+            if (!isPreparingRun()) return;
             toast.error("Unable to render prompt variables", {
               description:
                 error instanceof PromptVariableError || error instanceof Error
                   ? error.message
                   : "Please check the system prompt variables.",
             });
+            finishPreparingRun();
             return;
           }
+          if (!isPreparingRun()) return;
           const abortController = new AbortController();
-          const runId = uuid();
           const isActiveRun = () => get().activeRunId === runId;
           set({
             status: "running",
@@ -1317,7 +1349,7 @@ export function createThreadStore(
           }
         },
         undo() {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return;
           }
           const result = undoHistory(get().changeHistory);
@@ -1341,7 +1373,7 @@ export function createThreadStore(
           });
         },
         redo() {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return;
           }
           const result = redoHistory(get().changeHistory);
@@ -1365,7 +1397,7 @@ export function createThreadStore(
           });
         },
         restoreThread(thread: Thread) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return;
           }
           const next = withRunMetadata(thread, {
@@ -1384,7 +1416,7 @@ export function createThreadStore(
           });
         },
         removeRun(run: RunSnapshot) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return;
           }
           const current = get().runHistory;
@@ -1418,7 +1450,7 @@ export function createThreadStore(
           });
         },
         saveEvaluation(input) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return false;
           }
           const evaluations = upsertEvaluation(
@@ -1450,7 +1482,7 @@ export function createThreadStore(
           return true;
         },
         removeEvaluation(evaluation: EvaluationRecord) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return;
           }
           const current = get().evaluations;
@@ -1479,7 +1511,7 @@ export function createThreadStore(
           });
         },
         saveEvaluationRubric(input) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return null;
           }
           const result = upsertEvaluationRubric(get().evaluationRubrics, input);
@@ -1505,7 +1537,7 @@ export function createThreadStore(
           return result.rubric;
         },
         removeEvaluationRubric(id) {
-          if (get().status === "running") {
+          if (get().status !== "idle") {
             return false;
           }
           const current = get().evaluationRubrics;
@@ -1535,6 +1567,10 @@ export function createThreadStore(
         },
         abort() {
           const { status } = get();
+          if (status === "preparing") {
+            set({ status: "idle", activeRunId: null });
+            return;
+          }
           if (status !== "running") {
             return;
           }

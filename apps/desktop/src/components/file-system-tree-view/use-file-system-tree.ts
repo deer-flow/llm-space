@@ -24,6 +24,12 @@ import { z } from "zod";
 import { createFileSystemClient } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 
+import {
+  runFileMutationWithGuard,
+  type AcquireFileMutation,
+} from "./file-mutation-guard";
+import { runGuardedFileMove } from "./guarded-file-move";
+
 /** Query-key factory for a directory listing. */
 export const fsKeys = {
   ls: (runtimeId: RuntimeId, path: string) =>
@@ -223,12 +229,25 @@ export interface FileSystemTree {
   rename: (path: string, newBase: string) => Promise<string | null>;
 }
 
+export interface FileMutationReconciliation {
+  onMove?: (
+    from: string,
+    to: string,
+    runtimeId: RuntimeId
+  ) => void | Promise<void>;
+  onRemove?: (path: string, runtimeId: RuntimeId) => void | Promise<void>;
+}
+
 /**
  * Owns all server state for the file tree via React Query: one lazily-enabled
  * `ls` query per expanded directory (root always loaded), plus mutations that
  * invalidate the affected directories. `move` is optimistic with rollback.
  */
-export function useFileSystemTree(runtimeId: RuntimeId): FileSystemTree {
+export function useFileSystemTree(
+  runtimeId: RuntimeId,
+  acquireMutation?: AcquireFileMutation,
+  reconciliation: FileMutationReconciliation = {}
+): FileSystemTree {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
   // Restore the directories that were open last session (shallowest-first, so
@@ -403,33 +422,43 @@ export function useFileSystemTree(runtimeId: RuntimeId): FileSystemTree {
   );
 
   const remove = useCallback(
-    async (path: string): Promise<boolean> => {
-      try {
-        await fs.rm(path);
-      } catch (err) {
-        toast.error((err as Error).message);
-        // The delete may still have landed even though it reported failure
-        // (e.g. the RPC timed out while the OS waited on a permission
-        // prompt), so re-fetch rather than leaving a stale entry in the tree.
-        void qc.invalidateQueries({
-          queryKey: fsKeys.ls(runtimeId, parentOf(path)),
-        });
-        return false;
-      }
-      // Prune the removed subtree from the expanded set.
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        for (const p of prev) {
-          if (isSelfOrDescendant(path, p)) next.delete(p);
-        }
-        return next;
-      });
-      void qc.invalidateQueries({
-        queryKey: fsKeys.ls(runtimeId, parentOf(path)),
-      });
-      return true;
-    },
-    [qc, fs, runtimeId]
+    (path: string): Promise<boolean> =>
+      runFileMutationWithGuard({
+        acquireMutation,
+        paths: [path],
+        runtimeId,
+        action: "moving this item to the trash",
+        blockedResult: false,
+        mutate: async () => {
+          try {
+            await fs.rm(path);
+          } catch (err) {
+            toast.error((err as Error).message);
+            // The delete may still have landed even though it reported failure
+            // (e.g. the RPC timed out while the OS waited on a permission
+            // prompt), so re-fetch rather than leaving a stale entry in the tree.
+            void qc.invalidateQueries({
+              queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+            });
+            return false;
+          }
+          // Prune the removed subtree from the expanded set.
+          setExpanded((prev) => {
+            const next = new Set(prev);
+            for (const p of prev) {
+              if (isSelfOrDescendant(path, p)) next.delete(p);
+            }
+            return next;
+          });
+          void qc.invalidateQueries({
+            queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+          });
+          return true;
+        },
+        reconcile: (removed) =>
+          removed ? reconciliation.onRemove?.(path, runtimeId) : undefined,
+      }),
+    [acquireMutation, qc, fs, reconciliation, runtimeId]
   );
 
   const duplicate = useCallback(
@@ -480,114 +509,132 @@ export function useFileSystemTree(runtimeId: RuntimeId): FileSystemTree {
       const srcKey = fsKeys.ls(runtimeId, srcParent);
       const destKey = fsKeys.ls(runtimeId, destDir);
 
-      // Detect a name collision up front (from a fresh listing, not the possibly
-      // stale cache) and confirm the overwrite before touching anything — an
-      // unconfirmed clash would otherwise silently replace the existing entry.
-      let overwrite = false;
       try {
-        const destNodes = await fs.ls(destDir);
-        const clash = destNodes.find((n) => n.name === name);
-        if (clash) {
-          const confirmed = await opts?.confirmOverwrite?.({
-            name,
-            isDir: clash.type === "directory",
-          });
-          if (!confirmed) return null;
-          overwrite = true;
-        }
+        return await runGuardedFileMove({
+          acquireMutation,
+        paths: [src, dest],
+        runtimeId,
+        action: "moving this item",
+        blockedResult: null,
+        // Collision inspection lives inside the source/destination lease. A
+        // listing taken before acquisition can become stale and silently turn
+        // an ordinary move into an overwrite.
+          detectConflict: async (): Promise<MoveConflict | null> => {
+            const destNodes = await fs.ls(destDir);
+            const clash = destNodes.find((node) => node.name === name);
+            return clash
+              ? { name, isDir: clash.type === "directory" }
+              : null;
+          },
+          confirmConflict: opts?.confirmOverwrite,
+          mutate: async (overwrite) => {
+          await Promise.all([
+            qc.cancelQueries({ queryKey: srcKey }),
+            qc.cancelQueries({ queryKey: destKey }),
+          ]);
+          const prevSrc = qc.getQueryData<FileNode[]>(srcKey);
+          const prevDest = qc.getQueryData<FileNode[]>(destKey);
+          const moved = prevSrc?.find((n) => n.path === src);
+
+          // Optimistically remove from the source and add to the destination,
+          // dropping any same-named entry there (the one being overwritten).
+          if (prevSrc) {
+            qc.setQueryData<FileNode[]>(
+              srcKey,
+              prevSrc.filter((n) => n.path !== src)
+            );
+          }
+          if (moved && prevDest) {
+            qc.setQueryData<FileNode[]>(
+              destKey,
+              sortNodes([
+                ...prevDest.filter((n) => n.name !== name),
+                { ...moved, path: dest, name },
+              ])
+            );
+          }
+
+          let ok = true;
+          try {
+            // Replacing an existing entry: send it to the trash first, so the
+            // move succeeds for directories too.
+            if (overwrite) {
+              await fs.rm(dest);
+            }
+            await fs.mv(src, dest);
+          } catch (err) {
+            // Roll back.
+            if (prevSrc) qc.setQueryData(srcKey, prevSrc);
+            if (prevDest) qc.setQueryData(destKey, prevDest);
+            toast.error((err as Error).message);
+            ok = false;
+          } finally {
+            void qc.invalidateQueries({ queryKey: srcKey });
+            void qc.invalidateQueries({ queryKey: destKey });
+          }
+          // Moving a subtree invalidates the expanded paths under it.
+          if (ok) {
+            setExpanded((prev) => {
+              const next = new Set(prev);
+              for (const p of prev) {
+                if (isSelfOrDescendant(src, p)) next.delete(p);
+              }
+              return next;
+            });
+          }
+          return ok ? dest : null;
+          },
+          reconcile: (to) =>
+            to ? reconciliation.onMove?.(src, to, runtimeId) : undefined,
+        });
       } catch (err) {
         toast.error((err as Error).message);
         return null;
       }
-
-      await Promise.all([
-        qc.cancelQueries({ queryKey: srcKey }),
-        qc.cancelQueries({ queryKey: destKey }),
-      ]);
-      const prevSrc = qc.getQueryData<FileNode[]>(srcKey);
-      const prevDest = qc.getQueryData<FileNode[]>(destKey);
-      const moved = prevSrc?.find((n) => n.path === src);
-
-      // Optimistically remove from the source and add to the destination,
-      // dropping any same-named entry there (the one being overwritten).
-      if (prevSrc) {
-        qc.setQueryData<FileNode[]>(
-          srcKey,
-          prevSrc.filter((n) => n.path !== src)
-        );
-      }
-      if (moved && prevDest) {
-        qc.setQueryData<FileNode[]>(
-          destKey,
-          sortNodes([
-            ...prevDest.filter((n) => n.name !== name),
-            { ...moved, path: dest, name },
-          ])
-        );
-      }
-
-      let ok = true;
-      try {
-        // Replacing an existing entry: send it to the trash first, so the move
-        // succeeds for directories too (rename onto a non-empty dir fails).
-        if (overwrite) {
-          await fs.rm(dest);
-        }
-        await fs.mv(src, dest);
-      } catch (err) {
-        // Roll back.
-        if (prevSrc) qc.setQueryData(srcKey, prevSrc);
-        if (prevDest) qc.setQueryData(destKey, prevDest);
-        toast.error((err as Error).message);
-        ok = false;
-      } finally {
-        void qc.invalidateQueries({ queryKey: srcKey });
-        void qc.invalidateQueries({ queryKey: destKey });
-      }
-      // Moving a subtree invalidates the expanded paths under it.
-      if (ok) {
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          for (const p of prev) {
-            if (isSelfOrDescendant(src, p)) next.delete(p);
-          }
-          return next;
-        });
-      }
-      return ok ? dest : null;
     },
-    [qc, fs, runtimeId]
+    [acquireMutation, qc, fs, reconciliation, runtimeId]
   );
 
   const rename = useCallback(
     async (path: string, newBase: string): Promise<string | null> => {
       const dest = joinPath(parentOf(path), newBase);
       if (dest === path) return null;
-      try {
-        await fs.mv(path, dest);
-        if (dest.endsWith(".json")) {
-          const thread = await fs.read(dest);
-          await fs.write(dest, normalizeThreadForPath(thread, dest));
-        }
-      } catch (err) {
-        toast.error((err as Error).message);
-        return null;
-      }
-      // The renamed subtree's old paths are no longer valid query keys; collapse
-      // it so its children reload under the new path on next expand.
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        for (const p of prev) {
-          if (isSelfOrDescendant(path, p)) next.delete(p);
-        }
-        return next;
+      return runFileMutationWithGuard({
+        acquireMutation,
+        paths: [path, dest],
+        runtimeId,
+        action: "renaming this item",
+        blockedResult: null,
+        mutate: async () => {
+          try {
+            await fs.mv(path, dest);
+            if (dest.endsWith(".json")) {
+              const thread = await fs.read(dest);
+              await fs.write(dest, normalizeThreadForPath(thread, dest));
+            }
+          } catch (err) {
+            toast.error((err as Error).message);
+            return null;
+          }
+          // The renamed subtree's old paths are no longer valid query keys;
+          // collapse it so its children reload under the new path next time.
+          setExpanded((prev) => {
+            const next = new Set(prev);
+            for (const p of prev) {
+              if (isSelfOrDescendant(path, p)) next.delete(p);
+            }
+            return next;
+          });
+          void qc.invalidateQueries({
+            queryKey: fsKeys.ls(runtimeId, parentOf(path)),
+          });
+          return dest;
+        },
+        reconcile: (to) =>
+          to ? reconciliation.onMove?.(path, to, runtimeId) : undefined,
       });
-      void qc.invalidateQueries({
-        queryKey: fsKeys.ls(runtimeId, parentOf(path)),
-      });
-      return dest;
     },
-    [qc, fs, runtimeId]
+    [acquireMutation, qc, fs, reconciliation, runtimeId]
   );
 
   return {

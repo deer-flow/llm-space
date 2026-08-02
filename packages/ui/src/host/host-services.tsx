@@ -7,9 +7,10 @@ import type { HostServices } from "./types";
 const HostServicesContext = createContext<HostServices | null>(null);
 
 /**
- * Provides the host capabilities the Thread Playground needs (transport, tool
- * execution, skills/mcp/paths access, navigation). The desktop app supplies an
- * Electrobun-backed value; a web build supplies a display-only stub.
+ * Provides the host capabilities the Thread Playground needs (transport
+ * creation, tool execution, skills/mcp/paths access, navigation). The desktop
+ * app supplies an Electrobun-backed value; a web build supplies a display-only
+ * stub.
  */
 export function HostServicesProvider({
   value,
