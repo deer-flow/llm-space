@@ -1,6 +1,6 @@
 import desktopPackageJson from "../../desktop/package.json";
 
-import { helpText, parseArgs } from "./args";
+import { helpText, parseArgs, resolveServerToken } from "./args";
 import { startHttpServer } from "./http-server";
 import { createServerRuntime } from "./runtime-factory";
 
@@ -19,6 +19,8 @@ async function main(): Promise<void> {
     return;
   }
 
+  const token = await resolveServerToken(args);
+
   const runtime = await createServerRuntime(args.home);
   let stopping = false;
   const stop = async () => {
@@ -32,7 +34,7 @@ async function main(): Promise<void> {
   const server = startHttpServer({
     host: args.host,
     port: args.port,
-    token: args.token,
+    token,
     runtime,
     version: desktopPackageJson.version,
     onShutdown: () => void stop(),
