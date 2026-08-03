@@ -66,6 +66,7 @@ export function ProviderProfileSelector({
         aria-label={`${provider?.name ?? providerId} connection profile: ${
           selectedProfile?.name ?? "Default"
         }`}
+      >
         {variant === "compact" ? (
           <SelectValue>
             {isDefaultProfile ? <CableIcon /> : selectedProfile?.name}
