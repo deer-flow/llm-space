@@ -4,6 +4,36 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-08-03
+
+Remote runtimes get a thorough correctness pass — every thread operation now
+stays bound to the runtime that owns it — plus DeerFlow run-event imports and
+two security fixes.
+
+### Added
+
+- Import DeerFlow run-event JSONL files as threads.
+
+### Changed
+
+- Sharing, prompt-file resolution, and auxiliary generation are each scoped to
+  the runtime that owns the thread, instead of falling back to the local one.
+- Switching runtimes preserves thread state, and retained runtime panes no
+  longer re-render unnecessarily.
+
+### Fixed
+
+- SSH trust is bound to the approved host key, so a changed key no longer
+  silently passes.
+- Runtime bearer tokens are no longer passed through `argv`, where other local
+  processes could read them.
+- Stale-port recovery is ownership-aware and awaits its async cleanup, so it
+  can't reclaim a port that another runtime still holds.
+- Failed remote streams terminate cleanly instead of hanging the thread.
+- Cancelling GitHub Device Flow authentication is now authoritative — a
+  cancelled attempt can no longer complete in the background.
+- Disabled buttons apply their dimmed style based on status.
+
 ## [4.6.3] - 2026-07-31
 
 A maintenance release with clipboard and tool-response improvements, refreshed
