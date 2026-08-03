@@ -44,4 +44,81 @@ describe("convertToPiContext", () => {
       isError: false,
     });
   });
+
+  test("separates provider-hosted configs from client tools", () => {
+    const result = convertToPiContext({
+      messages: [],
+      tools: [
+        {
+          type: "function",
+          name: "lookup",
+          description: "Lookup",
+          parameters: { type: "object" },
+        },
+        {
+          type: "provider-hosted",
+          config: {
+            type: "web_search",
+            search_context_size: "high",
+            user_location: { type: "approximate", country: "CN" },
+          },
+        },
+      ],
+    });
+
+    expect(result.tools.map((tool) => tool.name)).toEqual(["lookup"]);
+    expect(result.responseApiNativeTools).toEqual([
+      {
+        type: "web_search",
+        search_context_size: "high",
+        user_location: { type: "approximate", country: "CN" },
+      },
+    ]);
+  });
+
+  test("preserves response replay metadata on assistant messages", () => {
+    const result = convertToPiContext({
+      messages: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Result",
+              annotations: [
+                {
+                  type: "url_citation",
+                  url: "https://example.com",
+                  startIndex: 0,
+                  endIndex: 6,
+                  raw: { type: "url_citation", url: "https://example.com" },
+                },
+              ],
+            },
+          ],
+          providerHostedToolActivities: [
+            {
+              id: "ws_1",
+              type: "web_search_call",
+              raw: { id: "ws_1", type: "web_search_call" },
+            },
+          ],
+          responseOutputItems: [{ id: "ws_1", type: "web_search_call" }],
+        },
+      ],
+    });
+
+    const assistant = result.messages[0];
+    expect(assistant?.role).toBe("assistant");
+    if (assistant?.role !== "assistant") throw new Error("Expected assistant");
+    expect(assistant.content[0]).toMatchObject({
+      type: "text",
+      annotations: [{ url: "https://example.com" }],
+    });
+    expect(assistant.nativeToolActivities).toHaveLength(1);
+    expect(assistant.responseOutputItems).toEqual([
+      { id: "ws_1", type: "web_search_call" },
+    ]);
+  });
 });

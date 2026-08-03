@@ -103,6 +103,10 @@ describe("buildContextExports", () => {
         },
         // Built-in tools are copied in as real code, not exported to references.
         { type: "builtin", name: "read", description: "b", parameters: {} },
+        {
+          type: "provider-hosted",
+          config: { type: "web_search", search_context_size: "high" },
+        },
       ],
       variables: { current_date: { type: "currentDate", format: "iso-date" } },
       messages: [
@@ -131,6 +135,7 @@ describe("buildContextExports", () => {
     );
     // Built-in tools are NOT exported to references (they're copied as code).
     expect(byPath.has("references/tools/read.json")).toBe(false);
+    expect(byPath.has("references/tools/web_search.json")).toBe(false);
     // The first message is flagged meta.
     expect(byPath.get("references/messages/01-user.md")).toContain("(meta)");
     expect(byPath.get("references/messages/02-user.md")).toContain("hi");

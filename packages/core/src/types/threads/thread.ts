@@ -1,6 +1,11 @@
 import { Type, type Static } from "typebox";
 
-import { Message, ModelUsage } from "../messages";
+import {
+  type AssistantMessage,
+  Message,
+  ModelUsage,
+  type ProviderHostedToolActivity,
+} from "../messages";
 import { ModelConfig } from "../models";
 import { normalizeTools, Tool } from "../tools";
 
@@ -382,17 +387,13 @@ export type Thread = Static<typeof Thread>;
 
 export function normalizeThread(thread: Thread): Thread {
   const context = thread.context;
-  const tools = context?.tools;
   const runHistory = thread.runHistory;
   let next = thread;
 
-  if (tools) {
-    const normalizedTools = normalizeTools(tools);
-    if (!_sameTools(tools, normalizedTools)) {
-      next = {
-        ...next,
-        context: { ...context, tools: normalizedTools },
-      };
+  if (context) {
+    const normalizedContext = _normalizeThreadContext(context);
+    if (normalizedContext !== context) {
+      next = { ...next, context: normalizedContext };
     }
   }
 
@@ -412,6 +413,53 @@ export function normalizeThread(thread: Thread): Thread {
   }
 
   return next;
+}
+
+function _normalizeThreadContext(context: ThreadContext): ThreadContext {
+  let next = context;
+  const tools = context.tools;
+  if (tools) {
+    const normalizedTools = normalizeTools(tools);
+    if (!_sameTools(tools, normalizedTools)) {
+      next = { ...next, tools: normalizedTools };
+    }
+  }
+
+  const messages = context.messages;
+  if (messages) {
+    let changed = false;
+    const normalizedMessages = messages.map((message) => {
+      const normalizedMessage = _normalizeMessage(message);
+      if (normalizedMessage !== message) changed = true;
+      return normalizedMessage;
+    });
+    if (changed) {
+      next = { ...next, messages: normalizedMessages };
+    }
+  }
+
+  return next;
+}
+
+function _normalizeMessage(message: Message): Message {
+  if (message.role !== "assistant" || !("nativeToolActivities" in message)) {
+    return message;
+  }
+
+  const legacy = message as AssistantMessage & {
+    nativeToolActivities?: ProviderHostedToolActivity[];
+  };
+  const { nativeToolActivities, ...rest } = legacy;
+  if (
+    rest.providerHostedToolActivities !== undefined ||
+    nativeToolActivities === undefined
+  ) {
+    return rest;
+  }
+  return {
+    ...rest,
+    providerHostedToolActivities: nativeToolActivities,
+  };
 }
 
 function _sameTools(

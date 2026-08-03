@@ -11,7 +11,7 @@ import { forwardStreamThread } from "./stream-thread-request";
 
 const REQUEST: AgentStreamRequest = {
   model: { provider: "test", id: "test" },
-  context: { messages: [], tools: [] },
+  context: { messages: [], tools: [], responseApiNativeTools: [] },
 };
 
 function _createRuntime(error: Error): Pick<RuntimeClient, "streamThread"> {

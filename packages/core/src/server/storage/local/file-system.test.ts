@@ -138,6 +138,88 @@ describe("LocalFileSystem.write", () => {
     expect(JSON.stringify(raw).match(/blob:sha256:/g)).toHaveLength(2);
     expect(await fileSystem.read("thread.json")).toEqual(thread);
   });
+
+  test("preserves provider-hosted tool configuration and response metadata", async () => {
+    const fileSystem = await _createFileSystem();
+    const thread: Thread = {
+      title: "Native search",
+      context: {
+        tools: [
+          {
+            type: "provider-hosted",
+            config: {
+              type: "web_search",
+              user_location: {
+                type: "approximate",
+                country: "CN",
+              },
+            },
+          },
+        ],
+        messages: [
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: "A cited answer",
+                annotations: [
+                  {
+                    type: "url_citation",
+                    url: "https://example.com/source",
+                    title: "Example source",
+                    startIndex: 2,
+                    endIndex: 7,
+                    raw: {
+                      type: "url_citation",
+                      url: "https://example.com/source",
+                    },
+                  },
+                ],
+              },
+            ],
+            providerHostedToolActivities: [
+              {
+                id: "search-1",
+                type: "web_search_call",
+                status: "completed",
+                action: { type: "search", query: "example query" },
+                sources: [
+                  {
+                    url: "https://example.com/source",
+                    title: "Example source",
+                  },
+                ],
+                raw: {
+                  id: "search-1",
+                  type: "web_search_call",
+                  status: "completed",
+                },
+              },
+            ],
+            responseOutputItems: [
+              {
+                id: "search-1",
+                type: "web_search_call",
+                status: "completed",
+              },
+              {
+                id: "message-1",
+                type: "message",
+                role: "assistant",
+                content: [],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    await fileSystem.write("thread.json", thread);
+
+    expect(await fileSystem.read("thread.json")).toEqual(thread);
+  });
 });
 
 describe("LocalFileSystem.read recovery", () => {

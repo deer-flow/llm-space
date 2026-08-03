@@ -2,6 +2,7 @@ import {
   DEFAULT_SEARCH_SETTINGS,
   type BuiltinTool,
   type FunctionTool,
+  isProviderHostedTool,
   type McpTool,
   type SearchSettings,
 } from "../../types";
@@ -117,6 +118,12 @@ export const langgraphGenerator: GeneratorDefinition = {
       renderedVariableValues,
       targetDir: dir,
     } = input;
+
+    if ((context.tools ?? []).some(isProviderHostedTool)) {
+      throw new Error(
+        "LangGraph export does not support provider-hosted tools"
+      );
+    }
 
     const written: string[] = [];
     const write = async (path: string, contents: string): Promise<void> => {
