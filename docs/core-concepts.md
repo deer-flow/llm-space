@@ -278,7 +278,7 @@ Actual files may also contain `runHistory`, `evaluationRubrics`, and `evaluation
 
 # Supported Import Schemas
 
-The import entry point currently selects parsers by file extension, and `.json` is supported. When importing JSON, LLM Space attempts to recognize and normalize the following formats:
+The import entry point selects parsers by file extension. `.json` and `.jsonl` are supported. LLM Space attempts to recognize and normalize the following formats:
 
 | Format | Description |
 | --- | --- |
@@ -286,5 +286,6 @@ The import entry point currently selects parsers by file extension, and `.json` 
 | OpenAI Chat Completions-style JSON | Chat exports containing fields such as `messages`, `role`, `content`, and `tool_calls`. |
 | Anthropic Messages-style JSON | Chat exports containing fields such as `system`, `messages`, content blocks, `tool_use`, `tool_result`, and `input_schema`. |
 | Aurora-style JSON | Aurora Thread exports containing `Messages` and `Tools`. |
+| DeerFlow run-event JSONL | Persisted run events containing human, assistant, and tool messages. |
 
 After import, external formats are converted to the LLM Space Thread structure and written as new `.json` files under the current workspace directory. Files that cannot produce messages, System Prompt, Tools, or model information are skipped.
