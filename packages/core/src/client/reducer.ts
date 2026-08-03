@@ -60,13 +60,40 @@ export function reduceMessages(
       );
     case "message_end": {
       const message = streamingMessage!;
-      const usage = _normalizeUsage(
-        event.message.role === "assistant" ? event.message.usage : undefined
-      );
+      const providerMessage =
+        event.message.role === "assistant" ? event.message : undefined;
+      const usage = _normalizeUsage(providerMessage?.usage);
+      const providerText = Array.isArray(providerMessage?.content)
+        ? providerMessage.content
+            .filter((content) => content.type === "text")
+            .map((content) => ({
+              type: "text" as const,
+              text: content.text,
+              ...(content.annotations
+                ? { annotations: content.annotations }
+                : {}),
+            }))
+        : undefined;
+      const messageWithProviderOutput: AssistantMessage = {
+        ...message,
+        ...(providerText?.length ? { content: providerText } : {}),
+        ...(providerMessage?.nativeToolActivities
+          ? {
+              providerHostedToolActivities:
+                providerMessage.nativeToolActivities,
+            }
+          : {}),
+        ...(providerMessage?.responseOutputItems
+          ? { responseOutputItems: providerMessage.responseOutputItems }
+          : {}),
+      };
       const finalMessage =
-        message.content.length === 0
-          ? { ...message, content: [{ type: "text" as const, text: "" }] }
-          : message;
+        messageWithProviderOutput.content.length === 0
+          ? {
+              ...messageWithProviderOutput,
+              content: [{ type: "text" as const, text: "" }],
+            }
+          : messageWithProviderOutput;
       return {
         type: "message_end",
         message: usage ? { ...finalMessage, usage } : finalMessage,

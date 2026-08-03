@@ -2,6 +2,8 @@
 import {
   AssistantMessage,
   getMessageText,
+  getToolDisplayName,
+  getToolKey,
   isDangerousBashCommand,
   isExecutableTool,
   Message,
@@ -484,7 +486,8 @@ export function createThreadStore(
       const hasContent = (message: AssistantMessage): boolean =>
         Boolean(message.thinking) ||
         message.content.length > 0 ||
-        (message.toolCalls?.length ?? 0) > 0;
+        (message.toolCalls?.length ?? 0) > 0 ||
+        (message.providerHostedToolActivities?.length ?? 0) > 0;
 
       /**
        * Auto-call the pending tool calls on the last message so a run can loop
@@ -512,7 +515,9 @@ export function createThreadStore(
           return null;
         }
         const toolsByName = new Map(
-          (get().thread.context?.tools ?? []).map((tool) => [tool.name, tool])
+          (get().thread.context?.tools ?? [])
+            .filter(isExecutableTool)
+            .map((tool) => [tool.name, tool])
         );
         // Every tool call must map to an executable (MCP/built-in) tool; a
         // single `function` stub means the turn needs a hand-written result, so
@@ -889,9 +894,10 @@ export function createThreadStore(
         },
         addTool(tool) {
           const { thread } = get();
-          if (thread.context?.tools?.some((t) => t.name === tool.name)) {
+          const toolKey = getToolKey(tool);
+          if (thread.context?.tools?.some((t) => getToolKey(t) === toolKey)) {
             toast.error("Error", {
-              description: `Tool "${tool.name}" already exists`,
+              description: `Tool "${getToolDisplayName(tool)}" already exists`,
             });
             return false;
           }
@@ -903,16 +909,20 @@ export function createThreadStore(
         },
         updateTool(name, tool) {
           const tools = get().thread.context?.tools ?? [];
-          const index = tools.findIndex((t) => t.name === name);
+          const index = tools.findIndex((t) => getToolKey(t) === name);
           if (index === -1) {
             return false;
           }
           if (!validateTool(tool)) {
             return false;
           }
-          if (tool.name !== name && tools.some((t) => t.name === tool.name)) {
+          const nextKey = getToolKey(tool);
+          if (
+            nextKey !== name &&
+            tools.some((t) => getToolKey(t) === nextKey)
+          ) {
             toast.error("Error", {
-              description: `Tool "${tool.name}" already exists`,
+              description: `Tool "${getToolDisplayName(tool)}" already exists`,
             });
             return false;
           }
@@ -923,7 +933,9 @@ export function createThreadStore(
         },
         removeTool(name) {
           patchContext({
-            tools: get().thread.context?.tools?.filter((t) => t.name !== name),
+            tools: get().thread.context?.tools?.filter(
+              (tool) => getToolKey(tool) !== name
+            ),
           });
         },
         updateToolCallOutputTextContent(messageId, toolCallId, text, isError) {
@@ -1582,6 +1594,13 @@ export function createThreadStore(
 }
 
 function _isNonEmptyAssistantDelta(event: AgentEvent): boolean {
+  if (
+    event.type === "message_end" &&
+    event.message.role === "assistant" &&
+    (event.message.nativeToolActivities?.length ?? 0) > 0
+  ) {
+    return true;
+  }
   if (event.type !== "message_update") {
     return false;
   }

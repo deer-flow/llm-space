@@ -34,10 +34,13 @@ import {
 } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
+import { CitationList } from "./citation-list";
 import { ImageContentList } from "./image-content-view";
 import { MessageListItemHeader } from "./message-list-item-header";
+import { ProviderHostedToolActivityList } from "./provider-hosted-tool-activity-list";
 import { ThinkingView } from "./thinking-view";
 import { ToolCallListItem } from "./tool-call-list-item";
+import { useTextCitationExtension } from "./use-text-citation-extension";
 import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _MessageListItem({
@@ -70,6 +73,20 @@ function _MessageListItem({
     createMessagePromptVariablePlaceKey(message.id),
     context
   );
+  const assistantTextContents = useMemo(
+    () =>
+      message.role === "assistant"
+        ? (message.content.filter(
+            (content) => content.type === "text"
+          ))
+        : [],
+    [message]
+  );
+  const citationExtension = useTextCitationExtension(assistantTextContents);
+  const editorExtensions = useMemo(
+    () => [...(variableExtension ?? []), ...citationExtension],
+    [citationExtension, variableExtension]
+  );
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageContent; contentIndex: number }[] = [];
@@ -96,6 +113,7 @@ function _MessageListItem({
       message.role === "assistant" &&
       !message.thinking &&
       message.content.length === 0 &&
+      (message.providerHostedToolActivities?.length ?? 0) === 0 &&
       (message.toolCalls?.length ?? 0) > 0,
     [message]
   );
@@ -234,18 +252,30 @@ function _MessageListItem({
             streaming &&
             !message.thinking &&
             message.content.length === 0 &&
+            (!message.providerHostedToolActivities ||
+              message.providerHostedToolActivities.length === 0) &&
             (!message.toolCalls || message.toolCalls.length === 0) && (
               <StreamingMessageSkeleton className="mt-2" />
             )}
           {message.role === "assistant" && message.thinking && (
             <ThinkingView className="mt-2" thinking={message.thinking} />
           )}
+          {message.role === "assistant" &&
+            message.providerHostedToolActivities &&
+            message.providerHostedToolActivities.length > 0 && (
+              <ProviderHostedToolActivityList
+                activities={message.providerHostedToolActivities}
+              />
+            )}
           <ImageContentList
             messageId={message.id}
             images={imageContents}
             readonly={readonly}
           />
-          {message.content.length > 0 && (
+          {message.content.length > 0 &&
+            (text.length > 0 ||
+              message.role !== "assistant" ||
+              !message.providerHostedToolActivities?.length) && (
             <CodeEditor
               className="max-h-[40vh] min-h-9.5 w-full bg-transparent"
               autoFocus={autoFocus}
@@ -260,11 +290,14 @@ function _MessageListItem({
               streaming={streaming}
               readonly={readonly}
               value={text}
-              extraExtensions={variableExtension}
+              extraExtensions={editorExtensions}
               onChange={handleTextContentChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
             />
+          )}
+          {message.role === "assistant" && (
+            <CitationList contents={assistantTextContents} />
           )}
           {message.role === "assistant" &&
             message.toolCalls &&

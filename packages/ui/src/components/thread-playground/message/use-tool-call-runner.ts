@@ -26,7 +26,12 @@ export function useToolCallRunner(messageId: string) {
     useThreadStoreActions();
 
   const toolsByName = useMemo(
-    () => new Map((tools ?? []).map((tool) => [tool.name, tool])),
+    () =>
+      new Map(
+        (tools ?? [])
+          .filter(isExecutableTool)
+          .map((tool) => [tool.name, tool])
+      ),
     [tools]
   );
   const resolveTool = useCallback(

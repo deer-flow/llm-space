@@ -26,7 +26,18 @@ export function summarizeRun(thread: ThreadSnapshot): string {
     return `[${imageCount} image${imageCount > 1 ? "s" : ""}]`;
   }
   const text = getMessageText(last).trim();
-  return text || "Empty message";
+  if (text) {
+    return text;
+  }
+  if (
+    last.role === "assistant" &&
+    last.providerHostedToolActivities?.length
+  ) {
+    return last.providerHostedToolActivities
+      .map((activity) => activity.type)
+      .join(", ");
+  }
+  return "Empty message";
 }
 
 /** The model label for a run snapshot, separated so it can truncate safely. */
@@ -85,7 +96,20 @@ export function runResultText(thread: ThreadSnapshot): string {
   }
   const toolText = _toolResultText(message);
   const assistantText = getMessageText(message).trim();
-  return [assistantText, toolText].filter(Boolean).join("\n\n") || "Empty result";
+  const providerHostedText =
+    message.providerHostedToolActivities
+      ?.map((activity) =>
+        activity.status
+          ? `${activity.type} (${activity.status})`
+          : activity.type
+      )
+      .join("\n") ?? "";
+  return (
+    [assistantText, providerHostedText, toolText]
+      .filter(Boolean)
+      .join("\n\n") ||
+    "Empty result"
+  );
 }
 
 /** Compactly format tool calls and outputs inside an assistant result. */

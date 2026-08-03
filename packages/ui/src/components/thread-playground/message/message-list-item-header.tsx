@@ -80,6 +80,14 @@ function _MessageListItemHeader({
     if (message.role === "assistant" && message.toolCalls?.length) {
       return message.toolCalls.map((tc) => `${tc.input.name}()`).join(", ");
     }
+    if (
+      message.role === "assistant" &&
+      message.providerHostedToolActivities?.length
+    ) {
+      return message.providerHostedToolActivities
+        .map((activity) => activity.type)
+        .join(", ");
+    }
     return "";
   }, [collapsed, message, textContent]);
   const handleRun = useCallback(async () => {

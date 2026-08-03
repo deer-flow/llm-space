@@ -208,6 +208,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@earendil-works/pi-ai@0.83.0": "patches/@earendil-works%2Fpi-ai@0.83.0.patch",
+  },
   "overrides": {
     "@codemirror/state": "6.7.0",
     "@codemirror/view": "6.43.5",

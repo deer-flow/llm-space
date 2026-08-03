@@ -3,7 +3,6 @@ import { amazonBedrockProvider } from "@earendil-works/pi-ai/providers/amazon-be
 import { antLingProvider } from "@earendil-works/pi-ai/providers/ant-ling";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { azureOpenAIResponsesProvider } from "@earendil-works/pi-ai/providers/azure-openai-responses";
-import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { groqProvider } from "@earendil-works/pi-ai/providers/groq";
 import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface";
@@ -21,6 +20,7 @@ import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-
 import { arkProvider } from "./ark";
 import { arkAgentPlanProvider } from "./ark-agent-plan";
 import { arkCodingPlanProvider } from "./ark-coding-plan";
+import { deepseekProvider } from "./deepseek";
 import { minimaxProvider } from "./minimax";
 import { minimaxCnProvider } from "./minimax-cn";
 import { openaiCodexProvider } from "./openai-codex";
