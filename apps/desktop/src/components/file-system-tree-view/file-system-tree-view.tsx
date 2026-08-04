@@ -21,7 +21,11 @@ import {
   EmptyTitle,
 } from "@llm-space/ui/ui/empty";
 import { Spinner } from "@llm-space/ui/ui/spinner";
-import { FolderBookmarkIcon, MessagesSquare } from "lucide-react";
+import {
+  FolderBookmarkIcon,
+  FolderInputIcon,
+  MessagesSquare,
+} from "lucide-react";
 import {
   memo,
   useCallback,
@@ -53,8 +57,12 @@ const TRASH_NAME =
 
 /** The special workspace folder that deep-link shared-thread imports land in. */
 const SHARED_DIR = "shared";
-/** Accent color for the `shared` folder's icon and label. */
-const SHARED_DIR_COLOR = "text-sky-400";
+/** The special workspace folder that Thread Storage imports land in. */
+const IMPORTED_DIR = "imported";
+/** Shared accent color for system import folders. */
+const IMPORT_DIR_COLOR = "text-sky-400";
+/** System folders pinned before ordinary root entries, in display order. */
+const SPECIAL_ROOT_DIRS = [IMPORTED_DIR, SHARED_DIR] as const;
 
 /** Ancestor directory paths of a workspace file, shallowest-first (`a/b/c.json`
  * → `["a", "a/b"]`). */
@@ -365,12 +373,17 @@ function _FileSystemTreeView({
           (node) => node.type === "directory" || node.name.endsWith(".json")
         )
         .map(toItem);
-      // Pin the special "shared" folder (deep-link imports land here) to the top
-      // of the root. Array.sort is stable, so everything else keeps its order.
+      // Pin system import folders to the top of the root. Array.sort is stable,
+      // so everything else keeps its existing order.
       if (dirPath === "") {
-        items.sort((a, b) =>
-          a.id === SHARED_DIR ? -1 : b.id === SHARED_DIR ? 1 : 0
-        );
+        items.sort((a, b) => {
+          const aRank = SPECIAL_ROOT_DIRS.findIndex((dir) => dir === a.id);
+          const bRank = SPECIAL_ROOT_DIRS.findIndex((dir) => dir === b.id);
+          return (
+            (aRank === -1 ? SPECIAL_ROOT_DIRS.length : aRank) -
+            (bRank === -1 ? SPECIAL_ROOT_DIRS.length : bRank)
+          );
+        });
       }
       return items;
     };
@@ -412,14 +425,20 @@ function _FileSystemTreeView({
     // Files carry an icon; folders don't (chevron only). Keyed off the item, not
     // `isLeaf`, since a folder is rendered as a leaf while being renamed.
     const Icon = p.item.icon;
-    // The special "shared" folder (deep-link imports) gets a bookmark icon and
-    // accent color so it stands out from user folders.
+    // System import folders get dedicated icons and accent colors so they stand
+    // out from user folders.
     const isSharedFolder = p.item.id === SHARED_DIR;
+    const isImportedFolder = p.item.id === IMPORTED_DIR;
     return (
       <>
+        {isImportedFolder && (
+          <FolderInputIcon
+            className={cn("mr-2 h-4 w-4 shrink-0", IMPORT_DIR_COLOR)}
+          />
+        )}
         {isSharedFolder && (
           <FolderBookmarkIcon
-            className={cn("mr-2 h-4 w-4 shrink-0", SHARED_DIR_COLOR)}
+            className={cn("mr-2 h-4 w-4 shrink-0", IMPORT_DIR_COLOR)}
           />
         )}
         {Icon && <Icon className="text-primary mr-2 h-4 w-4 shrink-0" />}
@@ -465,7 +484,8 @@ function _FileSystemTreeView({
           <span
             className={cn(
               "min-w-0 grow truncate text-left text-sm",
-              isSharedFolder && cn("font-medium", SHARED_DIR_COLOR)
+              (isSharedFolder || isImportedFolder) &&
+                cn("font-medium", IMPORT_DIR_COLOR)
             )}
           >
             {p.item.name}
