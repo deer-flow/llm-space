@@ -25,6 +25,9 @@ export interface SkillInfo {
   path: string;
   /** `false` when the skill is in its folder's `hiddenSkills`. */
   enabled: boolean;
+  source?: "user" | "plugin";
+  readOnly?: boolean;
+  pluginId?: string;
 }
 
 /** One skill's full content, for the runtime Skill tool. */

@@ -89,7 +89,9 @@ export class GistThreadReader
       { token }
     );
 
-    const file = gist.files?.[locator.filename] ?? selectThreadFile(gist.files);
+    const file = locator.filename
+      ? gist.files?.[locator.filename]
+      : selectThreadFile(gist.files);
     if (!file) {
       throw new Error(`Gist ${locator.id} has no file "${locator.filename}".`);
     }

@@ -85,6 +85,9 @@ export interface McpServerView extends McpServerConfig {
   connected: boolean;
   toolCount: number | null;
   lastError?: string;
+  source?: "user" | "plugin";
+  readOnly?: boolean;
+  pluginId?: string;
 }
 
 export interface McpToolView {

@@ -8,6 +8,7 @@
     "./models": "./src/models/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./network": "./src/network/index.ts",
+    "./plugins": "./src/plugins/index.ts",
     "./runtime": "./src/runtime/index.ts",
     "./search": "./src/search/index.ts",
     "./skills": "./src/skills/index.ts",

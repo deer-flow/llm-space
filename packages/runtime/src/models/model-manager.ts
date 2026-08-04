@@ -101,6 +101,10 @@ const ModelsConfigFileSchema = z.object({
  */
 export class ModelManager {
   private readonly _config: ModelsConfig;
+  private _pluginProviders: {
+    pluginId: string;
+    provider: ProviderConfig;
+  }[] = [];
   private _models: Models | null = null;
 
   constructor() {
@@ -117,6 +121,34 @@ export class ModelManager {
   /** The `Models` registry of configured providers. Built once, then cached. */
   async getAvailableModels(): Promise<Models> {
     return (this._models ??= await Promise.resolve(this._buildModels()));
+  }
+
+  setPluginProviders(
+    entries: { pluginId: string; provider: ProviderConfig }[]
+  ): void {
+    const userIds = new Set(this._config.providers.map((entry) => entry.id));
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      counts.set(entry.provider.id, (counts.get(entry.provider.id) ?? 0) + 1);
+    }
+    this._pluginProviders = entries.filter(
+      (entry) =>
+        !userIds.has(entry.provider.id) && counts.get(entry.provider.id) === 1
+    );
+    this._models = null;
+  }
+
+  getProviderSource(providerId: string): {
+    source: "user" | "plugin";
+    readOnly: boolean;
+    pluginId?: string;
+  } {
+    const plugin = this._pluginProviders.find(
+      (entry) => entry.provider.id === providerId
+    );
+    return plugin
+      ? { source: "plugin", readOnly: true, pluginId: plugin.pluginId }
+      : { source: "user", readOnly: false };
   }
 
   /**
@@ -281,21 +313,17 @@ export class ModelManager {
 
   /** The custom base URL override for a provider, if configured. */
   getBaseUrl(providerId: string): string | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.baseUrl;
+    return this._findProvider(providerId)?.baseUrl;
   }
 
   /** The extra HTTP headers configured for a provider, if any. */
   getHeaders(providerId: string): Record<string, string> | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.headers;
+    return this._findProvider(providerId)?.headers;
   }
 
   /** The selected API compatibility mode for a custom provider. */
   getApi(providerId: string): CustomProviderApi | undefined {
-    const entry = this._config.providers.find(
-      (provider) => provider.id === providerId
-    );
+    const entry = this._findProvider(providerId);
     if (!entry || entry.builtin === true) {
       return undefined;
     }
@@ -304,10 +332,7 @@ export class ModelManager {
 
   /** The model ids the user has disabled for a provider (empty by default). */
   getDisabledModels(providerId: string): string[] {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.disabledModels ?? []
-    );
+    return this._findProvider(providerId)?.disabledModels ?? [];
   }
 
   /**
@@ -316,24 +341,17 @@ export class ModelManager {
    * id/name.
    */
   getProviderIcon(providerId: string): string | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.icon;
+    return this._findProvider(providerId)?.icon;
   }
 
   /** The ids of the user-added models for a provider (empty by default). */
   getCustomModels(providerId: string): string[] {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.customModels ?? []
-    );
+    return this._findProvider(providerId)?.customModels ?? [];
   }
 
   /** Whether a configured provider is one of the shipped builtin providers. */
   isBuiltin(providerId: string): boolean {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.builtin === true
-    );
+    return this._findProvider(providerId)?.builtin === true;
   }
 
   /**
@@ -510,9 +528,7 @@ export class ModelManager {
     providerId: string,
     resolved = true
   ): Promise<string | undefined> {
-    const apiKey = this._config.providers.find(
-      (entry) => entry.id === providerId
-    )?.apiKey;
+    const apiKey = this._findProvider(providerId)?.apiKey;
     if (!resolved) {
       return apiKey;
     }
@@ -564,13 +580,24 @@ export class ModelManager {
    */
   private _buildProviders(): Provider[] {
     const seen = new Set<string>();
-    return this._config.providers
+    return this._effectiveProviders()
       .filter((entry) =>
         seen.has(entry.id) ? false : (seen.add(entry.id), true)
       )
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((entry) => this._buildProvider(entry))
       .filter((provider): provider is Provider => provider !== null);
+  }
+
+  private _findProvider(providerId: string): ProviderConfig | undefined {
+    return this._effectiveProviders().find((entry) => entry.id === providerId);
+  }
+
+  private _effectiveProviders(): ProviderConfig[] {
+    return [
+      ...this._config.providers,
+      ...this._pluginProviders.map((entry) => entry.provider),
+    ];
   }
 
   /**

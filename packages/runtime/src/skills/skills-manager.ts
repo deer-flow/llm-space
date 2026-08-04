@@ -45,6 +45,7 @@ export interface SkillsManagerOptions {
 
 export class SkillsManager {
   private _settings: SkillsSettings;
+  private _pluginSkills: { pluginId: string; path: string }[] = [];
 
   constructor(private readonly _options: SkillsManagerOptions = {}) {
     this._settings = this._loadConfig();
@@ -52,6 +53,39 @@ export class SkillsManager {
 
   getConfig(): SkillsSettings {
     return this._clone(this._settings);
+  }
+
+  setPluginPaths(paths: { pluginId: string; path: string }[]): {
+    pluginId: string;
+    path: string;
+    name: string;
+  }[] {
+    const userNames = new Set(
+      this._settings.discoveryPaths.flatMap((entry) =>
+        this.listSkills(entry.path).map((skill) => skill.name)
+      )
+    );
+    const candidates = paths.flatMap((item) => {
+      try {
+        const name = this.readSkill(item.path).frontmatters.name;
+        return typeof name === "string" && name ? [{ ...item, name }] : [];
+      } catch {
+        return [];
+      }
+    });
+    const counts = new Map<string, number>();
+    for (const item of candidates) {
+      counts.set(item.name, (counts.get(item.name) ?? 0) + 1);
+    }
+    const conflicts = candidates.filter(
+      (item) => userNames.has(item.name) || counts.get(item.name) !== 1
+    );
+    this._pluginSkills = candidates
+      .filter(
+        (item) => !userNames.has(item.name) && counts.get(item.name) === 1
+      )
+      .map(({ pluginId, path }) => ({ pluginId, path }));
+    return conflicts;
   }
 
   /** Append a folder (trimmed, de-duplicated) with an empty hidden list. */
@@ -198,6 +232,14 @@ export class SkillsManager {
       );
       if (match) {
         return this.readSkill(match.path);
+      }
+    }
+    for (const item of this._pluginSkills) {
+      try {
+        const content = this.readSkill(item.path);
+        if (content.frontmatters.name === name) return content;
+      } catch {
+        // Invalid plugin skills are excluded without affecting other skills.
       }
     }
     return null;

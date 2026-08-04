@@ -129,6 +129,9 @@ export class GistThreadWriter implements WritableThreadStorage {
       token
     );
     const filename = existing.filename;
+    if (!filename) {
+      throw new Error(`Gist ${id} did not resolve to a thread filename.`);
+    }
     const gist = await gistRequest<GistResponse>(
       this._fetch,
       this._baseUrl,

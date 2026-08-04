@@ -46,8 +46,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-const CONNECT_TIMEOUT_MS = 10_000;
-const LIST_TIMEOUT_MS = 10_000;
+const TEST_TIMEOUT_MS = 5 * 60_000;
 const CALL_TIMEOUT_MS = 5 * 60_000;
 const MAX_OUTPUT_CHARS = 20_000;
 const ENV_REFERENCE_PATTERN =
@@ -165,8 +164,13 @@ interface McpDiagnosticDraft {
  */
 export class McpManager {
   private _config: McpServersConfig;
+  private _pluginServers: {
+    pluginId: string;
+    server: McpServerConfig;
+  }[] = [];
   private readonly _clients = new Map<string, McpClientEntry>();
   private readonly _connecting = new Map<string, Promise<McpClientEntry>>();
+  private readonly _tests = new Map<string, AbortController>();
   private readonly _status = new Map<string, McpServerRuntimeStatus>();
 
   constructor() {
@@ -174,7 +178,38 @@ export class McpManager {
   }
 
   listServers(): McpServerView[] {
-    return this._config.servers.map((server) => this._toServerView(server));
+    return this._effectiveServers().map((server) => this._toServerView(server));
+  }
+
+  async setPluginServers(
+    entries: { pluginId: string; server: McpServerConfig }[]
+  ): Promise<void> {
+    const nextIds = new Set(entries.map((entry) => entry.server.id));
+    const nextById = new Map(
+      entries.map((entry) => [entry.server.id, entry.server] as const)
+    );
+    await Promise.all(
+      this._pluginServers
+        .filter(
+          (entry) =>
+            !nextIds.has(entry.server.id) ||
+            JSON.stringify(nextById.get(entry.server.id)) !==
+              JSON.stringify(entry.server)
+        )
+        .map(async (entry) => {
+          await this._closeServer(entry.server.id);
+          this._status.delete(entry.server.id);
+        })
+    );
+    const userIds = new Set(this._config.servers.map((server) => server.id));
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      counts.set(entry.server.id, (counts.get(entry.server.id) ?? 0) + 1);
+    }
+    this._pluginServers = entries.filter(
+      (entry) =>
+        !userIds.has(entry.server.id) && counts.get(entry.server.id) === 1
+    );
   }
 
   addServer(draft: McpServerDraft): McpServerView[] {
@@ -194,7 +229,7 @@ export class McpManager {
     serverId: string,
     draft: McpServerDraft
   ): Promise<McpServerView[]> {
-    const current = this._getServer(serverId);
+    const current = this._getUserServer(serverId);
     const server = this._normalizeServerDraft(draft, {
       id: current.id,
       createdAt: current.createdAt,
@@ -224,6 +259,7 @@ export class McpManager {
   }
 
   async removeServer(serverId: string): Promise<McpServerView[]> {
+    this._getUserServer(serverId);
     this._config = {
       servers: this._config.servers.filter((server) => server.id !== serverId),
     };
@@ -240,8 +276,17 @@ export class McpManager {
     return this.listServers();
   }
 
+  async cancelTest(serverId: string): Promise<McpServerView[]> {
+    this._getServer(serverId);
+    this._tests.get(serverId)?.abort();
+    await this._closeServer(serverId);
+    return this.listServers();
+  }
+
   /** Close every live or connecting client during application shutdown. */
   async shutdown(): Promise<void> {
+    for (const controller of this._tests.values()) controller.abort();
+    this._tests.clear();
     const serverIds = new Set([
       ...this._clients.keys(),
       ...this._connecting.keys(),
@@ -254,6 +299,11 @@ export class McpManager {
 
   async listTools(serverId: string): Promise<McpServerToolsResponse> {
     const server = this._getServer(serverId);
+    if (this._tests.has(serverId)) {
+      throw new Error(`MCP test is already running: ${server.name}`);
+    }
+    const controller = new AbortController();
+    this._tests.set(serverId, controller);
     const diagnostic = _isRemoteTransport(server.transport)
       ? _createDiagnosticDraft(server)
       : undefined;
@@ -265,8 +315,13 @@ export class McpManager {
           `${_transportLabel(server.transport)} configuration is valid.`
         );
       }
-      const entry = await this._connect(server, diagnostic);
-      const tools = await this._fetchAllTools(entry.client, server, diagnostic);
+      const entry = await this._connect(server, diagnostic, controller.signal);
+      const tools = await this._fetchAllTools(
+        entry.client,
+        server,
+        diagnostic,
+        controller.signal
+      );
       entry.tools = tools;
       const toolViews = this._toToolViews(server, tools);
       const result = diagnostic
@@ -289,6 +344,10 @@ export class McpManager {
         tools: toolViews,
       };
     } catch (error) {
+      if (controller.signal.aborted) {
+        await this._closeServer(serverId);
+        throw new Error("MCP test cancelled.", { cause: error });
+      }
       const category =
         diagnostic && _diagnosticFailedStep(diagnostic, "listTools")
           ? "listTools"
@@ -316,6 +375,10 @@ export class McpManager {
       });
       await this._closeServer(serverId);
       throw new Error(message, { cause: error });
+    } finally {
+      if (this._tests.get(serverId) === controller) {
+        this._tests.delete(serverId);
+      }
     }
   }
 
@@ -349,7 +412,8 @@ export class McpManager {
 
   private async _connect(
     server: McpServerConfig,
-    diagnostic?: McpDiagnosticDraft
+    diagnostic?: McpDiagnosticDraft,
+    signal?: AbortSignal
   ): Promise<McpClientEntry> {
     const cached = this._clients.get(server.id);
     if (cached) {
@@ -390,7 +454,7 @@ export class McpManager {
       }
       return entry;
     }
-    const promise = this._openConnection(server, diagnostic);
+    const promise = this._openConnection(server, diagnostic, signal);
     this._connecting.set(server.id, promise);
     try {
       return await promise;
@@ -401,7 +465,8 @@ export class McpManager {
 
   private async _openConnection(
     server: McpServerConfig,
-    diagnostic?: McpDiagnosticDraft
+    diagnostic?: McpDiagnosticDraft,
+    signal?: AbortSignal
   ): Promise<McpClientEntry> {
     const client = new Client({
       name: "llm-space",
@@ -409,7 +474,7 @@ export class McpManager {
     });
     const transport = this._createTransport(server, diagnostic);
     try {
-      await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS });
+      await client.connect(transport, { timeout: TEST_TIMEOUT_MS, signal });
       if (diagnostic) {
         _passDiagnosticStep(diagnostic, "transport", "Connection opened.");
         _passDiagnosticStep(
@@ -519,7 +584,8 @@ export class McpManager {
   private async _fetchAllTools(
     client: Client,
     server: McpServerConfig,
-    diagnostic?: McpDiagnosticDraft
+    diagnostic?: McpDiagnosticDraft,
+    signal?: AbortSignal
   ): Promise<SdkMcpTool[]> {
     const tools: SdkMcpTool[] = [];
     let cursor: string | undefined;
@@ -528,7 +594,8 @@ export class McpManager {
         const response = await client.listTools(
           cursor ? { cursor } : undefined,
           {
-            timeout: LIST_TIMEOUT_MS,
+            timeout: TEST_TIMEOUT_MS,
+            signal,
           }
         );
         tools.push(...response.tools);
@@ -606,7 +673,12 @@ export class McpManager {
       }),
     };
     if (!updated) {
-      throw new Error(`MCP server not configured: ${serverId}`);
+      const plugin = this._pluginServers.find(
+        (entry) => entry.server.id === serverId
+      );
+      if (!plugin) throw new Error(`MCP server not configured: ${serverId}`);
+      plugin.server = { ...plugin.server, readiness };
+      return plugin.server;
     }
     this._saveConfig();
     return updated;
@@ -619,12 +691,18 @@ export class McpManager {
       toolCount: null,
       tools: [],
     };
+    const plugin = this._pluginServers.find(
+      (entry) => entry.server.id === server.id
+    );
     return {
       ...server,
       readiness,
       connected: this._clients.has(server.id),
       toolCount: status?.toolCount ?? readiness.toolCount,
       lastError: status?.lastError ?? readiness.lastError,
+      source: plugin ? "plugin" : "user",
+      readOnly: Boolean(plugin),
+      pluginId: plugin?.pluginId,
     };
   }
 
@@ -679,7 +757,7 @@ export class McpManager {
   }
 
   private _assertUniqueServerName(server: McpServerConfig, exceptId?: string) {
-    const existing = this._config.servers.find(
+    const existing = this._effectiveServers().find(
       (item) => item.id !== exceptId && item.serverName === server.serverName
     );
     if (existing) {
@@ -688,11 +766,27 @@ export class McpManager {
   }
 
   private _getServer(serverId: string): McpServerConfig {
-    const server = this._config.servers.find((item) => item.id === serverId);
+    const server = this._effectiveServers().find(
+      (item) => item.id === serverId
+    );
     if (!server) {
       throw new Error(`MCP server not configured: ${serverId}`);
     }
     return server;
+  }
+
+  private _getUserServer(serverId: string): McpServerConfig {
+    const server = this._config.servers.find((item) => item.id === serverId);
+    if (!server)
+      throw new Error(`MCP server is read-only or unavailable: ${serverId}`);
+    return server;
+  }
+
+  private _effectiveServers(): McpServerConfig[] {
+    return [
+      ...this._config.servers,
+      ...this._pluginServers.map((entry) => entry.server),
+    ];
   }
 
   private async _closeServer(serverId: string): Promise<void> {
