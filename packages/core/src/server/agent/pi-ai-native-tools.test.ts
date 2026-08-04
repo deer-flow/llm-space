@@ -24,6 +24,13 @@ const MODEL: Model<"openai-responses"> = {
   maxTokens: 16_384,
 };
 
+const DEEPSEEK_MODEL: Model<"openai-responses"> = {
+  ...MODEL,
+  id: "deepseek-v4-flash",
+  name: "DeepSeek V4 Flash",
+  provider: "deepseek",
+};
+
 const CODEX_MODEL: Model<"openai-codex-responses"> = {
   ...MODEL,
   id: "gpt-codex-native-test",
@@ -186,6 +193,80 @@ async function _requestBody(
 }
 
 describe("pi-ai Responses native tools bridge", () => {
+  test("pairs replayed tool results for non-OpenAI Responses providers", async () => {
+    const requestBodies: Record<string, unknown>[] = [];
+    globalThis.fetch = (async (input, init) => {
+      requestBodies.push(await _requestBody(input, init));
+      return _sseResponse();
+    }) as typeof fetch;
+
+    const assistant: AssistantMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall",
+          id: "call_1|fc_1",
+          name: "lookup",
+          arguments: { topic: "LLM Space" },
+        },
+      ],
+      api: "openai-responses",
+      provider: "deepseek",
+      model: DEEPSEEK_MODEL.id,
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: 0,
+        },
+      },
+      responseOutputItems: [RESPONSE_OUTPUT[1]],
+    };
+    const toolResult: ToolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call_1|fc_1",
+      toolName: "lookup",
+      content: [{ type: "text", text: "lookup result" }],
+      isError: false,
+      timestamp: Date.now(),
+    };
+
+    await streamSimple(
+      DEEPSEEK_MODEL,
+      {
+        messages: [
+          { role: "user", content: "Find LLM Space", timestamp: Date.now() },
+          assistant,
+          toolResult,
+        ],
+        tools: [FUNCTION_TOOL],
+      },
+      { apiKey: "test-key" }
+    ).result();
+
+    expect(requestBodies[0]?.input).toEqual([
+      {
+        role: "user",
+        content: [{ type: "input_text", text: "Find LLM Space" }],
+      },
+      RESPONSE_OUTPUT[1],
+      {
+        type: "function_call_output",
+        call_id: "call_1",
+        output: "lookup result",
+      },
+    ]);
+  });
+
   test("preserves Codex native output items when the terminal event is sparse", async () => {
     globalThis.fetch = (() =>
       Promise.resolve(
@@ -289,7 +370,10 @@ describe("pi-ai Responses native tools bridge", () => {
 
     const secondInput = requestBodies[1]?.input;
     expect(secondInput).toEqual([
-      { role: "user", content: [{ type: "input_text", text: "Find LLM Space" }] },
+      {
+        role: "user",
+        content: [{ type: "input_text", text: "Find LLM Space" }],
+      },
       ...RESPONSE_OUTPUT,
       {
         type: "function_call_output",

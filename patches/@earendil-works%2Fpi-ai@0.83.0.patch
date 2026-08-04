@@ -1,7 +1,16 @@
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index a6a07c1..6b86fe8 100644
+index a6a07c1..3597a40 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
+@@ -67,7 +67,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
+     };
+     const normalizeToolCallId = (id, _targetModel, source) => {
+         if (!allowedToolCallProviders.has(model.provider))
+-            return normalizeIdPart(id);
++            return normalizeIdPart(id.split("|")[0]);
+         if (!id.includes("|"))
+             return normalizeIdPart(id);
+         const [callId, itemId] = id.split("|");
 @@ -129,6 +129,11 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
          else if (msg.role === "assistant") {
              const output = [];
