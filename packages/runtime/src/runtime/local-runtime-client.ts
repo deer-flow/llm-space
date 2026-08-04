@@ -222,6 +222,10 @@ export class LocalRuntimeClient implements RuntimeClient {
     return this._deps.mcpManager.disconnectServer(serverId);
   }
 
+  mcpCancelTest(serverId: string) {
+    return this._deps.mcpManager.cancelTest(serverId);
+  }
+
   mcpListTools(serverId: string) {
     return this._deps.mcpManager.listTools(serverId);
   }

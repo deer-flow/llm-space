@@ -1,6 +1,6 @@
 import type { RuntimeCapability } from "./runtime";
 
-export const REMOTE_RUNTIME_PROTOCOL_VERSION = 2;
+export const REMOTE_RUNTIME_PROTOCOL_VERSION = 3;
 
 export interface RemoteRuntimeHealthResponse {
   ok: true;
@@ -46,6 +46,7 @@ export type RemoteRuntimeRpcMethod =
   | "mcp.updateServer"
   | "mcp.removeServer"
   | "mcp.disconnectServer"
+  | "mcp.cancelTest"
   | "mcp.listTools"
   | "mcp.callTool"
   | "builtinTools.list"

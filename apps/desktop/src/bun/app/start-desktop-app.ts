@@ -1,14 +1,19 @@
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getLlmSpaceHomePath } from "@llm-space/core/server";
-import { GistThreadWriter } from "@llm-space/core/storage";
+import { GistThreadReader, GistThreadWriter } from "@llm-space/core/storage";
+import { PluginManager } from "@llm-space/runtime/plugins";
 import Electrobun, {
   app,
   type BrowserWindow,
   type ElectrobunEvent,
   Utils,
+  PATHS,
 } from "electrobun/bun";
 
+import packageJson from "../../../package.json";
 import type { Command } from "../../shared/commands";
 import { Analytics } from "../analytics";
 import { GitHubAuthManager } from "../auth";
@@ -56,6 +61,17 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const skillsManager = new SkillsManager({
     managedSkillsDir: getManagedSkillsDir(),
   });
+  let mainWindow: BrowserWindow | null = null;
+  let rpc: MainWindowRPC | null = null;
+  let deepLink: DeepLinkHandler | null = null;
+  const getRpc = (): MainWindowRPC => {
+    if (!rpc) throw new Error("Main window RPC is not ready.");
+    return rpc;
+  };
+  const getMainWindow = (): BrowserWindow => {
+    if (!mainWindow) throw new Error("Main window is not ready.");
+    return mainWindow;
+  };
   const githubAuth = new GitHubAuthManager({
     onChange: (state) => getRpc().send.githubAuthChanged(state),
   });
@@ -64,6 +80,74 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   // GitHub token (the `gist` scope); creates secret gists readable by URL.
   const gistWriter = new GistThreadWriter({
     getToken: () => githubAuth.getAccessToken(),
+  });
+  const gistReader = new GistThreadReader({
+    getToken: () => githubAuth.getAccessToken(),
+  });
+  const packagedRunnerPath = path.join(
+    PATHS.RESOURCES_FOLDER,
+    "app",
+    "plugin-runner.ts"
+  );
+  const sourceRunnerPath = path.resolve(
+    import.meta.dir,
+    "../../../../../packages/runtime/src/plugins/plugin-runner.ts"
+  );
+  let executePluginHostCommand = (type: string): Promise<unknown> =>
+    Promise.reject(new Error(`Command execution is not ready: ${type}`));
+  const pluginManager = await PluginManager.create({
+    homePath,
+    appVersion: packageJson.version,
+    runnerPath: existsSync(packagedRunnerPath)
+      ? packagedRunnerPath
+      : sourceRunnerPath,
+    skillsManager,
+    mcpManager,
+    modelManager,
+    onChanged: () => rpc?.send.pluginsChanged({}),
+    handleHostRequest: async (method, rawParams) => {
+      const params = (rawParams ?? {}) as Record<string, unknown>;
+      if (method === "notify") {
+        Utils.showNotification({
+          title: "LLM Space",
+          body: _stringParam(params, "message"),
+        });
+        return null;
+      }
+      if (method === "openLink") {
+        Utils.openExternal(_stringParam(params, "url"));
+        return null;
+      }
+      if (method === "pickFile") {
+        const selected = await Utils.openFileDialog({
+          startingFolder: "~/",
+          canChooseFiles: true,
+          canChooseDirectory: false,
+          allowsMultipleSelection: false,
+        });
+        return selected[0] ?? null;
+      }
+      if (method === "readWorkspaceFile") {
+        return readFile(localFs.realpath(_stringParam(params, "path")), "utf8");
+      }
+      if (method === "writeWorkspaceFile") {
+        const filePath = localFs.realpath(_stringParam(params, "path"));
+        await mkdir(path.dirname(filePath), { recursive: true });
+        await writeFile(filePath, _stringParam(params, "content"), "utf8");
+        return null;
+      }
+      if (method === "executeHostCommand") {
+        return executePluginHostCommand(_stringParam(params, "type"));
+      }
+      throw new Error(`Unsupported plugin host operation: ${method}`);
+    },
+  });
+  pluginManager.threadStorages.registerBuiltin({
+    id: "builtin:github-gist",
+    displayName: "GitHub Gist",
+    description: "Read and write a thread using GitHub Gist.",
+    reader: gistReader,
+    writer: gistWriter,
   });
   const traceManager = new TraceManager({ homePath });
   const streaming = new StreamThreadController(modelManager, analytics);
@@ -105,21 +189,6 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     runtimeRouter,
   });
 
-  let mainWindow: BrowserWindow | null = null;
-  let rpc: MainWindowRPC | null = null;
-  let deepLink: DeepLinkHandler | null = null;
-  const getRpc = (): MainWindowRPC => {
-    if (!rpc) {
-      throw new Error("Main window RPC is not ready.");
-    }
-    return rpc;
-  };
-  const getMainWindow = (): BrowserWindow => {
-    if (!mainWindow) {
-      throw new Error("Main window is not ready.");
-    }
-    return mainWindow;
-  };
   const updater = new UpdaterService((message) =>
     getRpc().send.updateStatusChanged(message)
   );
@@ -132,6 +201,13 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   };
   const executeCommand = (command: Command, window: BrowserWindow): void =>
     executeCommandInBun(command, window, commandDependencies);
+  executePluginHostCommand = (type) => {
+    if (type !== "openSettings" && type !== "refreshTree") {
+      throw new Error(`Plugin host command is not allowed: ${type}`);
+    }
+    executeCommand({ type, args: {} }, getMainWindow());
+    return Promise.resolve(null);
+  };
 
   let stopPromise: Promise<void> | null = null;
   const runtime: DesktopAppRuntime = {
@@ -144,6 +220,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
         ["streaming", () => streaming.shutdown()],
         ["desktop host", () => host.stop()],
         ["MCP manager", () => mcpManager.shutdown()],
+        ["plugin manager", () => pluginManager.shutdown()],
         ["GitHub auth", () => githubAuth.cancelSignIn()],
         ["analytics", () => analytics.shutdown()],
       ]);
@@ -164,6 +241,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       remoteServerManager,
       skillsManager,
       updater,
+      pluginManager,
     });
     remoteServerManager.setStatusListener((payload) =>
       getRpc().send.remoteServerStatusChanged(payload)
@@ -172,7 +250,12 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
 
     // The window + rpc are ready — wire the importer and flush any deep links
     // buffered at process entry during a cold-start launch (see deep-link/launch).
-    deepLink = createDeepLinkHandler({ localFs, githubAuth, getRpc });
+    deepLink = createDeepLinkHandler({
+      localFs,
+      githubAuth,
+      threadStorages: pluginManager.threadStorages,
+      getRpc,
+    });
     setDeepLinkHandler((url) => void deepLink?.handle(url));
 
     analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
@@ -193,6 +276,14 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     await runtime.stop();
     throw error;
   }
+}
+
+function _stringParam(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  if (typeof value !== "string") {
+    throw new Error(`Plugin host parameter must be a string: ${key}`);
+  }
+  return value;
 }
 
 async function _stopDesktopApp(

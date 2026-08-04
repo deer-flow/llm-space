@@ -38,6 +38,7 @@ import {
   RefreshCw,
   Trash2,
   Unplug,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -52,6 +53,7 @@ import { format } from "timeago.js";
 
 import {
   addMcpServer,
+  cancelMcpTest,
   disconnectMcpServer,
   listMcpServers,
   listMcpTools,
@@ -181,12 +183,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [tools, setTools] = useState<McpToolView[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [testingServerId, setTestingServerId] = useState<string | null>(null);
+  const [cancellingTest, setCancellingTest] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const formRef = useRef(form);
   const preserveFormAfterCreateRef = useRef(false);
+  const cancelRequestedRef = useRef(false);
   formRef.current = form;
 
   const selectedServer = useMemo(
@@ -194,6 +198,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     [selectedId, servers]
   );
   const normalizedName = normalizeMcpName(form.name);
+  const testing = selectedServer?.id === testingServerId;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -323,10 +328,12 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     if (!selectedServer) {
       return;
     }
+    const server = selectedServer;
     setFormError(null);
-    setTesting(true);
+    cancelRequestedRef.current = false;
+    setTestingServerId(server.id);
     try {
-      const response = await listMcpTools(selectedServer.id, runtimeId);
+      const response = await listMcpTools(server.id, runtimeId);
       setTools(response.tools);
       setServers((current) =>
         current.map((server) =>
@@ -338,13 +345,39 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
       });
     } catch (error) {
       setTools([]);
+      if (
+        cancelRequestedRef.current ||
+        (error instanceof Error && error.message === "MCP test cancelled.")
+      ) {
+        return;
+      }
       await refresh();
       toast.error("Failed to connect MCP server", {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
-      setTesting(false);
+      cancelRequestedRef.current = false;
+      setTestingServerId((current) => (current === server.id ? null : current));
+    }
+  };
+
+  const cancelTest = async () => {
+    if (!testingServerId) return;
+    cancelRequestedRef.current = true;
+    setCancellingTest(true);
+    try {
+      const next = await cancelMcpTest(testingServerId, runtimeId);
+      setServers(next);
+      setTools([]);
+    } catch (error) {
+      cancelRequestedRef.current = false;
+      toast.error("Failed to cancel MCP test", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setCancellingTest(false);
     }
   };
 
@@ -416,7 +449,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                 <button
                   type="button"
                   aria-label="Add MCP server"
-                  disabled={saving || dirty}
+                  disabled={saving || dirty || testingServerId !== null}
                   className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
                   onClick={createServer}
                 >
@@ -431,7 +464,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                 <button
                   key={server.id}
                   type="button"
-                  disabled={saving || dirty}
+                  disabled={saving || dirty || testingServerId !== null}
                   className={cn(
                     "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
                     selectedId === server.id && "bg-accent"
@@ -476,7 +509,71 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         </aside>
 
         <main className="min-w-0 grow">
-          {creating || selectedId ? (
+          {selectedServer?.readOnly ? (
+            <div className="flex h-full flex-col gap-4 overflow-auto p-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading text-lg font-medium">
+                    {selectedServer.name}
+                  </h3>
+                  <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] uppercase">
+                    Plugin · Read only
+                  </span>
+                </div>
+                <p className="text-muted-foreground mt-1 font-mono text-xs">
+                  {selectedServer.id}
+                </p>
+              </div>
+              <div className="text-sm">
+                <span className="text-muted-foreground">Transport: </span>
+                {selectedServer.transport}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={testing ? "outline" : "secondary"}
+                  onClick={() =>
+                    testing ? void cancelTest() : void testServer()
+                  }
+                  disabled={disconnecting || cancellingTest}
+                >
+                  {testing ? (
+                    cancellingTest ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <X />
+                    )
+                  ) : (
+                    <RefreshCw />
+                  )}
+                  {testing
+                    ? "Cancel"
+                    : selectedServer.connected
+                      ? "Retest"
+                      : "Connect & Test"}
+                </Button>
+                {selectedServer.connected ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void disconnectServer()}
+                    disabled={testing || disconnecting}
+                  >
+                    {disconnecting ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Unplug />
+                    )}
+                    Disconnect
+                  </Button>
+                ) : null}
+              </div>
+              <ReadinessPanel
+                server={selectedServer}
+                liveToolsLoaded={tools.length > 0}
+              />
+            </div>
+          ) : creating || selectedId ? (
             <ServerEditor
               form={form}
               normalizedName={normalizedName}
@@ -485,6 +582,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               saving={saving}
               dirty={dirty}
               testing={testing}
+              cancellingTest={cancellingTest}
               disconnecting={disconnecting}
               creating={creating}
               tools={tools}
@@ -494,6 +592,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                 setDirty(true);
               }}
               onTest={() => void testServer()}
+              onCancelTest={() => void cancelTest()}
               onDisconnect={() => void disconnectServer()}
               onCancel={cancelCreate}
               onRemove={() => setRemoveOpen(true)}
@@ -530,11 +629,13 @@ function ServerEditor({
   saving,
   dirty,
   testing,
+  cancellingTest,
   disconnecting,
   creating,
   tools,
   onFormChange,
   onTest,
+  onCancelTest,
   onDisconnect,
   onCancel,
   onRemove,
@@ -546,11 +647,13 @@ function ServerEditor({
   saving: boolean;
   dirty: boolean;
   testing: boolean;
+  cancellingTest: boolean;
   disconnecting: boolean;
   creating: boolean;
   tools: McpToolView[];
   onFormChange: (form: ServerForm) => void;
   onTest: () => void;
+  onCancelTest: () => void;
   onDisconnect: () => void;
   onCancel: () => void;
   onRemove: () => void;
@@ -574,7 +677,6 @@ function ServerEditor({
       : server?.readiness?.testedAt
         ? `Last test ${format(server.readiness.testedAt)}`
         : null;
-
   return (
     <ScrollArea className="h-full">
       <div className="flex max-w-2xl flex-col gap-6 pb-6">
@@ -601,27 +703,28 @@ function ServerEditor({
               Cancel
             </Button>
           ) : null}
-          <span className="text-muted-foreground shrink-0 text-xs">
-            {saving
-              ? "Saving…"
-              : dirty
-                ? creating && !_canCreateServer(form)
-                  ? "Complete required fields to create"
-                  : "Waiting to save…"
-                : server
-                  ? "Saved automatically"
-                  : "Not saved yet"}
-          </span>
           {server ? (
             <>
               <Button
                 size="sm"
-                variant="secondary"
-                onClick={onTest}
-                disabled={testing || disconnecting || saving || dirty}
+                variant={testing ? "outline" : "secondary"}
+                onClick={testing ? onCancelTest : onTest}
+                disabled={disconnecting || saving || dirty || cancellingTest}
               >
-                {testing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                {server.connected ? "Retest" : "Connect & Test"}
+                {testing ? (
+                  cancellingTest ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <X />
+                  )
+                ) : (
+                  <RefreshCw />
+                )}
+                {testing
+                  ? "Cancel"
+                  : server.connected
+                    ? "Retest"
+                    : "Connect & Test"}
               </Button>
               {server.connected ? (
                 <Button

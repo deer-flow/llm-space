@@ -8,8 +8,12 @@ import {
   CommandItem,
   CommandList,
 } from "@llm-space/ui/ui/command";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
+import { executePluginCommand, listPluginCommands } from "@/client/plugins";
 import { useCommands } from "@/commands";
+import { electrobun } from "@/lib/electrobun";
 import {
   COMMAND_META,
   type Command as AppCommand,
@@ -26,12 +30,34 @@ export function CommandPalette({
   open,
   onOpenChange,
   blacklist = [],
+  onSaveTo,
+  onImportFrom,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   blacklist?: string[];
+  onSaveTo?: () => void;
+  onImportFrom?: () => void;
 }) {
   const { executeCommand } = useCommands();
+  const [pluginCommands, setPluginCommands] = useState<
+    Awaited<ReturnType<typeof listPluginCommands>>
+  >([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const refresh = () => {
+      void listPluginCommands()
+        .then(setPluginCommands)
+        .catch((error) =>
+          toast.error(error instanceof Error ? error.message : String(error))
+        );
+    };
+    refresh();
+    const rpc = electrobun.rpc;
+    rpc?.addMessageListener("pluginsChanged", refresh);
+    return () => rpc?.removeMessageListener("pluginsChanged", refresh);
+  }, [open]);
 
   const types = (Object.keys(COMMAND_META) as CommandType[]).filter(
     (type) => !blacklist.includes(type)
@@ -53,6 +79,44 @@ export function CommandPalette({
           {types.map((type) => (
             <CommandItem key={type} onSelect={() => run(type)}>
               {COMMAND_META[type].label}
+            </CommandItem>
+          ))}
+          {onSaveTo ? (
+            <CommandItem
+              value="Save to Thread Storage"
+              onSelect={() => {
+                onOpenChange(false);
+                onSaveTo();
+              }}
+            >
+              Save to…
+            </CommandItem>
+          ) : null}
+          {onImportFrom ? (
+            <CommandItem
+              value="Import from Thread Storage"
+              onSelect={() => {
+                onOpenChange(false);
+                onImportFrom();
+              }}
+            >
+              Import from…
+            </CommandItem>
+          ) : null}
+          {pluginCommands.map((command) => (
+            <CommandItem
+              key={command.id}
+              value={`${command.displayName} ${command.description ?? ""}`}
+              onSelect={() => {
+                onOpenChange(false);
+                void executePluginCommand(command.id).catch((error) =>
+                  toast.error(
+                    error instanceof Error ? error.message : String(error)
+                  )
+                );
+              }}
+            >
+              {command.displayName}
             </CommandItem>
           ))}
         </CommandList>

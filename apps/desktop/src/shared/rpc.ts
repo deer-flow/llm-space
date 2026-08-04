@@ -11,6 +11,12 @@ import type {
   SearchSettings,
   SystemProxyDetection,
   Thread,
+  ThreadLocator,
+  ThreadStorageView,
+  PluginCommandView,
+  PluginView,
+  JsonObject,
+  JsonValue,
 } from "@llm-space/core";
 import type {
   McpCallToolResponse,
@@ -248,6 +254,50 @@ export interface DesktopRPCType {
         params: RuntimeScopedParams & { path: string; thread: Thread };
         response: null;
       };
+      pluginsList: {
+        params: Record<string, never>;
+        response: PluginView[];
+      };
+      pluginsRefresh: {
+        params: Record<string, never>;
+        response: PluginView[];
+      };
+      pluginsReload: {
+        params: { pluginId: string };
+        response: PluginView[];
+      };
+      pluginsSetEnabled: {
+        params: { pluginId: string; enabled: boolean };
+        response: PluginView[];
+      };
+      pluginsSetSettings: {
+        params: { pluginId: string; settings: JsonObject };
+        response: PluginView[];
+      };
+      pluginCommandsList: {
+        params: Record<string, never>;
+        response: PluginCommandView[];
+      };
+      pluginCommandExecute: {
+        params: { commandId: string };
+        response: JsonValue;
+      };
+      threadStoragesList: {
+        params: Record<string, never>;
+        response: ThreadStorageView[];
+      };
+      threadStorageResolveLatest: {
+        params: { storageId: string; resourceId: string };
+        response: ThreadLocator;
+      };
+      threadStorageRead: {
+        params: { storageId: string; locator: ThreadLocator };
+        response: Thread;
+      };
+      threadStorageWrite: {
+        params: { storageId: string; thread: Thread; resourceId?: string };
+        response: ThreadLocator;
+      };
       // Publish a workspace thread as a shareable link: read the thread from
       // disk, create a secret GitHub Gist (requires GitHub sign-in), and return
       // the web viewer URL + gist id. `title`/`description` override the shared
@@ -315,9 +365,7 @@ export interface DesktopRPCType {
       // `uv` runs. The wizard's "Next" gate on the directory step.
       generatorPrepareDirectory: {
         params: { parentDir: string; projectName: string };
-        response:
-          | { ok: true; dir: string }
-          | { ok: false; error: string };
+        response: { ok: true; dir: string } | { ok: false; error: string };
       };
       // Whether `uv` is installed on the host (+ version), so the renderer can
       // prompt to install it or fall back to instructions in PLAN.md.
@@ -352,7 +400,10 @@ export interface DesktopRPCType {
       // provider API key plus the raw values of named environment variables. Used
       // only after explicit user opt-in to materialize secrets to disk.
       generatorResolveEnv: {
-        params: RuntimeScopedParams & { providerId: string; envNames: string[] };
+        params: RuntimeScopedParams & {
+          providerId: string;
+          envNames: string[];
+        };
         response: { modelApiKey: string; envValues: Record<string, string> };
       };
       mcpListServers: {
@@ -375,6 +426,10 @@ export interface DesktopRPCType {
         response: McpServerView[];
       };
       mcpDisconnectServer: {
+        params: RuntimeScopedParams & { serverId: string };
+        response: McpServerView[];
+      };
+      mcpCancelTest: {
         params: RuntimeScopedParams & { serverId: string };
         response: McpServerView[];
       };
@@ -496,7 +551,10 @@ export interface DesktopRPCType {
       };
       // Import renderer-read Langfuse JSON files into one trace project.
       traceImportLangfuseJson: {
-        params: RuntimeScopedParams & { projectId: string; files: TraceImportFile[] };
+        params: RuntimeScopedParams & {
+          projectId: string;
+          files: TraceImportFile[];
+        };
         response: TraceImportResult;
       };
       // Search a bounded remote Langfuse trace list for explicit user sync.
@@ -615,6 +673,7 @@ export interface DesktopRPCType {
       sharedImportStatusChanged: SharedImportStatusPayload;
       // Remote SSH connection progress and status updates from the bun side.
       remoteServerStatusChanged: RemoteServerStatusChangedPayload;
+      pluginsChanged: Record<string, never>;
     };
   }>;
 }

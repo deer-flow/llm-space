@@ -58,6 +58,7 @@ function createRuntime(): RuntimeClient {
     mcpUpdateServer: () => Promise.resolve([]),
     mcpRemoveServer: () => Promise.resolve([]),
     mcpDisconnectServer: () => Promise.resolve([]),
+    mcpCancelTest: () => Promise.resolve([]),
     mcpListTools: () =>
       Promise.resolve({
         server: {

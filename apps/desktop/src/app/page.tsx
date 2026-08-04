@@ -1,3 +1,4 @@
+import type { Thread } from "@llm-space/core";
 import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
 import { useModels } from "@llm-space/ui/components/model-provider";
 import {
@@ -107,6 +108,11 @@ const OnboardDialog = lazy(() =>
 const StartFromExampleDialog = lazy(() =>
   import("@/components/start-from-example-dialog").then((m) => ({
     default: m.StartFromExampleDialog,
+  }))
+);
+const ThreadStorageDialog = lazy(() =>
+  import("@/components/thread-storage-dialog").then((m) => ({
+    default: m.ThreadStorageDialog,
   }))
 );
 const LazyTracePanel = lazy(() =>
@@ -362,20 +368,12 @@ function PageWorkspace({
   }, [showRuntimeRunBlocked]);
   const handlePaneRunStart = useCallback(
     (paneId: string, runtimeId: RuntimeId, runId: string, path?: string) =>
-      runtimeRunTrackerRef.current.beginRun(
-        paneId,
-        runtimeId,
-        runId,
-        path
-      ),
+      runtimeRunTrackerRef.current.beginRun(paneId, runtimeId, runId, path),
     []
   );
-  const handlePaneRunSettled = useCallback(
-    (paneId: string, runId: string) => {
-      runtimeRunTrackerRef.current.settleRun(paneId, runId);
-    },
-    []
-  );
+  const handlePaneRunSettled = useCallback((paneId: string, runId: string) => {
+    runtimeRunTrackerRef.current.settleRun(paneId, runId);
+  }, []);
   const handlePanePersistenceChange = useCallback(
     (
       paneId: string,
@@ -396,11 +394,7 @@ function PageWorkspace({
   );
   const isPaneMutationReserved = useCallback(
     (paneId: string, runtimeId: RuntimeId, path?: string) =>
-      runtimeRunTrackerRef.current.isMutationReserved(
-        paneId,
-        runtimeId,
-        path
-      ),
+      runtimeRunTrackerRef.current.isMutationReserved(paneId, runtimeId, path),
     []
   );
   const acquireFileMutation = useCallback(
@@ -414,15 +408,12 @@ function PageWorkspace({
       }),
     [showRuntimeRunBlocked]
   );
-  const acquireRemoteConnectionMutation = useCallback(
-    () => {
-      const release = runtimeRunTrackerRef.current.reserveAll();
-      if (release) return release;
-      showRuntimeRunBlocked("changing remote connections");
-      return null;
-    },
-    [showRuntimeRunBlocked]
-  );
+  const acquireRemoteConnectionMutation = useCallback(() => {
+    const release = runtimeRunTrackerRef.current.reserveAll();
+    if (release) return release;
+    showRuntimeRunBlocked("changing remote connections");
+    return null;
+  }, [showRuntimeRunBlocked]);
   const acquireRuntimeDisconnectMutation = useCallback(
     (runtimeId: RuntimeId) => {
       const release = runtimeRunTrackerRef.current.reserveRuntime(runtimeId);
@@ -460,6 +451,9 @@ function PageWorkspace({
     if (settingsOpen) track({ event: "settings_opened", properties: {} });
   }, [settingsOpen]);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [threadStorageMode, setThreadStorageMode] = useState<
+    "save" | "import" | null
+  >(null);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<"files" | "traces">("files");
@@ -535,11 +529,7 @@ function PageWorkspace({
         }
       });
     },
-    [
-      discardRuntimeWorkspace,
-      transitionWorkspaceRuntime,
-      workspaceRuntimeIdRef,
-    ]
+    [discardRuntimeWorkspace, transitionWorkspaceRuntime, workspaceRuntimeIdRef]
   );
 
   useEffect(() => {
@@ -603,6 +593,38 @@ function PageWorkspace({
       );
     },
     [models, executeCommand, openTab, workspaceRuntimeIdRef]
+  );
+  const getActiveThreadForStorage =
+    useCallback(async (): Promise<Thread | null> => {
+      const target = getActiveShareThread();
+      if (!target) return null;
+      return createFileSystemClient(target.runtimeId).read(target.path);
+    }, [getActiveShareThread]);
+  const importFromThreadStorage = useCallback(
+    async (thread: Thread) => {
+      const runtimeId: RuntimeId = "local";
+      if (
+        workspaceRuntimeIdRef.current !== runtimeId &&
+        !switchWorkspaceRuntime(runtimeId)
+      ) {
+        throw new Error(
+          "Finish active remote runs before importing into the local workspace."
+        );
+      }
+      const fs = createFileSystemClient(runtimeId);
+      await fs.mkdir("imported").catch(() => undefined);
+      await handleImportFiles(
+        [
+          {
+            name: `${thread.title?.trim() || "imported-thread"}.json`,
+            text: JSON.stringify(thread),
+          },
+        ],
+        "imported",
+        runtimeId
+      );
+    },
+    [handleImportFiles, switchWorkspaceRuntime, workspaceRuntimeIdRef]
   );
 
   // Register the command handlers backed by page-level state (tabs, sidebar,
@@ -1014,6 +1036,19 @@ function PageWorkspace({
           open={commandPaletteOpen}
           onOpenChange={setCommandPaletteOpen}
           blacklist={COMMAND_PALETTE_BLACKLIST}
+          onSaveTo={() => setThreadStorageMode("save")}
+          onImportFrom={() => setThreadStorageMode("import")}
+        />
+      </LazyMount>
+      <LazyMount open={threadStorageMode !== null}>
+        <ThreadStorageDialog
+          mode={threadStorageMode ?? "save"}
+          open={threadStorageMode !== null}
+          onOpenChange={(open) => {
+            if (!open) setThreadStorageMode(null);
+          }}
+          getThread={getActiveThreadForStorage}
+          onImported={importFromThreadStorage}
         />
       </LazyMount>
       <LazyMount open={onboardOpen}>

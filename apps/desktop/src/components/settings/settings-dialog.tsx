@@ -14,6 +14,7 @@ import {
   CircleUser,
   FlaskConical,
   Network,
+  Puzzle,
   Server,
   Search,
   SlidersHorizontal,
@@ -32,6 +33,7 @@ import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
 import { ModelsPage } from "./models-page";
 import { NetworkPage } from "./network-page";
+import { PluginsPage } from "./plugins-page";
 import { RemoteServersPage } from "./remote-servers-page";
 import { SearchPage } from "./search-page";
 import { SkillsPage } from "./skills-page";
@@ -119,6 +121,12 @@ const PAGES = [
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <SkillsPage runtimeId={runtimeId} />
     ),
+  },
+  {
+    value: "plugins",
+    label: "Plugins",
+    icon: Puzzle,
+    Page: () => <PluginsPage />,
   },
   {
     value: "experimental",

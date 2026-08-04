@@ -114,10 +114,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
   resolveGeneratorEnv(
     input: Parameters<RuntimeClient["resolveGeneratorEnv"]>[0]
   ) {
-    return this._rpc<{ modelApiKey: string; envValues: Record<string, string> }>(
-      "models.resolveGeneratorEnv",
-      input
-    );
+    return this._rpc<{
+      modelApiKey: string;
+      envValues: Record<string, string>;
+    }>("models.resolveGeneratorEnv", input);
   }
 
   fsLs(path: string) {
@@ -321,6 +321,9 @@ export class RemoteRuntimeClient implements RuntimeClient {
   mcpDisconnectServer(serverId: string) {
     return this._rpc<McpServerView[]>("mcp.disconnectServer", { serverId });
   }
+  mcpCancelTest(serverId: string) {
+    return this._rpc<McpServerView[]>("mcp.cancelTest", { serverId });
+  }
   mcpListTools(serverId: string) {
     return this._rpc<McpServerToolsResponse>("mcp.listTools", { serverId });
   }
@@ -415,7 +418,11 @@ export class RemoteRuntimeClient implements RuntimeClient {
       title,
     });
   }
-  async traceWriteWorkbench(projectId: string, traceKey: string, thread: Thread) {
+  async traceWriteWorkbench(
+    projectId: string,
+    traceKey: string,
+    thread: Thread
+  ) {
     await this._rpc<null>("trace.writeWorkbench", {
       projectId,
       traceKey,

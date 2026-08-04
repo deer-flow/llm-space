@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentStreamRequest } from "@llm-space/core";
+import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
 import type { RuntimeCapability } from "@llm-space/runtime/runtime";
 
 import { RemoteRuntimeClient } from "./remote-runtime-client";
@@ -21,7 +22,7 @@ const CAPABILITIES: RuntimeCapability[] = [
 const HEALTH_BODY = {
   ok: true,
   version: currentDesktopVersion(),
-  protocolVersion: 2,
+  protocolVersion: REMOTE_RUNTIME_PROTOCOL_VERSION,
   capabilities: CAPABILITIES,
   homePath: "/tmp/remote",
   workspacePath: "/tmp/remote/workspace",
@@ -172,6 +173,7 @@ describe("RemoteRuntimeClient", () => {
         await client.fsRm("c");
         await client.builtInCallTool({ name: "ls", arguments: {} });
         await client.mcpListTools("server-1");
+        await client.mcpCancelTest("server-1");
         await client.mcpCallTool({
           serverId: "server-1",
           toolName: "tool",
@@ -192,6 +194,7 @@ describe("RemoteRuntimeClient", () => {
       "fs.rm",
       "builtinTools.call",
       "mcp.listTools",
+      "mcp.cancelTest",
       "mcp.callTool",
       "search.set",
     ]);
@@ -220,9 +223,7 @@ describe("RemoteRuntimeClient", () => {
           token: "secret",
         });
 
-        expect(await client.readTextFile("~/prompt.md")).toBe(
-          "REMOTE CONTENT"
-        );
+        expect(await client.readTextFile("~/prompt.md")).toBe("REMOTE CONTENT");
         expect(await client.textFileExists("/remote-only.md")).toBe(true);
       }
     );

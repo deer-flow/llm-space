@@ -150,6 +150,8 @@ async function _dispatch(
       return runtime.mcpRemoveServer(_stringParam(params, "serverId"));
     case "mcp.disconnectServer":
       return runtime.mcpDisconnectServer(_stringParam(params, "serverId"));
+    case "mcp.cancelTest":
+      return runtime.mcpCancelTest(_stringParam(params, "serverId"));
     case "mcp.listTools":
       return runtime.mcpListTools(_stringParam(params, "serverId"));
     case "mcp.callTool":
@@ -216,9 +218,11 @@ async function _dispatch(
     case "trace.importLangfuseJson":
       return runtime.traceImportLangfuseJson(
         _stringParam(params, "projectId"),
-        (params as unknown as {
-          files: Parameters<RuntimeClient["traceImportLangfuseJson"]>[1];
-        }).files
+        (
+          params as unknown as {
+            files: Parameters<RuntimeClient["traceImportLangfuseJson"]>[1];
+          }
+        ).files
       );
     case "trace.searchLangfuseTraces":
       return runtime.traceSearchLangfuseTraces(

@@ -62,6 +62,16 @@ export async function disconnectMcpServer(
   });
 }
 
+export async function cancelMcpTest(
+  serverId: string,
+  runtimeId?: RuntimeId
+): Promise<McpServerView[]> {
+  return _rpc().request.mcpCancelTest({
+    ...runtimeScope(runtimeId),
+    serverId,
+  });
+}
+
 export async function listMcpTools(
   serverId: string,
   runtimeId?: RuntimeId

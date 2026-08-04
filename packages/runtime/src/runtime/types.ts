@@ -151,6 +151,7 @@ export interface RuntimeClient {
   ): Promise<McpServerView[]>;
   mcpRemoveServer(serverId: string): Promise<McpServerView[]>;
   mcpDisconnectServer(serverId: string): Promise<McpServerView[]>;
+  mcpCancelTest(serverId: string): Promise<McpServerView[]>;
   mcpListTools(serverId: string): Promise<McpServerToolsResponse>;
   mcpCallTool(input: {
     serverId: string;
@@ -203,7 +204,10 @@ export interface RuntimeClient {
     projectId: string;
     traceIds: string[];
   }): MaybePromise<TraceSyncResult>;
-  traceReadTrace(projectId: string, traceKey: string): MaybePromise<TraceRecord>;
+  traceReadTrace(
+    projectId: string,
+    traceKey: string
+  ): MaybePromise<TraceRecord>;
   traceReadOrCreateWorkbench(
     projectId: string,
     traceKey: string
