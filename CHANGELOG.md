@@ -4,6 +4,17 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.1] - 2026-08-04
+
+This release adds provider-hosted tools and makes MCP tool naming configurable.
+
+### Added
+
+- Configure provider-hosted tools, including provider-native search, and show
+  their activity and citations in the thread.
+- Optionally expose MCP tools with their original names instead of the
+  `mcp__{serverName}__` prefix.
+
 ## [4.7.0] - 2026-08-03
 
 Remote runtimes get a thorough correctness pass — every thread operation now
