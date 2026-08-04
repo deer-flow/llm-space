@@ -120,6 +120,7 @@ const serverConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   serverName: z.string(),
+  useOriginalToolNames: z.boolean().optional(),
   transport: z.union([
     z.literal("stdio"),
     z.literal("streamableHttp"),
@@ -206,7 +207,11 @@ export class McpManager {
           ? {
               ...server,
               readiness: current.readiness
-                ? _markReadinessStale(current.readiness, server.serverName)
+                ? _markReadinessStale(
+                    current.readiness,
+                    server.serverName,
+                    server.useOriginalToolNames
+                  )
                 : undefined,
             }
           : item
@@ -570,6 +575,7 @@ export class McpManager {
         directName: buildMcpToolName({
           serverName: server.serverName,
           toolName: normalizedToolName,
+          useOriginalToolNames: server.useOriginalToolNames,
         }),
         description: tool.description ?? "",
         inputSchema: tool.inputSchema,
@@ -643,6 +649,7 @@ export class McpManager {
         ...metadata,
         name,
         serverName,
+        useOriginalToolNames: draft.useOriginalToolNames === true,
         transport: "stdio",
         command,
         args: (draft.args ?? []).map((arg) => arg.trim()).filter(Boolean),
@@ -664,6 +671,7 @@ export class McpManager {
       ...metadata,
       name,
       serverName,
+      useOriginalToolNames: draft.useOriginalToolNames === true,
       transport: draft.transport,
       url,
       headers: _cleanRecord(draft.headers),
@@ -1271,7 +1279,8 @@ function _normalizeDiagnostic(
 
 function _markReadinessStale(
   readiness: McpServerReadiness,
-  serverName: string
+  serverName: string,
+  useOriginalToolNames = false
 ): McpServerReadiness {
   return {
     ...readiness,
@@ -1283,6 +1292,7 @@ function _markReadinessStale(
       directName: buildMcpToolName({
         serverName,
         toolName: tool.normalizedToolName,
+        useOriginalToolNames,
       }),
     })),
   };

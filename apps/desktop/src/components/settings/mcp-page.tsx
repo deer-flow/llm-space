@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  buildMcpToolName,
   getMcpReadinessLabel,
   normalizeMcpName,
   type McpDiagnosticStep,
@@ -24,12 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@llm-space/ui/ui/select";
+import { Switch } from "@llm-space/ui/ui/switch";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
-  Check,
   CircleAlert,
   CircleDot,
   Copy,
+  Eye,
+  EyeOff,
   Loader2,
   Plus,
   RefreshCw,
@@ -40,6 +43,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -59,12 +63,14 @@ import type { RuntimeId } from "@/shared/runtime";
 import { SettingsPage } from "./settings-page";
 
 interface Row {
+  id: string;
   key: string;
   value: string;
 }
 
 interface ServerForm {
   name: string;
+  useOriginalToolNames: boolean;
   transport: McpTransportType;
   command: string;
   argsText: string;
@@ -76,6 +82,7 @@ interface ServerForm {
 
 const EMPTY_FORM: ServerForm = {
   name: "",
+  useOriginalToolNames: false,
   transport: "stdio",
   command: "",
   argsText: "",
@@ -91,6 +98,7 @@ function _formFromServer(server: McpServerView | null): ServerForm {
   }
   return {
     name: server.name,
+    useOriginalToolNames: server.useOriginalToolNames ?? false,
     transport: server.transport,
     command: server.command ?? "",
     argsText: (server.args ?? []).join("\n"),
@@ -105,6 +113,7 @@ function _draftFromForm(form: ServerForm): McpServerDraft {
   if (form.transport === "stdio") {
     return {
       name: form.name,
+      useOriginalToolNames: form.useOriginalToolNames,
       transport: "stdio",
       command: form.command,
       args: form.argsText
@@ -117,6 +126,7 @@ function _draftFromForm(form: ServerForm): McpServerDraft {
   }
   return {
     name: form.name,
+    useOriginalToolNames: form.useOriginalToolNames,
     transport: form.transport,
     url: form.url,
     headers: _recordFromRows(form.headers),
@@ -124,7 +134,13 @@ function _draftFromForm(form: ServerForm): McpServerDraft {
 }
 
 function _rowsFromRecord(record: Record<string, string> | undefined): Row[] {
-  return Object.entries(record ?? {}).map(([key, value]) => ({ key, value }));
+  return Object.entries(record ?? {}).map(([key, value]) =>
+    _createRow(key, value)
+  );
+}
+
+function _createRow(key = "", value = ""): Row {
+  return { id: crypto.randomUUID(), key, value };
 }
 
 function _recordFromRows(rows: Row[]): Record<string, string> | undefined {
@@ -136,6 +152,21 @@ function _recordFromRows(rows: Row[]): Record<string, string> | undefined {
     }
   }
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function _canCreateServer(form: ServerForm): boolean {
+  if (!normalizeMcpName(form.name)) {
+    return false;
+  }
+  if (form.transport === "stdio") {
+    return form.command.trim().length > 0;
+  }
+  try {
+    new URL(form.url);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
@@ -153,6 +184,10 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [testing, setTesting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const formRef = useRef(form);
+  const preserveFormAfterCreateRef = useRef(false);
+  formRef.current = form;
 
   const selectedServer = useMemo(
     () => servers.find((server) => server.id === selectedId) ?? null,
@@ -190,7 +225,12 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
 
   useEffect(() => {
     if (!creating) {
-      setForm(_formFromServer(selectedServer));
+      if (preserveFormAfterCreateRef.current) {
+        preserveFormAfterCreateRef.current = false;
+      } else {
+        setForm(_formFromServer(selectedServer));
+        setDirty(false);
+      }
       setTools([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when the selected server's id changes, not on every object update (would clobber in-progress edits)
@@ -202,12 +242,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     setSelectedId(null);
     setFormError(null);
     setForm({ ...EMPTY_FORM });
+    setDirty(false);
     setTools([]);
   };
 
   const cancelCreate = () => {
     setCreating(false);
     setFormError(null);
+    setDirty(false);
     setTools([]);
     setSelectedId(
       selectedIdBeforeCreate &&
@@ -218,36 +260,64 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     setSelectedIdBeforeCreate(null);
   };
 
-  const save = async () => {
-    setFormError(null);
-    setSaving(true);
-    try {
-      const draft = _draftFromForm(form);
-      const next =
-        creating || !selectedId
-          ? await addMcpServer(draft, runtimeId)
-          : await updateMcpServer(selectedId, draft, runtimeId);
-      setServers(next);
-      const saved =
-        creating || !selectedId
-          ? [...next]
-              .reverse()
-              .find(
-                (server) => server.serverName === normalizeMcpName(form.name)
-              )
-          : next.find((server) => server.id === selectedId);
-      setCreating(false);
-      setSelectedIdBeforeCreate(null);
-      setSelectedId(saved?.id ?? next[0]?.id ?? null);
-      toast.success("MCP server saved");
-    } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : "Please try again."
-      );
-    } finally {
-      setSaving(false);
+  const save = useCallback(
+    async (
+      snapshot: ServerForm,
+      targetId: string | null,
+      isCreating: boolean
+    ) => {
+      setFormError(null);
+      setSaving(true);
+      try {
+        const draft = _draftFromForm(snapshot);
+        const next =
+          isCreating || !targetId
+            ? await addMcpServer(draft, runtimeId)
+            : await updateMcpServer(targetId, draft, runtimeId);
+        setServers(next);
+        const saved =
+          isCreating || !targetId
+            ? [...next]
+                .reverse()
+                .find(
+                  (server) =>
+                    server.serverName === normalizeMcpName(snapshot.name)
+                )
+            : next.find((server) => server.id === targetId);
+        const hasNewerChanges = formRef.current !== snapshot;
+        preserveFormAfterCreateRef.current = isCreating && hasNewerChanges;
+        setCreating(false);
+        setSelectedIdBeforeCreate(null);
+        setSelectedId(saved?.id ?? next[0]?.id ?? null);
+        if (!hasNewerChanges) {
+          setDirty(false);
+        }
+      } catch (error) {
+        setFormError(
+          error instanceof Error ? error.message : "Please try again."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [runtimeId]
+  );
+
+  useEffect(() => {
+    if (
+      !dirty ||
+      saving ||
+      formError !== null ||
+      (creating && !_canCreateServer(form)) ||
+      (!creating && !selectedId)
+    ) {
+      return;
     }
-  };
+    const timeout = window.setTimeout(() => {
+      void save(form, selectedId, creating);
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [creating, dirty, form, formError, save, saving, selectedId]);
 
   const testServer = async () => {
     if (!selectedServer) {
@@ -346,7 +416,8 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                 <button
                   type="button"
                   aria-label="Add MCP server"
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+                  disabled={saving || dirty}
+                  className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
                   onClick={createServer}
                 >
                   <Plus className="size-4" />
@@ -360,8 +431,9 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                 <button
                   key={server.id}
                   type="button"
+                  disabled={saving || dirty}
                   className={cn(
-                    "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors",
+                    "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
                     selectedId === server.id && "bg-accent"
                   )}
                   onClick={() => {
@@ -411,6 +483,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               server={selectedServer}
               formError={formError}
               saving={saving}
+              dirty={dirty}
               testing={testing}
               disconnecting={disconnecting}
               creating={creating}
@@ -418,8 +491,8 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               onFormChange={(nextForm) => {
                 setFormError(null);
                 setForm(nextForm);
+                setDirty(true);
               }}
-              onSave={() => void save()}
               onTest={() => void testServer()}
               onDisconnect={() => void disconnectServer()}
               onCancel={cancelCreate}
@@ -455,12 +528,12 @@ function ServerEditor({
   server,
   formError,
   saving,
+  dirty,
   testing,
   disconnecting,
   creating,
   tools,
   onFormChange,
-  onSave,
   onTest,
   onDisconnect,
   onCancel,
@@ -471,12 +544,12 @@ function ServerEditor({
   server: McpServerView | null;
   formError: string | null;
   saving: boolean;
+  dirty: boolean;
   testing: boolean;
   disconnecting: boolean;
   creating: boolean;
   tools: McpToolView[];
   onFormChange: (form: ServerForm) => void;
-  onSave: () => void;
   onTest: () => void;
   onDisconnect: () => void;
   onCancel: () => void;
@@ -484,8 +557,17 @@ function ServerEditor({
 }) {
   const patch = (partial: Partial<ServerForm>) =>
     onFormChange({ ...form, ...partial });
-  const toolItems: McpToolSummary[] =
+  const savedToolItems: McpToolSummary[] =
     tools.length > 0 ? tools : (server?.readiness?.tools ?? []);
+  const previewServerName = normalizedName || server?.serverName || "server";
+  const toolItems = savedToolItems.map((tool) => ({
+    ...tool,
+    directName: buildMcpToolName({
+      serverName: previewServerName,
+      toolName: tool.normalizedToolName,
+      useOriginalToolNames: form.useOriginalToolNames,
+    }),
+  }));
   const toolsLabel =
     tools.length > 0
       ? "Current test"
@@ -502,9 +584,11 @@ function ServerEditor({
               {form.name || "MCP Server"}
             </h3>
             <div className="text-muted-foreground font-mono text-xs">
-              {normalizedName
-                ? `mcp__${normalizedName}__tool`
-                : "mcp__server__tool"}
+              {form.useOriginalToolNames
+                ? "tool"
+                : normalizedName
+                  ? `mcp__${normalizedName}__tool`
+                  : "mcp__server__tool"}
             </div>
           </div>
           {creating ? (
@@ -517,17 +601,24 @@ function ServerEditor({
               Cancel
             </Button>
           ) : null}
-          <Button size="sm" onClick={onSave} disabled={saving}>
-            {saving ? <Loader2 className="animate-spin" /> : <Check />}
-            Save
-          </Button>
+          <span className="text-muted-foreground shrink-0 text-xs">
+            {saving
+              ? "Saving…"
+              : dirty
+                ? creating && !_canCreateServer(form)
+                  ? "Complete required fields to create"
+                  : "Waiting to save…"
+                : server
+                  ? "Saved automatically"
+                  : "Not saved yet"}
+          </span>
           {server ? (
             <>
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={onTest}
-                disabled={testing || disconnecting}
+                disabled={testing || disconnecting || saving || dirty}
               >
                 {testing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
                 {server.connected ? "Retest" : "Connect & Test"}
@@ -580,6 +671,22 @@ function ServerEditor({
           />
         </Field>
 
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-sm font-medium">Use original tool names</span>
+            <span className="text-muted-foreground text-xs">
+              Expose tools without the MCP server prefix, for example web_fetch.
+            </span>
+          </div>
+          <Switch
+            checked={form.useOriginalToolNames}
+            aria-label="Use original MCP tool names without a prefix"
+            onCheckedChange={(useOriginalToolNames) =>
+              patch({ useOriginalToolNames })
+            }
+          />
+        </div>
+
         <Field label="Transport">
           <Select
             value={form.transport}
@@ -628,6 +735,7 @@ function ServerEditor({
               label="Environment"
               rows={form.env}
               valueType="password"
+              revealValue
               namePlaceholder="KEY"
               valuePlaceholder="$TOKEN"
               onChange={(env) => patch({ env })}
@@ -879,6 +987,7 @@ function KeyValueRows({
   label,
   rows,
   valueType = "text",
+  revealValue = false,
   namePlaceholder,
   valuePlaceholder,
   onChange,
@@ -886,6 +995,7 @@ function KeyValueRows({
   label: string;
   rows: Row[];
   valueType?: "text" | "password";
+  revealValue?: boolean;
   namePlaceholder: string;
   valuePlaceholder: string;
   onChange: (rows: Row[]) => void;
@@ -899,7 +1009,7 @@ function KeyValueRows({
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium">{label}</span>
       {rows.map((row, index) => (
-        <div key={index} className="flex items-center gap-2">
+        <div key={row.id} className="flex items-center gap-2">
           <Input
             value={row.key}
             placeholder={namePlaceholder}
@@ -908,14 +1018,13 @@ function KeyValueRows({
               setRow(index, { ...row, key: event.target.value })
             }
           />
-          <Input
+          <SecretValueInput
             type={valueType}
+            revealable={revealValue}
             value={row.value}
             placeholder={valuePlaceholder}
             aria-label={`${label} ${index + 1} value`}
-            onChange={(event) =>
-              setRow(index, { ...row, value: event.target.value })
-            }
+            onChange={(value) => setRow(index, { ...row, value })}
           />
           <Tooltip content={`Remove ${label.toLowerCase()} row`}>
             <button
@@ -934,10 +1043,57 @@ function KeyValueRows({
         variant="ghost"
         size="sm"
         className="self-start"
-        onClick={() => onChange([...rows, { key: "", value: "" }])}
+        onClick={() => onChange([...rows, _createRow()])}
       >
         <Plus /> Add {label.toLowerCase()}
       </Button>
+    </div>
+  );
+}
+
+function SecretValueInput({
+  type,
+  revealable,
+  value,
+  placeholder,
+  "aria-label": ariaLabel,
+  onChange,
+}: {
+  type: "text" | "password";
+  revealable: boolean;
+  value: string;
+  placeholder: string;
+  "aria-label": string;
+  onChange: (value: string) => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative w-full">
+      <Input
+        type={revealable && visible ? "text" : type}
+        value={value}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className={revealable ? "pr-9" : undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {revealable ? (
+        <Tooltip content={visible ? "Hide value" : "Show value"}>
+          <button
+            type="button"
+            aria-label={`${visible ? "Hide" : "Show"} ${ariaLabel}`}
+            aria-pressed={visible}
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded transition-colors"
+            onClick={() => setVisible((current) => !current)}
+          >
+            {visible ? (
+              <EyeOff className="size-4" />
+            ) : (
+              <Eye className="size-4" />
+            )}
+          </button>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }
