@@ -199,6 +199,8 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   );
   const normalizedName = normalizeMcpName(form.name);
   const testing = selectedServer?.id === testingServerId;
+  const userServers = servers.filter((server) => server.source !== "plugin");
+  const pluginServers = servers.filter((server) => server.source === "plugin");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -460,7 +462,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
           </div>
           <ScrollArea className="min-h-0 grow">
             <div className="flex flex-col gap-1 pr-2">
-              {servers.map((server) => (
+              {userServers.map((server) => (
                 <button
                   key={server.id}
                   type="button"
@@ -499,10 +501,46 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                   </span>
                 </button>
               ) : null}
-              {servers.length === 0 && !creating ? (
+              {userServers.length === 0 && !creating ? (
                 <div className="text-muted-foreground px-1 py-2 text-xs">
                   No MCP servers.
                 </div>
+              ) : null}
+              {pluginServers.length > 0 ? (
+                <>
+                  <div className="text-muted-foreground mt-5 px-2 text-xs font-medium tracking-wide uppercase">
+                    MCPs in Plugins
+                  </div>
+                  {pluginServers.map((server) => (
+                    <button
+                      key={server.id}
+                      type="button"
+                      disabled={saving || dirty || testingServerId !== null}
+                      className={cn(
+                        "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+                        selectedId === server.id && "bg-accent"
+                      )}
+                      onClick={() => {
+                        setCreating(false);
+                        setFormError(null);
+                        setSelectedId(server.id);
+                      }}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <StatusDot server={server} />
+                        <span className="truncate text-sm font-medium">
+                          {server.name}
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
+                        {server.transport}
+                      </span>
+                      <span className="text-muted-foreground truncate pl-4 text-xs">
+                        {_sidebarReadiness(server)}
+                      </span>
+                    </button>
+                  ))}
+                </>
               ) : null}
             </div>
           </ScrollArea>

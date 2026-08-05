@@ -303,8 +303,11 @@ function PluginEditor({
   );
 
   return (
-    <div className="flex min-w-0 grow flex-col pl-6">
-      <Tabs defaultValue="general" className="min-h-0 grow gap-0">
+    <div className="flex min-w-0 grow flex-col overflow-hidden pl-6">
+      <Tabs
+        defaultValue="general"
+        className="min-h-0 w-full min-w-0 grow gap-0 overflow-hidden"
+      >
         <div className="shrink-0 space-y-4 pr-4">
           <div className="flex items-start gap-3">
             <PluginIcon plugin={plugin} className="size-10" />
@@ -386,9 +389,12 @@ function PluginEditor({
           </TabsList>
         </div>
 
-        <TabsContent value="general" className="min-h-0">
-          <ScrollArea className="h-full">
-            <div className="flex flex-col gap-8 pt-5 pr-4 pb-4">
+        <TabsContent
+          value="general"
+          className="min-h-0 min-w-0 overflow-hidden"
+        >
+          <ScrollArea className="h-full w-full max-w-full">
+            <div className="flex max-w-full min-w-0 flex-col gap-8 pt-5 pr-4 pb-4">
               <section className="space-y-3">
                 <h4 className="text-sm font-medium">Plugin</h4>
                 <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
@@ -437,7 +443,7 @@ function PluginEditor({
                   </span>
                 </div>
                 {plugin.extensions.length > 0 ? (
-                  <div className="divide-y rounded-md border">
+                  <div className="min-w-0 divide-y overflow-hidden rounded-md border">
                     {plugin.extensions.map((extension) => (
                       <div
                         key={`${extension.kind}:${extension.id}`}
@@ -453,9 +459,20 @@ function PluginEditor({
                                 : "bg-muted-foreground/40"
                           )}
                         />
-                        <span className="grow truncate">
-                          {extension.displayName}
-                        </span>
+                        {extension.sourcePath ? (
+                          <button
+                            type="button"
+                            className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
+                            title={`Reveal ${extension.sourcePath}`}
+                            onClick={() => _reveal(extension.sourcePath!)}
+                          >
+                            {extension.displayName}
+                          </button>
+                        ) : (
+                          <span className="grow truncate">
+                            {extension.displayName}
+                          </span>
+                        )}
                         <span className="text-muted-foreground uppercase">
                           {extension.kind}
                         </span>
@@ -470,19 +487,21 @@ function PluginEditor({
               </section>
 
               {errors.length > 0 ? (
-                <section className="space-y-3">
+                <section className="min-w-0 space-y-3">
                   <h4 className="text-sm font-medium">Diagnostics</h4>
                   {errors.map((error) =>
                     error ? (
                       <div
                         key={error.id}
-                        className="border-destructive/30 bg-destructive/5 rounded-md border p-3 text-xs"
+                        className="border-destructive/30 bg-destructive/5 max-w-full min-w-0 overflow-hidden rounded-md border p-3 text-xs"
                       >
-                        <p>{error.summary}</p>
-                        <p className="text-muted-foreground mt-1 font-mono">
+                        <p className="[overflow-wrap:anywhere] break-words">
+                          {error.summary}
+                        </p>
+                        <p className="text-muted-foreground mt-1 font-mono [overflow-wrap:anywhere] break-words">
                           error-id: {error.id}
                         </p>
-                        <p className="text-muted-foreground truncate font-mono">
+                        <p className="text-muted-foreground font-mono [overflow-wrap:anywhere] break-words">
                           {error.logPath}
                         </p>
                         <div className="mt-2 flex gap-2">
