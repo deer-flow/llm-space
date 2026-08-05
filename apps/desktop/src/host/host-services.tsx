@@ -10,6 +10,7 @@ import { useMemo, type ReactNode } from "react";
 import { fsReveal, listBuiltInTools } from "@/client/built-in-tools";
 import {
   checkUv,
+  openGeneratorDevTerminal,
   pickGeneratorDirectory,
   prepareGeneratorDirectory,
   removeProjectFile,
@@ -145,6 +146,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         runUv,
         writeFile: writeProjectFile,
         removeFile: removeProjectFile,
+        openDevTerminal: openGeneratorDevTerminal,
         getSearchSettings: (options: { runtimeId: string }) =>
           getSearchSettings(options.runtimeId as RuntimeId),
         resolveEnv: (

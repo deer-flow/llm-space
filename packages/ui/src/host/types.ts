@@ -149,6 +149,11 @@ export interface GeneratorHost {
   ): Promise<void>;
   /** Delete a file under an authorized project directory; no-op when missing. */
   removeFile(rootDir: string, relativePath: string): Promise<void>;
+  /**
+   * Open a native terminal in the generated project and run its development
+   * target. Returns false when the host platform does not support this action.
+   */
+  openDevTerminal(rootDir: string): Promise<boolean>;
   /** The user's web-search settings, written into a generated project's `.env`. */
   getSearchSettings(options: RuntimeOwnedHostOptions): Promise<SearchSettings>;
   /**

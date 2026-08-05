@@ -9,6 +9,7 @@ import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
+  openGeneratorDevTerminal,
   prepareGeneratorDir,
   removeProjectFile,
   runUv,
@@ -287,6 +288,8 @@ export function createMainWindowRPC({
           await removeProjectFile(rootDir, relativePath);
           return null;
         },
+        generatorOpenDevTerminal: ({ rootDir }) =>
+          openGeneratorDevTerminal(rootDir),
         generatorResolveEnv: ({ runtimeId, providerId, envNames }) =>
           getRuntime(runtimeId).resolveGeneratorEnv({ providerId, envNames }),
         mcpListServers: ({ runtimeId }) =>

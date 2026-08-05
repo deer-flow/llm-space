@@ -386,6 +386,7 @@ export function GenerateProjectButton({
       return;
     }
     setWritingEnv(true);
+    let envCreated = false;
     try {
       const modelInfo = _resolveModelInfo(providers, model);
       const usesWebTools = (context?.tools ?? []).some(
@@ -431,12 +432,25 @@ export function GenerateProjectButton({
       );
       await generator.writeFile(result.dir, ".env", contents);
       toast.success(".env created with your keys.");
+      envCreated = true;
     } catch (e) {
       toast.error("Couldn't create .env", {
         description: e instanceof Error ? e.message : String(e),
       });
+    }
+    try {
+      if (
+        !envCreated ||
+        !(await generator.openDevTerminal(result.dir))
+      ) {
+        await openGeneratedProject();
+      }
+    } catch (e) {
+      toast.error("Couldn't start the development server", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      await openGeneratedProject();
     } finally {
-      void openGeneratedProject();
       setWritingEnv(false);
       setEnvConfirmOpen(false);
       setOpen(false);

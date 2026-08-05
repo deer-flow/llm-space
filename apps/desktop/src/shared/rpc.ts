@@ -396,6 +396,12 @@ export interface DesktopRPCType {
         params: { rootDir: string; relativePath: string };
         response: null;
       };
+      // On macOS, open Terminal in an authorized generated project and run
+      // `make dev`. Returns false on unsupported platforms.
+      generatorOpenDevTerminal: {
+        params: { rootDir: string };
+        response: boolean;
+      };
       // Resolve real secret values for a generated `.env`: the runtime's model
       // provider API key plus the raw values of named environment variables. Used
       // only after explicit user opt-in to materialize secrets to disk.
