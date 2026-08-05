@@ -1,3 +1,5 @@
+@import "@llm-space/ui/styles/globals.css";
+
 /* Landing-page-only styles, additive to `@llm-space/ui/styles/globals.css`
    (which owns `@import "tailwindcss"`, the `dark` variant, and the shadcn color
    tokens). We keep ONLY the landing's unique tokens/keyframes/helpers here — the

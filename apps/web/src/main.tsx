@@ -4,14 +4,13 @@ import {
   LOCAL_STORAGE_KEYS,
   writeLocalStorage,
 } from "@llm-space/ui/lib/local-storage";
-import "@llm-space/ui/styles/globals.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 
 import { App } from "@/app";
-// Landing-page-only styles; imported after globals so its additive tokens/helpers
-// layer on top without redefining the shared theme.
+// This is the web app's single CSS entry. It imports the shared UI globals first,
+// then adds the landing-only theme tokens and helpers in the same Tailwind graph.
 import "@/landing/index.css";
 
 // This site is dark-only: pin the theme before React mounts so ThemeProvider
