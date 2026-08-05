@@ -4,6 +4,23 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.3] - 2026-08-05
+
+This patch release streamlines the generated LangGraph project setup on macOS.
+
+### Changed
+
+- After explicitly creating a generated project's `.env`, macOS users now get
+  a Terminal window that starts the development server with `make dev`.
+- Other platforms, cancelled setup, and launch failures continue to reveal the
+  generated project without starting a process.
+
+### Fixed
+
+- Generated project paths with spaces or shell-special characters are safely
+  passed to Terminal, and only user-authorized generator directories can be
+  launched.
+
 ## [4.8.2] - 2026-08-05
 
 This patch release makes filesystem tools handle home-relative paths reliably
