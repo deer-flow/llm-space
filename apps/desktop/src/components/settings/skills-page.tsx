@@ -291,6 +291,10 @@ function PathList({
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+      <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+        FOLDERS
+      </span>
+
       <ScrollArea className="min-h-0 grow">
         {paths.length === 0 && pluginGroups.length === 0 ? (
           <div className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">

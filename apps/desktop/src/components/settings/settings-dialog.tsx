@@ -225,7 +225,7 @@ export function SettingsDialog({
                         <TabsTrigger
                           key={value}
                           value={value}
-                          className="w-full pl-5"
+                          className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary w-full pl-5 data-active:shadow-sm dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:shadow-none"
                         >
                           <Icon />
                           {label}
@@ -241,7 +241,7 @@ export function SettingsDialog({
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="w-full"
+                      className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary w-full data-active:shadow-sm dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:shadow-none"
                     >
                       <Icon />
                       {label}

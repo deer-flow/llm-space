@@ -4,6 +4,14 @@ import type { JsonObject, JsonValue, PluginView } from "@llm-space/core";
 import { Link } from "@llm-space/ui/components/link";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@llm-space/ui/ui/empty";
 import { Input } from "@llm-space/ui/ui/input";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { Switch } from "@llm-space/ui/ui/switch";
@@ -15,12 +23,33 @@ import {
 } from "@llm-space/ui/ui/tabs";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
+  ArrowUpRightIcon,
+  Blocks,
+  Bot,
+  BrainCircuit,
+  Braces,
+  Cable,
+  Cloud,
+  Code2,
+  Command,
   Copy,
+  Database,
+  FileCode2,
   FolderOpen,
+  Globe2,
+  MessageSquare,
+  Package,
   Puzzle,
   RefreshCw,
   ScrollText,
   Search,
+  Server,
+  Sparkles,
+  Terminal,
+  Workflow,
+  Wrench,
+  Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -39,6 +68,41 @@ import { SettingsPage } from "./settings-page";
 
 const PLUGIN_DOCUMENTATION_URL =
   "https://github.com/deer-flow/llm-space/blob/main/docs/plugins.md";
+
+const PLUGIN_WALL_ICONS: readonly LucideIcon[] = [
+  Wrench,
+  Sparkles,
+  Bot,
+  Server,
+  Blocks,
+  Database,
+  BrainCircuit,
+  Workflow,
+  Terminal,
+  Cloud,
+  Puzzle,
+  Code2,
+  Search,
+  MessageSquare,
+  FileCode2,
+  Braces,
+  Globe2,
+  Zap,
+  Package,
+  Cable,
+  Command,
+];
+
+const PLUGIN_WALL_ROTATIONS = [
+  -14, 8, -5, 13, -9, 4, 16, -11, 7, -3, 12, -16,
+];
+
+const PLUGIN_WALL_ITEMS = Array.from({ length: 63 }, (_, index) => ({
+  Icon: PLUGIN_WALL_ICONS[index % PLUGIN_WALL_ICONS.length],
+  opacity: 0.68 + (index % 4) * 0.08,
+  rotation: PLUGIN_WALL_ROTATIONS[index % PLUGIN_WALL_ROTATIONS.length],
+  scale: 0.82 + (index % 5) * 0.08,
+}));
 
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
@@ -110,32 +174,81 @@ export function PluginsPage() {
         </div>
       ) : null}
       {!loading && plugins.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-          <p className="text-muted-foreground max-w-2xl text-sm">
-            No plugins discovered. Install plugins at{" "}
-            {pluginsPath ? (
-              <button
-                type="button"
-                className="text-foreground max-w-full cursor-pointer truncate align-bottom font-mono underline underline-offset-2"
-                title={`Open ${pluginsPath}`}
-                onClick={() => _reveal(pluginsPath)}
-              >
-                {pluginsPath}
-              </button>
-            ) : (
-              "the plugins directory"
-            )}
-            .
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={refreshing}
-            onClick={() => void refresh()}
-          >
-            <RefreshCw className={refreshing ? "animate-spin" : undefined} />
-            Refresh
-          </Button>
+        <div className="relative isolate flex h-full min-h-0 flex-col gap-4">
+          <_PluginIconWall />
+          <Empty className="relative z-10 min-h-80 flex-1 border-0 p-8">
+            <div className="relative z-10 flex w-full max-w-lg flex-col items-center gap-5 px-8 py-7">
+              <EmptyHeader className="max-w-md gap-2.5">
+                <EmptyMedia
+                  variant="icon"
+                  className="bg-background/45 text-primary ring-primary/20 size-11 rounded-xl shadow-sm ring-1 backdrop-blur-md dark:bg-background/35"
+                >
+                  <Puzzle className="size-5" />
+                </EmptyMedia>
+                <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
+                  No plugins installed
+                </span>
+                <EmptyTitle className="text-2xl">
+                  Add new powers to LLM Space
+                </EmptyTitle>
+                <EmptyDescription className="max-w-md">
+                  Plugins bundle tools, skills, model providers, MCP servers,
+                  commands, and custom thread storage into installable
+                  extensions.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent className="max-w-lg gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="bg-background/60 hover:bg-background/85 border-border/80 shadow-sm backdrop-blur-md"
+                    disabled={!pluginsPath}
+                    onClick={() => pluginsPath && _reveal(pluginsPath)}
+                  >
+                    <FolderOpen />
+                    Open plugins folder
+                  </Button>
+                  <Button
+                    disabled={refreshing}
+                    onClick={() => void refresh()}
+                  >
+                    <RefreshCw
+                      className={refreshing ? "animate-spin" : undefined}
+                    />
+                    Refresh plugins
+                  </Button>
+                </div>
+                <Button
+                  variant="link"
+                  asChild
+                  className="text-muted-foreground"
+                  size="sm"
+                >
+                  <Link href={PLUGIN_DOCUMENTATION_URL}>
+                    Learn more <ArrowUpRightIcon />
+                  </Link>
+                </Button>
+              </EmptyContent>
+            </div>
+          </Empty>
+
+          <div className="relative z-10 grid shrink-0 gap-3 sm:grid-cols-3">
+            <_PluginCapability
+              icon={Wrench}
+              title="Tools & skills"
+              description="Give the model new actions and reusable expertise."
+            />
+            <_PluginCapability
+              icon={Cable}
+              title="Models & connections"
+              description="Add model providers and connect MCP servers."
+            />
+            <_PluginCapability
+              icon={Command}
+              title="Commands & storage"
+              description="Customize workflows and how threads are saved."
+            />
+          </div>
         </div>
       ) : null}
       {!loading && plugins.length > 0 ? (
@@ -155,6 +268,78 @@ export function PluginsPage() {
         </>
       ) : null}
     </SettingsPage>
+  );
+}
+
+function _PluginIconWall() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 -top-6 -bottom-6 overflow-hidden"
+    >
+      <div className="bg-primary/12 dark:bg-primary/8 absolute top-1/2 left-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" />
+      <_PluginIconWallLayer />
+      <_PluginIconWallLayer blurred />
+    </div>
+  );
+}
+
+function _PluginIconWallLayer({ blurred = false }: { blurred?: boolean }) {
+  const maskImage = blurred
+    ? "radial-gradient(ellipse 72% 68% at 50% 50%, transparent 24%, rgba(0,0,0,0.45) 58%, black 100%)"
+    : "radial-gradient(ellipse 58% 54% at 50% 50%, black 8%, rgba(0,0,0,0.9) 44%, transparent 82%)";
+
+  return (
+    <div
+      className={cn(
+        "absolute -inset-10",
+        blurred
+          ? "text-primary opacity-[0.11] blur-[3px] dark:text-foreground/80 dark:opacity-[0.09]"
+          : "text-primary opacity-[0.3] dark:text-foreground dark:opacity-[0.25]"
+      )}
+      style={{ maskImage, WebkitMaskImage: maskImage }}
+    >
+      <div className="grid size-full grid-cols-9 grid-rows-7 place-items-center gap-x-5 gap-y-6 p-5">
+        {PLUGIN_WALL_ITEMS.map(
+          ({ Icon, opacity, rotation, scale }, index) => (
+            <Icon
+              // This is a fixed decorative grid; its position is its identity.
+              key={index}
+              className="size-7"
+              strokeWidth={1.45}
+              style={{
+                opacity,
+                transform: `rotate(${rotation}deg) scale(${scale})`,
+              }}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+function _PluginCapability({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-card/80 flex min-w-0 items-start gap-3 rounded-xl border p-4 shadow-sm dark:bg-card/50 dark:shadow-none">
+      <div className="bg-muted text-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+        <Icon className="size-4" />
+      </div>
+      <div className="flex min-w-0 flex-col gap-1">
+        <h3 className="text-sm font-medium">{title}</h3>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {description}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -199,9 +384,17 @@ function PluginList({
       </div>
       <ScrollArea className="min-h-0 grow">
         {filtered.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">
-            No plugin matches &quot;{query.trim()}&quot;.
-          </p>
+          <Empty className="min-h-48 gap-2 border-0 px-2 py-6">
+            <EmptyHeader className="gap-1.5">
+              <EmptyMedia variant="icon" className="text-muted-foreground">
+                <Search />
+              </EmptyMedia>
+              <EmptyTitle>No matching plugins</EmptyTitle>
+              <EmptyDescription className="text-xs">
+                No plugin matches &quot;{query.trim()}&quot;. Try another search.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <div className="flex flex-col gap-1 pr-2">
             {filtered.map((plugin) => (

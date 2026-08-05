@@ -158,6 +158,10 @@ function ProviderList({
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+      <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+        PROVIDERS
+      </span>
+
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
         <Input

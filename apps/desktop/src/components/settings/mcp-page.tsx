@@ -16,6 +16,14 @@ import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@llm-space/ui/ui/empty";
 import { Input } from "@llm-space/ui/ui/input";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
@@ -31,13 +39,19 @@ import {
   CircleAlert,
   CircleDot,
   Copy,
+  Database,
   Eye,
   EyeOff,
+  FileText,
   Loader2,
   Plus,
   RefreshCw,
+  Search,
+  ServerCog,
+  Sparkles,
   Trash2,
   Unplug,
+  Waypoints,
   X,
 } from "lucide-react";
 import {
@@ -181,7 +195,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [form, setForm] = useState<ServerForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [tools, setTools] = useState<McpToolView[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingServerId, setTestingServerId] = useState<string | null>(null);
   const [cancellingTest, setCancellingTest] = useState(false);
@@ -426,11 +440,19 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
       title="MCP"
       description="Connect a server to expose its tools, which you can then add to a thread's tools."
     >
-      <div className="flex h-full min-h-0 gap-6">
+      {loading && servers.length === 0 && !creating ? (
+        <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          Loading MCP servers
+        </div>
+      ) : servers.length === 0 && !creating ? (
+        <McpEmptyState onAdd={createServer} />
+      ) : (
+        <div className="flex h-full min-h-0 gap-6">
         <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              Servers
+              SERVERS
             </span>
             <div className="flex items-center gap-1">
               <Tooltip content="Refresh servers">
@@ -500,11 +522,6 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     Unsaved server
                   </span>
                 </button>
-              ) : null}
-              {userServers.length === 0 && !creating ? (
-                <div className="text-muted-foreground px-1 py-2 text-xs">
-                  No MCP servers.
-                </div>
               ) : null}
               {pluginServers.length > 0 ? (
                 <>
@@ -640,8 +657,9 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               Select or add an MCP server
             </div>
           )}
-        </main>
-      </div>
+          </main>
+        </div>
+      )}
       <ConfirmDialog
         open={removeOpen}
         onOpenChange={setRemoveOpen}
@@ -656,6 +674,99 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         onConfirm={() => void confirmRemove()}
       />
     </SettingsPage>
+  );
+}
+
+function McpEmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <Empty className="relative h-full overflow-hidden rounded-none border-0 p-0">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="bg-primary/10 absolute top-[8%] left-1/2 size-[28rem] -translate-x-1/2 rounded-full blur-3xl dark:bg-blue-500/10" />
+        <div className="absolute inset-x-[8%] top-[8%] h-[58%] bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--color-primary)_13%,transparent),transparent_68%)]" />
+      </div>
+
+      <div className="relative z-10 flex w-full max-w-4xl flex-col items-center gap-8 px-5 py-8">
+        <EmptyHeader className="max-w-xl gap-3">
+          <EmptyMedia className="relative mb-1 size-32" aria-hidden>
+            <div className="border-primary/20 bg-background/70 shadow-primary/10 absolute inset-[25%] z-10 flex items-center justify-center rounded-2xl border shadow-xl backdrop-blur-xl">
+              <ServerCog className="text-primary size-7" />
+            </div>
+            {[
+              { Icon: Search, className: "top-0 left-1/2 -translate-x-1/2" },
+              { Icon: Database, className: "bottom-1 left-1" },
+              { Icon: FileText, className: "right-1 bottom-1" },
+            ].map(({ Icon, className }, index) => (
+              <div
+                key={index}
+                className={`border-border/70 bg-background/65 text-muted-foreground absolute flex size-9 items-center justify-center rounded-xl border shadow-sm backdrop-blur-md ${className}`}
+              >
+                <Icon className="size-4" />
+              </div>
+            ))}
+            <Waypoints className="text-primary/25 absolute inset-0 size-full stroke-[0.7]" />
+          </EmptyMedia>
+          <span className="text-muted-foreground text-xs font-semibold tracking-[0.22em] uppercase">
+            No MCP servers
+          </span>
+          <EmptyTitle className="text-foreground text-3xl font-semibold sm:text-4xl">
+            Connect tools through MCP
+          </EmptyTitle>
+          <EmptyDescription className="max-w-lg text-base leading-relaxed">
+            Add a local command or remote endpoint, discover its tools, and make
+            those capabilities available to your threads.
+          </EmptyDescription>
+        </EmptyHeader>
+
+        <EmptyContent className="max-w-none">
+          <Button size="lg" onClick={onAdd}>
+            <Plus className="size-4" />
+            Add MCP server
+          </Button>
+        </EmptyContent>
+
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+          <EmptyFeature
+            icon={<ServerCog />}
+            title="Local or remote"
+            description="Connect with stdio, HTTP, or SSE transports."
+          />
+          <EmptyFeature
+            icon={<Sparkles />}
+            title="Discover tools"
+            description="Test the connection and inspect exposed capabilities."
+          />
+          <EmptyFeature
+            icon={<Waypoints />}
+            title="Use in threads"
+            description="Choose the tools each thread can call."
+          />
+        </div>
+      </div>
+    </Empty>
+  );
+}
+
+function EmptyFeature({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="border-border/70 bg-card/55 flex gap-3 rounded-xl border p-4 text-left shadow-sm backdrop-blur-md">
+      <div className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-4">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          {description}
+        </p>
+      </div>
+    </div>
   );
 }
 
