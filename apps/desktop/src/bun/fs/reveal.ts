@@ -5,7 +5,7 @@ import path from "node:path";
  * Reveal an absolute path in the OS file manager, selecting the entry within
  * its containing folder where the platform supports it:
  *
- * - macOS — `open -R <path>` (Finder, with the item selected).
+ * - macOS — `/usr/bin/open -R <path>` (Finder, with the item selected).
  * - Windows — `explorer /select,<path>` (Explorer, with the item selected).
  * - Linux — no portable "select" exists, so open the containing directory
  *   (or the directory itself) via `xdg-open`.
@@ -24,7 +24,7 @@ export async function revealInFileManager(abs: string): Promise<void> {
  * a folder in the file manager). Unlike {@link revealInFileManager}, this opens
  * the target itself rather than selecting it in its parent folder.
  *
- * - macOS — `open <path>`.
+ * - macOS — `/usr/bin/open <path>`.
  * - Windows — `explorer <path>`.
  * - Linux/other — `xdg-open <path>`.
  *
@@ -37,7 +37,9 @@ export function openPath(abs: string): void {
 
 function _openCommand(abs: string): string[] {
   if (process.platform === "darwin") {
-    return ["open", abs];
+    // Desktop apps can start with a minimal PATH. Use the stable system path
+    // so Finder actions do not depend on shell environment hydration.
+    return ["/usr/bin/open", abs];
   }
   if (process.platform === "win32") {
     return ["explorer.exe", abs];
@@ -47,7 +49,7 @@ function _openCommand(abs: string): string[] {
 
 async function _revealCommand(abs: string): Promise<string[]> {
   if (process.platform === "darwin") {
-    return ["open", "-R", abs];
+    return ["/usr/bin/open", "-R", abs];
   }
   if (process.platform === "win32") {
     // `/select,<path>` must be a single argument; explorer also exits non-zero

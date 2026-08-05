@@ -39,6 +39,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
@@ -854,17 +855,14 @@ function WorkingDirectoryVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
 }) {
-  const { files } = useHostServices();
+  const { builtinTools, files } = useHostServices();
   const [directoryExists, setDirectoryExists] = useState<boolean | null>(null);
   const directoryCheckIdRef = useRef(0);
 
-  const commitAndCheckPath = useCallback(
+  const checkPath = useCallback(
     async (rawValue: string) => {
       const checkId = ++directoryCheckIdRef.current;
       const value = _normalizeDirectoryPath(rawValue);
-      if (value !== variable.value) {
-        onUpdate(name, { ...variable, value });
-      }
       if (!value) {
         setDirectoryExists(null);
         return;
@@ -882,7 +880,27 @@ function WorkingDirectoryVariableDetail({
         }
       }
     },
-    [files, name, onUpdate, variable]
+    [files]
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void checkPath(variable.value);
+    }, 200);
+
+    return () => window.clearTimeout(timeout);
+  }, [checkPath, variable.value]);
+
+  const commitPath = useCallback(
+    (rawValue: string) => {
+      const value = _normalizeDirectoryPath(rawValue);
+      if (value !== variable.value) {
+        onUpdate(name, { ...variable, value });
+      } else {
+        void checkPath(value);
+      }
+    },
+    [checkPath, name, onUpdate, variable]
   );
 
   const handlePathChange = useCallback(
@@ -905,6 +923,17 @@ function WorkingDirectoryVariableDetail({
       });
     }
   }, [files, name, onUpdate, variable]);
+
+  const reveal = useCallback(async () => {
+    try {
+      await builtinTools.fsReveal(variable.value);
+    } catch (error) {
+      toast.error("Failed to reveal folder", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  }, [builtinTools, variable.value]);
 
   return (
     <DetailShell
@@ -929,12 +958,8 @@ function WorkingDirectoryVariableDetail({
             value={variable.value}
             disabled={disabled}
             placeholder="~/Desktop/llm-space-project"
-            onChange={(event) =>
-              handlePathChange(event.currentTarget.value)
-            }
-            onBlur={(event) =>
-              void commitAndCheckPath(event.currentTarget.value)
-            }
+            onChange={(event) => handlePathChange(event.currentTarget.value)}
+            onBlur={(event) => commitPath(event.currentTarget.value)}
           />
           <Button
             size="sm"
@@ -947,6 +972,19 @@ function WorkingDirectoryVariableDetail({
             Browse…
           </Button>
         </div>
+        {directoryExists === true && (
+          <Button
+            type="button"
+            size="sm"
+            variant="link"
+            className="h-auto w-fit p-0"
+            disabled={disabled}
+            onClick={() => void reveal()}
+          >
+            <FolderOpenIcon className="size-3.5" />
+            Reveal in Finder
+          </Button>
+        )}
       </Field>
       {directoryExists === false && (
         <p
