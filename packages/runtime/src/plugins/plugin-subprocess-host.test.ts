@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,6 +15,13 @@ const roots: string[] = [];
 const hosts: PluginSubprocessHost[] = [];
 interface LoadResult {
   commands: { id: string; displayName: string }[];
+  tools: {
+    id: string;
+    name: string;
+    description: string;
+    parameters: object;
+    strict?: boolean;
+  }[];
   storages: { id: string; displayName: string; deepLinkId?: string }[];
   errors: { id: string; kind: string }[];
 }
@@ -39,12 +52,222 @@ describe("PluginSubprocessHost", () => {
       await host.call<unknown>("command.execute", {
         id: "plugin:demo:command:hello",
       })
-    ).toEqual({ count: 1, setting: "ok" });
+    ).toEqual({ result: { count: 1, setting: "ok" } });
     expect(
       await host.call<unknown>("command.execute", {
         id: "plugin:demo:command:hello",
       })
-    ).toEqual({ count: 2, setting: "ok" });
+    ).toEqual({ result: { count: 2, setting: "ok" } });
+  });
+
+  test("exposes and stages the invocation's active thread", async () => {
+    const root = _root();
+    const command = path.join(root, "commands", "thread.ts");
+    mkdirSync(path.dirname(command));
+    writeFileSync(
+      command,
+      `export default class ThreadCommand {
+        displayName = "Thread";
+        async execute(ctx, args) {
+          const { filename, thread } = ctx.activeTab;
+          thread.title = "updated";
+          await ctx.activeTab.writeThread(thread);
+          return {
+            filename,
+            workingDirectory: thread.context.variables.current_working_directory.value,
+            contextArguments: ctx.arguments,
+            arguments: args,
+          };
+        }
+      }`
+    );
+    const host = _host();
+    await host.call("initialize", {
+      settings: {},
+      commands: [{ id: "thread", path: command }],
+      storages: [],
+    });
+
+    expect(
+      await host.call<unknown>("command.execute", {
+        id: "thread",
+        arguments: ["skill", "abc", "123"],
+        activeTab: {
+          filename: "original.json",
+          thread: {
+            title: "original",
+            context: {
+              variables: {
+                current_working_directory: {
+                  type: "workingDirectory",
+                  value: "/workspace",
+                },
+              },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      result: {
+        filename: "original.json",
+        workingDirectory: "/workspace",
+        contextArguments: ["skill", "abc", "123"],
+        arguments: ["skill", "abc", "123"],
+      },
+      activeTabThreadUpdate: {
+        title: "updated",
+        context: {
+          variables: {
+            current_working_directory: {
+              type: "workingDirectory",
+              value: "/workspace",
+            },
+          },
+        },
+      },
+    });
+  });
+
+  test("exposes a null active tab when no thread is active", async () => {
+    const root = _root();
+    const command = path.join(root, "commands", "no-thread.ts");
+    mkdirSync(path.dirname(command));
+    writeFileSync(
+      command,
+      `export default class NoThread {
+        displayName = "No thread";
+        async execute(ctx) {
+          return { activeTab: ctx.activeTab };
+        }
+      }`
+    );
+    const host = _host();
+    await host.call("initialize", {
+      settings: {},
+      commands: [{ id: "no-thread", path: command }],
+      storages: [],
+    });
+
+    expect(
+      await host.call<unknown>("command.execute", {
+        id: "no-thread",
+        activeTab: null,
+      })
+    ).toEqual({
+      result: {
+        activeTab: null,
+      },
+    });
+  });
+
+  test("executes Plugin Tools with frozen owning context and structured results", async () => {
+    const root = _root();
+    const tool = path.join(root, "tools", "project-info.ts");
+    mkdirSync(path.dirname(tool));
+    writeFileSync(
+      tool,
+      `export default class ProjectInfo {
+        name = "project_info";
+        description = "Read project context";
+        parameters = { type: "object", properties: {} };
+        strict = true;
+        execute(context, args) {
+          return context.createResult([{ type: "text", text: JSON.stringify({
+            title: context.thread.title,
+            cwd: context.variables.current_working_directory,
+            args,
+            frozen: Object.isFrozen(context.thread) && Object.isFrozen(context.thread.context) && Object.isFrozen(context.variables),
+          }) }]);
+        }
+      }`
+    );
+    const host = _host();
+    const loaded = await host.call<LoadResult>("initialize", {
+      settings: {},
+      commands: [],
+      tools: [{ id: "plugin:demo:tool:project-info", path: tool }],
+      storages: [],
+    });
+
+    expect(loaded.tools).toEqual([
+      {
+        id: "plugin:demo:tool:project-info",
+        name: "project_info",
+        description: "Read project context",
+        parameters: { type: "object", properties: {} },
+        strict: true,
+      },
+    ]);
+    expect(
+      await host.call<unknown>("tool.execute", {
+        id: "plugin:demo:tool:project-info",
+        thread: { title: "Owning thread", context: {} },
+        variables: { current_working_directory: "/workspace" },
+        arguments: { detail: true },
+      })
+    ).toEqual({
+      kind: "content",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            title: "Owning thread",
+            cwd: "/workspace",
+            args: { detail: true },
+            frozen: true,
+          }),
+        },
+      ],
+    });
+  });
+
+  test("times out a Plugin Tool call and disposes Tool instances on shutdown", async () => {
+    const root = _root();
+    const marker = path.join(root, "disposed.txt");
+    const tool = path.join(root, "tools", "slow.ts");
+    mkdirSync(path.dirname(tool));
+    writeFileSync(
+      tool,
+      `export default class Slow {
+        name = "slow";
+        description = "Wait";
+        parameters = { type: "object", properties: {} };
+        async execute() { await Bun.sleep(250); return "done"; }
+        async dispose() { await Bun.write(${JSON.stringify(marker)}, "disposed"); }
+      }`
+    );
+    const host = _host();
+    const initialization = {
+      settings: {},
+      commands: [],
+      tools: [{ id: "plugin:demo:tool:slow", path: tool }],
+      storages: [],
+    };
+    await host.call("initialize", initialization);
+
+    const error = await host
+      .call(
+        "tool.execute",
+        {
+          id: "plugin:demo:tool:slow",
+          thread: { context: {} },
+          variables: {},
+          arguments: {},
+        },
+        20
+      )
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toHaveProperty(
+      "message",
+      "Plugin request timed out: tool.execute"
+    );
+
+    // The timed-out runner was terminated. Reload a fresh instance, then prove
+    // the normal shutdown lifecycle invokes the Tool hook.
+    await host.call("initialize", initialization);
+    await host.shutdown();
+    expect(readFileSync(marker, "utf8")).toBe("disposed");
   });
 
   test("isolates invalid files while retaining valid extensions", async () => {
@@ -122,8 +345,8 @@ describe("PluginSubprocessHost", () => {
     if (!(crashError instanceof Error))
       throw new Error("Expected runner error");
     expect(crashError.message).toContain("exited with code 71");
-    expect(await host.call<unknown>("command.execute", { id: "good" })).toBe(
-      "restored"
+    expect(await host.call<unknown>("command.execute", { id: "good" })).toEqual(
+      { result: "restored" }
     );
   });
 });

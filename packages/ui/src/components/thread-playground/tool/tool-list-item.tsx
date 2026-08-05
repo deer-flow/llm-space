@@ -5,7 +5,13 @@ import {
   isProviderHostedTool,
   type Tool,
 } from "@llm-space/core";
-import { CableIcon, CloudIcon, FunctionSquareIcon, XIcon } from "lucide-react";
+import {
+  CableIcon,
+  CloudIcon,
+  FunctionSquareIcon,
+  PackageCheckIcon,
+  XIcon,
+} from "lucide-react";
 import React, { memo, useCallback, useMemo } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
@@ -56,7 +62,9 @@ function _ToolListItem({
       ? CableIcon
       : tool.type === "builtin"
         ? getBuiltInToolIcon(tool)
-        : FunctionSquareIcon;
+        : tool.type === "plugin"
+          ? PackageCheckIcon
+          : FunctionSquareIcon;
   const editDisabled = readonly;
 
   return (
@@ -107,7 +115,7 @@ function _ToolListItem({
             aria-label={
               tool.type === "function"
                 ? `Edit ${displayName} tool`
-                : `Manage ${displayName} ${tool.type === "mcp" ? "MCP" : tool.type === "builtin" ? "built-in" : "provider-hosted"} tool`
+                : `Manage ${displayName} ${tool.type === "mcp" ? "MCP" : tool.type === "builtin" ? "built-in" : tool.type === "plugin" ? "Plugin" : "provider-hosted"} tool`
             }
             disabled={editDisabled}
             onClick={() => onEdit(tool)}

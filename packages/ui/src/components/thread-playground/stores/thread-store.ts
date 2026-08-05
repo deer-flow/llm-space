@@ -16,6 +16,7 @@ import {
   type AgentEvent,
   type BuiltinTool,
   type McpTool,
+  type PluginTool,
   type MessageContent,
   type ModelConfig,
   type ModelConfigParams,
@@ -48,6 +49,7 @@ import {
   removePromptVariableSnapshotNames,
   removePromptVariableSnapshotPlaces,
   renderThreadPromptVariables,
+  resolveThreadPromptVariableValues,
   replaceThreadPromptVariableReferences,
   SYSTEM_PROMPT_PLACE_KEY,
   upsertEvaluation,
@@ -221,8 +223,14 @@ export function createThreadStore(
      * layer.
      */
     executeTool?: (
-      tool: McpTool | BuiltinTool,
-      args: Record<string, unknown>
+      tool: McpTool | BuiltinTool | PluginTool,
+      args: Record<string, unknown>,
+      context: {
+        thread: Thread;
+        variables: Awaited<
+          ReturnType<typeof resolveThreadPromptVariableValues>
+        >;
+      }
     ) => Promise<{
       content: ToolCallOutput["content"];
       isError: boolean;
@@ -524,7 +532,7 @@ export function createThreadStore(
         // we bail and let the user fill it in.
         const executable: {
           toolCall: ToolCall;
-          tool: McpTool | BuiltinTool;
+          tool: McpTool | BuiltinTool | PluginTool;
         }[] = [];
         for (const toolCall of toolCalls) {
           const tool = toolsByName.get(toolCall.input.name);
@@ -551,12 +559,23 @@ export function createThreadStore(
           }
           executable.push({ toolCall, tool });
         }
+        const owningThread = structuredClone(get().thread);
+        const variables = executable.some(({ tool }) => tool.type === "plugin")
+          ? await resolveThreadPromptVariableValues({
+              context: owningThread.context,
+              loadSkills: options.loadSkills ?? _noSkills,
+              loadFile: options.loadFile ?? _noFile,
+              fileExists: options.fileExists ?? _noFileExists,
+            })
+          : {};
+        const invocationContext = { thread: owningThread, variables };
         const results = await Promise.all(
           executable.map(async ({ toolCall, tool }) => {
             try {
               const { content, isError } = await execute(
                 tool,
-                toolCall.input.arguments
+                toolCall.input.arguments,
+                invocationContext
               );
               return {
                 id: toolCall.id,

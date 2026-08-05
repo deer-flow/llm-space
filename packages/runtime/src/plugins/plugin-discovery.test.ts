@@ -61,11 +61,25 @@ describe("discoverPlugins", () => {
       path.join(root, "commands", "nested", "two.ts"),
       "export default class {}\n"
     );
+    mkdirSync(path.join(root, "tools", "nested"), { recursive: true });
+    writeFileSync(
+      path.join(root, "tools", "project.ts"),
+      "export default class {}\n"
+    );
+    writeFileSync(
+      path.join(root, "tools", "nested", "ignored.ts"),
+      "export default class {}\n"
+    );
     expect(
       _discover(home).plugins[0]?.commandPaths.map((filePath) =>
         path.basename(filePath)
       )
     ).toEqual(["one.ts"]);
+    expect(
+      _discover(home).plugins[0]?.toolPaths.map((filePath) =>
+        path.basename(filePath)
+      )
+    ).toEqual(["project.ts"]);
   });
 
   test("rejects non-SemVer versions and symlinked extension directories", () => {

@@ -213,8 +213,15 @@ export function createMainWindowRPC({
           pluginManager.setSettings(pluginId, settings),
         pluginCommandsList: () =>
           Promise.resolve(pluginManager.commands.list()),
-        pluginCommandExecute: ({ commandId }) =>
-          pluginManager.commands.execute(commandId),
+        pluginCommandExecute: ({ commandId, arguments: args, activeTab }) =>
+          pluginManager.commands.executeWithContext(
+            commandId,
+            { activeTab },
+            args
+          ),
+        pluginToolsList: () => Promise.resolve(pluginManager.tools.list()),
+        pluginToolExecute: ({ tool, thread, variables, arguments: args }) =>
+          pluginManager.tools.execute(tool, { thread, variables }, args),
         threadStoragesList: () =>
           Promise.resolve(pluginManager.threadStorages.list()),
         threadStorageResolveLatest: ({ storageId, resourceId }) =>

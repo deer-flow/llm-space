@@ -28,6 +28,9 @@ export const webHost: HostServices = {
     list: () => Promise.resolve([]),
     fsReveal: () => unavailable(),
   },
+  pluginTools: {
+    list: () => Promise.resolve([]),
+  },
   paths: {
     ensureRootDir: (relativePath) => Promise.resolve(relativePath),
   },

@@ -1,18 +1,32 @@
 import type {
   JsonObject,
   JsonValue,
+  BuiltinToolCallResponse,
+  PluginCommandExecutionResult,
   PluginCommandView,
   PluginView,
+  PluginTool,
   Thread,
   ThreadLocator,
   ThreadStorageView,
 } from "@llm-space/core";
 
 import { electrobun } from "@/lib/electrobun";
+import type { RuntimeId } from "@/shared/runtime";
 
 function _rpc() {
   if (!electrobun.rpc) throw new Error("Electrobun RPC is not initialized");
   return electrobun.rpc;
+}
+
+/** The mounted pane snapshot captured when a Plugin Command starts. */
+export interface PluginActiveTab {
+  tabId: string;
+  paneId: string;
+  path: string;
+  filename: string;
+  runtimeId: RuntimeId;
+  thread: Thread;
 }
 
 export const listPlugins = (): Promise<PluginView[]> =>
@@ -39,8 +53,32 @@ export const setPluginSettings = (
 export const listPluginCommands = (): Promise<PluginCommandView[]> =>
   _rpc().request.pluginCommandsList({});
 
-export const executePluginCommand = (commandId: string): Promise<JsonValue> =>
-  _rpc().request.pluginCommandExecute({ commandId });
+export const executePluginCommand = (
+  commandId: string,
+  activeTab: Pick<PluginActiveTab, "filename" | "thread"> | null,
+  args: string[]
+): Promise<PluginCommandExecutionResult> =>
+  _rpc().request.pluginCommandExecute({
+    commandId,
+    activeTab,
+    arguments: args,
+  });
+
+export const listPluginTools = (): Promise<PluginTool[]> =>
+  _rpc().request.pluginToolsList({});
+
+export const executePluginTool = (
+  tool: PluginTool,
+  thread: Thread,
+  variables: Record<string, JsonValue>,
+  args: Record<string, unknown>
+): Promise<BuiltinToolCallResponse> =>
+  _rpc().request.pluginToolExecute({
+    tool,
+    thread,
+    variables,
+    arguments: args,
+  });
 
 export const listThreadStorages = (): Promise<ThreadStorageView[]> =>
   _rpc().request.threadStoragesList({});

@@ -1,11 +1,16 @@
 import { isExecutableTool, type Tool, type ToolCall } from "@llm-space/core";
-import { getToolResultText } from "@llm-space/core/thread";
+import {
+  getToolResultText,
+  resolveThreadPromptVariableValues,
+} from "@llm-space/core/thread";
 import { useCallback, useMemo } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
 import { isFirecrawlLimitError } from "@llm-space/ui/lib/firecrawl";
 
+import { createRuntimePromptFiles } from "../runtime-prompt-files";
 import { useThreadStore, useThreadStoreActions } from "../stores";
+import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
 export interface ToolCallOutcome {
   isError: boolean;
@@ -19,9 +24,11 @@ export interface ToolCallOutcome {
  * stays at the call site — only detection and plumbing are shared here.
  */
 export function useToolCallRunner(messageId: string) {
-  const { executeTool } = useHostServices();
+  const { executeTool, files, skills } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
+  const thread = useThreadStore((state) => state.thread);
   const runtimeId = useThreadStore((state) => state.runtimeId);
+  const ownerRuntimeId = runtimeId ?? "local";
   const { updateToolCallOutput, updateToolCallOutputText } =
     useThreadStoreActions();
 
@@ -46,10 +53,24 @@ export function useToolCallRunner(messageId: string) {
         return null;
       }
       try {
+        const owningThread = structuredClone(thread);
+        const promptFiles = createRuntimePromptFiles(files, ownerRuntimeId);
+        const variables =
+          tool.type === "plugin"
+            ? await resolveThreadPromptVariableValues({
+                context: owningThread.context,
+                loadSkills: () =>
+                  listEnabledPromptVariableSkills(skills, {
+                    runtimeId: ownerRuntimeId,
+                  }),
+                loadFile: promptFiles.loadFile,
+                fileExists: promptFiles.fileExists,
+              })
+            : {};
         const { content, isError } = await executeTool(
           tool,
           toolCall.input.arguments,
-          { runtimeId }
+          { runtimeId: ownerRuntimeId, thread: owningThread, variables }
         );
         updateToolCallOutput(messageId, toolCall.id, content, isError);
         const text = getToolResultText(content);
@@ -66,9 +87,12 @@ export function useToolCallRunner(messageId: string) {
     },
     [
       executeTool,
+      files,
       messageId,
       resolveTool,
-      runtimeId,
+      ownerRuntimeId,
+      skills,
+      thread,
       updateToolCallOutput,
       updateToolCallOutputText,
     ]

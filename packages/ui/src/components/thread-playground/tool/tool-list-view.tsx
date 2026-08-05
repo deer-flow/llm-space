@@ -4,6 +4,7 @@ import {
   getToolKey,
   isProviderHostedTool,
   type FunctionTool,
+  type PluginTool,
   type ProviderHostedTool,
   type Tool,
 } from "@llm-space/core";
@@ -35,6 +36,7 @@ import {
 
 import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
 import { McpToolImportDialog } from "./mcp-tool-import-popover";
+import { PluginToolImportDialog } from "./plugin-tool-import-dialog";
 import { ProviderHostedToolEditorDialog } from "./provider-hosted-tool-editor-dialog";
 import { ToolEditorDialog } from "./tool-editor-dialog";
 import { ToolListItem } from "./tool-list-item";
@@ -55,6 +57,7 @@ export function ToolListView({
     useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [builtInOpen, setBuiltInOpen] = useState(false);
+  const [pluginOpen, setPluginOpen] = useState(false);
   const [initialMcpServerId, setInitialMcpServerId] = useState<string | null>(
     null
   );
@@ -64,6 +67,9 @@ export function ToolListView({
   const [initialBuiltInToolName, setInitialBuiltInToolName] = useState<
     string | null
   >(null);
+  const [initialPluginToolId, setInitialPluginToolId] = useState<string | null>(
+    null
+  );
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
   const [editingProviderHostedTool, setEditingProviderHostedTool] =
     useState<ProviderHostedTool | null>(null);
@@ -104,6 +110,11 @@ export function ToolListView({
     if (tool.type === "builtin") {
       setInitialBuiltInToolName(tool.name);
       setBuiltInOpen(true);
+      return;
+    }
+    if (tool.type === "plugin") {
+      setInitialPluginToolId(tool.toolId);
+      setPluginOpen(true);
       return;
     }
     setEditingTool(tool);
@@ -160,6 +171,15 @@ export function ToolListView({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
+                  setInitialPluginToolId(null);
+                  setPluginOpen(true);
+                }}
+              >
+                <PackageCheckIcon />
+                Add Plugin Tools
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
                   setInitialMcpServerId(null);
                   setInitialMcpToolName(null);
                   setMcpOpen(true);
@@ -209,6 +229,18 @@ export function ToolListView({
           runtimeId={runtimeId}
           onAdd={addTool}
           onRemove={removeTool}
+        />
+        <PluginToolImportDialog
+          open={pluginOpen}
+          onOpenChange={(open) => {
+            setPluginOpen(open);
+            if (!open) setInitialPluginToolId(null);
+          }}
+          initialToolId={initialPluginToolId}
+          existingToolNames={existingToolNames}
+          runtimeId={runtimeId}
+          onAdd={(tool: PluginTool) => addTool(tool)}
+          onRemove={(tool) => removeTool(getToolKey(tool))}
         />
       </div>
       <ToolEditorDialog

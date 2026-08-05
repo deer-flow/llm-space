@@ -88,6 +88,7 @@ export function discoverPlugins({
         mcpPath: _realFile(rootPath, "mcp.json"),
         modelsPath: _realFile(rootPath, "models.json"),
         commandPaths: _extensionFiles(rootPath, "commands"),
+        toolPaths: _extensionFiles(rootPath, "tools"),
         threadStoragePaths: _extensionFiles(rootPath, "thread-storages"),
         settingsSchemaPath: _realFile(rootPath, "config.schema.json"),
       });

@@ -40,7 +40,9 @@ process.stdout.write = (chunk: unknown) => {
 };
 
 const commands = new Map<string, any>();
+const tools = new Map<string, any>();
 const storages = new Map<string, any>();
+const STRUCTURED_TOOL_RESULT = Symbol("structuredToolResult");
 const pendingHost = new Map<
   string,
   { resolve(value: any): void; reject(error: Error): void }
@@ -79,6 +81,98 @@ function context(signal?: AbortSignal) {
   });
 }
 
+function commandContext(
+  initialActiveTab: any,
+  initialArguments: unknown
+) {
+  let activeTabThread: unknown =
+    initialActiveTab == null ? null : structuredClone(initialActiveTab.thread);
+  let activeTabThreadUpdated = false;
+  const activeTab =
+    initialActiveTab == null
+      ? null
+      : Object.freeze({
+          filename: String(initialActiveTab.filename),
+          thread: structuredClone(initialActiveTab.thread),
+          writeThread: (thread: unknown) => {
+            activeTabThread = structuredClone(thread);
+            activeTabThreadUpdated = true;
+            return Promise.resolve();
+          },
+        });
+  const value = Object.freeze({
+    ...context(),
+    arguments: Object.freeze(
+      Array.isArray(initialArguments) ? [...initialArguments] : []
+    ),
+    activeTab,
+  });
+  return {
+    value,
+    result(result: any) {
+      return {
+        result: result ?? null,
+        ...(activeTabThreadUpdated
+          ? { activeTabThreadUpdate: activeTabThread }
+          : {}),
+      };
+    },
+  };
+}
+
+function toolContext(initialThread: unknown, initialVariables: unknown) {
+  const thread = deepFreeze(structuredClone(initialThread));
+  const variables = deepFreeze(
+    structuredClone(initialVariables ?? {}) as Record<string, unknown>
+  );
+  return Object.freeze({
+    ...context(),
+    thread,
+    variables,
+    createResult: (content: unknown) => {
+      if (!isToolContent(content)) {
+        throw new Error("Plugin Tool structured content is invalid.");
+      }
+      return { [STRUCTURED_TOOL_RESULT]: true, content };
+    },
+  });
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function isToolContent(value: unknown): value is unknown[] {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!item || typeof item !== "object") return false;
+      const content = item as Record<string, unknown>;
+      if (content.type === "text") return typeof content.text === "string";
+      return (
+        content.type === "image" &&
+        typeof content.data === "string" &&
+        typeof content.mimeType === "string"
+      );
+    })
+  );
+}
+
+function toolResult(result: any) {
+  if (
+    result &&
+    typeof result === "object" &&
+    result[STRUCTURED_TOOL_RESULT] === true
+  ) {
+    return { kind: "content", content: result.content };
+  }
+  return { kind: "value", value: result ?? null };
+}
+
 async function loadClass(filePath: string): Promise<any> {
   const module = await import(
     `${pathToFileURL(filePath).href}?runner=${Date.now()}`
@@ -92,8 +186,10 @@ async function handle(method: string, params: any): Promise<any> {
   if (method === "initialize") {
     settings = params.settings ?? {};
     commands.clear();
+    tools.clear();
     storages.clear();
     const commandViews = [];
+    const toolViews = [];
     const storageViews = [];
     const errors = [];
     for (const item of params.commands ?? []) {
@@ -115,6 +211,43 @@ async function handle(method: string, params: any): Promise<any> {
         errors.push({
           id: item.id,
           kind: "command",
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
+    }
+    for (const item of params.tools ?? []) {
+      try {
+        const instance = await loadClass(item.path);
+        if (
+          typeof instance.name !== "string" ||
+          instance.name.trim().length === 0 ||
+          typeof instance.description !== "string" ||
+          !instance.parameters ||
+          typeof instance.parameters !== "object" ||
+          Array.isArray(instance.parameters) ||
+          typeof instance.execute !== "function" ||
+          (instance.strict !== undefined &&
+            typeof instance.strict !== "boolean")
+        ) {
+          throw new Error(
+            "Plugin Tool requires name, description, parameters, and execute(context, args)."
+          );
+        }
+        tools.set(item.id, instance);
+        toolViews.push({
+          id: item.id,
+          name: instance.name,
+          description: instance.description,
+          parameters: structuredClone(instance.parameters),
+          ...(instance.strict === undefined
+            ? {}
+            : { strict: instance.strict }),
+        });
+      } catch (error) {
+        errors.push({
+          id: item.id,
+          kind: "tool",
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         });
@@ -171,7 +304,12 @@ async function handle(method: string, params: any): Promise<any> {
         });
       }
     }
-    return { commands: commandViews, storages: storageViews, errors };
+    return {
+      commands: commandViews,
+      tools: toolViews,
+      storages: storageViews,
+      errors,
+    };
   }
   if (method === "settings.update") {
     settings = params.settings ?? {};
@@ -180,7 +318,21 @@ async function handle(method: string, params: any): Promise<any> {
   if (method === "command.execute") {
     const command = commands.get(params.id);
     if (!command) throw new Error(`Unknown plugin command: ${params.id}`);
-    return await command.execute(context());
+    const invocation = commandContext(params.activeTab, params.arguments);
+    const result = await command.execute(
+      invocation.value,
+      invocation.value.arguments
+    );
+    return invocation.result(result);
+  }
+  if (method === "tool.execute") {
+    const tool = tools.get(params.id);
+    if (!tool) throw new Error(`Unknown Plugin Tool: ${params.id}`);
+    const result = await tool.execute(
+      toolContext(params.thread, params.variables),
+      params.arguments ?? {}
+    );
+    return toolResult(result);
   }
   if (method.startsWith("storage.")) {
     const storage = storages.get(params.id);
@@ -193,7 +345,11 @@ async function handle(method: string, params: any): Promise<any> {
       return await storage.write(params.thread, params.resourceId, context());
   }
   if (method === "shutdown") {
-    for (const instance of [...commands.values(), ...storages.values()]) {
+    for (const instance of [
+      ...commands.values(),
+      ...tools.values(),
+      ...storages.values(),
+    ]) {
       if (typeof instance.dispose === "function") await instance.dispose();
     }
     setTimeout(() => process.exit(0), 0);

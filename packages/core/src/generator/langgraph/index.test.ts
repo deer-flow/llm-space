@@ -150,4 +150,70 @@ describe("langgraphGenerator", () => {
     expect(phases).toEqual([]);
     expect(logs).toEqual([]);
   });
+
+  test("rejects Plugin Tools before writing any files", async () => {
+    const written: string[] = [];
+    const capabilities: GeneratorCapabilities = {
+      checkUv: () => Promise.resolve({ installed: false }),
+      runUv: () =>
+        Promise.resolve({
+          code: 0,
+          stdout: "",
+          stderr: "",
+          timedOut: false,
+        }),
+      writeFile: (_rootDir, relativePath) => {
+        written.push(relativePath);
+        return Promise.resolve();
+      },
+      removeFile: () => Promise.resolve(),
+    };
+    const workflow: WorkflowContext = {
+      phase: () => undefined,
+      log: () => undefined,
+      agent: () => Promise.resolve(""),
+      parallel: <T>(thunks: (() => Promise<T>)[]) =>
+        Promise.all(thunks.map((thunk) => thunk())),
+      signal: new AbortController().signal,
+    };
+    const input: GeneratorRunInput = {
+      targetDir: "/authorized/output",
+      context: {
+        tools: [
+          {
+            type: "plugin",
+            pluginId: "project-kit",
+            toolId: "plugin:project-kit:tool:project-info",
+            name: "project_info",
+            description: "Read project information.",
+            parameters: { type: "object", properties: {} },
+          },
+        ],
+      },
+      rendered: {},
+      systemPromptTemplate: "",
+      skills: [],
+      renderedVariableValues: {},
+      model: { provider: "openai", id: "gpt-5" },
+      modelInfo: {
+        name: "GPT-5",
+        anthropic: false,
+        deepseekThinking: false,
+        supportsReasoning: true,
+      },
+      capabilities,
+    };
+
+    let error: unknown;
+    try {
+      await langgraphGenerator.run(workflow, input);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(() => {
+      throw error;
+    }).toThrow("LangGraph export does not support Plugin tools");
+    expect(written).toEqual([]);
+  });
 });

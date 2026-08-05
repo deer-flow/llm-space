@@ -163,8 +163,11 @@ function _ThreadPlayground({
       getReactLoop,
       runtimeId: ownerRuntimeId,
       executeTool: executeTool
-        ? (tool, args) =>
-            executeTool(tool, args, { runtimeId: ownerRuntimeId })
+        ? (tool, args, context) =>
+            executeTool(tool, args, {
+              runtimeId: ownerRuntimeId,
+              ...context,
+            })
         : undefined,
       loadSkills: () =>
         listEnabledPromptVariableSkills(skills, {
@@ -401,9 +404,7 @@ function ThreadPlaygroundContent({
                       )}
                       aria-label="Run settings"
                       disabled={
-                        readonlyFromProps ||
-                        status !== "idle" ||
-                        !hasModel
+                        readonlyFromProps || status !== "idle" || !hasModel
                       }
                     >
                       <ChevronDownIcon className="size-3" />

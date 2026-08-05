@@ -444,7 +444,7 @@ function _ToolStepContinuation({
             size="sm"
             variant="outline"
             disabled={!canCallTools}
-            aria-label="Call available MCP and built-in tools"
+            aria-label="Call available tools"
             onClick={() => void handleCallTools()}
           >
             Call tools

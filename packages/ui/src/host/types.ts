@@ -13,11 +13,14 @@ import type {
   McpServerToolsResponse,
   McpServerView,
   McpTool,
+  PluginTool,
+  JsonValue,
   ModelConfig,
   ModelProviderGroup,
   SearchSettings,
   SkillInfo,
   SkillsSettings,
+  Thread,
 } from "@llm-space/core";
 
 /** A tool call's result, normalized across the built-in and MCP backends. */
@@ -41,13 +44,17 @@ export interface ShareThreadActionInput {
   runtimeId: string;
 }
 
-export interface ExecuteToolOptions extends RuntimeScopedHostOptions {}
+export interface ExecuteToolOptions extends RuntimeScopedHostOptions {
+  /** Owning Thread snapshot and one resolved variable map for this call batch. */
+  thread: Thread;
+  variables: Record<string, JsonValue>;
+}
 
-/** Invoke an executable tool (built-in or MCP). */
+/** Invoke an executable tool (built-in, MCP, or Plugin). */
 export type ExecuteTool = (
-  tool: McpTool | BuiltinTool,
+  tool: McpTool | BuiltinTool | PluginTool,
   args: Record<string, unknown>,
-  options?: ExecuteToolOptions
+  options: ExecuteToolOptions
 ) => Promise<ToolCallResult>;
 
 /** Read-only skills access used by prompt variables + examples. */
@@ -74,6 +81,11 @@ export interface BuiltinToolsHost {
   list(options?: RuntimeScopedHostOptions): Promise<BuiltinTool[]>;
   /** Open a directory itself, or reveal a file selected in its parent folder. */
   fsReveal(path: string): Promise<void>;
+}
+
+/** Locally installed Plugin Tools available for importing into a Thread. */
+export interface PluginToolsHost {
+  list(options?: RuntimeScopedHostOptions): Promise<PluginTool[]>;
 }
 
 /** Workspace path resolution (used to seed example threads). */
@@ -207,6 +219,7 @@ export interface HostServices {
   skills: SkillsHost;
   mcp: McpHost;
   builtinTools: BuiltinToolsHost;
+  pluginTools: PluginToolsHost;
   paths: PathsHost;
   files: FilesHost;
   /** Code-generator backing; `null` on hosts without it (the web viewer). */

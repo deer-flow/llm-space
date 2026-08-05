@@ -1,5 +1,6 @@
 "use client";
 
+import type { Thread } from "@llm-space/core";
 import { useTheme } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -92,6 +93,7 @@ interface ThreadTabsProps {
   onToggleSidebar?: () => void;
   lifecycleHost: PaneLifecycleHost;
   mutationRevision: number;
+  onThreadStateChange?: (tabId: string, thread: Thread | null) => void;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
 }
@@ -121,6 +123,7 @@ export function ThreadTabs({
   onToggleSidebar,
   lifecycleHost,
   mutationRevision,
+  onThreadStateChange,
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
@@ -258,6 +261,7 @@ export function ThreadTabs({
           onMove={onMove}
           onClose={close}
           consumeDiscardedPane={consumeDiscardedPane}
+          onThreadStateChange={onThreadStateChange}
         />
       ) : (
         <TraceTabPane
@@ -278,6 +282,7 @@ export function ThreadTabs({
       lifecycleHost,
       mutationRevision,
       onMove,
+      onThreadStateChange,
       onTraceTitleChange,
     ]
   );

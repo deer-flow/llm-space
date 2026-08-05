@@ -27,6 +27,7 @@ import {
   readTextFile,
   textFileExists,
 } from "@/client/paths";
+import { listPluginTools } from "@/client/plugins";
 import { createRpcTransport } from "@/client/rpc-transport";
 import { getSearchSettings } from "@/client/search";
 import {
@@ -128,6 +129,12 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         list: (options) =>
           listBuiltInTools(options?.runtimeId as RuntimeId | undefined),
         fsReveal,
+      },
+      pluginTools: {
+        list: ({ runtimeId } = {}) =>
+          runtimeId && runtimeId !== "local"
+            ? Promise.resolve([])
+            : listPluginTools(),
       },
       paths: { ensureRootDir },
       files: {

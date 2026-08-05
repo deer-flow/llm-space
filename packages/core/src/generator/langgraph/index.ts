@@ -125,6 +125,9 @@ export const langgraphGenerator: GeneratorDefinition = {
         "LangGraph export does not support provider-hosted tools"
       );
     }
+    if ((context.tools ?? []).some((tool) => tool.type === "plugin")) {
+      throw new Error("LangGraph export does not support Plugin tools");
+    }
 
     const written: string[] = [];
     const write = async (path: string, contents: string): Promise<void> => {

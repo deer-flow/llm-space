@@ -36,6 +36,27 @@ describe("ask_user_question termination", () => {
   });
 });
 
+describe("Plugin Tools", () => {
+  test("preserves source identity while exposing an executable PI shape", () => {
+    const tool = {
+      type: "plugin" as const,
+      pluginId: "project-kit",
+      toolId: "plugin:project-kit:tool:project-info",
+      name: "project_info",
+      description: "Read project information.",
+      parameters: { type: "object", properties: {} },
+      strict: true,
+    };
+    const validator = Compile(Tool);
+
+    expect(validator.Check(tool)).toBe(true);
+    expect(normalizeTool(tool)).toEqual(tool);
+    expect(isExecutableTool(tool)).toBe(true);
+    expect(getToolKey(tool)).toBe("plugin:project-kit:tool:project-info");
+    expect(getToolDisplayName(tool)).toBe("project_info");
+  });
+});
+
 describe("provider-hosted tools", () => {
   const validator = Compile(Tool);
 

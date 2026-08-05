@@ -14,6 +14,8 @@ import type {
   ThreadLocator,
   ThreadStorageView,
   PluginCommandView,
+  PluginCommandExecutionResult,
+  PluginTool,
   PluginView,
   JsonObject,
   JsonValue,
@@ -279,8 +281,25 @@ export interface DesktopRPCType {
         response: PluginCommandView[];
       };
       pluginCommandExecute: {
-        params: { commandId: string };
-        response: JsonValue;
+        params: {
+          commandId: string;
+          arguments: string[];
+          activeTab: { filename: string; thread: Thread } | null;
+        };
+        response: PluginCommandExecutionResult;
+      };
+      pluginToolsList: {
+        params: Record<string, never>;
+        response: PluginTool[];
+      };
+      pluginToolExecute: {
+        params: {
+          tool: PluginTool;
+          thread: Thread;
+          variables: Record<string, JsonValue>;
+          arguments: Record<string, unknown>;
+        };
+        response: BuiltinToolCallResponse;
       };
       threadStoragesList: {
         params: Record<string, never>;

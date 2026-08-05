@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { executePluginCommand, listPluginCommands } from "@/client/plugins";
+import type { PluginActiveTab } from "@/client/plugins";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
 import {
@@ -19,6 +20,12 @@ import {
   type Command as AppCommand,
   type CommandType,
 } from "@/shared/commands";
+
+import {
+  matchesCommandText,
+  parsePluginCommandInvocation,
+  pluginCommandQualifiedName,
+} from "./plugin-command-input";
 
 /**
  * The ⌘⇧P command palette. Lists every registered command (from
@@ -32,20 +39,29 @@ export function CommandPalette({
   blacklist = [],
   onSaveTo,
   onImportFrom,
+  getActiveTab,
+  writeActiveTabThread,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   blacklist?: string[];
   onSaveTo?: () => void;
   onImportFrom?: () => void;
+  getActiveTab: () => PluginActiveTab | null;
+  writeActiveTabThread: (
+    target: PluginActiveTab,
+    thread: PluginActiveTab["thread"]
+  ) => Promise<void>;
 }) {
   const { executeCommand } = useCommands();
   const [pluginCommands, setPluginCommands] = useState<
     Awaited<ReturnType<typeof listPluginCommands>>
   >([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    setSearch("");
     const refresh = () => {
       void listPluginCommands()
         .then(setPluginCommands)
@@ -60,8 +76,24 @@ export function CommandPalette({
   }, [open]);
 
   const types = (Object.keys(COMMAND_META) as CommandType[]).filter(
-    (type) => !blacklist.includes(type)
+    (type) =>
+      !blacklist.includes(type) &&
+      matchesCommandText(COMMAND_META[type].label, search)
   );
+  const visiblePluginCommands = pluginCommands.filter((command) => {
+    try {
+      return (
+        parsePluginCommandInvocation(search, command) !== null ||
+        matchesCommandText(
+          `${command.displayName} ${command.description ?? ""} ${pluginCommandQualifiedName(command)}`,
+          search
+        )
+      );
+    } catch {
+      // Keep the targeted command visible while the user finishes a quote.
+      return true;
+    }
+  });
 
   const run = (type: CommandType) => {
     onOpenChange(false);
@@ -72,8 +104,12 @@ export function CommandPalette({
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <Command>
-        <CommandInput placeholder="Search commands..." />
+      <Command shouldFilter={false}>
+        <CommandInput
+          placeholder="Search commands or enter arguments..."
+          value={search}
+          onValueChange={setSearch}
+        />
         <CommandList>
           <CommandEmpty>No commands found.</CommandEmpty>
           {types.map((type) => (
@@ -81,7 +117,7 @@ export function CommandPalette({
               {COMMAND_META[type].label}
             </CommandItem>
           ))}
-          {onSaveTo ? (
+          {onSaveTo && matchesCommandText("Save to", search) ? (
             <CommandItem
               value="Save to Thread Storage"
               onSelect={() => {
@@ -92,7 +128,7 @@ export function CommandPalette({
               Save to…
             </CommandItem>
           ) : null}
-          {onImportFrom ? (
+          {onImportFrom && matchesCommandText("Import from", search) ? (
             <CommandItem
               value="Import from Thread Storage"
               onSelect={() => {
@@ -103,20 +139,57 @@ export function CommandPalette({
               Import from…
             </CommandItem>
           ) : null}
-          {pluginCommands.map((command) => (
+          {visiblePluginCommands.map((command) => (
             <CommandItem
               key={command.id}
-              value={`${command.displayName} ${command.description ?? ""}`}
+              value={`${command.displayName} ${command.description ?? ""} ${pluginCommandQualifiedName(command)}`}
               onSelect={() => {
-                onOpenChange(false);
-                void executePluginCommand(command.id).catch((error) =>
+                let args: string[];
+                try {
+                  args = parsePluginCommandInvocation(search, command) ?? [];
+                } catch (error) {
                   toast.error(
                     error instanceof Error ? error.message : String(error)
-                  )
-                );
+                  );
+                  return;
+                }
+                onOpenChange(false);
+                const activeTab = getActiveTab();
+                void executePluginCommand(
+                  command.id,
+                  activeTab
+                    ? {
+                        filename: activeTab.filename,
+                        thread: activeTab.thread,
+                      }
+                    : null,
+                  args
+                )
+                  .then(async ({ activeTabThreadUpdate }) => {
+                    if (activeTabThreadUpdate === undefined) return;
+                    if (!activeTab) {
+                      throw new Error(
+                        "Plugin Command cannot write without an active tab."
+                      );
+                    }
+                    await writeActiveTabThread(
+                      activeTab,
+                      activeTabThreadUpdate
+                    );
+                  })
+                  .catch((error) =>
+                    toast.error(
+                      error instanceof Error ? error.message : String(error)
+                    )
+                  );
               }}
             >
-              {command.displayName}
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate">{command.displayName}</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {pluginCommandQualifiedName(command)}
+                </span>
+              </div>
             </CommandItem>
           ))}
         </CommandList>

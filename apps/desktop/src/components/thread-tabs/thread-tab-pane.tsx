@@ -5,14 +5,7 @@ import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createFileSystemClient, createRpcTransport } from "@/client";
@@ -44,6 +37,8 @@ interface ThreadTabPaneProps {
   onClose: (tabId: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
   consumeDiscardedPane?: (paneId: string) => boolean;
+  /** Publish the pane's latest in-memory thread for host integrations. */
+  onThreadStateChange?: (tabId: string, thread: Thread | null) => void;
 }
 
 /**
@@ -63,6 +58,7 @@ function _ThreadTabPane({
   onMove,
   onClose,
   consumeDiscardedPane,
+  onThreadStateChange,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
@@ -90,6 +86,22 @@ function _ThreadTabPane({
     isError,
     isLoading,
   });
+
+  const publishedThreadTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (thread && publishedThreadTabRef.current !== tabId) {
+      publishedThreadTabRef.current = tabId;
+      onThreadStateChange?.(tabId, thread);
+    }
+  }, [onThreadStateChange, tabId, thread]);
+
+  useEffect(
+    () => () => {
+      publishedThreadTabRef.current = null;
+      onThreadStateChange?.(tabId, null);
+    },
+    [onThreadStateChange, tabId]
+  );
 
   // The tab is opened optimistically (see `useThreadTabs.open`) without
   // pre-checking the file exists, so a since-deleted (or otherwise unreadable)
@@ -150,21 +162,26 @@ function _ThreadTabPane({
   const handleChange = useCallback(
     (next: Thread) => {
       if (
-        lifecycleHost.isMutationReserved(
-          paneId,
-          runtimeId,
-          pathRef.current
-        )
+        lifecycleHost.isMutationReserved(paneId, runtimeId, pathRef.current)
       ) {
         return;
       }
+      onThreadStateChange?.(tabId, next);
       persistence.setPending(next);
       if (writeTimer.current) clearTimeout(writeTimer.current);
       writeTimer.current = setTimeout(() => {
         void flushPending();
       }, 500);
     },
-    [flushPending, lifecycleHost, paneId, persistence, runtimeId]
+    [
+      flushPending,
+      lifecycleHost,
+      onThreadStateChange,
+      paneId,
+      persistence,
+      runtimeId,
+      tabId,
+    ]
   );
 
   const handleStreamingStart = useCallback(
@@ -238,6 +255,12 @@ function _ThreadTabPane({
           queryKey: ["thread", runtimeId, pathRef.current],
           exact: true,
         });
+        const refreshed = qc.getQueryData<Thread>([
+          "thread",
+          runtimeId,
+          pathRef.current,
+        ]);
+        if (refreshed) onThreadStateChange?.(tabId, refreshed);
         markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
@@ -250,11 +273,13 @@ function _ThreadTabPane({
     })();
   }, [
     markCommitPending,
+    onThreadStateChange,
     persistence,
     refreshNonce,
     qc,
     runtimeId,
     settleWithoutCommit,
+    tabId,
   ]);
 
   const handleRenameTitle = useCallback(
@@ -295,13 +320,10 @@ function _ThreadTabPane({
     [flushPending, fs, lifecycleHost, onMove, qc, runtimeId]
   );
 
-  const mutationReserved = useMemo(
-    () => {
-      void mutationRevision;
-      return lifecycleHost.isMutationReserved(paneId, runtimeId, path);
-    },
-    [lifecycleHost, mutationRevision, paneId, path, runtimeId]
-  );
+  const mutationReserved = useMemo(() => {
+    void mutationRevision;
+    return lifecycleHost.isMutationReserved(paneId, runtimeId, path);
+  }, [lifecycleHost, mutationRevision, paneId, path, runtimeId]);
 
   if (loadError) {
     return (

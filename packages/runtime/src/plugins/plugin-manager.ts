@@ -25,6 +25,10 @@ import {
   PluginSubprocessHost,
   type PluginHostRequestHandler,
 } from "./plugin-subprocess-host";
+import {
+  PluginToolRegistry,
+  type LoadedPluginToolDefinition,
+} from "./plugin-tool-registry";
 import type {
   DiscoveredPlugin,
   PluginDiscoveryFailure,
@@ -62,10 +66,11 @@ const ModelsFileSchema = z.object({
 
 interface RunnerInitializationResult {
   commands: Omit<PluginCommandView, "pluginId">[];
+  tools: LoadedPluginToolDefinition[];
   storages: Omit<ThreadStorageView, "pluginId" | "source">[];
   errors: {
     id: string;
-    kind: "command" | "threadStorage";
+    kind: "command" | "tool" | "threadStorage";
     message: string;
     stack?: string;
   }[];
@@ -79,6 +84,7 @@ export interface PluginManagerOptions {
   mcpManager: Pick<McpManager, "setPluginServers">;
   modelManager: Pick<ModelManager, "setPluginProviders">;
   commandRegistry?: PluginCommandRegistry;
+  toolRegistry?: PluginToolRegistry;
   threadStorageRegistry?: ThreadStorageRegistry;
   handleHostRequest?: PluginHostRequestHandler;
   onChanged?: () => void;
@@ -86,6 +92,7 @@ export interface PluginManagerOptions {
 
 export class PluginManager {
   readonly commands: PluginCommandRegistry;
+  readonly tools: PluginToolRegistry;
   readonly threadStorages: ThreadStorageRegistry;
   private readonly _logger: PluginLogger;
   private readonly _settings: PluginSettingsStore;
@@ -126,6 +133,7 @@ export class PluginManager {
     };
     this.commands =
       _options.commandRegistry ?? new PluginCommandRegistry(operationError);
+    this.tools = _options.toolRegistry ?? new PluginToolRegistry(operationError);
     this.threadStorages =
       _options.threadStorageRegistry ??
       new ThreadStorageRegistry(operationError);
@@ -293,7 +301,11 @@ export class PluginManager {
     this._loadSkills(record);
     this._loadMcp(record);
     this._loadModels(record);
-    if (record.commandPaths.length || record.threadStoragePaths.length)
+    if (
+      record.commandPaths.length ||
+      record.toolPaths.length ||
+      record.threadStoragePaths.length
+    )
       await this._startRunner(record);
     this._refreshStatus(record);
   }
@@ -403,6 +415,12 @@ export class PluginManager {
         filePath,
       ])
     );
+    const toolSourcePaths = new Map(
+      record.toolPaths.map((filePath) => [
+        _extensionId(record.id, "tool", filePath),
+        filePath,
+      ])
+    );
     const storageSourcePaths = new Map(
       record.threadStoragePaths.map((filePath) => [
         _extensionId(record.id, "thread-storage", filePath),
@@ -423,6 +441,10 @@ export class PluginManager {
           id: _extensionId(record.id, "command", filePath),
           path: filePath,
         })),
+        tools: record.toolPaths.map((filePath) => ({
+          id: _extensionId(record.id, "tool", filePath),
+          path: filePath,
+        })),
         storages: record.threadStoragePaths.map((filePath) => ({
           id: _extensionId(record.id, "thread-storage", filePath),
           path: filePath,
@@ -435,6 +457,14 @@ export class PluginManager {
           command.id,
           command.displayName,
           commandSourcePaths.get(command.id)
+        );
+      for (const tool of result.tools)
+        this._extension(
+          record,
+          "tool",
+          tool.id,
+          tool.name,
+          toolSourcePaths.get(tool.id)
         );
       for (const storage of result.storages)
         this._extension(
@@ -455,10 +485,13 @@ export class PluginManager {
           error,
           failure.kind === "command"
             ? commandSourcePaths.get(failure.id)
-            : storageSourcePaths.get(failure.id)
+            : failure.kind === "tool"
+              ? toolSourcePaths.get(failure.id)
+              : storageSourcePaths.get(failure.id)
         );
       }
       this.commands.replacePlugin(record.id, host, result.commands);
+      this.tools.replacePlugin(record.id, host, result.tools);
       this.threadStorages.replacePlugin(record.id, host, result.storages);
     } catch (error) {
       const safe = this._logger.writeError({
@@ -473,6 +506,16 @@ export class PluginManager {
         record.extensions.push({
           id: _extensionId(record.id, "command", filePath),
           kind: "command",
+          displayName: path.basename(filePath),
+          sourcePath: filePath,
+          active: false,
+          error: safe,
+        });
+      }
+      for (const filePath of record.toolPaths) {
+        record.extensions.push({
+          id: _extensionId(record.id, "tool", filePath),
+          kind: "tool",
           displayName: path.basename(filePath),
           sourcePath: filePath,
           active: false,
@@ -494,6 +537,7 @@ export class PluginManager {
 
   private async _deactivate(record: PluginRecord): Promise<void> {
     this.commands.removePlugin(record.id);
+    this.tools.removePlugin(record.id);
     this.threadStorages.removePlugin(record.id);
     const host = this._hosts.get(record.id);
     this._hosts.delete(record.id);

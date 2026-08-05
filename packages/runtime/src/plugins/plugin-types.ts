@@ -30,6 +30,7 @@ export interface DiscoveredPlugin {
   mcpPath?: string;
   modelsPath?: string;
   commandPaths: string[];
+  toolPaths: string[];
   threadStoragePaths: string[];
   settingsSchemaPath?: string;
 }

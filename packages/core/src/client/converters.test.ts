@@ -56,6 +56,14 @@ describe("convertToPiContext", () => {
           parameters: { type: "object" },
         },
         {
+          type: "plugin",
+          pluginId: "project-kit",
+          toolId: "plugin:project-kit:tool:project-info",
+          name: "project_info",
+          description: "Read project information",
+          parameters: { type: "object" },
+        },
+        {
           type: "provider-hosted",
           config: {
             type: "web_search",
@@ -66,7 +74,14 @@ describe("convertToPiContext", () => {
       ],
     });
 
-    expect(result.tools.map((tool) => tool.name)).toEqual(["lookup"]);
+    expect(result.tools).toEqual([
+      { name: "lookup", description: "Lookup", parameters: { type: "object" } },
+      {
+        name: "project_info",
+        description: "Read project information",
+        parameters: { type: "object" },
+      },
+    ]);
     expect(result.responseApiNativeTools).toEqual([
       {
         type: "web_search",

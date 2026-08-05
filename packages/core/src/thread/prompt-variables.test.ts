@@ -7,6 +7,7 @@ import {
   DEFAULT_WORKING_DIRECTORY,
   removePromptVariableSnapshotNames,
   renderThreadPromptVariables,
+  resolveThreadPromptVariableValues,
   SYSTEM_PROMPT_PLACE_KEY,
 } from "./prompt-variables";
 
@@ -56,6 +57,57 @@ describe("built-in working directory variable", () => {
       }),
     });
     expect(out.systemPrompt).toBe("Workspace: /path/that/does/not/exist");
+  });
+});
+
+describe("resolveThreadPromptVariableValues", () => {
+  test("resolves built-in, custom, JSON, skills, and file values once", async () => {
+    const resolved = await resolveThreadPromptVariableValues({
+      context: context("", {
+        variables: {
+          current_date: { type: "currentDate", format: "iso-date" },
+          current_working_directory: {
+            type: "workingDirectory",
+            value: "/workspace",
+          },
+          available_skills: {
+            type: "skills",
+            skillNames: ["review"],
+            includeAll: false,
+            format: "markdown-list",
+            indent: 0,
+          },
+          data: { type: "json", value: '{"count":2}' },
+          doc: { type: "file", value: "notes.md" },
+          invalid: { type: "json", value: "{bad" },
+        },
+        variableVariants: {
+          active: "default",
+          variants: { default: { greeting: "Hello", empty: "" } },
+        },
+      }),
+      now: () => new Date(2025, 0, 2, 12),
+      loadSkills: () =>
+        Promise.resolve([
+          {
+            name: "review",
+            description: "Review code",
+            path: "/skills/review",
+          },
+        ]),
+      loadFile: (path) => Promise.resolve(path === "notes.md" ? "Notes" : ""),
+    });
+
+    expect(resolved).toMatchObject({
+      current_date: "2025-01-02",
+      current_working_directory: "/workspace",
+      data: { count: 2 },
+      doc: "Notes",
+      greeting: "Hello",
+    });
+    expect(resolved.available_skills).toContain("review");
+    expect(resolved).not.toHaveProperty("invalid");
+    expect(resolved).not.toHaveProperty("empty");
   });
 });
 

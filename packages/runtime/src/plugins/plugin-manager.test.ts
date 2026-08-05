@@ -39,6 +39,16 @@ describe("PluginManager", () => {
       path.join(root, "commands", "broken.ts"),
       `throw new Error("broken import")`
     );
+    mkdirSync(path.join(root, "tools"));
+    writeFileSync(
+      path.join(root, "tools", "project-info.ts"),
+      `export default class ProjectInfo {
+        name = "project_info";
+        description = "Read project information";
+        parameters = { type: "object", properties: {} };
+        execute(context, args) { return { cwd: context.variables.cwd, title: context.thread.title, args }; }
+      }`
+    );
     mkdirSync(path.join(root, "thread-storages"));
     writeFileSync(
       path.join(root, "thread-storages", "memory.ts"),
@@ -58,6 +68,39 @@ describe("PluginManager", () => {
     expect(
       await manager.commands.execute("plugin:mixed-plugin:command:hello")
     ).toBe("hello");
+    const pluginTool = manager.tools.list()[0];
+    expect(pluginTool).toMatchObject({
+      type: "plugin",
+      pluginId: "mixed-plugin",
+      toolId: "plugin:mixed-plugin:tool:project-info",
+      name: "project_info",
+    });
+    if (!pluginTool) throw new Error("Expected Plugin Tool");
+    expect(
+      await manager.tools.execute(
+        pluginTool,
+        {
+          thread: { title: "Owning thread", context: {} },
+          variables: { cwd: "/workspace" },
+        },
+        { detail: true }
+      )
+    ).toEqual({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              cwd: "/workspace",
+              title: "Owning thread",
+              args: { detail: true },
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    });
     expect(
       plugin?.extensions.find(
         (extension) =>
@@ -80,6 +123,18 @@ describe("PluginManager", () => {
     expect(logPath).toBeString();
     if (!logPath) throw new Error("Expected plugin diagnostic log");
     expect(readFileSync(logPath, "utf8").length).toBeGreaterThan(0);
+
+    await manager.setEnabled("mixed-plugin", false);
+    expect(manager.tools.list()).toEqual([]);
+    expect(
+      manager.tools.execute(
+        pluginTool,
+        { thread: { context: {} }, variables: {} },
+        {}
+      )
+    ).rejects.toThrow(
+      "Plugin tool is unavailable: mixed-plugin/plugin:mixed-plugin:tool:project-info"
+    );
   });
 
   test("rebuilds read-only contributions and removes them on disable", async () => {

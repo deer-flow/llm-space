@@ -3,6 +3,30 @@ import { expect, test } from "bun:test";
 import type { Thread } from "./thread";
 import { ThreadZodSchema } from "./thread-zod";
 
+test("round-trips persisted Plugin Tool identity", () => {
+  const thread: Thread = {
+    context: {
+      tools: [
+        {
+          type: "plugin",
+          pluginId: "project-tools",
+          toolId: "plugin:project-tools:tool:project-info",
+          name: "project_info",
+          description: "Read project information.",
+          parameters: {
+            type: "object",
+            properties: {},
+            additionalProperties: false,
+          },
+          strict: true,
+        },
+      ],
+    },
+  };
+
+  expect(ThreadZodSchema.parse(thread)).toEqual(thread);
+});
+
 test("validates deeply nested provider-hosted tool JSON data", () => {
   const thread: Thread = {
     context: {

@@ -31,6 +31,7 @@ import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
 import { createFileSystemClient } from "@/client";
+import type { PluginActiveTab } from "@/client/plugins";
 import { getDefaultRuntime, listRuntimes } from "@/client/remote-servers";
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
@@ -305,6 +306,23 @@ function PageWorkspace({
       chooseActiveTabForRuntime(tabs.tabs, tabs.activeId, workspaceRuntimeId),
     [tabs.activeId, tabs.tabs, workspaceRuntimeId]
   );
+  const threadStateRef = useRef(new Map<string, Thread>());
+  const handleThreadStateChange = useCallback(
+    (tabId: string, thread: Thread | null) => {
+      if (thread) threadStateRef.current.set(tabId, thread);
+      else threadStateRef.current.delete(tabId);
+    },
+    []
+  );
+  const getActivePluginTab = useCallback((): PluginActiveTab | null => {
+    const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
+    if (activeTab?.type !== "thread") return null;
+    const thread = threadStateRef.current.get(activeTab.id);
+    const filename = activeTab.path.split("/").at(-1);
+    return thread && filename
+      ? { ...activeTab, tabId: activeTab.id, filename, thread }
+      : null;
+  }, [visibleActiveId, visibleTabs]);
   const getActiveShareThread = useCallback((): ShareThreadTarget | null => {
     const activeTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
     return activeTab?.type === "thread"
@@ -744,6 +762,48 @@ function PageWorkspace({
     [executeCommand]
   );
   const refreshReservationsRef = useRef(new Map<string, () => void>());
+  const writePluginActiveTabThread = useCallback(
+    async (target: PluginActiveTab, next: Thread): Promise<void> => {
+      const current = getActivePluginTab();
+      if (
+        current?.tabId !== target.tabId ||
+        current?.paneId !== target.paneId ||
+        current?.path !== target.path ||
+        current?.runtimeId !== target.runtimeId
+      ) {
+        throw new Error(
+          "The active thread changed before the Plugin Command completed."
+        );
+      }
+
+      const release = runtimeRunTrackerRef.current.reservePanes([
+        target.paneId,
+      ]);
+      if (!release) {
+        throw new Error(
+          "Finish the active run or save before a Plugin Command writes the thread."
+        );
+      }
+
+      try {
+        const committed: Thread = {
+          ...next,
+          runtimeId: target.runtimeId,
+        };
+        await createFileSystemClient(target.runtimeId).write(
+          target.path,
+          committed
+        );
+        threadStateRef.current.set(target.tabId, committed);
+        refreshReservationsRef.current.set(target.paneId, release);
+        tabs.refresh(target.tabId);
+      } catch (error) {
+        release();
+        throw error;
+      }
+    },
+    [getActivePluginTab, tabs]
+  );
   const handleRefreshTab = useCallback(
     (id: string) => {
       const tab = tabs.tabs.find((candidate) => candidate.id === id);
@@ -1002,6 +1062,7 @@ function PageWorkspace({
               onToggleSidebar={handleToggleSidebar}
               lifecycleHost={paneLifecycleHost}
               mutationRevision={mutationRevision}
+              onThreadStateChange={handleThreadStateChange}
               toolbarSlot={<UpdateIndicator />}
             />
           </ResizablePanel>
@@ -1038,6 +1099,8 @@ function PageWorkspace({
           blacklist={COMMAND_PALETTE_BLACKLIST}
           onSaveTo={() => setThreadStorageMode("save")}
           onImportFrom={() => setThreadStorageMode("import")}
+          getActiveTab={getActivePluginTab}
+          writeActiveTabThread={writePluginActiveTabThread}
         />
       </LazyMount>
       <LazyMount open={threadStorageMode !== null}>

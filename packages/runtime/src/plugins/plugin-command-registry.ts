@@ -1,4 +1,10 @@
-import type { JsonValue, PluginCommandView } from "@llm-space/core";
+import {
+  ThreadZodSchema,
+  type JsonValue,
+  type PluginCommandExecutionResult,
+  type PluginCommandInvocationContext,
+  type PluginCommandView,
+} from "@llm-space/core";
 
 import type { PluginSubprocessHost } from "./plugin-subprocess-host";
 
@@ -47,11 +53,32 @@ export class PluginCommandRegistry {
   }
 
   async execute(id: string): Promise<JsonValue> {
+    return (await this.executeWithContext(id, { activeTab: null }, []))
+      .result;
+  }
+
+  async executeWithContext(
+    id: string,
+    context: PluginCommandInvocationContext,
+    args: string[]
+  ): Promise<PluginCommandExecutionResult> {
     const entry = this._entries.get(id);
     if (!entry) throw new Error(`Plugin command is unavailable: ${id}`);
     try {
-      return ((await entry.host.call<unknown>("command.execute", { id })) ??
-        null) as JsonValue;
+      const response = await entry.host.call<PluginCommandExecutionResult>(
+        "command.execute",
+        { id, activeTab: context.activeTab, arguments: args }
+      );
+      return {
+        result: response.result ?? null,
+        ...(response.activeTabThreadUpdate === undefined
+          ? {}
+          : {
+              activeTabThreadUpdate: ThreadZodSchema.parse(
+                response.activeTabThreadUpdate
+              ),
+            }),
+      };
     } catch (error) {
       throw (
         this._onError?.(
