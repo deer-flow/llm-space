@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
 import { Input } from "@llm-space/ui/ui/input";
@@ -46,6 +45,10 @@ import {
 
 type ShareStatus = "idle" | "awaitingAuth" | "generating" | "success" | "error";
 
+const COPY_FEEDBACK_DURATION_MS = 1000;
+const URL_TAIL_MASK =
+  "linear-gradient(to right, black 0, black calc(100% - 5rem), rgba(0, 0, 0, 0.45) calc(100% - 2rem), transparent calc(100% - 0.25rem))";
+
 /**
  * The Share thread dialog. Publishes the thread at `path` as a secret GitHub
  * Gist and hands back a browser link. Signing in is folded into the flow: if the
@@ -77,6 +80,9 @@ export function ShareThreadDialog({
   const [confirmSignInOpen, setConfirmSignInOpen] = useState(false);
   const [flow] = useState(() => new ShareThreadDialogFlow());
   const authTransactionRef = useRef<ShareThreadTransaction | null>(null);
+  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Preparing a target is deliberately pure: React may discard this render.
   // The layout phase below is the first point at which the target is committed.
@@ -91,6 +97,10 @@ export function ShareThreadDialog({
   useLayoutEffect(() => {
     targetCommit.commit(flow);
     if (!open) return;
+    if (copyFeedbackTimerRef.current !== null) {
+      clearTimeout(copyFeedbackTimerRef.current);
+      copyFeedbackTimerRef.current = null;
+    }
     authTransactionRef.current = null;
     setStatus("idle");
     setShareUrl("");
@@ -104,6 +114,15 @@ export function ShareThreadDialog({
       setTitle
     );
   }, [flow, open, path, targetCommit]);
+
+  useEffect(
+    () => () => {
+      if (copyFeedbackTimerRef.current !== null) {
+        clearTimeout(copyFeedbackTimerRef.current);
+      }
+    },
+    []
+  );
 
   const publishTransaction = useCallback(
     (transaction: ShareThreadTransaction) => {
@@ -175,7 +194,14 @@ export function ShareThreadDialog({
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
+      if (copyFeedbackTimerRef.current !== null) {
+        clearTimeout(copyFeedbackTimerRef.current);
+      }
       setCopied(true);
+      copyFeedbackTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyFeedbackTimerRef.current = null;
+      }, COPY_FEEDBACK_DURATION_MS);
     } catch {
       // Clipboard can be unavailable; the link stays visible for manual copy.
     }
@@ -187,6 +213,11 @@ export function ShareThreadDialog({
       if (!next) {
         flow.invalidate();
         authTransactionRef.current = null;
+        if (copyFeedbackTimerRef.current !== null) {
+          clearTimeout(copyFeedbackTimerRef.current);
+          copyFeedbackTimerRef.current = null;
+        }
+        setCopied(false);
         setConfirmSignInOpen(false);
       }
       onOpenChange(next);
@@ -215,35 +246,24 @@ export function ShareThreadDialog({
               className="bg-primary/10 pointer-events-none absolute -top-24 -right-12 size-72 rounded-full blur-3xl"
             />
 
-            <DialogHeader className="relative grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 px-6 pt-4 text-left sm:text-left">
-              <span className="bg-background/70 row-span-2 flex size-7 items-center justify-center self-center rounded-lg border shadow-sm backdrop-blur-xl">
-                <Link2Icon className="text-primary size-3.5" />
-              </span>
-              <DialogTitle className="col-start-2">
-                Share thread
-              </DialogTitle>
-              <DialogDescription className="col-start-2 text-xs">
-                Create a link others can open in LLM Space or view on the web.
-              </DialogDescription>
-            </DialogHeader>
-
-            {status !== "success" ? (
-              <div className="relative grid items-center gap-5 px-6 pt-2 pb-3 md:grid-cols-[1fr_1.05fr]">
-                <div>
-                  <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
-                    Read-only web share
-                  </span>
-                  <h3 className="mt-1.5 text-xl font-semibold tracking-tight">
-                    Share the thread—not a screenshot.
-                  </h3>
-                  <p className="text-muted-foreground mt-1.5 max-w-sm text-xs/relaxed">
-                    Others can open it in LLM Space or explore it read-only on
-                    the web.
-                  </p>
-                </div>
-                <SharePreview />
+            <div className="relative grid items-center gap-5 px-6 pt-6 pb-4 md:grid-cols-[1fr_1.05fr]">
+              <div>
+                <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
+                  {status === "success" ? "Published" : "Read-only web share"}
+                </span>
+                <DialogTitle className="mt-1.5 text-xl font-semibold tracking-tight">
+                  {status === "success"
+                    ? "Your thread is ready to travel."
+                    : "Share the thread—not a screenshot."}
+                </DialogTitle>
+                <DialogDescription className="mt-1.5 max-w-sm">
+                  {status === "success"
+                    ? "Send this link to anyone. They can explore the full read-only thread without a GitHub account."
+                    : "Others can open it in LLM Space or explore it read-only on the web."}
+                </DialogDescription>
               </div>
-            ) : null}
+              <SharePreview />
+            </div>
           </div>
 
           {status === "success" ? (
@@ -256,7 +276,7 @@ export function ShareThreadDialog({
               }
             />
           ) : (
-            <div className="flex min-h-72 flex-col gap-4 p-6">
+            <div className="flex h-72 flex-col gap-4 p-6">
               <div className="space-y-2.5">
                 <label htmlFor="share-title" className="text-xs font-medium">
                   Title
@@ -387,35 +407,60 @@ function ShareSuccess({
   onCopy: () => void;
   onOpen: () => void;
 }) {
-  return (
-    <div className="flex flex-col items-center px-6 py-8 text-center">
-      <div className="relative mb-5 flex size-20 items-center justify-center">
-        <span className="border-primary/10 absolute inset-0 rounded-full border" />
-        <span className="border-primary/15 absolute inset-2 rounded-full border" />
-        <span className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-2xl border border-primary/20 shadow-sm">
-          <Link2Icon className="size-5" />
-        </span>
-      </div>
-      <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
-        Published
-      </span>
-      <h3 className="mt-2 text-2xl font-semibold tracking-tight">
-        Your thread is ready to travel
-      </h3>
-      <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
-        Send this link to anyone. They can explore the full read-only thread
-        without a GitHub account.
-      </p>
+  const displayUrl = shareUrl.replace(/^https:\/\//, "");
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const [hasHiddenUrlTail, setHasHiddenUrlTail] = useState(false);
 
-      <div className="mt-6 flex w-full max-w-xl items-center gap-2">
+  const updateUrlTailVisibility = useCallback(() => {
+    const input = urlInputRef.current;
+    if (!input) return;
+    setHasHiddenUrlTail(
+      input.scrollLeft + input.clientWidth < input.scrollWidth - 1
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    updateUrlTailVisibility();
+    const input = urlInputRef.current;
+    if (!input) return;
+    const resizeObserver = new ResizeObserver(updateUrlTailVisibility);
+    resizeObserver.observe(input);
+    return () => resizeObserver.disconnect();
+  }, [displayUrl, updateUrlTailVisibility]);
+
+  return (
+    <div className="flex h-72 flex-col items-center justify-center px-6 py-6 text-center">
+      <div className="flex w-full max-w-2xl items-center gap-2">
         <div className="bg-muted/25 flex min-w-0 flex-1 items-center gap-2 rounded-xl border p-1.5 pl-3 shadow-sm">
           <Link2Icon className="text-muted-foreground size-3.5 shrink-0" />
-          <Input
-            readOnly
-            value={shareUrl}
-            className="h-8 min-w-0 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0"
-            onFocus={(event) => event.currentTarget.select()}
-          />
+          <div className="bg-input/20 dark:bg-input/30 relative min-w-0 flex-1 rounded-md">
+            <Input
+              ref={urlInputRef}
+              readOnly
+              value={displayUrl}
+              className="h-8 border-0 bg-transparent px-2 font-mono text-xs shadow-none focus-visible:ring-0 dark:bg-transparent"
+              style={
+                hasHiddenUrlTail
+                  ? {
+                      maskImage: URL_TAIL_MASK,
+                      WebkitMaskImage: URL_TAIL_MASK,
+                    }
+                  : undefined
+              }
+              onFocus={(event) => event.currentTarget.select()}
+              onScroll={updateUrlTailVisibility}
+              onCopy={(event) => {
+                event.preventDefault();
+                event.clipboardData.setData("text/plain", shareUrl);
+              }}
+            />
+            {hasHiddenUrlTail ? (
+              <span
+                aria-hidden="true"
+                className="from-transparent via-background/80 to-background pointer-events-none absolute inset-y-0 right-0 w-20 rounded-r-md bg-gradient-to-r"
+              />
+            ) : null}
+          </div>
           <Button
             variant={copied ? "secondary" : "default"}
             size="sm"
@@ -427,7 +472,7 @@ function ShareSuccess({
             ) : (
               <CopyIcon />
             )}
-            {copied ? "Copied" : "Copy link"}
+            {copied ? "Copied" : "Copy"}
           </Button>
         </div>
         <Button
