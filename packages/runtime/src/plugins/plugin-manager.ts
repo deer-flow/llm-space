@@ -305,9 +305,22 @@ export class PluginManager {
       z.fromJSONSchema(schema);
       record.settingsSchema = schema;
       record.settings = _mergeSchemaDefaults(schema, record.settings);
-      this._extension(record, "settings", "settings", "Settings");
+      this._extension(
+        record,
+        "settings",
+        "settings",
+        "Settings",
+        record.settingsSchemaPath
+      );
     } catch (error) {
-      this._extensionError(record, "settings", "settings", "Settings", error);
+      this._extensionError(
+        record,
+        "settings",
+        "settings",
+        "Settings",
+        error,
+        record.settingsSchemaPath
+      );
     }
   }
 
@@ -317,7 +330,8 @@ export class PluginManager {
         record,
         "skill",
         path.basename(skillPath),
-        path.basename(skillPath)
+        path.basename(skillPath),
+        skillPath
       );
   }
 
@@ -332,7 +346,7 @@ export class PluginManager {
         const id = `plugin:${record.id}:mcp:${server.id}`;
         if (seen.has(id)) throw new Error(`Duplicate MCP id: ${server.id}`);
         seen.add(id);
-        this._extension(record, "mcp", id, server.name);
+        this._extension(record, "mcp", id, server.name, record.mcpPath);
         return {
           ...server,
           id,
@@ -348,7 +362,8 @@ export class PluginManager {
         "mcp",
         `plugin:${record.id}:mcp`,
         "MCP",
-        error
+        error,
+        record.mcpPath
       );
     }
   }
@@ -365,7 +380,7 @@ export class PluginManager {
         if (seen.has(id))
           throw new Error(`Duplicate model provider id: ${provider.id}`);
         seen.add(id);
-        this._extension(record, "model", id, provider.name);
+        this._extension(record, "model", id, provider.name, record.modelsPath);
         return { ...provider, id, builtin: false } as unknown as ProviderConfig;
       });
     } catch (error) {
@@ -375,12 +390,25 @@ export class PluginManager {
         "model",
         `plugin:${record.id}:models`,
         "Models",
-        error
+        error,
+        record.modelsPath
       );
     }
   }
 
   private async _startRunner(record: PluginRecord): Promise<void> {
+    const commandSourcePaths = new Map(
+      record.commandPaths.map((filePath) => [
+        _extensionId(record.id, "command", filePath),
+        filePath,
+      ])
+    );
+    const storageSourcePaths = new Map(
+      record.threadStoragePaths.map((filePath) => [
+        _extensionId(record.id, "thread-storage", filePath),
+        filePath,
+      ])
+    );
     const host = new PluginSubprocessHost(
       this._options.runnerPath,
       record.id,
@@ -401,13 +429,20 @@ export class PluginManager {
         })),
       });
       for (const command of result.commands)
-        this._extension(record, "command", command.id, command.displayName);
+        this._extension(
+          record,
+          "command",
+          command.id,
+          command.displayName,
+          commandSourcePaths.get(command.id)
+        );
       for (const storage of result.storages)
         this._extension(
           record,
           "threadStorage",
           storage.id,
-          storage.displayName
+          storage.displayName,
+          storageSourcePaths.get(storage.id)
         );
       for (const failure of result.errors) {
         const error = new Error(failure.message);
@@ -417,7 +452,10 @@ export class PluginManager {
           failure.kind,
           failure.id,
           failure.id,
-          error
+          error,
+          failure.kind === "command"
+            ? commandSourcePaths.get(failure.id)
+            : storageSourcePaths.get(failure.id)
         );
       }
       this.commands.replacePlugin(record.id, host, result.commands);
@@ -436,6 +474,7 @@ export class PluginManager {
           id: _extensionId(record.id, "command", filePath),
           kind: "command",
           displayName: path.basename(filePath),
+          sourcePath: filePath,
           active: false,
           error: safe,
         });
@@ -445,6 +484,7 @@ export class PluginManager {
           id: _extensionId(record.id, "thread-storage", filePath),
           kind: "threadStorage",
           displayName: path.basename(filePath),
+          sourcePath: filePath,
           active: false,
           error: safe,
         });
@@ -490,13 +530,20 @@ export class PluginManager {
           item.displayName === path.basename(conflict.path)
       );
       if (!record || !extension || extension.error) continue;
+      const message = `Skill name "${conflict.name}" is declared by multiple files: ${[
+        conflict.path,
+        ...conflict.conflictingPaths,
+      ]
+        .map((skillPath) => `"${path.join(skillPath, "SKILL.md")}"`)
+        .join(" and ")}.`;
       extension.active = false;
       extension.error = this._logger.writeError({
         pluginId: record.id,
         pluginVersion: record.metadata.version,
         stage: "conflict",
         extension: extension.id,
-        error: new Error(`Skill canonical name conflicts: ${conflict.name}`),
+        error: new Error(message),
+        summary: message,
       });
       this._refreshStatus(record);
     }
@@ -519,9 +566,16 @@ export class PluginManager {
     record: PluginRecord,
     kind: PluginExtensionKind,
     id: string,
-    displayName: string
+    displayName: string,
+    sourcePath?: string
   ): void {
-    record.extensions.push({ id, kind, displayName, active: true });
+    record.extensions.push({
+      id,
+      kind,
+      displayName,
+      sourcePath,
+      active: true,
+    });
   }
 
   private _extensionError(
@@ -529,7 +583,8 @@ export class PluginManager {
     kind: PluginExtensionKind,
     id: string,
     displayName: string,
-    error: unknown
+    error: unknown,
+    sourcePath?: string
   ): void {
     const safe = this._logger.writeError({
       pluginId: record.id,
@@ -542,6 +597,7 @@ export class PluginManager {
       id,
       kind,
       displayName,
+      sourcePath,
       active: false,
       error: safe,
     });

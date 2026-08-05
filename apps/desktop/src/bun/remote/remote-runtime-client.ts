@@ -362,8 +362,24 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }) {
     return this._rpc<SkillsSettings>("skills.setSkillHidden", input);
   }
+  skillsSetPluginSkillHidden(input: {
+    pluginId: string;
+    skillName: string;
+    hidden: boolean;
+  }) {
+    return this._rpc<SkillsSettings>("skills.setPluginSkillHidden", input);
+  }
+  skillsSetAllPluginSkillsHidden(input: { pluginId: string; hidden: boolean }) {
+    return this._rpc<SkillsSettings>("skills.setAllPluginSkillsHidden", input);
+  }
   skillsSetAllSkillsHidden(input: { path: string; hidden: boolean }) {
     return this._rpc<SkillsSettings>("skills.setAllSkillsHidden", input);
+  }
+  skillsListAvailable() {
+    return this._rpc<SkillInfo[]>("skills.listAvailable");
+  }
+  skillsListPluginSkills() {
+    return this._rpc<SkillInfo[]>("skills.listPluginSkills");
   }
   skillsListSkills(path: string) {
     return this._rpc<SkillInfo[]>("skills.listSkills", { path });

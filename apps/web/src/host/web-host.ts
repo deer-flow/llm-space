@@ -17,6 +17,7 @@ export const webHost: HostServices = {
   executeTool: null,
   skills: {
     getSettings: () => Promise.resolve({ discoveryPaths: [] }),
+    listAvailable: () => Promise.resolve([]),
     listSkills: () => Promise.resolve([]),
   },
   mcp: {

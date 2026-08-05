@@ -52,6 +52,32 @@ export async function setSkillHidden(
   });
 }
 
+export async function setPluginSkillHidden(
+  pluginId: string,
+  skillName: string,
+  hidden: boolean,
+  runtimeId?: RuntimeId
+): Promise<SkillsSettings> {
+  return _rpc().request.skillsSetPluginSkillHidden({
+    ...runtimeScope(runtimeId),
+    pluginId,
+    skillName,
+    hidden,
+  });
+}
+
+export async function setAllPluginSkillsHidden(
+  pluginId: string,
+  hidden: boolean,
+  runtimeId?: RuntimeId
+): Promise<SkillsSettings> {
+  return _rpc().request.skillsSetAllPluginSkillsHidden({
+    ...runtimeScope(runtimeId),
+    pluginId,
+    hidden,
+  });
+}
+
 export async function setAllSkillsHidden(
   path: string,
   hidden: boolean,
@@ -69,6 +95,18 @@ export async function listSkills(
   runtimeId?: RuntimeId
 ): Promise<SkillInfo[]> {
   return _rpc().request.skillsListSkills({ ...runtimeScope(runtimeId), path });
+}
+
+export async function listAvailableSkills(
+  runtimeId?: RuntimeId
+): Promise<SkillInfo[]> {
+  return _rpc().request.skillsListAvailable({ ...runtimeScope(runtimeId) });
+}
+
+export async function listPluginSkills(
+  runtimeId?: RuntimeId
+): Promise<SkillInfo[]> {
+  return _rpc().request.skillsListPluginSkills({ ...runtimeScope(runtimeId) });
 }
 
 export async function readSkill(

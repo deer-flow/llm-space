@@ -53,6 +53,7 @@ export type ExecuteTool = (
 /** Read-only skills access used by prompt variables + examples. */
 export interface SkillsHost {
   getSettings(options?: RuntimeScopedHostOptions): Promise<SkillsSettings>;
+  listAvailable(options?: RuntimeScopedHostOptions): Promise<SkillInfo[]>;
   listSkills(
     path: string,
     options?: RuntimeScopedHostOptions

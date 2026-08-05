@@ -19,6 +19,7 @@ class ControllableRpc {
   readonly envRequests: Record<string, unknown>[] = [];
   readonly mcpRequests: Record<string, unknown>[] = [];
   readonly searchRequests: Record<string, unknown>[] = [];
+  readonly skillAvailableRequests: Record<string, unknown>[] = [];
   readonly skillListRequests: Record<string, unknown>[] = [];
   readonly skillSettingsRequests: Record<string, unknown>[] = [];
   readonly starts: StreamThreadRequestPayload[] = [];
@@ -42,6 +43,10 @@ class ControllableRpc {
       return Promise.resolve({
         discoveryPaths: [{ path: "/remote/skills", hiddenSkills: [] }],
       });
+    },
+    skillsListAvailable: (payload: Record<string, unknown>) => {
+      this.skillAvailableRequests.push(payload);
+      return Promise.resolve([]);
     },
     skillsListSkills: (payload: Record<string, unknown>) => {
       this.skillListRequests.push(payload);
@@ -79,6 +84,7 @@ class ControllableRpc {
     this.envRequests.length = 0;
     this.mcpRequests.length = 0;
     this.searchRequests.length = 0;
+    this.skillAvailableRequests.length = 0;
     this.skillListRequests.length = 0;
     this.skillSettingsRequests.length = 0;
     this.starts.length = 0;
@@ -200,20 +206,18 @@ describe("Desktop runtime-scoped host services", () => {
     }
 
     await host.skills.getSettings({ runtimeId: REMOTE_RUNTIME });
+    await host.skills.listAvailable({ runtimeId: REMOTE_RUNTIME });
     await host.skills.listSkills("/remote/skills", {
       runtimeId: REMOTE_RUNTIME,
     });
     await host.mcp.listServers({ runtimeId: REMOTE_RUNTIME });
     await host.generator.getSearchSettings({ runtimeId: REMOTE_RUNTIME });
-    await host.generator.resolveEnv(
-      "remote-provider",
-      ["REMOTE_SEARCH_KEY"],
-      { runtimeId: REMOTE_RUNTIME }
-    );
+    await host.generator.resolveEnv("remote-provider", ["REMOTE_SEARCH_KEY"], {
+      runtimeId: REMOTE_RUNTIME,
+    });
 
-    expect(RPC.skillSettingsRequests).toEqual([
-      { runtimeId: REMOTE_RUNTIME },
-    ]);
+    expect(RPC.skillSettingsRequests).toEqual([{ runtimeId: REMOTE_RUNTIME }]);
+    expect(RPC.skillAvailableRequests).toEqual([{ runtimeId: REMOTE_RUNTIME }]);
     expect(RPC.skillListRequests).toEqual([
       { runtimeId: REMOTE_RUNTIME, path: "/remote/skills" },
     ]);

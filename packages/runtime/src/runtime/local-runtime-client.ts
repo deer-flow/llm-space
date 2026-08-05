@@ -288,6 +288,25 @@ export class LocalRuntimeClient implements RuntimeClient {
     );
   }
 
+  skillsSetPluginSkillHidden(
+    input: Parameters<RuntimeClient["skillsSetPluginSkillHidden"]>[0]
+  ) {
+    return this._deps.skillsManager.setPluginSkillHidden(
+      input.pluginId,
+      input.skillName,
+      input.hidden
+    );
+  }
+
+  skillsSetAllPluginSkillsHidden(
+    input: Parameters<RuntimeClient["skillsSetAllPluginSkillsHidden"]>[0]
+  ) {
+    return this._deps.skillsManager.setAllPluginSkillsHidden(
+      input.pluginId,
+      input.hidden
+    );
+  }
+
   skillsSetAllSkillsHidden(
     input: Parameters<RuntimeClient["skillsSetAllSkillsHidden"]>[0]
   ) {
@@ -295,6 +314,14 @@ export class LocalRuntimeClient implements RuntimeClient {
       input.path,
       input.hidden
     );
+  }
+
+  skillsListAvailable() {
+    return this._deps.skillsManager.listAvailableSkills();
+  }
+
+  skillsListPluginSkills() {
+    return this._deps.skillsManager.listPluginSkills();
   }
 
   skillsListSkills(path: string) {

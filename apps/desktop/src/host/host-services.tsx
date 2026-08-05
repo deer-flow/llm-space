@@ -28,7 +28,11 @@ import {
 } from "@/client/paths";
 import { createRpcTransport } from "@/client/rpc-transport";
 import { getSearchSettings } from "@/client/search";
-import { getSkillsSettings, listSkills } from "@/client/skills";
+import {
+  getSkillsSettings,
+  listAvailableSkills,
+  listSkills,
+} from "@/client/skills";
 import { executeTool } from "@/client/tool-execution";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
@@ -108,6 +112,8 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       skills: {
         getSettings: (options) =>
           getSkillsSettings(options?.runtimeId as RuntimeId | undefined),
+        listAvailable: (options) =>
+          listAvailableSkills(options?.runtimeId as RuntimeId | undefined),
         listSkills: (path, options) =>
           listSkills(path, options?.runtimeId as RuntimeId | undefined),
       },

@@ -179,10 +179,21 @@ export interface RuntimeClient {
     skillName: string;
     hidden: boolean;
   }): MaybePromise<SkillsSettings>;
+  skillsSetPluginSkillHidden(input: {
+    pluginId: string;
+    skillName: string;
+    hidden: boolean;
+  }): MaybePromise<SkillsSettings>;
+  skillsSetAllPluginSkillsHidden(input: {
+    pluginId: string;
+    hidden: boolean;
+  }): MaybePromise<SkillsSettings>;
   skillsSetAllSkillsHidden(input: {
     path: string;
     hidden: boolean;
   }): MaybePromise<SkillsSettings>;
+  skillsListAvailable(): MaybePromise<SkillInfo[]>;
+  skillsListPluginSkills(): MaybePromise<SkillInfo[]>;
   skillsListSkills(path: string): MaybePromise<SkillInfo[]>;
   skillsReadSkill(path: string): MaybePromise<SkillContent>;
 

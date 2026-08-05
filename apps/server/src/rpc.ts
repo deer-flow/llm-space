@@ -195,10 +195,22 @@ async function _dispatch(
       return runtime.skillsSetSkillHidden(
         params as Parameters<RuntimeClient["skillsSetSkillHidden"]>[0]
       );
+    case "skills.setPluginSkillHidden":
+      return runtime.skillsSetPluginSkillHidden(
+        params as Parameters<RuntimeClient["skillsSetPluginSkillHidden"]>[0]
+      );
+    case "skills.setAllPluginSkillsHidden":
+      return runtime.skillsSetAllPluginSkillsHidden(
+        params as Parameters<RuntimeClient["skillsSetAllPluginSkillsHidden"]>[0]
+      );
     case "skills.setAllSkillsHidden":
       return runtime.skillsSetAllSkillsHidden(
         params as Parameters<RuntimeClient["skillsSetAllSkillsHidden"]>[0]
       );
+    case "skills.listAvailable":
+      return runtime.skillsListAvailable();
+    case "skills.listPluginSkills":
+      return runtime.skillsListPluginSkills();
     case "skills.listSkills":
       return runtime.skillsListSkills(_stringParam(params, "path"));
     case "skills.readSkill":

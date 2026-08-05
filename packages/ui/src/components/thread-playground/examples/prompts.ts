@@ -130,12 +130,9 @@ async function listEnabledSkills(
   skills: SkillsHost,
   options?: RuntimeScopedHostOptions
 ): Promise<SkillInfo[]> {
-  const { discoveryPaths } = await skills.getSettings(options);
-  const perPath = await Promise.all(
-    discoveryPaths.map((entry) => skills.listSkills(entry.path, options))
-  );
+  const available = await skills.listAvailable(options);
   const byName = new Map<string, SkillInfo>();
-  for (const skill of perPath.flat()) {
+  for (const skill of available) {
     if (skill.enabled && !byName.has(skill.name)) {
       byName.set(skill.name, skill);
     }

@@ -12,6 +12,7 @@ import path from "node:path";
 import type { McpServerConfig } from "@llm-space/core";
 
 import type { ProviderConfig } from "../models/types";
+import type { PluginSkillConflict } from "../skills/skills-manager";
 
 import { PluginManager } from "./plugin-manager";
 
@@ -38,6 +39,11 @@ describe("PluginManager", () => {
       path.join(root, "commands", "broken.ts"),
       `throw new Error("broken import")`
     );
+    mkdirSync(path.join(root, "thread-storages"));
+    writeFileSync(
+      path.join(root, "thread-storages", "memory.ts"),
+      `export default class Memory { displayName = "Memory"; capabilities = { read: false, write: false }; }`
+    );
 
     const { manager } = await _manager(home);
     const plugin = manager.listPlugins()[0];
@@ -52,6 +58,23 @@ describe("PluginManager", () => {
     expect(
       await manager.commands.execute("plugin:mixed-plugin:command:hello")
     ).toBe("hello");
+    expect(
+      plugin?.extensions.find(
+        (extension) =>
+          extension.id === "plugin:mixed-plugin:command:hello"
+      )?.sourcePath
+    ).toBe(path.join(root, "commands", "hello.ts"));
+    expect(
+      plugin?.extensions.find(
+        (extension) => extension.id === "plugin:mixed-plugin:command:broken"
+      )?.sourcePath
+    ).toBe(path.join(root, "commands", "broken.ts"));
+    expect(
+      plugin?.extensions.find(
+        (extension) =>
+          extension.id === "plugin:mixed-plugin:thread-storage:memory"
+      )?.sourcePath
+    ).toBe(path.join(root, "thread-storages", "memory.ts"));
     const logPath = plugin?.extensions.find((extension) => extension.error)
       ?.error?.logPath;
     expect(logPath).toBeString();
@@ -103,12 +126,51 @@ describe("PluginManager", () => {
     expect(state.skillPaths).toHaveLength(1);
     expect(state.mcpServers[0]?.server.id).toBe("plugin:declarative:mcp:local");
     expect(state.modelProviders[0]?.provider.baseUrl).toBe("http://localhost");
+    expect(
+      Object.fromEntries(
+        state.manager
+          .listPlugins()[0]
+          .extensions.map((extension) => [extension.kind, extension.sourcePath])
+      )
+    ).toEqual({
+      settings: path.join(root, "config.schema.json"),
+      skill: path.join(root, "skills", "review"),
+      mcp: path.join(root, "mcp.json"),
+      model: path.join(root, "models.json"),
+    });
 
     await state.manager.setEnabled("declarative", false);
     expect(state.skillPaths).toEqual([]);
     expect(state.mcpServers).toEqual([]);
     expect(state.modelProviders).toEqual([]);
     expect(managerCommandIds(state.manager)).toEqual([]);
+  });
+
+  test("identifies both files in a skill conflict diagnostic", async () => {
+    const home = _home();
+    const root = _plugin(home, "conflicting-skills");
+    const pluginSkill = path.join(root, "skills", "review");
+    const userSkill = path.join(home, "user-skills", "review");
+    mkdirSync(pluginSkill, { recursive: true });
+    writeFileSync(
+      path.join(pluginSkill, "SKILL.md"),
+      "---\nname: review\ndescription: Review code\n---\n"
+    );
+
+    const { manager } = await _manager(home, [
+      {
+        pluginId: "conflicting-skills",
+        path: pluginSkill,
+        name: "review",
+        conflictingPaths: [userSkill],
+      },
+    ]);
+    const error = manager
+      .listPlugins()[0]
+      ?.extensions.find((extension) => extension.kind === "skill")?.error;
+
+    expect(error?.summary).toContain(path.join(pluginSkill, "SKILL.md"));
+    expect(error?.summary).toContain(path.join(userSkill, "SKILL.md"));
   });
 
   test("refreshes discovery and reloads a plugin after its files change", async () => {
@@ -160,7 +222,10 @@ function _plugin(home: string, name: string): string {
   return root;
 }
 
-async function _manager(home: string) {
+async function _manager(
+  home: string,
+  skillConflicts: PluginSkillConflict[] = []
+) {
   let skillPaths: { pluginId: string; path: string }[] = [];
   let mcpServers: { pluginId: string; server: McpServerConfig }[] = [];
   let modelProviders: { pluginId: string; provider: ProviderConfig }[] = [];
@@ -171,7 +236,7 @@ async function _manager(home: string) {
     skillsManager: {
       setPluginPaths: (entries) => {
         skillPaths = entries;
-        return [];
+        return skillConflicts;
       },
     },
     mcpManager: {

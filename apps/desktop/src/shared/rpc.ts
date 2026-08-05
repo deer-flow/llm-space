@@ -514,10 +514,35 @@ export interface DesktopRPCType {
         };
         response: SkillsSettings;
       };
+      skillsSetPluginSkillHidden: {
+        params: RuntimeScopedParams & {
+          pluginId: string;
+          skillName: string;
+          hidden: boolean;
+        };
+        response: SkillsSettings;
+      };
+      skillsSetAllPluginSkillsHidden: {
+        params: RuntimeScopedParams & {
+          pluginId: string;
+          hidden: boolean;
+        };
+        response: SkillsSettings;
+      };
       // Enable/disable every skill in one folder at once.
       skillsSetAllSkillsHidden: {
         params: RuntimeScopedParams & { path: string; hidden: boolean };
         response: SkillsSettings;
+      };
+      // List every enabled, conflict-free skill available to agents.
+      skillsListAvailable: {
+        params: RuntimeScopedParams;
+        response: SkillInfo[];
+      };
+      // List all Skills from active Plugins, including individually disabled ones.
+      skillsListPluginSkills: {
+        params: RuntimeScopedParams;
+        response: SkillInfo[];
       };
       // Discover the skills under one folder (name/description/path/enabled).
       skillsListSkills: {

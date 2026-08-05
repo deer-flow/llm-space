@@ -353,10 +353,34 @@ export function createMainWindowRPC({
               hidden,
             })
           ),
+        skillsSetPluginSkillHidden: ({
+          runtimeId,
+          pluginId,
+          skillName,
+          hidden,
+        }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).skillsSetPluginSkillHidden({
+              pluginId,
+              skillName,
+              hidden,
+            })
+          ),
+        skillsSetAllPluginSkillsHidden: ({ runtimeId, pluginId, hidden }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).skillsSetAllPluginSkillsHidden({
+              pluginId,
+              hidden,
+            })
+          ),
         skillsSetAllSkillsHidden: ({ runtimeId, path, hidden }) =>
           Promise.resolve(
             getRuntime(runtimeId).skillsSetAllSkillsHidden({ path, hidden })
           ),
+        skillsListAvailable: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsListAvailable()),
+        skillsListPluginSkills: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsListPluginSkills()),
         skillsListSkills: ({ runtimeId, path }) =>
           Promise.resolve(getRuntime(runtimeId).skillsListSkills(path)),
         skillsReadSkill: ({ runtimeId, path }) =>

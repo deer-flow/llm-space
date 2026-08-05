@@ -68,6 +68,113 @@ describe("SkillsManager YAML frontmatter", () => {
     ]);
   });
 
+  test("reports every file involved in a plugin skill name conflict", () => {
+    const { manager, skillDir } = createManagerFixture();
+    const root = mkdtempSync(path.join(os.tmpdir(), "llm-space-plugin-skill-"));
+    temporaryRoots.push(root);
+    const firstPluginSkill = path.join(root, "plugin-a", "pregnancy-followup");
+    const secondPluginSkill = path.join(root, "plugin-b", "pregnancy-followup");
+    for (const pluginSkill of [firstPluginSkill, secondPluginSkill]) {
+      mkdirSync(pluginSkill, { recursive: true });
+      writeFileSync(
+        path.join(pluginSkill, "SKILL.md"),
+        "---\nname: pregnancy-followup\ndescription: Plugin skill\n---\n"
+      );
+    }
+
+    expect(
+      manager.setPluginPaths([
+        { pluginId: "plugin-a", path: firstPluginSkill },
+        { pluginId: "plugin-b", path: secondPluginSkill },
+      ])
+    ).toEqual([
+      {
+        pluginId: "plugin-a",
+        path: firstPluginSkill,
+        name: "pregnancy-followup",
+        conflictingPaths: [skillDir, secondPluginSkill],
+      },
+      {
+        pluginId: "plugin-b",
+        path: secondPluginSkill,
+        name: "pregnancy-followup",
+        conflictingPaths: [skillDir, firstPluginSkill],
+      },
+    ]);
+    expect(manager.findSkill("pregnancy-followup")).not.toBeNull();
+  });
+
+  test("includes plugin skills in the agent list and skill lookup", () => {
+    const { manager, skillDir, description } = createManagerFixture();
+    const root = mkdtempSync(path.join(os.tmpdir(), "llm-space-plugin-skill-"));
+    temporaryRoots.push(root);
+    const pluginSkill = path.join(root, "plugin-review");
+    mkdirSync(pluginSkill, { recursive: true });
+    writeFileSync(
+      path.join(pluginSkill, "SKILL.md"),
+      "---\nname: plugin-review\ndescription: Review with plugin guidance\n---\n\n# Plugin review\n"
+    );
+
+    expect(
+      manager.setPluginPaths([{ pluginId: "review-plugin", path: pluginSkill }])
+    ).toEqual([]);
+    const available = manager.listAvailableSkills();
+    expect(available.find((skill) => skill.name === "plugin-review")).toEqual({
+      name: "plugin-review",
+      description: "Review with plugin guidance",
+      path: pluginSkill,
+      enabled: true,
+      source: "plugin",
+      readOnly: true,
+      pluginId: "review-plugin",
+    });
+    expect(available.find((skill) => skill.path === skillDir)).toMatchObject({
+      name: "pregnancy-followup",
+      description,
+      source: "user",
+    });
+    expect(manager.findSkill("plugin-review")).toMatchObject({
+      path: pluginSkill,
+      frontmatters: { name: "plugin-review" },
+      content: "\n# Plugin review\n",
+    });
+
+    manager.setPluginSkillHidden("review-plugin", "plugin-review", true);
+    expect(manager.listPluginSkills()).toContainEqual({
+      name: "plugin-review",
+      description: "Review with plugin guidance",
+      path: pluginSkill,
+      enabled: false,
+      source: "plugin",
+      readOnly: true,
+      pluginId: "review-plugin",
+    });
+    expect(
+      manager
+        .listAvailableSkills()
+        .some((skill) => skill.name === "plugin-review")
+    ).toBe(false);
+    expect(manager.findSkill("plugin-review")).toBeNull();
+    expect(
+      manager.findSkill("plugin-review", { enabledOnly: false })
+    ).not.toBeNull();
+
+    const reloaded = new SkillsManager();
+    reloaded.setPluginPaths([{ pluginId: "review-plugin", path: pluginSkill }]);
+    expect(reloaded.listPluginSkills()[0]?.enabled).toBe(false);
+
+    reloaded.setPluginSkillHidden("review-plugin", "plugin-review", false);
+    expect(reloaded.findSkill("plugin-review")).not.toBeNull();
+
+    reloaded.setAllPluginSkillsHidden("review-plugin", true);
+    expect(reloaded.listPluginSkills()[0]?.enabled).toBe(false);
+    expect(reloaded.findSkill("plugin-review")).toBeNull();
+
+    reloaded.setAllPluginSkillsHidden("review-plugin", false);
+    expect(reloaded.listPluginSkills()[0]?.enabled).toBe(true);
+    expect(reloaded.findSkill("plugin-review")).not.toBeNull();
+  });
+
   test("reads a literal block description and the markdown body", () => {
     const { manager, skillDir, description } = createManagerFixture();
 
