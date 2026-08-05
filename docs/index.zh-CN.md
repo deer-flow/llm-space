@@ -8,15 +8,16 @@
 
 # 中文文档
 
-| 文档 | 说明 |
-| --- | --- |
-| [快速开始](./get-started.zh-CN.md) | 从安装、模型配置到运行第一个 Thread。 |
-| [核心概念](./core-concepts.zh-CN.md) | 解释 Thread、Model、Model Provider、Tools、Messages、Tool Calls 和文件格式。 |
-| [变量与模板](./variables-and-templates.zh-CN.md) | 用 `{{变量}}` 复用内容，用模板添加逻辑：`@include`、条件判断和循环。 |
-| [界面布局](./ui-layout.zh-CN.md) | 说明主界面各区域的用途。 |
-| [设置](./settings.zh-CN.md) | 介绍 Settings 入口，以及 General、Models、MCP、Search、Skills 页面。 |
-| [SSH Remote Runtime](./remote-runtime.zh-CN.md) | 通过系统 OpenSSH 配置连接 Linux 远端 runtime。 |
-| [常用快捷键](./shortcut-keys.zh-CN.md) | 介绍菜单快捷键、命令面板和 Thread 运行快捷键。 |
+| 文档                                             | 说明                                                                         |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| [快速开始](./get-started.zh-CN.md)               | 从安装、模型配置到运行第一个 Thread。                                        |
+| [核心概念](./core-concepts.zh-CN.md)             | 解释 Thread、Model、Model Provider、Tools、Messages、Tool Calls 和文件格式。 |
+| [变量与模板](./variables-and-templates.zh-CN.md) | 用 `{{变量}}` 复用内容，用模板添加逻辑：`@include`、条件判断和循环。         |
+| [界面布局](./ui-layout.zh-CN.md)                 | 说明主界面各区域的用途。                                                     |
+| [设置](./settings.zh-CN.md)                      | 介绍 Settings 入口，以及 General、Models、MCP、Search、Skills 页面。         |
+| [Plugin 开发指南](./plugins.zh-CN.md)            | 介绍 Plugin 的目录、metadata、Settings、Extensions、运行模型和开发示例。     |
+| [SSH Remote Runtime](./remote-runtime.zh-CN.md)  | 通过系统 OpenSSH 配置连接 Linux 远端 runtime。                               |
+| [常用快捷键](./shortcut-keys.zh-CN.md)           | 介绍菜单快捷键、命令面板和 Thread 运行快捷键。                               |
 
 # 外部链接
 
