@@ -4,6 +4,37 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-08-05
+
+This release introduces trusted local Plugins that can extend LLM Space with
+agent capabilities, commands, model integrations, and custom Thread storage.
+
+### Added
+
+- Discover trusted local Plugins from `LLM_SPACE_HOME/plugins/`, with metadata,
+  settings, lifecycle controls, compatibility checks, and isolated diagnostics.
+- Plugins can contribute Skills, MCP servers, model providers, Command Palette
+  commands, and Thread Storages.
+- Plugin Skills are available to agents on local and remote runtimes and can be
+  enabled individually or per Plugin without modifying Plugin files.
+- Added English and Chinese Plugin development guides covering package layout,
+  Extensions, settings, lifecycle, diagnostics, and examples.
+
+### Changed
+
+- Settings navigation is grouped into App, Agent, and Connections, with clearer
+  names for Remote Servers, MCP Servers, and Web Search.
+- Plugin-provided MCP servers and Skills are identified separately in Settings,
+  and Plugin diagnostics can reveal the source of each Extension.
+- Imported Thread folders have a distinct treatment in the workspace tree.
+
+### Fixed
+
+- Replayed tool-call IDs are normalized correctly for non-OpenAI providers that
+  use the Responses API.
+- Plugin Skill conflicts identify every file involved, and long diagnostic paths
+  no longer overflow the Plugin settings panel.
+
 ## [4.7.1] - 2026-08-04
 
 This release adds provider-hosted tools and makes MCP tool naming configurable.
