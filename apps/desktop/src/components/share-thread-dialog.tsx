@@ -24,8 +24,16 @@ import {
   CheckIcon,
   CopyIcon,
   ExternalLinkIcon,
+  FileTextIcon,
+  Globe2Icon,
+  Link2Icon,
   Loader2Icon,
-  TriangleAlertIcon,
+  LockKeyholeIcon,
+  MessageSquareIcon,
+  MousePointer2Icon,
+  SendIcon,
+  ShieldCheckIcon,
+  WrenchIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -212,113 +220,151 @@ export function ShareThreadDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share thread</DialogTitle>
-            <DialogDescription>
-              Publish this thread to a link anyone can open in their browser.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <div className="relative overflow-hidden border-b">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:30px_30px] opacity-20 [mask-image:radial-gradient(circle_at_78%_50%,black,transparent_64%)]"
+            />
+            <div
+              aria-hidden="true"
+              className="bg-primary/10 pointer-events-none absolute -top-24 -right-12 size-72 rounded-full blur-3xl"
+            />
 
-          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-200/90">
-            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-400" />
-            <p>
-              Anyone with the link can view the full thread — its prompts,
-              messages, and tool calls. It&rsquo;s published as a secret GitHub
-              Gist under your account; delete the gist to revoke access.
-            </p>
+            <DialogHeader className="relative px-6 pt-5">
+              <DialogTitle className="flex items-center gap-2.5">
+                <span className="bg-background/70 flex size-8 items-center justify-center rounded-xl border shadow-sm backdrop-blur-xl">
+                  <Link2Icon className="text-primary size-4" />
+                </span>
+                Share playground
+              </DialogTitle>
+              <DialogDescription className="pl-10">
+                Publish a polished, read-only version anyone with the link can
+                open.
+              </DialogDescription>
+            </DialogHeader>
+
+            {status !== "success" ? (
+              <div className="relative grid items-center gap-5 px-6 pt-3 pb-5 md:grid-cols-[1fr_1.05fr]">
+                <div>
+                  <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
+                    Read-only web share
+                  </span>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-balance">
+                    Share the work, not a screenshot.
+                  </h3>
+                  <p className="text-muted-foreground mt-2 max-w-sm text-sm/relaxed">
+                    Your prompts, messages, and tool calls stay navigable—and
+                    can be brought back into LLM Space.
+                  </p>
+                </div>
+                <SharePreview />
+              </div>
+            ) : null}
           </div>
 
           {status === "success" ? (
-            <div className="space-y-2">
-              <span className="text-muted-foreground text-xs font-medium">
-                Share link
-              </span>
-              <div className="flex items-center gap-2">
-                <Input
-                  readOnly
-                  value={shareUrl}
-                  className="font-mono"
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="shrink-0"
-                >
-                  {copied ? (
-                    <CheckIcon className="text-emerald-500" />
-                  ) : (
-                    <CopyIcon />
-                  )}
-                  {copied ? "Copied" : "Copy"}
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  executeCommand({ type: "openLink", args: { url: shareUrl } })
-                }
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
-              >
-                <ExternalLinkIcon className="size-3.5" />
-                Open in browser
-              </button>
-            </div>
+            <ShareSuccess
+              shareUrl={shareUrl}
+              copied={copied}
+              onCopy={handleCopy}
+              onOpen={() =>
+                executeCommand({ type: "openLink", args: { url: shareUrl } })
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <span className="text-muted-foreground text-xs font-medium">
-                  Share via
-                </span>
-                <Select
-                  value={connector}
-                  onValueChange={setConnector}
-                  disabled={busy}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={GIST_CONNECTOR}>
-                      <GitHubIcon className="size-3.5" />
-                      GitHub Gist
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="grid gap-5 p-6 md:grid-cols-[0.85fr_1.15fr]">
+              <div className="flex flex-col gap-3">
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-[0.6875rem] font-semibold tracking-wide uppercase">
+                    Publish route
+                  </span>
+                  <Select
+                    value={connector}
+                    onValueChange={setConnector}
+                    disabled={busy}
+                  >
+                    <SelectTrigger className="h-auto w-full cursor-pointer px-3 py-2.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={GIST_CONNECTOR}>
+                        <GitHubIcon className="size-3.5" />
+                        GitHub Gist
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="bg-muted/20 rounded-xl border p-3.5">
+                  <div className="flex items-center gap-2">
+                    <Globe2Icon className="text-muted-foreground size-4" />
+                    <span className="text-xs font-semibold">Link access</span>
+                  </div>
+                  <p className="text-muted-foreground mt-1.5 text-[0.6875rem]/relaxed">
+                    Unlisted, not private. Anyone with the link can view it.
+                  </p>
+                  <div className="text-muted-foreground mt-3 flex items-center gap-3 border-t pt-3">
+                    <span className="flex items-center gap-1 text-[0.625rem]">
+                      <FileTextIcon className="size-3" /> Prompts
+                    </span>
+                    <span className="flex items-center gap-1 text-[0.625rem]">
+                      <MessageSquareIcon className="size-3" /> Messages
+                    </span>
+                    <span className="flex items-center gap-1 text-[0.625rem]">
+                      <WrenchIcon className="size-3" /> Tools
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-muted-foreground flex gap-2 px-1 text-[0.6875rem]/relaxed">
+                  <LockKeyholeIcon className="mt-0.5 size-3.5 shrink-0" />
+                  <p>Delete the secret Gist from GitHub to revoke access.</p>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <span className="text-muted-foreground text-xs font-medium">
-                  Title
-                </span>
-                <Input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Untitled thread"
-                  disabled={busy}
-                />
+
+              <div className="flex flex-col gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="share-title" className="text-xs font-medium">
+                    Title
+                  </label>
+                  <Input
+                    id="share-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Untitled playground"
+                    disabled={busy}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="share-description"
+                    className="text-xs font-medium"
+                  >
+                    Description{" "}
+                    <span className="text-muted-foreground font-normal">
+                      Optional
+                    </span>
+                  </label>
+                  <Textarea
+                    id="share-description"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Add context for the people opening this link…"
+                    disabled={busy}
+                    rows={4}
+                  />
+                </div>
+                {status === "error" ? (
+                  <p className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">
+                    {errorMessage}
+                  </p>
+                ) : null}
               </div>
-              <div className="space-y-1.5">
-                <span className="text-muted-foreground text-xs font-medium">
-                  Description{" "}
-                  <span className="text-muted-foreground/60">(optional)</span>
-                </span>
-                <Textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="What is this thread about?"
-                  disabled={busy}
-                  rows={2}
-                />
-              </div>
-              {status === "error" ? (
-                <p className="text-destructive text-xs">{errorMessage}</p>
-              ) : null}
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl">
             {status === "success" ? (
               <Button onClick={() => handleOpenChange(false)}>Done</Button>
             ) : (
@@ -335,6 +381,7 @@ export function ShareThreadDialog({
                       : status === "error"
                         ? "Try again"
                         : "Generate link"}
+                  {!busy ? <SendIcon className="size-3.5" /> : null}
                 </Button>
               </>
             )}
@@ -353,6 +400,121 @@ export function ShareThreadDialog({
         onConfirm={handleConfirmSignIn}
       />
     </>
+  );
+}
+
+/** Theme-aware HTML illustration of the read-only page the link opens. */
+function SharePreview() {
+  return (
+    <div className="relative mx-auto h-40 w-full max-w-72" aria-hidden="true">
+      <div className="bg-background/35 absolute inset-4 -rotate-3 rounded-2xl border backdrop-blur-sm" />
+      <div className="bg-background/90 absolute inset-2 overflow-hidden rounded-2xl border shadow-xl shadow-black/10 backdrop-blur-xl">
+        <div className="flex h-8 items-center gap-1.5 border-b px-3">
+          <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
+          <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
+          <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
+          <div className="bg-muted/60 text-muted-foreground ml-2 flex h-4 flex-1 items-center rounded px-2 text-[0.4375rem]">
+            llm-space/shared/playground
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5 p-3">
+          <div className="flex items-center gap-2">
+            <span className="bg-primary/12 text-primary flex size-6 items-center justify-center rounded-lg">
+              <MessageSquareIcon className="size-3" />
+            </span>
+            <div className="flex flex-col gap-1">
+              <span className="bg-foreground/70 h-1.5 w-20 rounded-full" />
+              <span className="bg-muted-foreground/25 h-1 w-12 rounded-full" />
+            </div>
+          </div>
+          <div className="bg-muted/45 flex flex-col gap-1.5 rounded-lg p-2.5">
+            <span className="bg-muted-foreground/30 h-1 w-[82%] rounded-full" />
+            <span className="bg-muted-foreground/20 h-1 w-[58%] rounded-full" />
+          </div>
+          <div className="border-primary/15 bg-primary/[0.06] ml-6 flex flex-col gap-1.5 rounded-lg border p-2.5">
+            <span className="bg-primary/30 h-1 w-[72%] rounded-full" />
+            <span className="bg-primary/20 h-1 w-[90%] rounded-full" />
+          </div>
+        </div>
+      </div>
+      <div className="bg-background/90 absolute right-0 bottom-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[0.625rem] font-medium shadow-lg backdrop-blur-xl">
+        <MousePointer2Icon className="text-primary size-3" />
+        Open anywhere
+      </div>
+    </div>
+  );
+}
+
+function ShareSuccess({
+  shareUrl,
+  copied,
+  onCopy,
+  onOpen,
+}: {
+  shareUrl: string;
+  copied: boolean;
+  onCopy: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center px-6 py-8 text-center">
+      <div className="relative mb-5 flex size-20 items-center justify-center">
+        <span className="border-primary/10 absolute inset-0 rounded-full border" />
+        <span className="border-primary/15 absolute inset-2 rounded-full border" />
+        <span className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-2xl border border-primary/20 shadow-sm">
+          <Link2Icon className="size-5" />
+        </span>
+      </div>
+      <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
+        Published
+      </span>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight">
+        Your playground is ready to travel
+      </h3>
+      <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
+        Send this link to anyone. They can explore the full read-only playground
+        without a GitHub account.
+      </p>
+
+      <div className="mt-6 flex w-full max-w-xl items-center gap-2">
+        <div className="bg-muted/25 flex min-w-0 flex-1 items-center gap-2 rounded-xl border p-1.5 pl-3 shadow-sm">
+          <Link2Icon className="text-muted-foreground size-3.5 shrink-0" />
+          <Input
+            readOnly
+            value={shareUrl}
+            className="h-8 min-w-0 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0"
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <Button
+            variant={copied ? "secondary" : "default"}
+            size="sm"
+            onClick={onCopy}
+            className="shrink-0 cursor-pointer"
+          >
+            {copied ? (
+              <CheckIcon className="text-emerald-500" />
+            ) : (
+              <CopyIcon />
+            )}
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onOpen}
+          className="shrink-0 cursor-pointer"
+          aria-label="Open in browser"
+        >
+          <ExternalLinkIcon />
+        </Button>
+      </div>
+
+      <div className="text-muted-foreground mt-5 flex items-center gap-2 text-[0.6875rem]">
+        <ShieldCheckIcon className="size-3.5" />
+        Nothing is published again unless you choose to share.
+      </div>
+    </div>
   );
 }
 
