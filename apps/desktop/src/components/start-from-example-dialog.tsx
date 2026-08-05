@@ -62,7 +62,7 @@ export function StartFromExampleDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[82vh] max-w-[52rem]! gap-0 overflow-hidden border-border/80 bg-background/95 p-0 shadow-2xl backdrop-blur-xl [&_[data-slot=dialog-close]]:top-4 [&_[data-slot=dialog-close]]:right-4 [&_[data-slot=dialog-close]]:z-30 [&_[data-slot=dialog-close]]:size-8 [&_[data-slot=dialog-close]]:border [&_[data-slot=dialog-close]]:border-border/70 [&_[data-slot=dialog-close]]:bg-background/75 [&_[data-slot=dialog-close]]:text-foreground/70 [&_[data-slot=dialog-close]]:shadow-sm [&_[data-slot=dialog-close]]:backdrop-blur-sm hover:[&_[data-slot=dialog-close]]:bg-accent hover:[&_[data-slot=dialog-close]]:text-foreground"
+        className="max-h-[82vh] max-w-[52rem]! gap-0 overflow-hidden border-border/80 bg-background/95 p-0 shadow-2xl backdrop-blur-xl [&_[data-slot=dialog-close]]:top-4 [&_[data-slot=dialog-close]]:right-4 [&_[data-slot=dialog-close]]:z-30 [&_[data-slot=dialog-close]]:size-8 [&_[data-slot=dialog-close]]:!rounded-full [&_[data-slot=dialog-close]]:bg-transparent [&_[data-slot=dialog-close]]:text-foreground/70 [&_[data-slot=dialog-close]]:shadow-none hover:[&_[data-slot=dialog-close]]:bg-accent hover:[&_[data-slot=dialog-close]]:text-foreground"
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
