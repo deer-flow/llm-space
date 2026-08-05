@@ -91,8 +91,8 @@ export function PluginsPage() {
       title="Plugins"
       description={
         <span>
-          Local plugins are trusted and enabled by default. Extension failures
-          are isolated and logged. Read the{" "}
+          Extend LLM Space with skills, MCP servers, model providers, commands,
+          and custom thread storage. Read the{" "}
           <Link
             href={PLUGIN_DOCUMENTATION_URL}
             className="text-foreground underline underline-offset-2"
