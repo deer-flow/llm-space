@@ -217,7 +217,7 @@ function SpecialistExample({
   return (
     <button
       type="button"
-      className="group border-border/70 bg-card/30 hover:border-primary/25 hover:bg-accent/60 focus-visible:ring-primary/60 flex min-h-20 cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-[border-color,background-color,box-shadow] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      className="group border-border/70 bg-card/30 hover:border-primary/25 hover:bg-accent/60 focus-visible:ring-primary/60 relative flex min-h-20 transform-gpu cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-[transform,border-color,background-color,box-shadow] duration-100 ease-out hover:z-10 hover:scale-[1.015] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.99]"
       onClick={onSelect}
     >
       <div className="border-border bg-background/70 text-muted-foreground group-hover:border-primary/20 group-hover:bg-primary/10 group-hover:text-primary flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors">
