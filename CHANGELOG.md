@@ -4,6 +4,41 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.4] - 2026-08-05
+
+This release expands local Plugins into first-class agent capabilities and
+refreshes the most important setup, sharing, and generation experiences.
+
+### Added
+
+- Local Plugins can contribute executable Tools that users add to Threads and
+  models invoke like built-in Tools, with stable identities, package icons,
+  lifecycle isolation, structured results, and owning-Thread variable context.
+- Plugin Commands accept quoted Command Palette arguments and can inspect the
+  active tab, filename, and Thread through an explicit context API.
+- Plugin development guides now document Commands and Tools in English and
+  Chinese, including discovery, context, variables, local-runtime limits, and
+  error behavior.
+
+### Changed
+
+- The new-Thread gallery, runnable-agent generator, and Thread-sharing flow now
+  use clearer, more focused layouts with polished Light and Dark appearances.
+- Account, Plugins, Skills, Models, MCP Servers, and Remote Servers settings now
+  have stronger navigation, purposeful empty states, and consistent list
+  headings.
+- Working-directory controls, Plugin discovery, and Tool selection provide more
+  direct feedback and actions, including revealing existing folders in Finder.
+
+### Fixed
+
+- Opening the local Plugins folder uses the native filesystem reveal path
+  instead of spawning an unavailable shell command.
+- Plugin Tool execution remains bound to the Thread that owns the call, even
+  when tabs change or multiple calls run concurrently.
+- Unsupported local Plugin Tools are rejected clearly on remote runtimes and
+  during LangGraph export instead of producing unusable output.
+
 ## [4.8.3] - 2026-08-05
 
 This patch release streamlines the generated LangGraph project setup on macOS.

@@ -501,15 +501,15 @@ export function GenerateProjectButton({
 
       <Dialog open={open} onOpenChange={busy ? undefined : setOpen}>
         <DialogContent className="flex h-[42rem] max-h-[calc(100vh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle className="flex items-center gap-2">
-              <span className="border-primary/20 bg-primary/10 text-primary flex size-8 items-center justify-center rounded-xl border">
-                <SparklesIcon className="size-4" />
-              </span>
+          <DialogHeader className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 border-b px-6 py-4 text-left sm:text-left">
+            <span className="border-primary/20 bg-primary/10 text-primary row-span-2 flex size-8 items-center justify-center self-center rounded-xl border">
+              <SparklesIcon className="size-4" />
+            </span>
+            <DialogTitle className="col-start-2 flex items-center gap-2">
               Generate a runnable agent
               <BetaBadge />
             </DialogTitle>
-            <DialogDescription className="pl-10">
+            <DialogDescription className="col-start-2">
               {step === "framework"
                 ? "Turn this thread into a real codebase—prompt, tools, variables, messages, and a plan to finish it."
                 : step === "target"

@@ -12,28 +12,17 @@ import {
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
 import { Input } from "@llm-space/ui/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@llm-space/ui/ui/select";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   CheckIcon,
   CopyIcon,
   ExternalLinkIcon,
-  FileTextIcon,
-  Globe2Icon,
   Link2Icon,
   Loader2Icon,
-  LockKeyholeIcon,
   MessageSquareIcon,
   MousePointer2Icon,
   SendIcon,
   ShieldCheckIcon,
-  WrenchIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -47,7 +36,6 @@ import {
 import { readShareThread, shareThread } from "@/client/share";
 import { useCommands } from "@/commands";
 import { useGithubAuth } from "@/components/github-auth-provider";
-import { GitHubIcon } from "@/components/github-icon";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
@@ -57,9 +45,6 @@ import {
 } from "./share-thread-dialog-flow";
 
 type ShareStatus = "idle" | "awaitingAuth" | "generating" | "success" | "error";
-
-/** The only connector today; the dropdown is shown for future connectors. */
-const GIST_CONNECTOR = "gist";
 
 /**
  * The Share thread dialog. Publishes the thread at `path` as a secret GitHub
@@ -81,7 +66,6 @@ export function ShareThreadDialog({
   const { state: authState, signIn } = useGithubAuth();
   const { executeCommand } = useCommands();
 
-  const [connector, setConnector] = useState(GIST_CONNECTOR);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ShareStatus>("idle");
@@ -231,31 +215,30 @@ export function ShareThreadDialog({
               className="bg-primary/10 pointer-events-none absolute -top-24 -right-12 size-72 rounded-full blur-3xl"
             />
 
-            <DialogHeader className="relative px-6 pt-5">
-              <DialogTitle className="flex items-center gap-2.5">
-                <span className="bg-background/70 flex size-8 items-center justify-center rounded-xl border shadow-sm backdrop-blur-xl">
-                  <Link2Icon className="text-primary size-4" />
-                </span>
-                Share playground
+            <DialogHeader className="relative grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 px-6 pt-4 text-left sm:text-left">
+              <span className="bg-background/70 row-span-2 flex size-7 items-center justify-center self-center rounded-lg border shadow-sm backdrop-blur-xl">
+                <Link2Icon className="text-primary size-3.5" />
+              </span>
+              <DialogTitle className="col-start-2">
+                Share thread
               </DialogTitle>
-              <DialogDescription className="pl-10">
-                Publish a polished, read-only version anyone with the link can
-                open.
+              <DialogDescription className="col-start-2 text-xs">
+                Create a link others can open in LLM Space or view on the web.
               </DialogDescription>
             </DialogHeader>
 
             {status !== "success" ? (
-              <div className="relative grid items-center gap-5 px-6 pt-3 pb-5 md:grid-cols-[1fr_1.05fr]">
+              <div className="relative grid items-center gap-5 px-6 pt-2 pb-3 md:grid-cols-[1fr_1.05fr]">
                 <div>
                   <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
                     Read-only web share
                   </span>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-balance">
-                    Share the work, not a screenshot.
+                  <h3 className="mt-1.5 text-xl font-semibold tracking-tight">
+                    Share the thread—not a screenshot.
                   </h3>
-                  <p className="text-muted-foreground mt-2 max-w-sm text-sm/relaxed">
-                    Your prompts, messages, and tool calls stay navigable—and
-                    can be brought back into LLM Space.
+                  <p className="text-muted-foreground mt-1.5 max-w-sm text-xs/relaxed">
+                    Others can open it in LLM Space or explore it read-only on
+                    the web.
                   </p>
                 </div>
                 <SharePreview />
@@ -273,94 +256,42 @@ export function ShareThreadDialog({
               }
             />
           ) : (
-            <div className="grid gap-5 p-6 md:grid-cols-[0.85fr_1.15fr]">
-              <div className="flex flex-col gap-3">
-                <div className="space-y-1.5">
-                  <span className="text-muted-foreground text-[0.6875rem] font-semibold tracking-wide uppercase">
-                    Publish route
-                  </span>
-                  <Select
-                    value={connector}
-                    onValueChange={setConnector}
-                    disabled={busy}
-                  >
-                    <SelectTrigger className="h-auto w-full cursor-pointer px-3 py-2.5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={GIST_CONNECTOR}>
-                        <GitHubIcon className="size-3.5" />
-                        GitHub Gist
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="bg-muted/20 rounded-xl border p-3.5">
-                  <div className="flex items-center gap-2">
-                    <Globe2Icon className="text-muted-foreground size-4" />
-                    <span className="text-xs font-semibold">Link access</span>
-                  </div>
-                  <p className="text-muted-foreground mt-1.5 text-[0.6875rem]/relaxed">
-                    Unlisted, not private. Anyone with the link can view it.
-                  </p>
-                  <div className="text-muted-foreground mt-3 flex items-center gap-3 border-t pt-3">
-                    <span className="flex items-center gap-1 text-[0.625rem]">
-                      <FileTextIcon className="size-3" /> Prompts
-                    </span>
-                    <span className="flex items-center gap-1 text-[0.625rem]">
-                      <MessageSquareIcon className="size-3" /> Messages
-                    </span>
-                    <span className="flex items-center gap-1 text-[0.625rem]">
-                      <WrenchIcon className="size-3" /> Tools
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-muted-foreground flex gap-2 px-1 text-[0.6875rem]/relaxed">
-                  <LockKeyholeIcon className="mt-0.5 size-3.5 shrink-0" />
-                  <p>Delete the secret Gist from GitHub to revoke access.</p>
-                </div>
+            <div className="flex min-h-72 flex-col gap-4 p-6">
+              <div className="space-y-2.5">
+                <label htmlFor="share-title" className="text-xs font-medium">
+                  Title
+                </label>
+                <Input
+                  id="share-title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Untitled thread"
+                  disabled={busy}
+                />
               </div>
 
-              <div className="flex flex-col gap-3">
-                <div className="space-y-1.5">
-                  <label htmlFor="share-title" className="text-xs font-medium">
-                    Title
-                  </label>
-                  <Input
-                    id="share-title"
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    placeholder="Untitled playground"
-                    disabled={busy}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="share-description"
-                    className="text-xs font-medium"
-                  >
-                    Description{" "}
-                    <span className="text-muted-foreground font-normal">
-                      Optional
-                    </span>
-                  </label>
-                  <Textarea
-                    id="share-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Add context for the people opening this link…"
-                    disabled={busy}
-                    rows={4}
-                  />
-                </div>
-                {status === "error" ? (
-                  <p className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">
-                    {errorMessage}
-                  </p>
-                ) : null}
+              <div className="flex flex-1 flex-col gap-2.5">
+                <label
+                  htmlFor="share-description"
+                  className="text-xs font-medium"
+                >
+                  Description
+                </label>
+                <Textarea
+                  id="share-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Add a short note for the people opening this link…"
+                  disabled={busy}
+                  rows={3}
+                  className="min-h-28 flex-1 resize-none"
+                />
               </div>
+              {status === "error" ? (
+                <p className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">
+                  {errorMessage}
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -406,18 +337,18 @@ export function ShareThreadDialog({
 /** Theme-aware HTML illustration of the read-only page the link opens. */
 function SharePreview() {
   return (
-    <div className="relative mx-auto h-40 w-full max-w-72" aria-hidden="true">
-      <div className="bg-background/35 absolute inset-4 -rotate-3 rounded-2xl border backdrop-blur-sm" />
-      <div className="bg-background/90 absolute inset-2 overflow-hidden rounded-2xl border shadow-xl shadow-black/10 backdrop-blur-xl">
-        <div className="flex h-8 items-center gap-1.5 border-b px-3">
+    <div className="relative mx-auto h-32 w-full max-w-64" aria-hidden="true">
+      <div className="bg-background/35 absolute inset-3 -rotate-3 rounded-xl border backdrop-blur-sm" />
+      <div className="bg-background/90 absolute inset-1 overflow-hidden rounded-xl border shadow-xl shadow-black/10 backdrop-blur-xl">
+        <div className="flex h-7 items-center gap-1.5 border-b px-2.5">
           <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
           <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
           <span className="bg-muted-foreground/25 size-1.5 rounded-full" />
-          <div className="bg-muted/60 text-muted-foreground ml-2 flex h-4 flex-1 items-center rounded px-2 text-[0.4375rem]">
-            llm-space/shared/playground
+          <div className="bg-muted/60 text-muted-foreground ml-2 flex h-4 min-w-0 flex-1 items-center truncate rounded px-2 text-[0.4375rem]">
+            deer-flow.github.io/llm-space
           </div>
         </div>
-        <div className="flex flex-col gap-2.5 p-3">
+        <div className="flex flex-col gap-1.5 p-2.5">
           <div className="flex items-center gap-2">
             <span className="bg-primary/12 text-primary flex size-6 items-center justify-center rounded-lg">
               <MessageSquareIcon className="size-3" />
@@ -427,11 +358,11 @@ function SharePreview() {
               <span className="bg-muted-foreground/25 h-1 w-12 rounded-full" />
             </div>
           </div>
-          <div className="bg-muted/45 flex flex-col gap-1.5 rounded-lg p-2.5">
+          <div className="bg-muted/45 flex flex-col gap-1.5 rounded-md p-2">
             <span className="bg-muted-foreground/30 h-1 w-[82%] rounded-full" />
             <span className="bg-muted-foreground/20 h-1 w-[58%] rounded-full" />
           </div>
-          <div className="border-primary/15 bg-primary/[0.06] ml-6 flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <div className="border-primary/15 bg-primary/[0.06] ml-6 flex flex-col gap-1 rounded-md border p-2">
             <span className="bg-primary/30 h-1 w-[72%] rounded-full" />
             <span className="bg-primary/20 h-1 w-[90%] rounded-full" />
           </div>
@@ -439,7 +370,7 @@ function SharePreview() {
       </div>
       <div className="bg-background/90 absolute right-0 bottom-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[0.625rem] font-medium shadow-lg backdrop-blur-xl">
         <MousePointer2Icon className="text-primary size-3" />
-        Open anywhere
+        Open in LLM Space
       </div>
     </div>
   );
@@ -469,10 +400,10 @@ function ShareSuccess({
         Published
       </span>
       <h3 className="mt-2 text-2xl font-semibold tracking-tight">
-        Your playground is ready to travel
+        Your thread is ready to travel
       </h3>
       <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
-        Send this link to anyone. They can explore the full read-only playground
+        Send this link to anyone. They can explore the full read-only thread
         without a GitHub account.
       </p>
 
