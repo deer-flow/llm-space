@@ -40,20 +40,68 @@ import { SkillsPage } from "./skills-page";
 
 const PAGES = [
   {
+    group: "App",
     value: "general",
     label: "General",
     icon: SlidersHorizontal,
     Page: () => <GeneralPage />,
   },
   {
+    group: "App",
     value: "account",
     label: "Account",
     icon: CircleUser,
     Page: () => <AccountPage />,
   },
   {
+    group: "Agent",
+    value: "models",
+    label: "Models",
+    icon: Boxes,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <ModelProvider client={createElectrobunModelClient(runtimeId)}>
+        <ModelsPage />
+      </ModelProvider>
+    ),
+  },
+  {
+    group: "Agent",
+    value: "skills",
+    label: "Skills",
+    icon: Sparkles,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <SkillsPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    group: "Agent",
+    value: "mcp",
+    label: "MCP Servers",
+    icon: Cable,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <McpPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    group: "Agent",
+    value: "search",
+    label: "Web Search",
+    icon: Search,
+    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
+      <SearchPage runtimeId={runtimeId} />
+    ),
+  },
+  {
+    group: "App",
+    value: "plugins",
+    label: "Plugins",
+    icon: Puzzle,
+    Page: () => <PluginsPage />,
+  },
+  {
+    group: "Connections",
     value: "remote",
-    label: "Remote",
+    label: "Remote Servers",
     icon: Server,
     Page: ({
       canConnect,
@@ -81,24 +129,7 @@ const PAGES = [
     ),
   },
   {
-    value: "models",
-    label: "Models",
-    icon: Boxes,
-    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
-      <ModelProvider client={createElectrobunModelClient(runtimeId)}>
-        <ModelsPage />
-      </ModelProvider>
-    ),
-  },
-  {
-    value: "mcp",
-    label: "MCP",
-    icon: Cable,
-    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
-      <McpPage runtimeId={runtimeId} />
-    ),
-  },
-  {
+    group: "Connections",
     value: "network",
     label: "Network",
     icon: Network,
@@ -107,34 +138,15 @@ const PAGES = [
     ),
   },
   {
-    value: "search",
-    label: "Search",
-    icon: Search,
-    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
-      <SearchPage runtimeId={runtimeId} />
-    ),
-  },
-  {
-    value: "skills",
-    label: "Skills",
-    icon: Sparkles,
-    Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
-      <SkillsPage runtimeId={runtimeId} />
-    ),
-  },
-  {
-    value: "plugins",
-    label: "Plugins",
-    icon: Puzzle,
-    Page: () => <PluginsPage />,
-  },
-  {
+    group: null,
     value: "experimental",
     label: "Experimental",
     icon: FlaskConical,
     Page: () => <ExperimentalPage />,
   },
 ] as const;
+
+const PAGE_GROUPS = ["App", "Agent", "Connections"] as const;
 
 export function SettingsDialog({
   open,
@@ -197,13 +209,46 @@ export function SettingsDialog({
             <header>
               <div className="text-base font-medium">Settings</div>
             </header>
-            <TabsList className="h-fit w-full flex-col gap-0.5 bg-transparent p-0">
-              {PAGES.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger key={value} value={value} className="w-full">
-                  <Icon />
-                  {label}
-                </TabsTrigger>
+            <TabsList className="h-fit w-full flex-col gap-0 bg-transparent p-0">
+              {PAGE_GROUPS.map((group) => (
+                <div
+                  key={group}
+                  className="mb-4 w-full"
+                  role="presentation"
+                >
+                  <div className="text-muted-foreground/70 dark:text-muted-foreground/50 px-2 pb-1 text-[10px] font-medium">
+                    {group}
+                  </div>
+                  <div className="flex flex-col gap-0.5" role="presentation">
+                    {PAGES.filter((page) => page.group === group).map(
+                      ({ value, label, icon: Icon }) => (
+                        <TabsTrigger
+                          key={value}
+                          value={value}
+                          className="w-full pl-5"
+                        >
+                          <Icon />
+                          {label}
+                        </TabsTrigger>
+                      )
+                    )}
+                  </div>
+                </div>
               ))}
+              <div className="w-full border-t pt-2" role="presentation">
+                {PAGES.filter((page) => page.group === null).map(
+                  ({ value, label, icon: Icon }) => (
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="w-full"
+                    >
+                      <Icon />
+                      {label}
+                    </TabsTrigger>
+                  )
+                )}
+              </div>
             </TabsList>
           </aside>
           <div className="min-w-0 grow">
