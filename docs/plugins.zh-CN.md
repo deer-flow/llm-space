@@ -4,7 +4,7 @@
 
 # Plugin 开发指南
 
-LLM Space Plugin 是安装在本机 `LLM_SPACE_HOME/plugins/` 下的 npm-compatible package。一个 Plugin 可以包含零个或多个扩展（Extensions），为 LLM Space 补充 Skills、MCP servers、模型、命令和 Thread Storages。
+LLM Space Plugin 是安装在本机 `LLM_SPACE_HOME/plugins/` 下的 npm-compatible package。一个 Plugin 可以包含零个或多个扩展（Extensions），为 LLM Space 补充 Skills、MCP servers、模型、Tools、命令和 Thread Storages。
 
 本文介绍当前已经实现的 Plugin 体系，包括目录约定、配置格式、运行机制、故障诊断和开发示例。
 
@@ -80,6 +80,7 @@ LLM Space 只从固定位置发现扩展：
 | `skills/*/SKILL.md`             | Skills                    |
 | `mcp.json`                      | MCP servers 与 tools      |
 | `models.json`                   | Model providers 与 models |
+| `tools/*.{ts,js,mjs}`           | 可执行 Plugin Tools       |
 | `commands/*.{ts,js,mjs}`        | Command Palette commands  |
 | `thread-storages/*.{ts,js,mjs}` | Thread Storages           |
 | `config.schema.json`            | Plugin Settings 表单      |
@@ -95,6 +96,8 @@ LLM Space 只从固定位置发现扩展：
 ├── config.schema.json
 ├── mcp.json
 ├── models.json
+├── tools/
+│   └── project-info.ts
 ├── skills/
 │   └── incident-review/
 │       ├── SKILL.md
@@ -363,7 +366,7 @@ plugin:@example/team-tools:mcp:knowledge-base
 
 不要在 `mcp.json` 中手动拼接这个前缀。Plugin MCP 在设置页标记为只读；用户不能在那里改写它，应通过 Plugin Settings 或环境变量配置。禁用 Plugin 时，其 MCP 连接会关闭，新调用也会被拒绝。
 
-Plugin 不支持直接提供 `tools/*.ts`。需要让 Agent 调用的工具应通过 MCP 暴露。
+Plugin 可以通过 `tools/*.{ts,js,mjs}` 提供本地可执行 Tools，也可以通过 MCP 暴露远程或共享工具。
 
 ## 8. Models
 
@@ -408,7 +411,76 @@ Plugin 不支持直接提供 `tools/*.ts`。需要让 Agent 调用的工具应�
 
 Plugin 只能声明配置，不能加载自定义 provider JavaScript。最终 provider ID 会被 namespace 化；用户配置与 Plugin 配置保持为两个独立来源。禁用 Plugin 后，这些模型不会再用于新的 Run。
 
-## 9. Commands
+## 9. Plugin Tools
+
+Plugin Tool 是可以加入本地 Thread 并由模型调用的 PI 兼容工具。每个直接位于
+`tools/*.{ts,js,mjs}` 下的文件必须 default export 一个无参数 class：
+
+```ts
+export default class ProjectInfoTool {
+  name = "project_info";
+  description = "Read information about the current project.";
+  parameters = {
+    type: "object",
+    properties: {},
+    additionalProperties: false,
+  };
+  strict = true;
+
+  async execute(context, args) {
+    const cwd = context.variables.current_working_directory;
+    const rawDefinition =
+      context.thread.context?.variables?.current_working_directory;
+    return { cwd, rawDefinition, args };
+  }
+}
+```
+
+文件名决定稳定 Extension ID，并随 Tool 定义持久化到 Thread：
+
+```text
+tools/project-info.ts
+→ plugin:@example/team-tools:tool:project-info
+```
+
+每次加载 Plugin 时 class 只实例化一次，并可实现 `dispose()`。修改 Plugin 包名或
+Tool 文件名会使已保存的引用失效。禁用或删除 Plugin 不会从 Thread 中删除 Tool；
+Plugin 恢复前，调用会明确返回 unavailable 错误。
+
+### 9.1 Tool context 与 variables
+
+`execute(context, args)` 获得产生本次 Tool Call 的 owning Thread，而不是 UI 当前
+选中的 Tab。`context.thread` 是独立且深度冻结的快照，不包含 filename、Tab API 或
+写入方法。同一批并行 Tool Calls 共享同一份 Thread 与 variables 快照。
+
+`context.variables` 在调用开始时解析所有已配置变量：
+
+| Variable 类型 | 解析结果 |
+| --- | --- |
+| Custom、working directory、current date | 字符串 |
+| Skills | 按变量配置格式生成的字符串 |
+| File | UTF-8 文件内容 |
+| JSON | 解析后的 JSON 值 |
+
+空值或无法解析的变量会被省略。原始定义仍可通过
+`context.thread.context.variables` 读取，custom variant 数据位于
+`context.thread.context.variableVariants`。Tool context 还提供 Plugin 的只读
+`settings`，以及 `notify`、`openLink`、`readWorkspaceFile`、
+`writeWorkspaceFile` 等通用 host 方法。
+
+普通 string/JSON 返回值会自动序列化为文本。需要显式返回 text/image 内容时使用：
+
+```ts
+return context.createResult([
+  { type: "text", text: "Completed" },
+  { type: "image", data: base64Data, mimeType: "image/png" },
+]);
+```
+
+Plugin Tools 首版仅支持本地 Runtime：remote Thread 不会列出本地 Plugin Tools，
+不能在 remote Runtime 执行，也暂时不能导出到 LangGraph 项目。
+
+## 10. Commands
 
 Commands 是出现在 Command Palette 中的动态操作。每个 `commands/*.{ts,js,mjs}` 文件必须 default export 一个无参数 class。
 
@@ -433,7 +505,7 @@ commands/open-documentation.ts
 
 每次加载 Plugin 时，每个 class 只实例化一次。实例可以持有短期内存状态，并可选实现 `dispose()`，在 Plugin 禁用、重载或应用退出时清理资源。
 
-### 9.1 Command context
+### 10.1 Command context
 
 `execute(context)` 可以使用：
 
@@ -446,7 +518,23 @@ context.pickFile(options);
 context.readWorkspaceFile(path);
 context.writeWorkspaceFile(path, content);
 context.executeHostCommand(type, args);
+context.arguments;
+context.activeTab?.filename;
+context.activeTab?.thread;
+await context.activeTab?.writeThread(thread);
 ```
+
+Command Palette 支持在 Command 显示名或稳定文件名别名后输入 shell 风格参数。
+例如，`sync skill "abc" '123'` 会将 `["skill", "abc", "123"]` 同时作为
+`context.arguments` 和可选的第二个 `execute(context, arguments)` 参数传入；
+引号只负责组合参数，不会进入参数值。
+
+`context.activeTab` 是 Command 启动时活跃的 Thread Tab；如果当前活跃 Tab 不是
+Thread，则为 `null`。其中 `filename` 是文件名，`thread` 是完整 `Thread` 的独立
+快照，包括模型、Prompt Variables、消息、工具、Run History 和 Evaluations。
+`activeTab.writeThread(thread)` 暂存一次完整 Thread 替换：仅当 Command 成功结束、
+同一个 Tab 仍处于活跃状态，且 Pane 没有正在运行或持久化的操作时，LLM Space 才会
+校验并提交写入，然后用提交后的内容刷新当前 Pane。
 
 目前允许调用的 LLM Space Commands 是 `openSettings` 和 `refreshTree`。其他类型会被拒绝。工作区文件方法中的路径相对于 LLM Space workspace 解析。
 
@@ -467,7 +555,7 @@ export default class CreateReadmeCommand {
 
 Commands 当前只进入 Command Palette，不会自动进入系统菜单、快捷键或右键菜单。
 
-## 10. Thread Storages
+## 11. Thread Storages
 
 Thread Storage 负责从外部 backend 读取一个 Thread，或把一个 Thread 写入 backend。它不是 workspace 的替代品：导入完成后，Thread 仍会保存到本地 `workspace/imported/`。
 
@@ -536,7 +624,7 @@ export default class TeamLibraryStorage implements PluginThreadStorage {
 
 > 上例中的 `example.com` 数据格式只是演示。真实 Storage 必须自行校验远端响应，再转换为合法的 LLM Space `Thread`。
 
-### 10.1 能力声明
+### 11.1 能力声明
 
 Storage 用 `capabilities` 声明能力：
 
@@ -548,7 +636,7 @@ Storage 用 `capabilities` 声明能力：
 
 `resolveLatest()` 把 backend 自己定义的 opaque resource ID 解析为 `ThreadLocator`。`filename` 和 `version` 都是可选的；调用者应把 locator 当成不透明地址，不要自行重建。
 
-### 10.2 Deep Link 注册
+### 11.2 Deep Link 注册
 
 可读 Storage 可以声明 `deepLinkId`：
 
@@ -572,7 +660,7 @@ LLM Space 使用 `threads` 和 `deepLinkId` 选择对应的 Storage。`team-libr
 
 Plugin Storage deep link 的作用是导入本地 workspace。它不会自动获得 Web Viewer、公开分享页面或 shared route 能力。
 
-## 11. 运行模型与生命周期
+## 12. 运行模型与生命周期
 
 声明式扩展和代码扩展具有不同的运行行为：
 
@@ -595,7 +683,7 @@ Plugin Storage deep link 的作用是导入本地 workspace。它不会自动获
 - **Disable**：阻止新调用、移除 Extensions，并关闭相关资源。
 - **Shutdown**：尽力调用实例的 `dispose()` 并关闭相关资源。
 
-## 12. ID、只读来源与冲突
+## 13. ID、只读来源与冲突
 
 扩展的稳定 ID 从 Plugin ID 和文件名或局部 ID 派生。例如：
 
@@ -614,7 +702,7 @@ Plugin 的声明式贡献与用户配置分层保存：
 - Plugin 来源在相应设置页中是只读的。
 - 想修改 Plugin 来源，应编辑 Plugin 文件或 Plugin Settings，然后 Reload。
 
-## 13. 信任与安全
+## 14. 信任与安全
 
 LLM Space 当前没有 Plugin trust 或权限授权界面。安装并启用一个本地 Plugin，意味着完全信任它。
 
@@ -635,7 +723,7 @@ Plugin 作者应遵循：
 - `dispose()` 中关闭长连接、定时器和临时资源。
 - Plugin 目录不使用 symlink，也不依赖安装目录外的相对路径。
 
-## 14. 状态、错误与日志
+## 15. 状态、错误与日志
 
 Plugin 状态包括：
 
@@ -669,7 +757,7 @@ LLM_SPACE_DISABLE_PLUGINS=1 mise run dev
 
 这会在该次启动中跳过所有第三方 Plugin，便于检查或修复安装目录与 Settings。
 
-## 15. 从零创建一个最小 Plugin
+## 16. 从零创建一个最小 Plugin
 
 下面创建一个只提供 Command 的示例 Plugin。
 
@@ -729,7 +817,7 @@ export default class HelloCommand {
 
 Settings tab 会出现 Audience 输入框，修改后自动保存并重载 Plugin。
 
-## 16. 开发检查清单
+## 17. 开发检查清单
 
 发布或分发 Plugin 前，建议至少检查：
 
@@ -749,12 +837,11 @@ Settings tab 会出现 Audience 输入框，修改后自动保存并重载 Plugi
 - Reload、Disable、Enable 和应用退出都会正确清理资源。
 - 日志中不包含 secrets、完整 prompt 或敏感 tool payload。
 
-## 17. 当前不支持的能力
+## 18. 当前不支持的能力
 
 当前 Plugin 体系不包括：
 
 - Hooks（before/after agent、turn、model 等）；
-- `tools/*.ts` 形式的 Tool 扩展；
 - Marketplace；
 - 自动安装、更新、依赖安装与回滚；
 - 项目级 Plugin；

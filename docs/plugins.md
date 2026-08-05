@@ -4,7 +4,7 @@ English | [中文](./plugins.zh-CN.md)
 
 # Plugin Development Guide
 
-An LLM Space Plugin is an npm-compatible package installed under `LLM_SPACE_HOME/plugins/`. A Plugin may contribute zero or more Extensions, including Skills, MCP servers, model providers, commands, and Thread Storages.
+An LLM Space Plugin is an npm-compatible package installed under `LLM_SPACE_HOME/plugins/`. A Plugin may contribute zero or more Extensions, including Skills, MCP servers, model providers, Tools, commands, and Thread Storages.
 
 This guide describes the current Plugin system: package layout, metadata, Settings, supported Extensions, lifecycle, diagnostics, and development practices.
 
@@ -80,6 +80,7 @@ LLM Space discovers Extensions only at these paths:
 | `skills/*/SKILL.md`             | Skills                     |
 | `mcp.json`                      | MCP servers and tools      |
 | `models.json`                   | Model providers and models |
+| `tools/*.{ts,js,mjs}`           | Executable Plugin Tools    |
 | `commands/*.{ts,js,mjs}`        | Command Palette commands   |
 | `thread-storages/*.{ts,js,mjs}` | Thread Storages            |
 | `config.schema.json`            | Plugin Settings form       |
@@ -95,6 +96,8 @@ A complete Plugin might look like this:
 ├── config.schema.json
 ├── mcp.json
 ├── models.json
+├── tools/
+│   └── project-info.ts
 ├── skills/
 │   └── incident-review/
 │       ├── SKILL.md
@@ -355,7 +358,7 @@ plugin:@example/team-tools:mcp:knowledge-base
 
 Do not include this prefix in `mcp.json`. Plugin MCP definitions cannot be edited or removed from the MCP page; configure them with Plugin Settings or environment variables. Disabling the Plugin closes its MCP connections and rejects new calls.
 
-Plugins cannot currently contribute `tools/*.ts`. Expose Agent-callable tools through MCP instead.
+Plugins can contribute local executable Tools through `tools/*.{ts,js,mjs}` or expose remote and shared tools through MCP.
 
 ## 8. Models
 
@@ -400,7 +403,80 @@ Example:
 
 A Plugin can declare configuration but cannot load a custom provider implementation. Provider IDs are namespaced automatically. Plugin and user providers remain separate sources. Models from a disabled Plugin are unavailable to new Runs.
 
-## 9. Commands
+## 9. Plugin Tools
+
+Plugin Tools are executable PI-compatible tools that can be added to a local
+Thread. Every direct `tools/*.{ts,js,mjs}` file must default-export a class with
+a zero-argument constructor:
+
+```ts
+export default class ProjectInfoTool {
+  name = "project_info";
+  description = "Read information about the current project.";
+  parameters = {
+    type: "object",
+    properties: {},
+    additionalProperties: false,
+  };
+  strict = true;
+
+  async execute(context, args) {
+    const cwd = context.variables.current_working_directory;
+    const rawDefinition =
+      context.thread.context?.variables?.current_working_directory;
+    return { cwd, rawDefinition, args };
+  }
+}
+```
+
+The file name determines the stable Extension ID persisted with the Tool:
+
+```text
+tools/project-info.ts
+→ plugin:@example/team-tools:tool:project-info
+```
+
+The class is instantiated once per Plugin load and may implement `dispose()`.
+Changing the Plugin package name or Tool file name breaks persisted references.
+Disabling or removing a Plugin does not delete its Tools from saved Threads;
+calls fail as unavailable until the Plugin returns.
+
+### 9.1 Tool context and variables
+
+`execute(context, args)` receives the Thread that owns the Tool Call, not the
+selected UI tab. `context.thread` is a detached, deeply frozen snapshot and has
+no filename, tab API, or write method. Parallel Tool Calls in one batch share
+the same Thread and resolved-variable snapshot.
+
+`context.variables` resolves all configured variables at invocation time:
+
+| Variable type | Resolved value |
+| --- | --- |
+| Custom, working directory, current date | String |
+| Skills | Formatted string using the configured format |
+| File | UTF-8 file contents |
+| JSON | Parsed JSON value |
+
+Empty or unresolvable variables are omitted. Original definitions remain under
+`context.thread.context.variables`; custom variants remain under
+`context.thread.context.variableVariants`. The context also exposes read-only
+Plugin `settings` and common host methods such as `notify`, `openLink`,
+`readWorkspaceFile`, and `writeWorkspaceFile`.
+
+Ordinary string and JSON return values become text. For explicit text/image
+Tool content, use:
+
+```ts
+return context.createResult([
+  { type: "text", text: "Completed" },
+  { type: "image", data: base64Data, mimeType: "image/png" },
+]);
+```
+
+Plugin Tools are local-runtime only. They are not listed for remote Threads,
+cannot execute remotely, and cannot currently be exported to LangGraph.
+
+## 10. Commands
 
 Commands are dynamic actions shown in the Command Palette. Every `commands/*.{ts,js,mjs}` file must default-export a class with a zero-argument constructor.
 
@@ -425,7 +501,7 @@ commands/open-documentation.ts
 
 Each class is instantiated once per Plugin load. An instance may hold short-lived in-memory state and may implement `dispose()` to clean up resources when the Plugin is disabled, reloaded, or the app exits.
 
-### 9.1 Command context
+### 10.1 Command context
 
 `execute(context)` can use:
 
@@ -438,7 +514,26 @@ context.pickFile(options);
 context.readWorkspaceFile(path);
 context.writeWorkspaceFile(path, content);
 context.executeHostCommand(type, args);
+context.arguments;
+context.activeTab?.filename;
+context.activeTab?.thread;
+await context.activeTab?.writeThread(thread);
 ```
+
+The palette accepts shell-style arguments after either the command's display
+name or its stable file-stem alias. For example,
+`sync skill "abc" '123'` exposes `["skill", "abc", "123"]` as both
+`context.arguments` and the optional second `execute(context, arguments)`
+parameter. Quotes group values and are not included in them.
+
+`context.activeTab` is the thread tab that was active when the command started,
+or `null` when the active tab is not a thread. Its `filename` identifies the
+file and `thread` is a detached snapshot of the complete `Thread`, including
+model, prompt variables, messages, tools, run history, and evaluations.
+`activeTab.writeThread(thread)` stages a whole-thread replacement. LLM Space
+validates and commits it only when the command succeeds, the same tab is still
+active, and the pane has no run or persistence operation in progress; the
+mounted pane is then refreshed from the committed value.
 
 The currently allowed host Commands are `openSettings` and `refreshTree`. Other command types are rejected. Workspace file paths are resolved relative to the LLM Space workspace.
 
@@ -457,7 +552,7 @@ export default class CreateReadmeCommand {
 
 Plugin Commands currently appear only in the Command Palette. They do not automatically receive native menu entries, shortcuts, or context-menu entries.
 
-## 10. Thread Storages
+## 11. Thread Storages
 
 A Thread Storage reads a Thread from an external backend or writes a Thread to one. It does not replace the workspace: imported Threads are saved under the local `workspace/imported/` directory.
 
@@ -526,7 +621,7 @@ export default class TeamLibraryStorage implements PluginThreadStorage {
 
 The response format in this example is illustrative. A real Storage must validate remote data before converting it to a valid LLM Space `Thread` or `ThreadLocator`.
 
-### 10.1 Capabilities
+### 11.1 Capabilities
 
 | Capabilities                   | Required methods            | Product entry point |
 | ------------------------------ | --------------------------- | ------------------- |
@@ -536,7 +631,7 @@ The response format in this example is illustrative. A real Storage must validat
 
 `resolveLatest()` converts an opaque backend resource ID into a `ThreadLocator`. Both `filename` and `version` are optional. Callers should treat locators as opaque addresses rather than reconstructing them.
 
-### 10.2 Deep links
+### 11.2 Deep links
 
 A readable Storage may register:
 
@@ -560,7 +655,7 @@ LLM Space uses `threads` and `deepLinkId` to select the Storage. Everything afte
 
 A Plugin Storage deep link imports into the local workspace. It does not automatically add Web Viewer, public sharing, or `shared` route support.
 
-## 11. Runtime and lifecycle
+## 12. Runtime and lifecycle
 
 | Extension       | Runtime behavior                                   |
 | --------------- | -------------------------------------------------- |
@@ -581,7 +676,7 @@ Lifecycle events:
 - **Disable:** reject new calls, remove Extensions, and close Plugin resources.
 - **Shutdown:** best-effort `dispose()` calls and resource cleanup.
 
-## 12. IDs, read-only sources, and conflicts
+## 13. IDs, read-only sources, and conflicts
 
 Stable Extension IDs are derived from the Plugin ID and a file name or local ID:
 
@@ -601,7 +696,7 @@ Plugin contributions and user configuration remain separate:
 - Plugin MCP and model definitions cannot be edited or removed from their respective Settings pages.
 - To change a Plugin definition, edit its files or Settings and then reload it.
 
-## 13. Trust and security
+## 14. Trust and security
 
 LLM Space currently has no Plugin trust prompt or permission manifest. Installing and enabling a local Plugin means fully trusting it.
 
@@ -620,7 +715,7 @@ Plugin authors should:
 - close connections, timers, and temporary resources in `dispose()`;
 - avoid symlinks and dependencies on paths outside the Plugin directory.
 
-## 14. Status, errors, and logs
+## 15. Status, errors, and logs
 
 | Status         | Meaning                                                |
 | -------------- | ------------------------------------------------------ |
@@ -650,7 +745,7 @@ To troubleshoot startup while skipping all third-party Plugins for one run:
 LLM_SPACE_DISABLE_PLUGINS=1 mise run dev
 ```
 
-## 15. Minimal Plugin example
+## 16. Minimal Plugin example
 
 This example contributes one Command:
 
@@ -708,7 +803,7 @@ Optionally add `config.schema.json`:
 
 The Settings tab now displays an Audience field. Editing it saves automatically and reloads the Plugin.
 
-## 16. Development checklist
+## 17. Development checklist
 
 Before distributing a Plugin, verify that:
 
@@ -728,12 +823,11 @@ Before distributing a Plugin, verify that:
 - reload, disable, enable, and shutdown clean up resources correctly;
 - logs contain no secrets, full prompts, or sensitive tool payloads.
 
-## 17. Currently unsupported
+## 18. Currently unsupported
 
 The current Plugin system does not include:
 
 - before/after agent, turn, or model hooks;
-- `tools/*.ts` Tool Extensions;
 - a Plugin marketplace;
 - automatic installation, update, dependency installation, or rollback;
 - project-scoped Plugins;
