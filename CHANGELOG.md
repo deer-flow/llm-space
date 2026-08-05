@@ -4,6 +4,24 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.1] - 2026-08-05
+
+This patch release polishes Settings layout and makes Plugin documentation
+easier to reach.
+
+### Changed
+
+- Settings pages use consistent header dividers, content spacing, and concise
+  descriptions, while compact form rows retain their intended density.
+- Experimental settings now share the same labeled toggle layout as Network
+  settings.
+- Plugin settings link directly to the Plugin development guide.
+
+### Fixed
+
+- Remote Servers content aligns flush with its header, while other split-pane
+  Settings pages keep the correct top spacing.
+
 ## [4.8.0] - 2026-08-05
 
 This release introduces trusted local Plugins that can extend LLM Space with

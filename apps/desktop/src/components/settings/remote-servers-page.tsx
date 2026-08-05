@@ -221,8 +221,7 @@ export function RemoteServersPage({
   const reportRunError = (id: string, error: unknown) => {
     const failed = serversRef.current.find((server) => server.id === id);
     toast.error(_failureTitle(failed), {
-      description:
-        error instanceof Error ? error.message : "Please try again.",
+      description: error instanceof Error ? error.message : "Please try again.",
     });
   };
 
@@ -294,7 +293,7 @@ export function RemoteServersPage({
       description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
       className="p-0"
     >
-      <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] border-t">
+      <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
         <aside className="bg-muted/20 flex min-h-0 flex-col border-r">
           <div className="flex h-11 items-center justify-between px-3">
             <span className="text-sm font-medium">Servers</span>
@@ -408,8 +407,7 @@ export function RemoteServersPage({
               onEdit={() => startEdit(selected)}
               onRemove={() =>
                 void runRemoteRuntimeActionIfAllowed({
-                  allowed: () =>
-                    canDisconnect?.(selected.runtimeId) ?? true,
+                  allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
                   acquire: acquireDisconnect
                     ? () => acquireDisconnect(selected.runtimeId)
                     : undefined,

@@ -61,6 +61,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
   return (
     <SettingsPage
       title="Search"
+      className="pt-0"
       description={
         <>
           Choose the provider for the built-in <code>web_search</code> tool.

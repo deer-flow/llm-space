@@ -1,13 +1,14 @@
 "use client";
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
-import { Switch } from "@llm-space/ui/ui/switch";
+import { Separator } from "@llm-space/ui/ui/separator";
 import { useState } from "react";
 
 import { useCommands } from "@/commands";
 import { useExperimental } from "@/components/experimental-provider";
 
 import { SettingsPage } from "./settings-page";
+import { SettingsToggleRow } from "./settings-toggle-row";
 
 export function ExperimentalPage() {
   const { tracingEnabled, setTracingEnabled, reactScanEnabled, setReactScanEnabled } =
@@ -23,37 +24,30 @@ export function ExperimentalPage() {
   };
 
   return (
-    <SettingsPage title="Experimental">
-      <div className="flex h-14 items-center justify-between gap-4">
-        <span className="flex flex-col gap-0.5 text-sm">
-          Tracing
-          <span className="text-muted-foreground text-xs">
-            Enable to connect Langfuse or create a manual project for JSON
-            exports.
-          </span>
-        </span>
-        <Switch
+    <SettingsPage
+      title="Experimental"
+      description="Configure preview features that are still under development."
+      className="overflow-y-auto"
+    >
+      <div className="flex flex-col gap-6 pb-2">
+        <SettingsToggleRow
+          title="Tracing"
+          hint="Enable to connect Langfuse or create a manual project for JSON exports."
           checked={tracingEnabled}
           onCheckedChange={setTracingEnabled}
-          aria-label="Tracing"
         />
+        {import.meta.env.DEV ? (
+          <>
+            <Separator />
+            <SettingsToggleRow
+              title="React Scan"
+              hint="Highlight component re-renders after a reload. Dev builds only."
+              checked={reactScanEnabled}
+              onCheckedChange={handleReactScanChange}
+            />
+          </>
+        ) : null}
       </div>
-      {import.meta.env.DEV ? (
-        <div className="flex h-14 items-center justify-between gap-4">
-          <span className="flex flex-col gap-0.5 text-sm">
-            React Scan
-            <span className="text-muted-foreground text-xs">
-              Overlay that highlights component re-renders. Takes effect after a
-              reload. Dev builds only.
-            </span>
-          </span>
-          <Switch
-            checked={reactScanEnabled}
-            onCheckedChange={handleReactScanChange}
-            aria-label="React Scan"
-          />
-        </div>
-      ) : null}
       <ConfirmDialog
         open={reloadPromptOpen}
         onOpenChange={setReloadPromptOpen}

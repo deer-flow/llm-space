@@ -37,6 +37,9 @@ import { electrobun } from "@/lib/electrobun";
 
 import { SettingsPage } from "./settings-page";
 
+const PLUGIN_DOCUMENTATION_URL =
+  "https://github.com/deer-flow/llm-space/blob/main/docs/plugins.md";
+
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
   const [pluginsPath, setPluginsPath] = useState<string>();
@@ -86,7 +89,19 @@ export function PluginsPage() {
   return (
     <SettingsPage
       title="Plugins"
-      description="Local plugins are trusted and enabled by default. Extension failures are isolated and logged."
+      description={
+        <span>
+          Local plugins are trusted and enabled by default. Extension failures
+          are isolated and logged. Read the{" "}
+          <Link
+            href={PLUGIN_DOCUMENTATION_URL}
+            className="text-foreground underline underline-offset-2"
+          >
+            Plugin development guide
+          </Link>
+          .
+        </span>
+      }
       className="flex size-full min-h-0"
     >
       {loading ? (
