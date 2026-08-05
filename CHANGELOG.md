@@ -4,6 +4,30 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.2] - 2026-08-05
+
+This patch release makes filesystem tools handle home-relative paths reliably
+and improves the generated LangGraph development workflow.
+
+### Added
+
+- Generated LangGraph projects include a `Makefile`; run `make dev` to start
+  `uv run langgraph dev`.
+
+### Changed
+
+- Filesystem tool schemas and generated Python implementations consistently
+  document and expand leading `~/` paths.
+- MCP stdio commands and working directories expand home-relative paths in both
+  the desktop runtime and generated LangGraph projects.
+
+### Fixed
+
+- `write`, `edit`, `read`, `ls`, `tree`, `grep`, `glob`, and `present_files` no
+  longer interpret `~/...` relative to the desktop app bundle.
+- Home-relative artifact paths can be revealed from tool calls, including a
+  `glob` target directory.
+
 ## [4.8.1] - 2026-08-05
 
 This patch release polishes Settings layout and makes Plugin documentation

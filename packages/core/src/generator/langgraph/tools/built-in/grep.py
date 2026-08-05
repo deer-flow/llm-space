@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from langchain.tools import tool
@@ -49,13 +50,15 @@ def grep(
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining what is being searched for.
         pattern: Regular expression pattern to search for in file contents.
-        path: Absolute path to a file or directory to search in.
+        path: Absolute path to a file or directory to search in. A leading ~/
+            is expanded to the current user's home directory.
         glob: Glob filter for files (e.g. "*.ts", "**/*.tsx") — maps to
             rg --glob.
         case_insensitive: Case insensitive search.
         context_lines: Number of context lines to show before and after each
             match (maps to rg -C). Defaults to 0.
     """
+    path = os.path.expanduser(path)
     args = ["rg", "--line-number", "--with-filename", "--color=never"]
     # Prune common noise dirs/files regardless of any .gitignore presence.
     for name in DEFAULT_IGNORES:

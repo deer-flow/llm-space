@@ -152,6 +152,15 @@ dev = [
 `;
 }
 
+/** `Makefile` — convenience commands for the generated development project. */
+export function makefile(): string {
+  return `.PHONY: dev
+
+dev:
+\tuv run langgraph dev
+`;
+}
+
 /** The literal API key to write into `.env`, or `null` for a `$ENV` reference. */
 export function literalApiKey(info: GeneratorModelInfo): string | null {
   if (!info.apiKey || info.apiKey.startsWith("$")) {
@@ -356,7 +365,7 @@ amount left to finish; otherwise the project is complete.
 
 \`\`\`sh
 cp .env.example .env   # then fill in any missing API keys
-uv run langgraph dev
+make dev
 \`\`\`
 
 This starts the LangGraph dev server + web UI so you can trace and debug the
@@ -825,6 +834,13 @@ function _mcpTransport(transport: McpTransportType): string {
   return transport === "streamableHttp" ? "streamable_http" : transport;
 }
 
+/** Render a launcher path, expanding only a leading home shortcut at runtime. */
+function _mcpLauncherPath(value: string): string {
+  return value === "~" || value.startsWith("~/") || value.startsWith("~\\")
+    ? `os.path.expanduser(${_pyStr(value)})`
+    : _pyStr(value);
+}
+
 /** A `MCP_SERVERS` dict entry (as Python lines) for one server + its env vars. */
 function _mcpServerBlock(server: GeneratorMcpServer): {
   block: string;
@@ -842,13 +858,13 @@ function _mcpServerBlock(server: GeneratorMcpServer): {
   if (server.transport === "stdio") {
     // command/args/cwd are the launcher — not secrets — so they stay literal.
     if (server.command) {
-      body.push(`${I8}"command": ${_pyStr(server.command)},`);
+      body.push(`${I8}"command": ${_mcpLauncherPath(server.command)},`);
     }
     if (server.args && server.args.length > 0) {
       body.push(`${I8}"args": [${server.args.map(_pyStr).join(", ")}],`);
     }
     if (server.cwd) {
-      body.push(`${I8}"cwd": ${_pyStr(server.cwd)},`);
+      body.push(`${I8}"cwd": ${_mcpLauncherPath(server.cwd)},`);
     }
     const keys = Object.keys(server.env ?? {});
     if (keys.length > 0) {
@@ -978,7 +994,7 @@ built-in tools, and the agent itself (\`src/agents/agent.py\`) are already wired
 
 \`\`\`sh
 cp .env.example .env   # fill in any missing API keys
-uv run langgraph dev
+make dev
 \`\`\``,
   ];
 

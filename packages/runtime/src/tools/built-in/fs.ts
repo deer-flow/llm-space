@@ -5,6 +5,7 @@ import path from "node:path";
 
 import type { BuiltinTool } from "@llm-space/core";
 import type { SkillContent } from "@llm-space/core";
+import { expandHomePath } from "@llm-space/core/server";
 
 import {
   createToolCallResponse,
@@ -115,7 +116,8 @@ export const readTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to read",
+        description:
+          "Absolute path to the file to read; a leading ~/ is expanded to the current user's home directory",
       },
       offset: {
         type: "number",
@@ -141,6 +143,7 @@ export async function read(
   offset?: number,
   limit?: number
 ): Promise<string | ToolCallResponse> {
+  filePath = expandHomePath(filePath);
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
     throw new Error(`${filePath} is a directory, not a file.`);
@@ -217,7 +220,8 @@ export const writeTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to write",
+        description:
+          "Absolute path to the file to write; a leading ~/ is expanded to the current user's home directory",
       },
       contents: {
         type: "string",
@@ -232,6 +236,7 @@ export async function write(
   filePath: string,
   contents: string
 ): Promise<string> {
+  filePath = expandHomePath(filePath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, contents, "utf8");
   return `Wrote ${Buffer.byteLength(contents, "utf8")} bytes to ${filePath}`;
@@ -257,7 +262,8 @@ export const editTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to edit",
+        description:
+          "Absolute path to the file to edit; a leading ~/ is expanded to the current user's home directory",
       },
       old_string: {
         type: "string",
@@ -284,6 +290,7 @@ export async function edit(
   newString: string,
   replaceAll = false
 ): Promise<string> {
+  filePath = expandHomePath(filePath);
   if (oldString === newString) {
     throw new Error("new_string must differ from old_string.");
   }
@@ -325,7 +332,8 @@ export const lsTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to the directory to list",
+        description:
+          "Absolute path to the directory to list; a leading ~/ is expanded to the current user's home directory",
       },
     },
     additionalProperties: false,
@@ -333,6 +341,7 @@ export const lsTool: BuiltinTool = {
 };
 
 export async function ls(dirPath: string): Promise<string> {
+  dirPath = expandHomePath(dirPath);
   const entries = (await fs.readdir(dirPath, { withFileTypes: true })).filter(
     (entry) => !_isIgnored(entry.name)
   );
@@ -384,7 +393,8 @@ export const treeTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to the directory to print as a tree",
+        description:
+          "Absolute path to the directory to print as a tree; a leading ~/ is expanded to the current user's home directory",
       },
       max_depth: {
         type: "number",
@@ -399,6 +409,7 @@ export async function tree(
   dirPath: string,
   maxDepth?: number
 ): Promise<string> {
+  dirPath = expandHomePath(dirPath);
   const stat = await fs.stat(dirPath);
   if (!stat.isDirectory()) {
     throw new Error(`${dirPath} is not a directory.`);
@@ -488,7 +499,8 @@ export const grepTool: BuiltinTool = {
       },
       path: {
         type: "string",
-        description: "Absolute path to a file or directory to search in",
+        description:
+          "Absolute path to a file or directory to search in; a leading ~/ is expanded to the current user's home directory",
       },
       glob: {
         type: "string",
@@ -516,6 +528,7 @@ export async function grep(
   caseInsensitive = false,
   contextLines?: number
 ): Promise<string> {
+  searchPath = expandHomePath(searchPath);
   const args = ["--line-number", "--with-filename", "--color=never"];
   // Prune common noise dirs/files regardless of any .gitignore presence.
   for (const name of DEFAULT_IGNORES) {
@@ -567,7 +580,7 @@ export const globTool: BuiltinTool = {
       target_directory: {
         type: "string",
         description:
-          "Absolute path to the directory to search in. Defaults to the workspace root if omitted.",
+          "Absolute path to the directory to search in; a leading ~/ is expanded to the current user's home directory. Defaults to the workspace root if omitted.",
       },
     },
     additionalProperties: false,
@@ -579,7 +592,7 @@ export async function glob(
   targetDirectory: string | undefined,
   workspaceRoot: string
 ): Promise<string> {
-  const root = targetDirectory ?? workspaceRoot;
+  const root = expandHomePath(targetDirectory ?? workspaceRoot);
   const scanner = new Bun.Glob(globPattern);
   const matches: { path: string; mtimeMs: number }[] = [];
   for await (const relative of scanner.scan({ cwd: root, dot: true })) {
@@ -714,7 +727,8 @@ export const presentFilesTool: BuiltinTool = {
         items: {
           type: "string",
         },
-        description: "Absolute paths to the files to present to the user",
+        description:
+          "Absolute paths to the files to present to the user; a leading ~/ is expanded to the current user's home directory",
       },
     },
     additionalProperties: false,
@@ -733,7 +747,8 @@ export async function present_files(
   dependencies: Pick<FsBuiltInToolsDependencies, "openPath" | "revealPath"> = {}
 ): Promise<"OK"> {
   const reveals: Promise<void>[] = [];
-  for (const p of paths) {
+  for (const requestedPath of paths) {
+    const p = expandHomePath(requestedPath);
     if (_isHtmlFile(p)) {
       await dependencies.openPath?.(p);
     } else {

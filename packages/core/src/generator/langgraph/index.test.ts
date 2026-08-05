@@ -6,6 +6,71 @@ import type { GeneratorCapabilities, GeneratorRunInput } from "../types";
 import { langgraphGenerator } from "./index";
 
 describe("langgraphGenerator", () => {
+  test("writes a Makefile with the development server target", async () => {
+    const written = new Map<string, string>();
+    const phases: string[] = [];
+    const logs: string[] = [];
+    const capabilities: GeneratorCapabilities = {
+      checkUv() {
+        return Promise.resolve({ installed: false });
+      },
+      runUv() {
+        return Promise.resolve({
+          code: 0,
+          stdout: "",
+          stderr: "",
+          timedOut: false,
+        });
+      },
+      writeFile(_rootDir, relativePath, contents) {
+        written.set(relativePath, contents);
+        return Promise.resolve();
+      },
+      removeFile() {
+        return Promise.resolve();
+      },
+    };
+    const workflow: WorkflowContext = {
+      phase(title) {
+        phases.push(title);
+      },
+      log(message) {
+        logs.push(message);
+      },
+      agent() {
+        return Promise.resolve("");
+      },
+      parallel<T>(thunks: (() => Promise<T>)[]) {
+        return Promise.all(thunks.map((thunk) => thunk()));
+      },
+      signal: new AbortController().signal,
+    };
+    const input: GeneratorRunInput = {
+      targetDir: "/authorized/output",
+      context: {},
+      rendered: {},
+      systemPromptTemplate: "You are helpful.",
+      skills: [],
+      renderedVariableValues: {},
+      model: { provider: "openai", id: "gpt-5" },
+      modelInfo: {
+        name: "GPT-5",
+        anthropic: false,
+        deepseekThinking: false,
+        supportsReasoning: true,
+      },
+      capabilities,
+    };
+
+    await langgraphGenerator.run(workflow, input);
+
+    expect(written.get("Makefile")).toBe(
+      ".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n"
+    );
+    expect(phases.at(-1)).toBe("Done");
+    expect(logs).toContain("uv not found — skipping dependency install");
+  });
+
   test("rejects provider-hosted tools before writing any files", async () => {
     const written: string[] = [];
     const capabilities: GeneratorCapabilities = {

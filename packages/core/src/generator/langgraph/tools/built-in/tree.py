@@ -89,10 +89,12 @@ def tree(description: str, path: str, max_depth: int = TREE_DEFAULT_DEPTH) -> st
     Args:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining why this tree is being generated.
-        path: Absolute path to the directory to print as a tree.
+        path: Absolute path to the directory to print as a tree. A leading ~/
+            is expanded to the current user's home directory.
         max_depth: Maximum directory depth to descend. Defaults to 5, capped at
             20.
     """
+    path = os.path.expanduser(path)
     if not os.path.isdir(path):
         raise ValueError(f"{path} is not a directory.")
     if max_depth is not None and max_depth > 0:

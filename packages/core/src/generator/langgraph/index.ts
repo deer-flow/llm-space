@@ -25,6 +25,7 @@ import {
   gitignore,
   langgraphJson,
   literalApiKey,
+  makefile,
   metaPromptMiddlewarePy,
   mcpEnvEntries,
   mcpModule,
@@ -192,6 +193,7 @@ export const langgraphGenerator: GeneratorDefinition = {
     const runtimeDeps = _runtimeDeps(modelDependency(modelInfo), extraDeps);
     await write("pyproject.toml", pyproject(_dirBaseName(dir), runtimeDeps));
     await write(".python-version", "3.12\n");
+    await write("Makefile", makefile());
 
     // Install once, best-effort. `uv sync` is network-bound and can outlast the
     // timeout on slow links, so a timeout/failure is surfaced to the user (who

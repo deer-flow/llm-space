@@ -1,5 +1,4 @@
 import { readdirSync, readFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import {
@@ -11,6 +10,7 @@ import {
 } from "@llm-space/core";
 import {
   atomicWriteJsonFileSync,
+  expandHomePath,
   getSettingsDir,
   readJsonFileSync,
 } from "@llm-space/core/server";
@@ -239,7 +239,7 @@ export class SkillsManager {
       (e) => e.path === inputPath
     );
     const hidden = new Set(entry?.hiddenSkills ?? []);
-    const dir = this._expand(inputPath);
+    const dir = expandHomePath(inputPath);
 
     let dirents: import("node:fs").Dirent[];
     try {
@@ -385,17 +385,6 @@ export class SkillsManager {
       content: parsed.content,
       path: skillDir,
     };
-  }
-
-  /** Expand a leading `~` to the home directory. */
-  private _expand(p: string): string {
-    if (p === "~") {
-      return os.homedir();
-    }
-    if (p.startsWith("~/") || p.startsWith("~\\")) {
-      return path.join(os.homedir(), p.slice(2));
-    }
-    return p;
   }
 
   private _clone(settings: SkillsSettings): SkillsSettings {

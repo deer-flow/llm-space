@@ -22,6 +22,7 @@ import {
 } from "@llm-space/core";
 import {
   atomicWriteJsonFileSync,
+  expandHomePath,
   getSettingsDir,
   readJsonFileSync,
 } from "@llm-space/core/server";
@@ -521,9 +522,9 @@ export class McpManager {
         );
       }
       return new StdioClientTransport({
-        command: server.command ?? "",
+        command: expandHomePath(server.command ?? ""),
         args: server.args ?? [],
-        cwd: server.cwd || undefined,
+        cwd: server.cwd ? expandHomePath(server.cwd) : undefined,
         env: {
           ...getDefaultEnvironment(),
           ...env,

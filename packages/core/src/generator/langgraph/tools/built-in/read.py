@@ -39,12 +39,14 @@ def read(
     Args:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining why this file is being read.
-        path: Absolute path to the file to read.
+        path: Absolute path to the file to read. A leading ~/ is expanded to
+            the current user's home directory.
         offset: 1-based line number to start reading from. Defaults to 1 (the
             first line).
         limit: Maximum number of lines to read from offset. Defaults to unlimited
             (the rest of the file), still capped by the 256KB output limit.
     """
+    path = os.path.expanduser(path)
     if os.path.isdir(path):
         raise ValueError(f"{path} is a directory, not a file.")
     if os.path.splitext(path)[1].lower() in IMAGE_EXTENSIONS:

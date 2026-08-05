@@ -1,6 +1,7 @@
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
+
+import { expandHomePath } from "@llm-space/core/server";
 
 /**
  * Filesystem/exec backing for the code Generator, deliberately kept OUTSIDE the
@@ -31,18 +32,6 @@ function _assertAuthorized(rootDir: string): string {
   return resolved;
 }
 
-/** Expand a leading `~` to the user's home directory. */
-function _expandTilde(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed === "~") {
-    return homedir();
-  }
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(homedir(), trimmed.slice(2));
-  }
-  return trimmed;
-}
-
 /**
  * Resolve `parentDir/projectName`, validate it can hold a fresh project, create
  * it, and authorize it for the generator's writes + `uv` runs. This is the
@@ -60,7 +49,7 @@ export async function prepareGeneratorDir(
   if (name === "." || name === ".." || /[/\\]/.test(name)) {
     return { ok: false, error: "Project name can't contain path separators." };
   }
-  const parent = path.resolve(_expandTilde(parentDir || "~"));
+  const parent = path.resolve(expandHomePath(parentDir.trim() || "~"));
   const target = path.join(parent, name);
   try {
     const parentStat = await stat(parent);

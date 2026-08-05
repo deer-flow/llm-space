@@ -56,11 +56,12 @@ def glob(
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining what files are being searched for.
         glob_pattern: Glob pattern to match (e.g. "*.ts", "**/test_*.ts").
-        target_directory: Absolute path to the directory to search in. Defaults
-            to the current working directory if omitted (the desktop tool
-            defaults to the workspace root).
+        target_directory: Absolute path to the directory to search in. A leading
+            ~/ is expanded to the current user's home directory. Defaults to the
+            current working directory if omitted (the desktop tool defaults to
+            the workspace root).
     """
-    root = target_directory if target_directory is not None else os.getcwd()
+    root = os.path.expanduser(target_directory) if target_directory else os.getcwd()
     root_path = Path(root)
 
     matches: list[tuple[str, float]] = []

@@ -113,7 +113,8 @@ const READ_FILE_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to read",
+        description:
+          "Absolute path to the file to read; a leading ~/ is expanded to the current user's home directory",
       },
       offset: {
         type: "number",
@@ -146,7 +147,8 @@ const WRITE_FILE_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to write",
+        description:
+          "Absolute path to the file to write; a leading ~/ is expanded to the current user's home directory",
       },
       contents: {
         type: "string",
@@ -173,7 +175,8 @@ const EDIT_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to the file to edit",
+        description:
+          "Absolute path to the file to edit; a leading ~/ is expanded to the current user's home directory",
       },
       old_string: {
         type: "string",
@@ -210,7 +213,8 @@ const LS_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to the directory to list",
+        description:
+          "Absolute path to the directory to list; a leading ~/ is expanded to the current user's home directory",
       },
     },
     additionalProperties: false,
@@ -233,7 +237,8 @@ const TREE_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to the directory to print as a tree",
+        description:
+          "Absolute path to the directory to print as a tree; a leading ~/ is expanded to the current user's home directory",
       },
       max_depth: {
         type: "number",
@@ -266,7 +271,8 @@ const GREP_TOOL: FunctionTool = _functionTool({
       },
       path: {
         type: "string",
-        description: "Absolute path to a file or directory to search in",
+        description:
+          "Absolute path to a file or directory to search in; a leading ~/ is expanded to the current user's home directory",
       },
       glob: {
         type: "string",
@@ -308,7 +314,7 @@ const GLOB_TOOL: FunctionTool = _functionTool({
       target_directory: {
         type: "string",
         description:
-          "Absolute path to the directory to search in. Defaults to the workspace root if omitted.",
+          "Absolute path to the directory to search in; a leading ~/ is expanded to the current user's home directory. Defaults to the workspace root if omitted.",
       },
     },
     additionalProperties: false,
@@ -352,7 +358,8 @@ const PRESENT_FILES_TOOL: FunctionTool = _functionTool({
         items: {
           type: "string",
         },
-        description: "Absolute paths to the files to present to the user",
+        description:
+          "Absolute paths to the files to present to the user; a leading ~/ is expanded to the current user's home directory",
       },
     },
     additionalProperties: false,

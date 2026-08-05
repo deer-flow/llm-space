@@ -43,9 +43,11 @@ def present_files(description: str, paths: list[str]) -> str:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining what files are being presented and
             why.
-        paths: Absolute paths to the files to present to the user.
+        paths: Absolute paths to the files to present to the user. A leading ~/
+            is expanded to the current user's home directory.
     """
-    for p in paths:
+    for requested_path in paths:
+        p = os.path.expanduser(requested_path)
         if _is_html_file(p):
             webbrowser.open(Path(p).resolve().as_uri())
         else:
