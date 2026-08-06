@@ -4,6 +4,18 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.5] - 2026-08-06
+
+This patch release restores tool-call continuation for OpenAI Responses-compatible
+providers in packaged desktop builds.
+
+### Fixed
+
+- Tool results replay the provider's original call ID without the internal
+  response-item suffix, preventing `No tool call found for tool output` errors.
+- The local `pi-ai` patch now applies correctly during clean dependency installs,
+  matching development and release builds.
+
 ## [4.8.4] - 2026-08-05
 
 This release expands local Plugins into first-class agent capabilities and

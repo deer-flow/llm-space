@@ -2,7 +2,7 @@ diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-sha
 index a6a07c1..3597a40 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
-@@ -67,7 +67,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
+@@ -72,7 +72,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
      };
      const normalizeToolCallId = (id, _targetModel, source) => {
          if (!allowedToolCallProviders.has(model.provider))
