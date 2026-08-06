@@ -237,8 +237,11 @@ third-party services.
 - URL citations use the existing safe external-link behavior.
 - Provider-hosted activities never render a local execution button or a
   missing-result state.
-- Text citations use normalized annotation ranges when valid and fall back to
-  a safe source list when ranges are absent or invalid.
+- Text citations render as a safe source list below the completed answer.
+  Citation annotations are deliberately not installed as CodeMirror
+  decorations: the message editor is the streaming hot path, and changing its
+  extension configuration on preview updates forces expensive editor
+  reconfiguration.
 
 ## Error handling
 

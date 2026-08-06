@@ -40,7 +40,6 @@ import { MessageListItemHeader } from "./message-list-item-header";
 import { ProviderHostedToolActivityList } from "./provider-hosted-tool-activity-list";
 import { ThinkingView } from "./thinking-view";
 import { ToolCallListItem } from "./tool-call-list-item";
-import { useTextCitationExtension } from "./use-text-citation-extension";
 import { useToolCallRunner } from "./use-tool-call-runner";
 
 function _MessageListItem({
@@ -81,11 +80,6 @@ function _MessageListItem({
           ))
         : [],
     [message]
-  );
-  const citationExtension = useTextCitationExtension(assistantTextContents);
-  const editorExtensions = useMemo(
-    () => [...(variableExtension ?? []), ...citationExtension],
-    [citationExtension, variableExtension]
   );
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
@@ -290,12 +284,15 @@ function _MessageListItem({
               streaming={streaming}
               readonly={readonly}
               value={text}
-              extraExtensions={editorExtensions}
+              extraExtensions={variableExtension}
               onChange={handleTextContentChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
             />
           )}
+          {/* Keep citations out of CodeMirror's extension configuration. The
+              editor is the streaming hot path, while provider annotations only
+              become authoritative when the message finishes. */}
           {message.role === "assistant" && (
             <CitationList contents={assistantTextContents} />
           )}
