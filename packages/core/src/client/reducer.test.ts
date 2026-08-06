@@ -62,3 +62,108 @@ describe("reduceMessages final Responses metadata", () => {
     expect(reduced?.message.toolCalls).toBeUndefined();
   });
 });
+
+describe("reduceMessages tool-call argument previews", () => {
+  test("freezes a large live preview and restores complete arguments at toolcall_end", () => {
+    let reduced = reduceMessages(
+      { type: "message_start", message: { role: "assistant" } } as AgentEvent,
+      {}
+    );
+    expect(reduced).not.toBeNull();
+
+    reduced = reduceMessages(
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_start",
+          contentIndex: 0,
+          partial: {
+            content: [
+              {
+                type: "toolCall",
+                id: "write-1",
+                name: "write",
+                arguments: {},
+              },
+            ],
+          },
+        },
+      } as unknown as AgentEvent,
+      { streamingMessage: reduced!.message, content: reduced!.content }
+    );
+
+    reduced = reduceMessages(
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_delta",
+          contentIndex: 0,
+          delta: '{"path":"/tmp/large.txt","content":"',
+        },
+      } as AgentEvent,
+      { streamingMessage: reduced!.message, content: reduced!.content }
+    );
+    expect(reduced?.message.toolCalls?.[0]?.input.arguments).toMatchObject({
+      path: "/tmp/large.txt",
+    });
+
+    reduced = reduceMessages(
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_delta",
+          contentIndex: 0,
+          delta: "x".repeat(10_000),
+        },
+      } as AgentEvent,
+      { streamingMessage: reduced!.message, content: reduced!.content }
+    );
+    const frozenMessage = reduced!.message;
+    const frozenArguments = frozenMessage.toolCalls?.[0]?.input.arguments as
+      | Record<string, unknown>
+      | undefined;
+    const frozenContent = frozenArguments?.content;
+    expect(typeof frozenContent).toBe("string");
+    expect((frozenContent as string).length).toBeLessThanOrEqual(1024);
+
+    reduced = reduceMessages(
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_delta",
+          contentIndex: 0,
+          delta: "not-visible-in-the-frozen-preview",
+        },
+      } as AgentEvent,
+      { streamingMessage: reduced!.message, content: reduced!.content }
+    );
+    expect(reduced?.message).toBe(frozenMessage);
+
+    const finalArguments = {
+      path: "/tmp/large.txt",
+      content: "x".repeat(10_000) + "not-visible-in-the-frozen-preview",
+    };
+    reduced = reduceMessages(
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_end",
+          contentIndex: 0,
+          toolCall: {
+            type: "toolCall",
+            id: "write-1",
+            name: "write",
+            arguments: finalArguments,
+          },
+        },
+      } as unknown as AgentEvent,
+      { streamingMessage: reduced!.message, content: reduced!.content }
+    );
+
+    expect(reduced?.message.toolCalls?.[0]?.input).toEqual({
+      name: "write",
+      arguments: finalArguments,
+      partialArguments: undefined,
+    });
+  });
+});

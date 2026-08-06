@@ -15,7 +15,15 @@ import { parseJSON, uuid } from "../utils";
 
 export type ToolCallContent = Omit<ToolCall, "arguments"> & {
   arguments: string;
+  previewFrozen?: boolean;
 };
+
+// Tool arguments can contain an entire file body (notably write.content), but
+// the message list only shows a short, truncated preview. Re-parsing the full
+// growing JSON document on every provider delta makes large writes quadratic
+// in practice. Parse at most this much for the live preview, then trust the
+// provider's complete toolCall payload at toolcall_end.
+const TOOL_CALL_PREVIEW_MAX_CHARS = 1024;
 export type ReducedMessageContent =
   ThinkingContent | TextContent | ToolCallContent;
 
@@ -279,9 +287,19 @@ function _reduceAssistantMessageEvent(
     case "toolcall_delta": {
       const toolCallContent = content[event.contentIndex] as ToolCallContent;
       toolCallContent.arguments += event.delta;
+      if (toolCallContent.previewFrozen) {
+        return _createUpdateMessageEvent(message, content);
+      }
+      const previewText = toolCallContent.arguments.slice(
+        0,
+        TOOL_CALL_PREVIEW_MAX_CHARS
+      );
+      if (toolCallContent.arguments.length >= TOOL_CALL_PREVIEW_MAX_CHARS) {
+        toolCallContent.previewFrozen = true;
+      }
       let args: Record<string, unknown> = {};
       try {
-        args = parseJSON<Record<string, unknown>>(toolCallContent.arguments);
+        args = parseJSON<Record<string, unknown>>(previewText);
       } catch {
         return _createUpdateMessageEvent(message, content);
       }
@@ -301,6 +319,11 @@ function _reduceAssistantMessageEvent(
       return _createUpdateMessageEvent(
         _replaceToolCall(message, event.toolCall.id, (toolCall) => ({
           ...toolCall,
+          input: {
+            name: event.toolCall.name,
+            arguments: event.toolCall.arguments,
+            partialArguments: undefined,
+          },
           output: { content: [{ type: "text", text: "" }] },
         })),
         content
