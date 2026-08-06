@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import { uuid } from "@llm-space/core";
@@ -141,6 +142,26 @@ const serversConfigSchema = z.object({
   servers: z.array(serverConfigSchema),
 });
 
+const pluginReadinessCacheSchema = z.object({
+  servers: z.record(
+    z.string(),
+    z.object({
+      configFingerprint: z.string(),
+      readiness: readinessSchema,
+    })
+  ),
+});
+
+interface McpPluginReadinessCache {
+  servers: Record<
+    string,
+    {
+      configFingerprint: string;
+      readiness: McpServerReadiness;
+    }
+  >;
+}
+
 interface McpClientEntry {
   client: Client;
   tools: SdkMcpTool[] | null;
@@ -165,6 +186,7 @@ interface McpDiagnosticDraft {
  */
 export class McpManager {
   private _config: McpServersConfig;
+  private _pluginReadinessCache: McpPluginReadinessCache;
   private _pluginServers: {
     pluginId: string;
     server: McpServerConfig;
@@ -176,6 +198,7 @@ export class McpManager {
 
   constructor() {
     this._config = this._loadConfig();
+    this._pluginReadinessCache = this._loadPluginReadinessCache();
   }
 
   listServers(): McpServerView[] {
@@ -186,16 +209,19 @@ export class McpManager {
     entries: { pluginId: string; server: McpServerConfig }[]
   ): Promise<void> {
     const nextIds = new Set(entries.map((entry) => entry.server.id));
-    const nextById = new Map(
-      entries.map((entry) => [entry.server.id, entry.server] as const)
+    const nextFingerprints = new Map(
+      entries.map(
+        (entry) =>
+          [entry.server.id, _serverConfigFingerprint(entry.server)] as const
+      )
     );
     await Promise.all(
       this._pluginServers
         .filter(
           (entry) =>
             !nextIds.has(entry.server.id) ||
-            JSON.stringify(nextById.get(entry.server.id)) !==
-              JSON.stringify(entry.server)
+            nextFingerprints.get(entry.server.id) !==
+              _serverConfigFingerprint(entry.server)
         )
         .map(async (entry) => {
           await this._closeServer(entry.server.id);
@@ -207,10 +233,41 @@ export class McpManager {
     for (const entry of entries) {
       counts.set(entry.server.id, (counts.get(entry.server.id) ?? 0) + 1);
     }
-    this._pluginServers = entries.filter(
-      (entry) =>
-        !userIds.has(entry.server.id) && counts.get(entry.server.id) === 1
-    );
+    let cacheChanged = false;
+    this._pluginServers = entries
+      .filter(
+        (entry) =>
+          !userIds.has(entry.server.id) && counts.get(entry.server.id) === 1
+      )
+      .map((entry) => {
+        const configFingerprint = _serverConfigFingerprint(entry.server);
+        const cached = this._pluginReadinessCache.servers[entry.server.id];
+        if (!cached) {
+          return entry;
+        }
+        const readiness =
+          cached.configFingerprint === configFingerprint
+            ? cached.readiness
+            : _markReadinessStale(
+                cached.readiness,
+                entry.server.serverName,
+                entry.server.useOriginalToolNames
+              );
+        if (cached.configFingerprint !== configFingerprint) {
+          this._pluginReadinessCache.servers[entry.server.id] = {
+            configFingerprint,
+            readiness,
+          };
+          cacheChanged = true;
+        }
+        return {
+          ...entry,
+          server: { ...entry.server, readiness },
+        };
+      });
+    if (cacheChanged) {
+      this._savePluginReadinessCache();
+    }
   }
 
   addServer(draft: McpServerDraft): McpServerView[] {
@@ -679,6 +736,11 @@ export class McpManager {
       );
       if (!plugin) throw new Error(`MCP server not configured: ${serverId}`);
       plugin.server = { ...plugin.server, readiness };
+      this._pluginReadinessCache.servers[serverId] = {
+        configFingerprint: _serverConfigFingerprint(plugin.server),
+        readiness,
+      };
+      this._savePluginReadinessCache();
       return plugin.server;
     }
     this._saveConfig();
@@ -834,8 +896,19 @@ export class McpManager {
     return path.join(getSettingsDir(), "mcp.json");
   }
 
+  private get _pluginReadinessCachePath(): string {
+    return path.join(getSettingsDir(), "mcp-plugin-readiness.json");
+  }
+
   private _saveConfig(): void {
     atomicWriteJsonFileSync(this._configPath, this._config);
+  }
+
+  private _savePluginReadinessCache(): void {
+    atomicWriteJsonFileSync(
+      this._pluginReadinessCachePath,
+      this._pluginReadinessCache
+    );
   }
 
   private _loadConfig(): McpServersConfig {
@@ -854,6 +927,26 @@ export class McpManager {
           ? _normalizeReadiness(server.readiness)
           : undefined,
       })),
+    };
+  }
+
+  private _loadPluginReadinessCache(): McpPluginReadinessCache {
+    const parsed = readJsonFileSync(this._pluginReadinessCachePath, {
+      schema: pluginReadinessCacheSchema,
+      recovery: "best-effort",
+      fallback: (): McpPluginReadinessCache => ({ servers: {} }),
+      seedMissing: true,
+    }).value;
+    return {
+      servers: Object.fromEntries(
+        Object.entries(parsed.servers).map(([serverId, entry]) => [
+          serverId,
+          {
+            configFingerprint: entry.configFingerprint,
+            readiness: _normalizeReadiness(entry.readiness),
+          },
+        ])
+      ),
     };
   }
 }
@@ -1439,6 +1532,40 @@ function _cleanRecord(
     }
   }
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Hashes only plugin-owned connection configuration. Runtime readiness is
+ * deliberately excluded so persisting a test result does not look like a
+ * plugin configuration change. The cache stores this digest, never a second
+ * copy of plugin headers or environment values.
+ */
+function _serverConfigFingerprint(server: McpServerConfig): string {
+  const config = {
+    id: server.id,
+    name: server.name,
+    serverName: server.serverName,
+    useOriginalToolNames: server.useOriginalToolNames === true,
+    transport: server.transport,
+    command: server.command,
+    args: server.args,
+    cwd: server.cwd,
+    env: _sortedRecord(server.env),
+    url: server.url,
+    headers: _sortedRecord(server.headers),
+  };
+  return createHash("sha256").update(JSON.stringify(config)).digest("hex");
+}
+
+function _sortedRecord(
+  value: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+  );
 }
 
 function _resolveValue(value: string): string {
