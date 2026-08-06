@@ -1,5 +1,10 @@
 import { VARIABLE_NAME_PATTERN } from "../../thread/prompt-variables";
-import { getMessageText, type ThreadContext, type Tool } from "../../types";
+import {
+  getMessageText,
+  type FunctionTool,
+  type McpTool,
+  type ThreadContext,
+} from "../../types";
 
 /** A single file to write, as a project-relative path + contents. */
 export interface ExportFile {
@@ -91,7 +96,7 @@ export function slugifyToolName(name: string): string {
 }
 
 /** JSON metadata for one tool, tagged by kind so the plan can branch on it. */
-function _toolExport(tool: Tool): unknown {
+function _toolExport(tool: FunctionTool | McpTool): unknown {
   const base = {
     name: tool.name,
     type: tool.type,
@@ -130,7 +135,10 @@ export function buildContextExports(
 
   // Built-in tools are copied into the project as real code (not references),
   // so only custom (function) and MCP tools need their JSON here.
-  const tools = (context.tools ?? []).filter((t) => t.type !== "builtin");
+  const tools = (context.tools ?? []).filter(
+    (tool): tool is FunctionTool | McpTool =>
+      tool.type === "function" || tool.type === "mcp"
+  );
   for (const tool of tools) {
     files.push({
       path: `references/tools/${slugifyToolName(tool.name)}.json`,

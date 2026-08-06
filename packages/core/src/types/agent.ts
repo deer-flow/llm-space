@@ -1,6 +1,7 @@
 import type * as pi from "@earendil-works/pi-ai";
 
 import type { ModelConfigParams } from "./models";
+import type { ProviderHostedToolConfig } from "./tools";
 
 /**
  * A thread context already lowered to the `@earendil-works/pi-*` formats —
@@ -10,6 +11,7 @@ export interface PiThreadContext {
   systemPrompt?: string;
   messages: pi.Message[];
   tools: pi.Tool[];
+  responseApiNativeTools: ProviderHostedToolConfig[];
 }
 
 /**

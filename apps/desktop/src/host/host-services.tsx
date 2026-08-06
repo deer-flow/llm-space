@@ -10,6 +10,7 @@ import { useMemo, type ReactNode } from "react";
 import { fsReveal, listBuiltInTools } from "@/client/built-in-tools";
 import {
   checkUv,
+  openGeneratorDevTerminal,
   pickGeneratorDirectory,
   prepareGeneratorDirectory,
   removeProjectFile,
@@ -26,9 +27,14 @@ import {
   readTextFile,
   textFileExists,
 } from "@/client/paths";
+import { listPluginTools } from "@/client/plugins";
 import { createRpcTransport } from "@/client/rpc-transport";
 import { getSearchSettings } from "@/client/search";
-import { getSkillsSettings, listSkills } from "@/client/skills";
+import {
+  getSkillsSettings,
+  listAvailableSkills,
+  listSkills,
+} from "@/client/skills";
 import { executeTool } from "@/client/tool-execution";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
@@ -124,6 +130,8 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       skills: {
         getSettings: (options) =>
           getSkillsSettings(options?.runtimeId as RuntimeId | undefined),
+        listAvailable: (options) =>
+          listAvailableSkills(options?.runtimeId as RuntimeId | undefined),
         listSkills: (path, options) =>
           listSkills(path, options?.runtimeId as RuntimeId | undefined),
       },
@@ -137,6 +145,12 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         list: (options) =>
           listBuiltInTools(options?.runtimeId as RuntimeId | undefined),
         fsReveal,
+      },
+      pluginTools: {
+        list: ({ runtimeId } = {}) =>
+          runtimeId && runtimeId !== "local"
+            ? Promise.resolve([])
+            : listPluginTools(),
       },
       paths: { ensureRootDir },
       files: {
@@ -155,6 +169,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         runUv,
         writeFile: writeProjectFile,
         removeFile: removeProjectFile,
+        openDevTerminal: openGeneratorDevTerminal,
         getSearchSettings: (options: { runtimeId: string }) =>
           getSearchSettings(options.runtimeId as RuntimeId),
         resolveEnv: (

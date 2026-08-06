@@ -1,5 +1,6 @@
 import { userDirectoryExists } from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
+import type { PluginManager } from "@llm-space/runtime/plugins";
 import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
@@ -8,11 +9,13 @@ import type { Analytics } from "../analytics";
 import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
+  openGeneratorDevTerminal,
   prepareGeneratorDir,
   removeProjectFile,
   runUv,
   writeProjectFile,
 } from "../fs";
+import type { PluginCommandExecutionController } from "../plugins/plugin-command-execution-controller";
 import {
   dismissGithubStarReminder,
   getNextFeatureReminder,
@@ -53,6 +56,8 @@ export interface MainWindowRPCDependencies {
   remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
   updater: UpdaterService;
+  pluginManager: PluginManager;
+  pluginCommandExecutions: PluginCommandExecutionController;
 }
 
 const MAX_REQUEST_TIME_MS = 5 * 60_000 + 10_000;
@@ -69,6 +74,8 @@ export function createMainWindowRPC({
   remoteServerManager,
   skillsManager,
   updater,
+  pluginManager,
+  pluginCommandExecutions,
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
   const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
@@ -205,6 +212,41 @@ export function createMainWindowRPC({
           await getRuntime(runtimeId).fsWrite(path, thread);
           return null;
         },
+        pluginsList: () => Promise.resolve(pluginManager.listPlugins()),
+        pluginsRefresh: () => pluginManager.refreshPlugins(),
+        pluginsReload: async ({ pluginId }) => {
+          await pluginManager.reloadPlugin(pluginId);
+          return pluginManager.listPlugins();
+        },
+        pluginsSetEnabled: ({ pluginId, enabled }) =>
+          pluginManager.setEnabled(pluginId, enabled),
+        pluginsSetSettings: ({ pluginId, settings }) =>
+          pluginManager.setSettings(pluginId, settings),
+        pluginCommandsList: () =>
+          Promise.resolve(pluginManager.commands.list()),
+        pluginCommandExecute: ({
+          executionId,
+          commandId,
+          arguments: args,
+          activeTab,
+        }) =>
+          pluginCommandExecutions.execute({
+            executionId,
+            commandId,
+            arguments: args,
+            context: { activeTab },
+          }),
+        pluginToolsList: () => Promise.resolve(pluginManager.tools.list()),
+        pluginToolExecute: ({ tool, thread, variables, arguments: args }) =>
+          pluginManager.tools.execute(tool, { thread, variables }, args),
+        threadStoragesList: () =>
+          Promise.resolve(pluginManager.threadStorages.list()),
+        threadStorageResolveLatest: ({ storageId, resourceId }) =>
+          pluginManager.threadStorages.resolveLatest(storageId, resourceId),
+        threadStorageRead: ({ storageId, locator }) =>
+          pluginManager.threadStorages.read(storageId, locator),
+        threadStorageWrite: ({ storageId, thread, resourceId }) =>
+          pluginManager.threadStorages.write(storageId, thread, resourceId),
         // Publish a thread as a secret gist and return its web viewer link.
         // `title`/`description` override the shared copy's display metadata
         // without touching the local thread file. The writer throws when signed
@@ -270,6 +312,8 @@ export function createMainWindowRPC({
           await removeProjectFile(rootDir, relativePath);
           return null;
         },
+        generatorOpenDevTerminal: ({ rootDir }) =>
+          openGeneratorDevTerminal(rootDir),
         generatorResolveEnv: ({ runtimeId, providerId, profileId, envNames }) =>
           getRuntime(runtimeId).resolveGeneratorEnv({
             providerId,
@@ -289,6 +333,8 @@ export function createMainWindowRPC({
           getRuntime(runtimeId).mcpRemoveServer(serverId),
         mcpDisconnectServer: ({ runtimeId, serverId }) =>
           getRuntime(runtimeId).mcpDisconnectServer(serverId),
+        mcpCancelTest: ({ runtimeId, serverId }) =>
+          getRuntime(runtimeId).mcpCancelTest(serverId),
         mcpListTools: ({ runtimeId, serverId }) =>
           getRuntime(runtimeId).mcpListTools(serverId),
         mcpCallTool: ({ runtimeId, serverId, toolName, arguments: args }) =>
@@ -349,10 +395,34 @@ export function createMainWindowRPC({
               hidden,
             })
           ),
+        skillsSetPluginSkillHidden: ({
+          runtimeId,
+          pluginId,
+          skillName,
+          hidden,
+        }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).skillsSetPluginSkillHidden({
+              pluginId,
+              skillName,
+              hidden,
+            })
+          ),
+        skillsSetAllPluginSkillsHidden: ({ runtimeId, pluginId, hidden }) =>
+          Promise.resolve(
+            getRuntime(runtimeId).skillsSetAllPluginSkillsHidden({
+              pluginId,
+              hidden,
+            })
+          ),
         skillsSetAllSkillsHidden: ({ runtimeId, path, hidden }) =>
           Promise.resolve(
             getRuntime(runtimeId).skillsSetAllSkillsHidden({ path, hidden })
           ),
+        skillsListAvailable: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsListAvailable()),
+        skillsListPluginSkills: ({ runtimeId }) =>
+          Promise.resolve(getRuntime(runtimeId).skillsListPluginSkills()),
         skillsListSkills: ({ runtimeId, path }) =>
           Promise.resolve(getRuntime(runtimeId).skillsListSkills(path)),
         skillsReadSkill: ({ runtimeId, path }) =>

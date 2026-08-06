@@ -14,6 +14,8 @@ import type {
   McpServerToolsResponse,
   McpServerView,
   McpTool,
+  PluginTool,
+  JsonValue,
   ModelConfig,
   ModelProviderGroup,
   ProviderConnectionRef,
@@ -21,6 +23,7 @@ import type {
   SearchSettings,
   SkillInfo,
   SkillsSettings,
+  Thread,
 } from "@llm-space/core";
 
 /** A tool call's result, normalized across the built-in and MCP backends. */
@@ -47,18 +50,22 @@ export interface ShareThreadActionInput {
 export interface ExecuteToolOptions extends RuntimeScopedHostOptions {
   /** Ephemeral provider connection used by provider-backed built-in tools. */
   connection?: ProviderConnectionRef;
+  /** Owning Thread snapshot and one resolved variable map for this call batch. */
+  thread: Thread;
+  variables: Record<string, JsonValue>;
 }
 
-/** Invoke an executable tool (built-in or MCP). */
+/** Invoke an executable tool (built-in, MCP, or Plugin). */
 export type ExecuteTool = (
-  tool: McpTool | BuiltinTool,
+  tool: McpTool | BuiltinTool | PluginTool,
   args: Record<string, unknown>,
-  options?: ExecuteToolOptions
+  options: ExecuteToolOptions
 ) => Promise<ToolCallResult>;
 
 /** Read-only skills access used by prompt variables + examples. */
 export interface SkillsHost {
   getSettings(options?: RuntimeScopedHostOptions): Promise<SkillsSettings>;
+  listAvailable(options?: RuntimeScopedHostOptions): Promise<SkillInfo[]>;
   listSkills(
     path: string,
     options?: RuntimeScopedHostOptions
@@ -79,6 +86,11 @@ export interface BuiltinToolsHost {
   list(options?: RuntimeScopedHostOptions): Promise<BuiltinTool[]>;
   /** Open a directory itself, or reveal a file selected in its parent folder. */
   fsReveal(path: string): Promise<void>;
+}
+
+/** Locally installed Plugin Tools available for importing into a Thread. */
+export interface PluginToolsHost {
+  list(options?: RuntimeScopedHostOptions): Promise<PluginTool[]>;
 }
 
 /** Workspace path resolution (used to seed example threads). */
@@ -154,6 +166,11 @@ export interface GeneratorHost {
   ): Promise<void>;
   /** Delete a file under an authorized project directory; no-op when missing. */
   removeFile(rootDir: string, relativePath: string): Promise<void>;
+  /**
+   * Open a native terminal in the generated project and run its development
+   * target. Returns false when the host platform does not support this action.
+   */
+  openDevTerminal(rootDir: string): Promise<boolean>;
   /** The user's web-search settings, written into a generated project's `.env`. */
   getSearchSettings(options: RuntimeOwnedHostOptions): Promise<SearchSettings>;
   /**
@@ -207,6 +224,7 @@ export interface HostServices {
   skills: SkillsHost;
   mcp: McpHost;
   builtinTools: BuiltinToolsHost;
+  pluginTools: PluginToolsHost;
   paths: PathsHost;
   files: FilesHost;
   /** Code-generator backing; `null` on hosts without it (the web viewer). */

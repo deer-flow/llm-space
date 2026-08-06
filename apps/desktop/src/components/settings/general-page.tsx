@@ -304,7 +304,11 @@ export function GeneralPage() {
   } = usePrimaryColor();
   const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
   return (
-    <SettingsPage title="General" className="overflow-y-auto">
+    <SettingsPage
+      title="General"
+      description="Customize appearance, defaults, privacy, and updates."
+      className="overflow-y-auto"
+    >
       <div className="flex flex-col gap-7 pb-2">
         <SettingsSection title="Appearance">
           <SettingsRow

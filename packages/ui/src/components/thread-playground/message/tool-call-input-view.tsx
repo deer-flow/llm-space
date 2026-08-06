@@ -21,9 +21,9 @@ import { parseTodoWriteInput } from "./todo-write-input";
 import { TodoWriteView } from "./todo-write-view";
 
 /**
- * Built-in `fs` tools whose `path` argument is an absolute on-disk path worth
- * making click-to-reveal in the OS file manager. Kept in sync with the tools in
- * `bun/tools/built-in/fs.ts` that take a `path` parameter.
+ * Built-in `fs` tools with an absolute on-disk path argument worth making
+ * click-to-reveal in the OS file manager. Kept in sync with the path-taking
+ * tools in the runtime's built-in `fs` module.
  */
 const FS_TOOLS_WITH_PATH = new Set([
   "read",
@@ -32,6 +32,7 @@ const FS_TOOLS_WITH_PATH = new Set([
   "ls",
   "tree",
   "grep",
+  "glob",
 ]);
 
 /**
@@ -77,7 +78,10 @@ function _linkKindFor(
   if (typeof value !== "string") {
     return undefined;
   }
-  if (isFsTool && key === "path") {
+  if (
+    isFsTool &&
+    (key === "path" || (toolName === "glob" && key === "target_directory"))
+  ) {
     return "path";
   }
   if (toolName === "skill" && key === "name") {

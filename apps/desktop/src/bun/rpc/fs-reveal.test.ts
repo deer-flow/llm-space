@@ -85,7 +85,7 @@ describe("fsReveal", () => {
     expect(openPath).toHaveBeenCalledWith(skillDirectory);
   });
 
-  test("expands a home path before validating it", async () => {
+  test("expands home paths before validating them", async () => {
     const openPath = mock(() => undefined);
 
     await fsReveal("~", {
@@ -94,6 +94,22 @@ describe("fsReveal", () => {
     });
 
     expect(openPath).toHaveBeenCalledWith(os.homedir());
+
+    const directory = await mkdtemp(
+      path.join(os.homedir(), ".llm-space-reveal-")
+    );
+    temporaryDirectories.push(directory);
+    const file = path.join(directory, "artifact.txt");
+    await writeFile(file, "artifact");
+    const revealInFileManager = mock(() => Promise.resolve());
+    const homePath = `~/${path.relative(os.homedir(), file)}`;
+
+    await fsReveal(homePath, {
+      skillsManager: _skillsManager(),
+      revealInFileManager,
+    });
+
+    expect(revealInFileManager).toHaveBeenCalledWith(file);
   });
 
   test("rejects relative and missing paths", async () => {

@@ -11,7 +11,7 @@ import { createStreamResponse } from "./stream";
 test("stream endpoint forwards the provider connection to the runtime", async () => {
   const request = {
     model: { provider: "openai", id: "gpt-5" },
-    context: { messages: [], tools: [] },
+    context: { messages: [], tools: [], responseApiNativeTools: [] },
   } as AgentStreamRequest;
   let received: RuntimeStreamRequestPayload | undefined;
   const runtime = {

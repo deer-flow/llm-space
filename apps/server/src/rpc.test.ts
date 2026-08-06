@@ -61,6 +61,7 @@ function createRuntime(): RuntimeClient {
     mcpUpdateServer: () => Promise.resolve([]),
     mcpRemoveServer: () => Promise.resolve([]),
     mcpDisconnectServer: () => Promise.resolve([]),
+    mcpCancelTest: () => Promise.resolve([]),
     mcpListTools: () =>
       Promise.resolve({
         server: {
@@ -92,7 +93,11 @@ function createRuntime(): RuntimeClient {
     skillsAddPath: () => ({ discoveryPaths: [] }),
     skillsRemovePath: () => ({ discoveryPaths: [] }),
     skillsSetSkillHidden: () => ({ discoveryPaths: [] }),
+    skillsSetPluginSkillHidden: () => ({ discoveryPaths: [] }),
+    skillsSetAllPluginSkillsHidden: () => ({ discoveryPaths: [] }),
     skillsSetAllSkillsHidden: () => ({ discoveryPaths: [] }),
+    skillsListAvailable: () => [],
+    skillsListPluginSkills: () => [],
     skillsListSkills: () => [],
     skillsReadSkill: () => ({ frontmatters: {}, content: "", path: "" }),
     traceListProjects: () => [],

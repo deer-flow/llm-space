@@ -1,6 +1,8 @@
+import { spawn } from "node:child_process";
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
+
+import { expandHomePath } from "@llm-space/core/server";
 
 /**
  * Filesystem/exec backing for the code Generator, deliberately kept OUTSIDE the
@@ -18,6 +20,14 @@ const _authorized = new Set<string>();
 /** Files `uv init` may drop that don't count against the "empty dir" gate. */
 const _IGNORED_ENTRIES = new Set([".DS_Store", ".git", ".idea", ".vscode"]);
 
+const OPEN_DEV_TERMINAL_SCRIPT = `on run argv
+  set projectDir to item 1 of argv
+  tell application "Terminal"
+    activate
+    do script "cd " & quoted form of projectDir & " && make dev"
+  end tell
+end run`;
+
 /** Record a user-picked directory as authorized for writes + `uv` runs. */
 export function authorizeGeneratorDir(dir: string): void {
   _authorized.add(path.resolve(dir));
@@ -29,18 +39,6 @@ function _assertAuthorized(rootDir: string): string {
     throw new Error("Directory is not authorized for project generation.");
   }
   return resolved;
-}
-
-/** Expand a leading `~` to the user's home directory. */
-function _expandTilde(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed === "~") {
-    return homedir();
-  }
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path.join(homedir(), trimmed.slice(2));
-  }
-  return trimmed;
 }
 
 /**
@@ -60,7 +58,7 @@ export async function prepareGeneratorDir(
   if (name === "." || name === ".." || /[/\\]/.test(name)) {
     return { ok: false, error: "Project name can't contain path separators." };
   }
-  const parent = path.resolve(_expandTilde(parentDir || "~"));
+  const parent = path.resolve(expandHomePath(parentDir.trim() || "~"));
   const target = path.join(parent, name);
   try {
     const parentStat = await stat(parent);
@@ -190,4 +188,51 @@ export async function removeProjectFile(
 ): Promise<void> {
   const target = _resolveInRoot(rootDir, relativePath);
   await rm(target, { force: true });
+}
+
+/**
+ * On macOS, open Terminal in an authorized generated project and start its
+ * Makefile development target. Other platforms report unsupported so the UI
+ * can fall back to revealing the generated directory.
+ */
+export async function openGeneratorDevTerminal(
+  rootDir: string,
+  dependencies: {
+    platform?: NodeJS.Platform;
+    runAppleScript?: (script: string, args: string[]) => Promise<void>;
+  } = {}
+): Promise<boolean> {
+  if ((dependencies.platform ?? process.platform) !== "darwin") {
+    return false;
+  }
+  const resolved = _assertAuthorized(rootDir);
+  await (dependencies.runAppleScript ?? _runAppleScript)(
+    OPEN_DEV_TERMINAL_SCRIPT,
+    [resolved]
+  );
+  return true;
+}
+
+function _runAppleScript(script: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("osascript", ["-e", script, ...args], {
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          stderr.trim() || `Failed to open Terminal (osascript exit ${code}).`
+        )
+      );
+    });
+  });
 }

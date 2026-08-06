@@ -2,6 +2,7 @@ import {
   DEFAULT_SEARCH_SETTINGS,
   type BuiltinTool,
   type FunctionTool,
+  isProviderHostedTool,
   type McpTool,
   type SearchSettings,
 } from "../../types";
@@ -24,6 +25,7 @@ import {
   gitignore,
   langgraphJson,
   literalApiKey,
+  makefile,
   metaPromptMiddlewarePy,
   mcpEnvEntries,
   mcpModule,
@@ -118,6 +120,15 @@ export const langgraphGenerator: GeneratorDefinition = {
       targetDir: dir,
     } = input;
 
+    if ((context.tools ?? []).some(isProviderHostedTool)) {
+      throw new Error(
+        "LangGraph export does not support provider-hosted tools"
+      );
+    }
+    if ((context.tools ?? []).some((tool) => tool.type === "plugin")) {
+      throw new Error("LangGraph export does not support Plugin tools");
+    }
+
     const written: string[] = [];
     const write = async (path: string, contents: string): Promise<void> => {
       await caps.writeFile(dir, path, contents);
@@ -185,6 +196,7 @@ export const langgraphGenerator: GeneratorDefinition = {
     const runtimeDeps = _runtimeDeps(modelDependency(modelInfo), extraDeps);
     await write("pyproject.toml", pyproject(_dirBaseName(dir), runtimeDeps));
     await write(".python-version", "3.12\n");
+    await write("Makefile", makefile());
 
     // Install once, best-effort. `uv sync` is network-bound and can outlast the
     // timeout on slow links, so a timeout/failure is surfaced to the user (who

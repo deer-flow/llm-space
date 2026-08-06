@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Compile } from "typebox/compile";
 
-import { Thread } from "./thread";
+import { normalizeThread, Thread } from "./thread";
 
 const validator = Compile(Thread);
 
@@ -169,7 +169,6 @@ describe("Thread evaluation schema", () => {
     ).toBe(false);
   });
 });
-
 describe("Thread assistant message timing schema", () => {
   test("accepts legacy assistant messages without timing", () => {
     expect(
@@ -275,5 +274,187 @@ describe("Thread image content schema", () => {
         },
       })
     ).toBe(false);
+  });
+});
+
+describe("Thread provider-hosted tool data schema", () => {
+  test("accepts provider-hosted configuration, activities, response output, and citations", () => {
+    expect(
+      validator.Check({
+        context: {
+          tools: [
+            {
+              type: "provider-hosted",
+              config: {
+                type: "web_search",
+                search_context_size: "high",
+              },
+            },
+          ],
+          messages: [
+            {
+              id: "assistant-native",
+              role: "assistant",
+              content: [
+                {
+                  type: "text",
+                  text: "LLM Space",
+                  annotations: [
+                    {
+                      type: "url_citation",
+                      url: "https://example.com/llm-space",
+                      title: "LLM Space",
+                      startIndex: 0,
+                      endIndex: 9,
+                      raw: {
+                        type: "url_citation",
+                        url: "https://example.com/llm-space",
+                      },
+                    },
+                  ],
+                },
+              ],
+              providerHostedToolActivities: [
+                {
+                  id: "ws_1",
+                  type: "web_search_call",
+                  status: "completed",
+                  action: { type: "search", query: "LLM Space" },
+                  sources: [
+                    {
+                      url: "https://example.com/llm-space",
+                      title: "LLM Space",
+                    },
+                  ],
+                  raw: {
+                    id: "ws_1",
+                    type: "web_search_call",
+                    status: "completed",
+                  },
+                },
+              ],
+              responseOutputItems: [
+                {
+                  id: "ws_1",
+                  type: "web_search_call",
+                  status: "completed",
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe(true);
+  });
+
+  test("keeps legacy threads valid without provider-hosted response fields", () => {
+    expect(
+      validator.Check({
+        context: {
+          messages: [
+            {
+              id: "assistant-legacy-native",
+              role: "assistant",
+              content: [{ type: "text", text: "Legacy" }],
+            },
+          ],
+        },
+      })
+    ).toBe(true);
+  });
+
+  test("normalizes legacy tool and activity fields recursively", () => {
+    const legacyMessage = {
+      id: "assistant-legacy",
+      role: "assistant" as const,
+      content: [{ type: "text" as const, text: "Result" }],
+      nativeToolActivities: [
+        {
+          id: "ws_1",
+          type: "web_search_call",
+          raw: { id: "ws_1", type: "web_search_call" },
+        },
+      ],
+    };
+    const legacyContext = {
+      tools: [
+        {
+          type: "response-api-native" as const,
+          config: { type: "web_search", search_context_size: "high" },
+        },
+      ],
+      messages: [legacyMessage],
+    };
+
+    const legacyThread = {
+      context: legacyContext,
+      runHistory: [
+        {
+          thread: { context: legacyContext },
+          timestamp: 1,
+        },
+      ],
+    } as unknown as Thread;
+    const normalized = normalizeThread(legacyThread);
+
+    expect(normalized.context?.tools?.[0]).toEqual({
+      type: "provider-hosted",
+      config: { type: "web_search", search_context_size: "high" },
+    });
+    expect(normalized.context?.messages?.[0]).toMatchObject({
+      providerHostedToolActivities: legacyMessage.nativeToolActivities,
+    });
+    expect(normalized.context?.messages?.[0]).not.toHaveProperty(
+      "nativeToolActivities"
+    );
+    expect(
+      normalized.runHistory?.[0]?.thread.context?.messages?.[0]
+    ).toMatchObject({
+      providerHostedToolActivities: legacyMessage.nativeToolActivities,
+    });
+  });
+
+  test("keeps canonical activities when runtime data contains both field names", () => {
+    const currentActivity = {
+      type: "current_web_search_call",
+      raw: { type: "current_web_search_call" },
+    };
+    const legacyActivity = {
+      type: "legacy_web_search_call",
+      raw: { type: "legacy_web_search_call" },
+    };
+    const message = {
+      id: "assistant-mixed",
+      role: "assistant" as const,
+      content: [],
+      providerHostedToolActivities: [currentActivity],
+      nativeToolActivities: [legacyActivity],
+    };
+    const mixedThread = {
+      context: { messages: [message] },
+      runHistory: [
+        {
+          timestamp: 1,
+          thread: { context: { messages: [message] } },
+        },
+      ],
+    } as unknown as Thread;
+
+    const normalized = normalizeThread(mixedThread);
+    const current = normalized.context?.messages?.[0];
+    const historical =
+      normalized.runHistory?.[0]?.thread.context?.messages?.[0];
+
+    expect(
+      current?.role === "assistant"
+        ? current.providerHostedToolActivities
+        : undefined
+    ).toEqual([currentActivity]);
+    expect(
+      historical?.role === "assistant"
+        ? historical.providerHostedToolActivities
+        : undefined
+    ).toEqual([currentActivity]);
+    expect(JSON.stringify(normalized)).not.toContain("nativeToolActivities");
   });
 });

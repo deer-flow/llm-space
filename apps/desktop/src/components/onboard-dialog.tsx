@@ -10,7 +10,6 @@ import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provi
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogClose, DialogContent } from "@llm-space/ui/ui/dialog";
-import { RainbowButton } from "@llm-space/ui/ui/rainbow-button";
 import { Spinner } from "@llm-space/ui/ui/spinner";
 import {
   ArrowRightIcon,
@@ -140,7 +139,7 @@ export function OnboardDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full max-w-[820px]! overflow-hidden p-0"
+        className="w-[calc(100vw-2rem)] max-w-[1040px]! overflow-hidden border-white/10 bg-[#050809] p-0 shadow-[0_34px_120px_rgba(0,0,0,0.7)]"
         showCloseButton={false}
         onInteractOutside={(event) => {
           event.preventDefault();
@@ -149,15 +148,19 @@ export function OnboardDialog({
           event.preventDefault();
         }}
       >
-        <div className="relative">
+        <div className="relative isolate aspect-video min-h-[34rem] overflow-hidden rounded-lg bg-[#050809] text-white">
           <img
             src="/images/onboard.png"
-            alt="Onboard"
-            className="w-full rounded-lg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 size-full select-none object-cover"
           />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(3,7,8,0.96)_0%,rgba(3,7,8,0.82)_27%,rgba(3,7,8,0.28)_46%,transparent_62%)]" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-[72%] bg-[linear-gradient(0deg,rgba(3,7,8,0.98)_0%,rgba(3,7,8,0.78)_20%,rgba(3,7,8,0.14)_46%,transparent_66%)] [mask-image:linear-gradient(90deg,#000_0%,#000_72%,transparent_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_38%,rgba(72,225,216,0.1),transparent_27%)]" />
           <DialogClose asChild>
             <Button
-              className="bg-muted/75 hover:bg-muted/85! text-foreground/80 absolute top-2 right-2 rounded-full"
+              className="absolute top-4 right-4 z-20 rounded-full border border-white/10 bg-black/35! text-white/70 backdrop-blur-md hover:bg-white/10! hover:text-white"
               variant="ghost"
               size="icon-sm"
               aria-label="Close onboarding"
@@ -165,13 +168,31 @@ export function OnboardDialog({
               <XIcon className="size-3" />
             </Button>
           </DialogClose>
-          <div className="absolute right-6 bottom-6 left-6 flex flex-col gap-3 md:right-8 md:bottom-8 md:left-12 md:flex-row md:items-end md:justify-between">
+
+          <header className="absolute top-[8%] right-[5%] left-[5%] z-10">
+            <div className="mb-5 flex items-center gap-3 text-[0.625rem] font-medium tracking-[0.28em] text-cyan-100/60 uppercase">
+              <span className="h-px w-8 bg-cyan-200/55" />
+              Agent workbench
+            </div>
+            <h1 className="font-heading tracking-[-0.055em] text-balance">
+              <span className="block text-[clamp(2.1rem,4.1vw,3.25rem)] leading-none font-thin text-white/72">
+                Welcome to
+              </span>
+              <span className="mt-1 block w-fit bg-[linear-gradient(103deg,#f2fbf9_4%,#83e5e5_56%,#ff9b86_108%)] bg-clip-text pr-[0.12em] text-[clamp(4.25rem,7.7vw,6.1rem)] leading-[0.9] font-normal tracking-[-0.075em] text-transparent">
+                LLM Space
+              </span>
+            </h1>
+            <p className="mt-5 max-w-md text-sm/6 font-normal tracking-[0.01em] text-white/58">
+              A better way to build, trace, debug, and evaluate agents.
+            </p>
+          </header>
+
+          <div className="absolute right-[5%] bottom-[6%] left-[5%] z-10 grid grid-cols-[minmax(0,1fr)_22rem] items-end gap-8">
             <div className="flex shrink-0 flex-col gap-2.5">
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2.5">
                 {models.length === 0 ? (
                   <Button
-                    className="border-ring/75 h-11 rounded-2xl border bg-white/10! px-6 backdrop-blur-xs"
-                    variant="outline"
+                    className="h-10 rounded-full border border-cyan-100/35 bg-cyan-100! px-5 text-[#071011] shadow-[0_12px_38px_rgba(67,220,223,0.18)] hover:bg-white!"
                     size="lg"
                     onClick={handleConfigureModels}
                   >
@@ -180,18 +201,17 @@ export function OnboardDialog({
                   </Button>
                 ) : (
                   <DialogClose asChild>
-                    <RainbowButton
-                      variant="outline"
-                      className="dark:bg-[red]!"
+                    <Button
+                      className="h-10 rounded-full border border-cyan-100/35 bg-cyan-100! px-5 text-[#071011] shadow-[0_12px_38px_rgba(67,220,223,0.18)] hover:bg-white!"
                       size="lg"
                     >
                       Get started
                       <ArrowRightIcon className="size-3.5" />
-                    </RainbowButton>
+                    </Button>
                   </DialogClose>
                 )}
                 <Button
-                  className="h-11 rounded-2xl border border-white/20 bg-white/10! px-8 text-white backdrop-blur-xs"
+                  className="h-10 rounded-full border border-white/15 bg-white/[0.055]! px-5 text-white/82 backdrop-blur-md hover:bg-white/10! hover:text-white"
                   variant="outline"
                   size="lg"
                   onClick={handleLearnMore}
@@ -199,11 +219,11 @@ export function OnboardDialog({
                   Learn more
                 </Button>
               </div>
-              <div className="text-xs text-white/65">
+              <div className="text-[0.6875rem] text-white/42">
                 We collect anonymous usage data to improve the app.{" "}
                 <button
                   type="button"
-                  className="underline underline-offset-2 transition-colors hover:text-white/90"
+                  className="underline decoration-white/25 underline-offset-2 transition-colors hover:text-white/85"
                   onClick={handleOpenAnalyticsSettings}
                 >
                   Manage in settings
@@ -211,7 +231,7 @@ export function OnboardDialog({
               </div>
             </div>
             <_OnboardSetupPanel
-              className="w-full md:w-[22rem] md:shrink-0"
+              className="w-[22rem] shrink-0"
               configured={models.length > 0}
               readyProviderName={readyProviderName}
               detectedProviders={detectedProviders}
@@ -290,7 +310,7 @@ function _OnboardSetupPanel({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md",
+        "rounded-[1.25rem] border border-white/12 bg-[#061012]/62 p-4 text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-sm",
         className
       )}
     >
@@ -389,7 +409,7 @@ function _DetectedSetupState({
             <button
               key={provider.id}
               type="button"
-              className="flex w-full items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-2.5 text-left transition-colors hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex w-full items-center gap-3 rounded-xl border border-white/12 bg-white/[0.055] p-2.5 text-left transition-colors hover:border-cyan-100/25 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-100/45 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
               disabled={Boolean(addingProviderId)}
               aria-label={`Add detected provider ${provider.name}`}
               onClick={() => onAddProvider(provider)}
@@ -452,7 +472,7 @@ function _ManualSetupState({
             <button
               key={provider.id}
               type="button"
-              className="flex w-full items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-2.5 text-left transition-colors hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none"
+              className="flex w-full items-center gap-3 rounded-xl border border-white/12 bg-white/[0.055] p-2.5 text-left transition-colors hover:border-cyan-100/25 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-100/45 focus-visible:outline-none"
               aria-label={`Open model settings to configure ${provider.name}`}
               onClick={onConfigureModels}
             >
@@ -476,7 +496,7 @@ function _ManualSetupState({
         </div>
       )}
       <Button
-        className="h-9 w-full rounded-xl border border-white/20 bg-white/10! backdrop-blur-xs"
+        className="h-9 w-full rounded-xl border border-white/15 bg-white/[0.055]! backdrop-blur-xs hover:bg-white/10!"
         variant="outline"
         onClick={onConfigureModels}
       >

@@ -8,8 +8,7 @@ import {
 } from "@llm-space/core";
 import { Input } from "@llm-space/ui/ui/input";
 import { Separator } from "@llm-space/ui/ui/separator";
-import { Switch } from "@llm-space/ui/ui/switch";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -20,35 +19,7 @@ import {
 import type { RuntimeId } from "@/shared/runtime";
 
 import { SettingsPage } from "./settings-page";
-
-/** A label-left, control-right row with an optional muted hint line. */
-function ToggleRow({
-  title,
-  hint,
-  checked,
-  onCheckedChange,
-}: {
-  title: string;
-  hint?: ReactNode;
-  checked: boolean;
-  onCheckedChange: (next: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="flex flex-col gap-1">
-        <span className="text-sm font-medium">{title}</span>
-        {hint ? (
-          <span className="text-muted-foreground text-xs">{hint}</span>
-        ) : null}
-      </span>
-      <Switch
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        aria-label={title}
-      />
-    </div>
-  );
-}
+import { SettingsToggleRow } from "./settings-toggle-row";
 
 /** A titled proxy URL field with an inline "unsupported" warning. */
 function ProxyField({
@@ -187,7 +158,7 @@ export function NetworkPage({ runtimeId }: { runtimeId: RuntimeId }) {
       className="overflow-y-auto"
     >
       <div className="flex flex-col gap-6 pb-2">
-        <ToggleRow
+        <SettingsToggleRow
           title="Enable proxy"
           hint="Connect through a proxy for model requests and other network calls."
           checked={settings.enabled}
@@ -201,7 +172,7 @@ export function NetworkPage({ runtimeId }: { runtimeId: RuntimeId }) {
             <Separator />
 
             <div className="flex flex-col gap-2">
-              <ToggleRow
+              <SettingsToggleRow
                 title="Use system proxy"
                 checked={settings.useSystemProxy}
                 onCheckedChange={(next) =>

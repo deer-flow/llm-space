@@ -8,7 +8,7 @@ test("HTTP transport forwards the selected provider connection profile", async (
   const request = {
     model: { provider: "openai", id: "gpt-5" },
     config: {},
-    context: { messages: [], tools: [] },
+    context: { messages: [], tools: [], responseApiNativeTools: [] },
   } as AgentStreamRequest;
   const originalFetch = globalThis.fetch;
   let requestBody: unknown;

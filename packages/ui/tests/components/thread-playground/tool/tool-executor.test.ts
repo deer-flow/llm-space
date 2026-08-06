@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { BuiltinTool } from "@llm-space/core";
+import type { BuiltinTool, Thread } from "@llm-space/core";
 
 import { createToolExecutor } from "../../../../src/components/thread-playground/tool/tool-executor";
 
@@ -24,11 +24,14 @@ test("tool executor resolves a provider-backed tool connection once for every ca
         : undefined,
     runtimeId: "remote-fixture",
   });
+  const thread = { id: "thread-fixture" } as Thread;
 
-  await execute(tool, { prompt: "A red circle" });
+  await execute(tool, { prompt: "A red circle" }, { thread, variables: {} });
 
   expect(receivedOptions).toEqual({
     runtimeId: "remote-fixture",
+    thread,
+    variables: {},
     connection: { providerId: "ark", profileId: "profile-work" },
   });
 });

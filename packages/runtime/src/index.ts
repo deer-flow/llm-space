@@ -1,6 +1,7 @@
 export * from "./mcp";
 export * from "./models";
 export * from "./network";
+export * from "./plugins";
 export * from "./runtime";
 export * from "./search";
 export * from "./skills";

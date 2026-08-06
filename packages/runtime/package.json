@@ -8,6 +8,7 @@
     "./models": "./src/models/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./network": "./src/network/index.ts",
+    "./plugins": "./src/plugins/index.ts",
     "./runtime": "./src/runtime/index.ts",
     "./search": "./src/search/index.ts",
     "./skills": "./src/skills/index.ts",
@@ -24,7 +25,7 @@
     "@earendil-works/pi-agent-core": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@llm-space/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "gray-matter": "^4.0.3",
     "skills-handler": "^0.1.2",
     "zod": "catalog:"

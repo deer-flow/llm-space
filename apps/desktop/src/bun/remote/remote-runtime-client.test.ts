@@ -185,6 +185,7 @@ describe("RemoteRuntimeClient", () => {
           connection: { providerId: "ark", profileId: "profile-work" },
         });
         await client.mcpListTools("server-1");
+        await client.mcpCancelTest("server-1");
         await client.mcpCallTool({
           serverId: "server-1",
           toolName: "tool",
@@ -205,6 +206,7 @@ describe("RemoteRuntimeClient", () => {
       "fs.rm",
       "builtinTools.call",
       "mcp.listTools",
+      "mcp.cancelTest",
       "mcp.callTool",
       "search.set",
     ]);

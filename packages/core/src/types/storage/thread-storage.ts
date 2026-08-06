@@ -37,7 +37,7 @@ export interface ThreadLocator {
   /**
    * The concrete file within the resource, e.g. "browser-use-evolving-01.json".
    */
-  filename: string;
+  filename?: string;
 
   /**
    * Resolved version; populated only by versioned backends (a gist commit
@@ -90,5 +90,4 @@ export interface VersionedThreadStorage extends ReadableThreadStorage {
  * A backend supporting both reading the latest version and upserting.
  */
 export interface ThreadStore
-  extends ReadableThreadStorage,
-    WritableThreadStorage {}
+  extends ReadableThreadStorage, WritableThreadStorage {}

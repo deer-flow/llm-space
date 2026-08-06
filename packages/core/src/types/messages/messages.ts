@@ -1,6 +1,10 @@
 import { Type, type Static } from "typebox";
 
 import { ImageContent, TextContent } from "./contents";
+import {
+  ProviderHostedToolActivity,
+  ResponseOutputItem,
+} from "./provider-hosted-tool";
 import { ToolCall } from "./tools";
 import { ModelUsage } from "./usage";
 
@@ -77,6 +81,12 @@ export const AssistantMessage = Type.Object({
    * The tool calls of the message.
    */
   toolCalls: Type.Optional(Type.Array(ToolCall)),
+
+  providerHostedToolActivities: Type.Optional(
+    Type.Array(ProviderHostedToolActivity)
+  ),
+
+  responseOutputItems: Type.Optional(Type.Array(ResponseOutputItem)),
 
   /**
    * Provider-reported token usage for this completed assistant/model step.

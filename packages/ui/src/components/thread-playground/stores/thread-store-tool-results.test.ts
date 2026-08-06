@@ -238,4 +238,100 @@ describe("auto-run tool results", () => {
       isError: false,
     });
   });
+
+  test("shares one owning Thread and variables snapshot across a Plugin Tool batch", async () => {
+    const providerToolCalls = ["first_tool", "second_tool"].map(
+      (name, index) => ({
+        type: "toolCall" as const,
+        id: `tool-${index}`,
+        name,
+        arguments: { index },
+      })
+    );
+    const events = [
+      _event({ type: "message_start", message: { role: "assistant" } }),
+      ...providerToolCalls.flatMap((toolCall, index) => [
+        _event({
+          type: "message_update",
+          assistantMessageEvent: {
+            type: "toolcall_start",
+            contentIndex: index,
+            partial: {
+              content: providerToolCalls,
+            },
+          },
+        }),
+        _event({
+          type: "message_update",
+          assistantMessageEvent: {
+            type: "toolcall_delta",
+            contentIndex: index,
+            delta: JSON.stringify(toolCall.arguments),
+          },
+        }),
+        _event({
+          type: "message_update",
+          assistantMessageEvent: {
+            type: "toolcall_end",
+            contentIndex: index,
+            toolCall,
+          },
+        }),
+      ]),
+      _event({ type: "message_end", message: { role: "assistant" } }),
+    ];
+    const transport: AgentTransport = async function* () {
+      yield* events;
+    };
+    const contexts: unknown[] = [];
+    const store = createThreadStore(
+      {
+        title: "Owning thread",
+        context: {
+          variables: {
+            current_working_directory: {
+              type: "workingDirectory",
+              value: "/workspace",
+            },
+          },
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Call both tools" }],
+            },
+          ],
+          tools: ["first_tool", "second_tool"].map((name) => ({
+            type: "plugin" as const,
+            pluginId: "fixture",
+            toolId: `plugin:fixture:tool:${name}`,
+            name,
+            description: name,
+            parameters: { type: "object", properties: {} },
+          })),
+        },
+      },
+      {
+        transport,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        getAutoRunTools: () => true,
+        executeTool: (_tool, _args, context) => {
+          contexts.push(context);
+          return Promise.resolve({
+            content: [{ type: "text", text: "ok" }],
+            isError: false,
+          });
+        },
+      }
+    );
+
+    await store.getState().run();
+
+    expect(contexts).toHaveLength(2);
+    expect(contexts[0]).toBe(contexts[1]);
+    expect(contexts[0]).toMatchObject({
+      thread: { title: "Owning thread" },
+      variables: { current_working_directory: "/workspace" },
+    });
+  });
 });

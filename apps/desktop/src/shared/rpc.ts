@@ -14,6 +14,16 @@ import type {
   SearchSettings,
   SystemProxyDetection,
   Thread,
+  ThreadLocator,
+  ThreadStorageView,
+  PluginCommandView,
+  PluginCommandExecutionResult,
+  PluginCommandReport,
+  PluginCommandUserMessage,
+  PluginTool,
+  PluginView,
+  JsonObject,
+  JsonValue,
 } from "@llm-space/core";
 import type {
   McpCallToolResponse,
@@ -67,6 +77,21 @@ export type StreamThreadResponsePayload =
 export interface AbortStreamThreadPayload extends RuntimeScopedParams {
   streamId: string;
 }
+
+export type PluginCommandExecutionEvent =
+  | {
+      executionId: string;
+      commandId: string;
+      type: "status";
+      status: "running" | "succeeded" | "failed";
+      userMessage?: PluginCommandUserMessage;
+    }
+  | {
+      executionId: string;
+      commandId: string;
+      type: "phase";
+      report: PluginCommandReport;
+    };
 
 export interface DesktopRPCType {
   bun: RPCSchema<{
@@ -270,6 +295,68 @@ export interface DesktopRPCType {
         params: RuntimeScopedParams & { path: string; thread: Thread };
         response: null;
       };
+      pluginsList: {
+        params: Record<string, never>;
+        response: PluginView[];
+      };
+      pluginsRefresh: {
+        params: Record<string, never>;
+        response: PluginView[];
+      };
+      pluginsReload: {
+        params: { pluginId: string };
+        response: PluginView[];
+      };
+      pluginsSetEnabled: {
+        params: { pluginId: string; enabled: boolean };
+        response: PluginView[];
+      };
+      pluginsSetSettings: {
+        params: { pluginId: string; settings: JsonObject };
+        response: PluginView[];
+      };
+      pluginCommandsList: {
+        params: Record<string, never>;
+        response: PluginCommandView[];
+      };
+      pluginCommandExecute: {
+        params: {
+          executionId: string;
+          commandId: string;
+          arguments: string[];
+          activeTab: { filename: string; thread: Thread } | null;
+        };
+        response: PluginCommandExecutionResult;
+      };
+      pluginToolsList: {
+        params: Record<string, never>;
+        response: PluginTool[];
+      };
+      pluginToolExecute: {
+        params: {
+          tool: PluginTool;
+          thread: Thread;
+          variables: Record<string, JsonValue>;
+          arguments: Record<string, unknown>;
+        };
+        response: BuiltinToolCallResponse;
+      };
+      threadStoragesList: {
+        params: Record<string, never>;
+        response: ThreadStorageView[];
+      };
+      threadStorageResolveLatest: {
+        params: { storageId: string; resourceId: string };
+        response: ThreadLocator;
+      };
+      threadStorageRead: {
+        params: { storageId: string; locator: ThreadLocator };
+        response: Thread;
+      };
+      threadStorageWrite: {
+        params: { storageId: string; thread: Thread; resourceId?: string };
+        response: ThreadLocator;
+      };
       // Publish a workspace thread as a shareable link: read the thread from
       // disk, create a secret GitHub Gist (requires GitHub sign-in), and return
       // the web viewer URL + gist id. `title`/`description` override the shared
@@ -368,6 +455,12 @@ export interface DesktopRPCType {
         params: { rootDir: string; relativePath: string };
         response: null;
       };
+      // On macOS, open Terminal in an authorized generated project and run
+      // `make dev`. Returns false on unsupported platforms.
+      generatorOpenDevTerminal: {
+        params: { rootDir: string };
+        response: boolean;
+      };
       // Resolve real secret values for a generated `.env`: the runtime's model
       // provider API key plus the raw values of named environment variables. Used
       // only after explicit user opt-in to materialize secrets to disk.
@@ -399,6 +492,10 @@ export interface DesktopRPCType {
         response: McpServerView[];
       };
       mcpDisconnectServer: {
+        params: RuntimeScopedParams & { serverId: string };
+        response: McpServerView[];
+      };
+      mcpCancelTest: {
         params: RuntimeScopedParams & { serverId: string };
         response: McpServerView[];
       };
@@ -485,10 +582,35 @@ export interface DesktopRPCType {
         };
         response: SkillsSettings;
       };
+      skillsSetPluginSkillHidden: {
+        params: RuntimeScopedParams & {
+          pluginId: string;
+          skillName: string;
+          hidden: boolean;
+        };
+        response: SkillsSettings;
+      };
+      skillsSetAllPluginSkillsHidden: {
+        params: RuntimeScopedParams & {
+          pluginId: string;
+          hidden: boolean;
+        };
+        response: SkillsSettings;
+      };
       // Enable/disable every skill in one folder at once.
       skillsSetAllSkillsHidden: {
         params: RuntimeScopedParams & { path: string; hidden: boolean };
         response: SkillsSettings;
+      };
+      // List every enabled, conflict-free skill available to agents.
+      skillsListAvailable: {
+        params: RuntimeScopedParams;
+        response: SkillInfo[];
+      };
+      // List all Skills from active Plugins, including individually disabled ones.
+      skillsListPluginSkills: {
+        params: RuntimeScopedParams;
+        response: SkillInfo[];
       };
       // Discover the skills under one folder (name/description/path/enabled).
       skillsListSkills: {
@@ -644,6 +766,8 @@ export interface DesktopRPCType {
       sharedImportStatusChanged: SharedImportStatusPayload;
       // Remote SSH connection progress and status updates from the bun side.
       remoteServerStatusChanged: RemoteServerStatusChangedPayload;
+      pluginsChanged: Record<string, never>;
+      pluginCommandExecutionChanged: PluginCommandExecutionEvent;
     };
   }>;
 }

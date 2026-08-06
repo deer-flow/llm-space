@@ -18,10 +18,7 @@ import {
 import type { GeneratorHost } from "../../host/types";
 
 import { bindProjectGenerationRuntime } from "./codegen/project-generation-runtime";
-import {
-  createThreadStore,
-  ThreadStoreContext,
-} from "./stores/thread-store";
+import { createThreadStore, ThreadStoreContext } from "./stores/thread-store";
 
 const MODEL_PROVIDER_PATH = new URL("../model-provider.tsx", import.meta.url)
   .pathname;
@@ -73,9 +70,7 @@ function _createTransportFactory(attempts: TransportAttempt[]) {
     };
 }
 
-function _host(
-  createTransport: HostServices["createTransport"]
-): HostServices {
+function _host(createTransport: HostServices["createTransport"]): HostServices {
   return { createTransport } as HostServices;
 }
 
@@ -175,6 +170,10 @@ describe("auxiliary generation runtime ownership", () => {
           discoveryPaths: [{ path: "/remote/skills", hiddenSkills: [] }],
         };
       },
+      listAvailable: async (options) => {
+        calls.push({ operation: "skills.available", ...options });
+        return [];
+      },
       listSkills: async (_path, options) => {
         calls.push({ operation: "skills.list", ...options });
         return [];
@@ -246,14 +245,13 @@ describe("auxiliary generation runtime ownership", () => {
       runtimeId: REMOTE_RUNTIME,
       aborted: true,
     });
-    expect(calls.slice(0, 5)).toEqual([
-      { operation: "skills.settings", runtimeId: REMOTE_RUNTIME },
-      { operation: "skills.list", runtimeId: REMOTE_RUNTIME },
+    expect(calls.slice(0, 4)).toEqual([
+      { operation: "skills.available", runtimeId: REMOTE_RUNTIME },
       { operation: "mcp.list", runtimeId: REMOTE_RUNTIME },
       { operation: "search.settings", runtimeId: REMOTE_RUNTIME },
       { operation: "generator.env", runtimeId: REMOTE_RUNTIME },
     ]);
-    expect(calls[5]).toEqual({
+    expect(calls[4]).toEqual({
       operation: "search.settings",
       runtimeId: "local",
     });

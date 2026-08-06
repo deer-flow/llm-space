@@ -147,6 +147,38 @@ function _emptySettingsDir() {
 }
 
 describe("ModelManager provider profiles", () => {
+  test("exposes a plugin provider's legacy connection as a read-only default profile", () => {
+    const manager = new ModelManager({ settingsDir: _emptySettingsDir() });
+    manager.setPluginProviders([
+      {
+        pluginId: "image-kit",
+        provider: {
+          id: "plugin:image-kit:model-provider:gateway",
+          name: "Plugin Gateway",
+          api: "openai-completions",
+          apiKey: "$PLUGIN_GATEWAY_KEY",
+          baseUrl: "https://plugin.example/v1",
+          headers: { "X-Plugin": "image-kit" },
+          models: [],
+        },
+      },
+    ]);
+
+    const providerId = "plugin:image-kit:model-provider:gateway";
+    expect(manager.getProfiles(providerId)).toMatchObject([
+      {
+        name: "Default",
+        apiKey: "$PLUGIN_GATEWAY_KEY",
+        baseUrl: "https://plugin.example/v1",
+        headers: { "X-Plugin": "image-kit" },
+      },
+    ]);
+    expect(manager.getBaseUrl(providerId)).toBe("https://plugin.example/v1");
+    expect(() => manager.addProfile(providerId)).toThrow(
+      `Provider not configured: ${providerId}`
+    );
+  });
+
   test("migrates legacy connection fields into a fixed default profile", () => {
     const settingsDir = _emptySettingsDir();
     writeFileSync(

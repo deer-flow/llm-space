@@ -24,15 +24,21 @@ import {
   type WorkflowEvent,
 } from "@llm-space/core/workflow";
 import {
-  ArrowLeftIcon,
   ArrowRightIcon,
+  BotIcon,
+  BracesIcon,
   CheckIcon,
   CopyIcon,
   ExternalLinkIcon,
+  FileCode2Icon,
   FolderIcon,
   FolderOpenIcon,
+  FolderTreeIcon,
+  PackageIcon,
+  RocketIcon,
   SparklesIcon,
   TerminalIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -391,6 +397,7 @@ export function GenerateProjectButton({
       return;
     }
     setWritingEnv(true);
+    let envCreated = false;
     try {
       const modelInfo = _resolveModelInfo(providers, model, selectedProfileId);
       const usesWebTools = (context?.tools ?? []).some(
@@ -437,12 +444,25 @@ export function GenerateProjectButton({
       );
       await generator.writeFile(result.dir, ".env", contents);
       toast.success(".env created with your keys.");
+      envCreated = true;
     } catch (e) {
       toast.error("Couldn't create .env", {
         description: e instanceof Error ? e.message : String(e),
       });
+    }
+    try {
+      if (
+        !envCreated ||
+        !(await generator.openDevTerminal(result.dir))
+      ) {
+        await openGeneratedProject();
+      }
+    } catch (e) {
+      toast.error("Couldn't start the development server", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      await openGeneratedProject();
     } finally {
-      void openGeneratedProject();
       setWritingEnv(false);
       setEnvConfirmOpen(false);
       setOpen(false);
@@ -487,29 +507,39 @@ export function GenerateProjectButton({
       </Tooltip>
 
       <Dialog open={open} onOpenChange={busy ? undefined : setOpen}>
-        <DialogContent className="flex h-[36rem] flex-col sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <SparklesIcon className="text-primary size-4" />
+        <DialogContent className="flex h-[42rem] max-h-[calc(100vh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 border-b px-6 py-4 text-left sm:text-left">
+            <span className="border-primary/20 bg-primary/10 text-primary row-span-2 flex size-8 items-center justify-center self-center rounded-xl border">
+              <SparklesIcon className="size-4" />
+            </span>
+            <DialogTitle className="col-start-2 flex items-center gap-2">
               Generate a runnable agent
               <BetaBadge />
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="col-start-2">
               {step === "framework"
-                ? "Turn this thread into a runnable code project — its prompt, tools, variables, and messages, plus a PLAN.md for a coding agent to finish."
+                ? "Turn this thread into a real codebase—prompt, tools, variables, messages, and a plan to finish it."
                 : step === "target"
-                  ? "Choose where the project is created and which thread context it uses."
+                  ? "Name the project, choose its home, and preview what will be created."
                   : uvMissing
                     ? "uv is needed to scaffold the project."
                     : result
-                      ? "All set — a few steps to run your agent."
-                      : "Scaffolding the project and writing its plan."}
+                      ? "The thread is now a runnable agent project."
+                      : "Compiling thread context into a runnable project."}
             </DialogDescription>
           </DialogHeader>
 
-          <StepIndicator step={step} />
+          <div className="relative px-6 py-3">
+            <div
+              aria-hidden="true"
+              className="from-muted/[0.08] via-muted/[0.03] pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent"
+            />
+            <div className="relative">
+              <StepIndicator step={step} />
+            </div>
+          </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {step === "framework" ? (
               <FrameworkStep selected={framework} onSelect={setFramework} />
             ) : null}
@@ -555,7 +585,7 @@ export function GenerateProjectButton({
             ) : null}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl">
             {step === "framework" ? (
               <>
                 <Button variant="ghost" onClick={() => setOpen(false)}>
@@ -563,7 +593,6 @@ export function GenerateProjectButton({
                 </Button>
                 <Button onClick={() => setStep("target")}>
                   Next
-                  <ArrowRightIcon className="size-4" />
                 </Button>
               </>
             ) : null}
@@ -575,7 +604,6 @@ export function GenerateProjectButton({
                   disabled={preparing}
                   onClick={() => setStep("framework")}
                 >
-                  <ArrowLeftIcon className="size-4" />
                   Back
                 </Button>
                 <Button
@@ -597,7 +625,6 @@ export function GenerateProjectButton({
                     setStep("target");
                   }}
                 >
-                  <ArrowLeftIcon className="size-4" />
                   Back
                 </Button>
                 <Button onClick={() => actions.openLink(UV_INSTALL_URL)}>
@@ -672,9 +699,9 @@ function BetaBadge() {
 
 /** Ordered wizard steps with their stepper titles. */
 const STEPS: { id: WizardStep; title: string }[] = [
-  { id: "framework", title: "Framework" },
-  { id: "target", title: "Directory" },
-  { id: "run", title: "Generate" },
+  { id: "framework", title: "Introduction" },
+  { id: "target", title: "Destination" },
+  { id: "run", title: "Build" },
 ];
 
 /**
@@ -685,7 +712,7 @@ const STEPS: { id: WizardStep; title: string }[] = [
 function StepIndicator({ step }: { step: WizardStep }) {
   const activeIndex = STEPS.findIndex((s) => s.id === step);
   return (
-    <div className="flex items-center">
+    <div className="mx-auto flex max-w-2xl items-center">
       {STEPS.map((s, index) => {
         const state =
           index < activeIndex
@@ -696,12 +723,15 @@ function StepIndicator({ step }: { step: WizardStep }) {
         return (
           <div
             key={s.id}
-            className={cn("flex items-center", index === 0 ? "" : "flex-1")}
+            className={cn(
+              "flex items-center",
+              index === 0 ? "" : "flex-1"
+            )}
           >
             {index > 0 ? (
               <span
                 className={cn(
-                  "mx-3 h-px flex-1 transition-colors",
+                  "mx-3 h-px flex-1 transition-colors duration-300",
                   index <= activeIndex ? "bg-primary" : "bg-border/60"
                 )}
               />
@@ -709,11 +739,11 @@ function StepIndicator({ step }: { step: WizardStep }) {
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors",
+                  "flex size-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition-all duration-300",
                   state === "completed" &&
-                    "border-primary bg-primary text-primary-foreground",
+                    "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20",
                   state === "active" &&
-                    "border-primary text-primary bg-primary/10",
+                    "border-primary bg-primary/10 text-primary ring-4 ring-primary/8",
                   state === "pending" &&
                     "border-border/60 text-muted-foreground"
                 )}
@@ -726,7 +756,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
               </span>
               <span
                 className={cn(
-                  "text-sm font-medium transition-colors",
+                  "text-xs font-semibold transition-colors",
                   state === "pending"
                     ? "text-muted-foreground"
                     : "text-foreground"
@@ -751,7 +781,57 @@ function FrameworkStep({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3.5">
+      <div className="bg-card group relative min-h-52 overflow-hidden rounded-2xl border shadow-sm">
+        <div className="absolute inset-y-0 right-0 w-[52%] overflow-hidden">
+          <img
+            src="/images/codegen/thread-to-agent.jpg"
+            alt="An abstract Liuli flow passing through a portal and becoming a structured agent"
+            className="size-full object-cover opacity-80 transition-transform duration-1000 ease-out group-hover:scale-[1.025] dark:opacity-65"
+          />
+          <div className="from-card absolute inset-0 bg-gradient-to-r from-0% via-transparent via-52% to-transparent" />
+          <div className="from-card/10 absolute inset-0 bg-gradient-to-t via-transparent to-transparent" />
+        </div>
+
+        <div className="relative flex min-h-52 w-[62%] flex-col justify-center p-6">
+          <div className="text-primary mb-3 flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] uppercase">
+            <WorkflowIcon className="size-3.5" />
+            Playground → code
+          </div>
+          <h3 className="max-w-md text-2xl font-semibold tracking-tight text-balance">
+            Take the agent out of the playground.
+          </h3>
+          <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
+            Export the intelligence already assembled here into a project you
+            can inspect, version, and run.
+          </p>
+
+          <div className="mt-5 flex items-center gap-2 text-[0.6875rem] font-medium">
+            <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
+              <BotIcon className="text-muted-foreground size-3.5" />
+              Playground context
+            </span>
+            <ArrowRightIcon className="text-muted-foreground size-3.5" />
+            <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
+              <PackageIcon className="text-muted-foreground size-3.5" />
+              Runnable project
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">Export format</p>
+          <p className="text-muted-foreground text-xs">
+            Choose the runtime that will receive this thread.
+          </p>
+        </div>
+        <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
+          1 available
+        </span>
+      </div>
+
       {FRAMEWORKS.map((fw) => {
         const isSelected = fw.id === selected;
         return (
@@ -762,41 +842,36 @@ function FrameworkStep({
             aria-pressed={isSelected}
             onClick={() => fw.available && onSelect(fw.id)}
             className={cn(
-              "flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+              "group flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3.5 text-left transition-all duration-200",
               isSelected
-                ? "border-primary bg-primary/5"
-                : "border-border/60 bg-muted/15 hover:bg-muted/30",
+                ? "border-foreground/20 bg-muted/35 shadow-sm"
+                : "border-border/60 bg-muted/10 hover:border-foreground/15 hover:bg-muted/25",
               !fw.available && "cursor-not-allowed opacity-50"
             )}
           >
-            <span
-              className={cn(
-                "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
-                isSelected
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <SparklesIcon className="size-4" />
+            <span className="bg-background/80 flex size-10 shrink-0 items-center justify-center rounded-xl border shadow-sm">
+              <BracesIcon className="size-4.5" />
             </span>
-            <span className="flex min-w-0 flex-col gap-1">
-              <span className="flex items-center gap-2 text-sm font-medium">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex items-center gap-2 text-sm font-semibold">
                 {fw.name}
-                <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[0.6875rem] font-normal">
+                <span className="text-muted-foreground bg-muted rounded-md px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
                   {fw.stack}
                 </span>
               </span>
-              <span className="text-muted-foreground text-xs/relaxed">
+              <span className="text-muted-foreground line-clamp-2 text-xs/relaxed">
                 {fw.description}
               </span>
             </span>
             <span
               className={cn(
-                "mt-1 shrink-0 transition-opacity",
-                isSelected ? "text-primary opacity-100" : "opacity-0"
+                "flex size-6 shrink-0 items-center justify-center rounded-full border transition-all",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border text-transparent"
               )}
             >
-              <CheckIcon className="size-4" />
+              <CheckIcon className="size-3.5" />
             </span>
           </button>
         );
@@ -835,46 +910,89 @@ function TargetStep({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <Field label="Parent directory">
-        <div className="flex items-center gap-2">
-          <Input
-            value={parentDir}
-            disabled={disabled}
-            spellCheck={false}
-            className="font-mono"
-            onChange={(e) => onParentChange(e.target.value)}
-            placeholder="~"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={disabled}
-            onClick={onBrowse}
-          >
-            <FolderIcon className="size-4" />
-            Browse
-          </Button>
+      <div>
+        <h3 className="text-lg font-semibold tracking-tight">
+          Give your agent a home
+        </h3>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Choose where the editable project will live.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+        <div className="border-border/60 bg-muted/10 flex flex-col gap-3.5 rounded-2xl border p-4">
+          <Field label="Parent directory">
+            <div className="flex items-center gap-2">
+              <Input
+                value={parentDir}
+                disabled={disabled}
+                spellCheck={false}
+                className="font-mono"
+                onChange={(e) => onParentChange(e.target.value)}
+                placeholder="~"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={disabled}
+                onClick={onBrowse}
+                className="cursor-pointer"
+              >
+                <FolderIcon className="size-4" />
+                Browse
+              </Button>
+            </div>
+          </Field>
+
+          <Field label="Project name">
+            <Input
+              value={projectName}
+              disabled={disabled}
+              spellCheck={false}
+              className="font-mono"
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder="my-agent"
+            />
+          </Field>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium">Project path</span>
+            <div className="border-border/60 bg-background/70 text-muted-foreground truncate rounded-lg border px-3 py-2 font-mono text-xs shadow-sm">
+              {targetPreview}
+            </div>
+          </div>
         </div>
-      </Field>
 
-      <Field label="Project name">
-        <Input
-          value={projectName}
-          disabled={disabled}
-          spellCheck={false}
-          className="font-mono"
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder="my-agent"
-        />
-      </Field>
-
-      <Field label="The project will be created at">
-        <div className="border-border/60 bg-muted/30 text-muted-foreground truncate rounded-md border px-2 py-1.5 font-mono text-xs">
-          {targetPreview}
+        <div className="relative overflow-hidden rounded-2xl border bg-foreground/[0.025] p-4">
+          <div className="absolute -top-12 -right-12 size-40 rounded-full bg-primary/8 blur-3xl" />
+          <div className="relative flex h-full flex-col">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="bg-background flex size-8 items-center justify-center rounded-lg border shadow-sm">
+                <FolderTreeIcon className="size-4" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold">Project blueprint</p>
+                <p className="text-muted-foreground text-[0.6875rem]">
+                  A real, editable Python project
+                </p>
+              </div>
+            </div>
+            <div className="text-muted-foreground flex flex-1 flex-col gap-1.5 font-mono text-[0.6875rem]">
+              <ProjectTreeLine icon={FolderIcon} label={`${projectName || "my-agent"}/`} strong />
+              <ProjectTreeLine icon={BotIcon} label="agent.py" nested />
+              <ProjectTreeLine icon={WorkflowIcon} label="langgraph.json" nested />
+              <ProjectTreeLine icon={PackageIcon} label="pyproject.toml" nested />
+              <ProjectTreeLine icon={FileCode2Icon} label="PLAN.md" nested />
+              <ProjectTreeLine icon={FolderIcon} label="references/" nested />
+            </div>
+            <div className="border-border/60 text-muted-foreground mt-3 border-t pt-2.5 text-[0.6875rem]">
+              Thread context and PLAN.md included.
+            </div>
+          </div>
         </div>
-      </Field>
+      </div>
 
-      <div className="border-border/60 bg-muted/15 flex items-start justify-between gap-5 rounded-lg border p-3.5">
+      <div className="border-border/60 bg-muted/15 flex items-start justify-between gap-5 rounded-xl border px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex items-center gap-2">
             <label
@@ -898,10 +1016,10 @@ function TargetStep({
                   : "Suggested off"}
             </span>
           </div>
-          <p className="text-muted-foreground max-w-xl text-xs/relaxed">
+          <p className="text-muted-foreground max-w-2xl text-xs">
             {hasFirstUserMessage
-              ? "A meta user prompt is first-turn runtime context—such as the current date, workspace, or available skills—rather than a question. Our suggested setting is based on this thread; you can change it. When enabled, the context is inserted before every model call."
-              : "A meta user prompt is first-turn runtime context—such as the current date, workspace, or available skills—rather than a question. This thread has no first user message that can be used as one."}
+              ? "Reuse the first message as runtime context before every model call."
+              : "This thread has no first user message to use as runtime context."}
           </p>
         </div>
         <Switch
@@ -915,8 +1033,35 @@ function TargetStep({
       </div>
 
       {error ? (
-        <div className="text-destructive text-xs/relaxed">{error}</div>
+        <div className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs/relaxed">
+          {error}
+        </div>
       ) : null}
+    </div>
+  );
+}
+
+function ProjectTreeLine({
+  icon: Icon,
+  label,
+  nested = false,
+  strong = false,
+}: {
+  icon: typeof FolderIcon;
+  label: string;
+  nested?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        nested && "pl-5",
+        strong && "text-foreground font-medium"
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" />
+      <span className="truncate">{label}</span>
     </div>
   );
 }
@@ -943,30 +1088,46 @@ function Field({
  */
 function UvMissingStep() {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="border-border/60 bg-muted/15 flex items-start gap-3 rounded-xl border px-4 py-3">
-        <span className="bg-muted text-muted-foreground mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg">
-          <TerminalIcon className="size-4" />
+    <div className="mx-auto flex max-w-2xl flex-col gap-5 py-3">
+      <div className="flex flex-col items-center text-center">
+        <div className="bg-muted/60 ring-border/60 mb-4 flex size-14 items-center justify-center rounded-2xl ring-1">
+          <TerminalIcon className="size-6" />
+        </div>
+        <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
+          One requirement
         </span>
-        <span className="flex flex-col gap-1">
-          <span className="text-sm font-medium">uv is required</span>
-          <span className="text-muted-foreground text-xs/relaxed">
-            This generator uses <span className="font-mono">uv</span> —
-            Astral&apos;s Python package manager — to scaffold the project and
-            install dependencies. It wasn&apos;t found on your PATH.
-          </span>
-        </span>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight">
+          Install uv to build the project
+        </h3>
+        <p className="text-muted-foreground mt-2 max-w-lg text-sm/relaxed">
+          uv is Astral&apos;s fast Python package manager. The generator uses it
+          to scaffold the environment and lock every dependency.
+        </p>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium">Install it, then come back</span>
-        <div className="border-border/60 bg-muted/30 text-muted-foreground rounded-md border px-2 py-1.5 font-mono text-xs">
+
+      <div className="border-border/60 overflow-hidden rounded-2xl border">
+        <div className="bg-muted/25 flex items-center gap-3 border-b px-4 py-3">
+          <span className="bg-background flex size-6 items-center justify-center rounded-full border text-[0.6875rem] font-semibold">
+            1
+          </span>
+          <span className="text-sm font-medium">Install uv in Terminal</span>
+        </div>
+        <div className="bg-neutral-950 px-4 py-4 font-mono text-xs text-neutral-200">
+          <span className="mr-2 text-emerald-400">$</span>
           curl -LsSf https://astral.sh/uv/install.sh | sh
         </div>
-        <span className="text-muted-foreground text-xs">
-          Or click “Install uv” to open the installation guide. Once installed,
-          go back and generate again.
-        </span>
+        <div className="bg-muted/25 flex items-center gap-3 border-t px-4 py-3">
+          <span className="bg-background flex size-6 items-center justify-center rounded-full border text-[0.6875rem] font-semibold">
+            2
+          </span>
+          <span className="text-sm font-medium">
+            Return here and generate again
+          </span>
+        </div>
       </div>
+      <p className="text-muted-foreground text-center text-xs">
+        “Install uv” opens Astral&apos;s official installation guide.
+      </p>
     </div>
   );
 }
@@ -982,26 +1143,66 @@ function RunStep({
   running: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="border-border/60 bg-muted/15 min-h-0 flex-1 overflow-y-auto rounded-xl border p-3 font-mono text-xs">
-        {events.length === 0 && !error ? (
-          <div className="text-muted-foreground">Starting…</div>
-        ) : null}
-        {events.map((event, index) => (
-          <ProgressLine key={index} event={event} />
-        ))}
-        {error ? (
-          <div className="text-destructive mt-2 whitespace-pre-wrap">
-            {error}
+    <div className="grid h-full min-h-80 gap-4 md:grid-cols-[0.8fr_1.2fr]">
+      <div className="relative min-h-56 overflow-hidden rounded-2xl border bg-neutral-950 text-white">
+        <img
+          src="/images/codegen/thread-to-agent.jpg"
+          alt=""
+          className="absolute inset-0 size-full object-cover opacity-55"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
+        <div className="relative flex h-full flex-col justify-between p-5">
+          <div className="flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] text-white/65 uppercase">
+            {running ? <Spinner className="size-3" /> : <PackageIcon className="size-3.5" />}
+            {running ? "Building" : error ? "Build stopped" : "Build complete"}
+          </div>
+          <div>
+            <div className="mb-4 flex size-11 items-center justify-center rounded-xl border border-white/15 bg-black/25 backdrop-blur-xl">
+              <RocketIcon className="size-5" />
+            </div>
+            <h3 className="text-xl font-semibold tracking-tight">
+              Turning context into code
+            </h3>
+            <p className="mt-1.5 text-xs/relaxed text-white/65">
+              Scaffolding the runtime, exporting references, and writing a plan
+              your coding agent can finish.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-border/60 bg-muted/10 flex min-h-0 flex-col overflow-hidden rounded-2xl border">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center gap-2">
+            <TerminalIcon className="text-muted-foreground size-3.5" />
+            <span className="text-xs font-semibold">Build activity</span>
+          </div>
+          <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
+            {events.length} events
+          </span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 font-mono text-xs">
+          {events.length === 0 && !error ? (
+            <div className="text-muted-foreground flex items-center gap-2">
+              <Spinner className="size-3" />
+              Preparing the build…
+            </div>
+          ) : null}
+          {events.map((event, index) => (
+            <ProgressLine key={index} event={event} />
+          ))}
+          {error ? (
+            <div className="border-destructive/20 bg-destructive/5 text-destructive mt-3 whitespace-pre-wrap rounded-lg border p-3 font-sans text-xs/relaxed">
+              {error}
+            </div>
+          ) : null}
+        </div>
+        {running ? (
+          <div className="text-muted-foreground border-t px-4 py-3 text-[0.6875rem]">
+            Dependencies may take a moment to install on the first build.
           </div>
         ) : null}
       </div>
-
-      {running ? (
-        <p className="text-muted-foreground text-xs">
-          This can take a moment while dependencies install.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -1104,21 +1305,32 @@ function SuccessStep({
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col items-center gap-3 pt-1 pb-7 text-center">
-        <div className="to-primary/20 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400/20 ring-1 ring-emerald-500/20">
-          <CheckIcon className="size-7 text-emerald-500" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-semibold tracking-tight">
-            Your agent is ready
-          </h3>
-          <p className="text-muted-foreground max-w-md truncate text-xs">
-            Generated at <span className="font-mono">{dir}</span>
-          </p>
+      <div className="relative mb-5 overflow-hidden rounded-2xl border bg-neutral-950 text-white">
+        <img
+          src="/images/codegen/thread-to-agent.jpg"
+          alt=""
+          className="absolute inset-0 size-full object-cover opacity-50"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/15" />
+        <div className="relative flex min-h-36 items-center gap-4 p-6">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 backdrop-blur-xl">
+            <CheckIcon className="size-6 text-emerald-300" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[0.625rem] font-semibold tracking-[0.18em] text-emerald-300/80 uppercase">
+              Build complete
+            </span>
+            <h3 className="mt-1 text-2xl font-semibold tracking-tight">
+              Your agent is ready
+            </h3>
+            <p className="mt-1 max-w-xl truncate font-mono text-xs text-white/60">
+              {dir}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="border-border/60 bg-muted/15 flex flex-col gap-5 rounded-xl border p-5">
+      <div className="border-border/60 bg-muted/10 flex flex-col gap-4 rounded-2xl border p-5">
         <span className="text-muted-foreground text-[0.6875rem] font-medium tracking-wider uppercase">
           Next steps
         </span>

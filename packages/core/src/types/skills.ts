@@ -15,6 +15,8 @@ export interface DiscoveryPathConfig {
 /** User-configured skills settings, persisted to `settings/skills.json`. */
 export interface SkillsSettings {
   discoveryPaths: DiscoveryPathConfig[];
+  /** Per-plugin Skill visibility overrides. Plugin files remain untouched. */
+  pluginSkills?: Record<string, { hiddenSkills: string[] }>;
 }
 
 /** One discovered skill, as shown in the settings UI. */
@@ -25,6 +27,9 @@ export interface SkillInfo {
   path: string;
   /** `false` when the skill is in its folder's `hiddenSkills`. */
   enabled: boolean;
+  source?: "user" | "plugin";
+  readOnly?: boolean;
+  pluginId?: string;
 }
 
 /** One skill's full content, for the runtime Skill tool. */
@@ -47,4 +52,5 @@ export const DEFAULT_SKILLS_SETTINGS: SkillsSettings = {
     { path: "~/.codex/skills", hiddenSkills: [] },
     { path: "~/.agents/skills", hiddenSkills: [] },
   ],
+  pluginSkills: {},
 };

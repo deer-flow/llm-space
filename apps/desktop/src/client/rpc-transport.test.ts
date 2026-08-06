@@ -67,7 +67,7 @@ const { createRpcTransport } = await import("./rpc-transport");
 
 const REQUEST: AgentStreamRequest = {
   model: { provider: "test", id: "test" },
-  context: { messages: [], tools: [] },
+  context: { messages: [], tools: [], responseApiNativeTools: [] },
 };
 const START: AgentEvent = { type: "agent_start" };
 const TURN: AgentEvent = { type: "turn_start" };

@@ -74,7 +74,7 @@ export function SharedImportProvider() {
     >
       <DialogContent showCloseButton={false} className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Importing shared thread</DialogTitle>
+          <DialogTitle>Importing thread</DialogTitle>
           <DialogDescription>
             Fetching and saving it to your workspace…
           </DialogDescription>

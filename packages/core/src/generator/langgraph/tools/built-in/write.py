@@ -14,9 +14,11 @@ def write(description: str, path: str, contents: str) -> str:
     Args:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining what is being written and why.
-        path: Absolute path to the file to write.
+        path: Absolute path to the file to write. A leading ~/ is expanded to
+            the current user's home directory.
         contents: The full text content to write to the file.
     """
+    path = os.path.expanduser(path)
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)

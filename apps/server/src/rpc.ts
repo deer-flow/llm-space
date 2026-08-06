@@ -165,6 +165,8 @@ async function _dispatch(
       return runtime.mcpRemoveServer(_stringParam(params, "serverId"));
     case "mcp.disconnectServer":
       return runtime.mcpDisconnectServer(_stringParam(params, "serverId"));
+    case "mcp.cancelTest":
+      return runtime.mcpCancelTest(_stringParam(params, "serverId"));
     case "mcp.listTools":
       return runtime.mcpListTools(_stringParam(params, "serverId"));
     case "mcp.callTool":
@@ -210,10 +212,22 @@ async function _dispatch(
       return runtime.skillsSetSkillHidden(
         params as Parameters<RuntimeClient["skillsSetSkillHidden"]>[0]
       );
+    case "skills.setPluginSkillHidden":
+      return runtime.skillsSetPluginSkillHidden(
+        params as Parameters<RuntimeClient["skillsSetPluginSkillHidden"]>[0]
+      );
+    case "skills.setAllPluginSkillsHidden":
+      return runtime.skillsSetAllPluginSkillsHidden(
+        params as Parameters<RuntimeClient["skillsSetAllPluginSkillsHidden"]>[0]
+      );
     case "skills.setAllSkillsHidden":
       return runtime.skillsSetAllSkillsHidden(
         params as Parameters<RuntimeClient["skillsSetAllSkillsHidden"]>[0]
       );
+    case "skills.listAvailable":
+      return runtime.skillsListAvailable();
+    case "skills.listPluginSkills":
+      return runtime.skillsListPluginSkills();
     case "skills.listSkills":
       return runtime.skillsListSkills(_stringParam(params, "path"));
     case "skills.readSkill":

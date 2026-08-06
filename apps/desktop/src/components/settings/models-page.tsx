@@ -185,6 +185,10 @@ function ProviderList({
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+      <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+        PROVIDERS
+      </span>
+
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
         <Input
@@ -425,47 +429,55 @@ function ProviderListItem({
       />
       <span className="line-clamp-1 grow">{provider.name}</span>
 
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label={`${provider.name} provider actions`}
-            title={`${provider.name} provider actions`}
-            className={cn(
-              "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
-              menuOpen
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="size-4" />
-          </span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setConfirmOpen(true)}
-          >
-            <Trash2 />
-            Remove {provider.name}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {!provider.readOnly ? (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={`${provider.name} provider actions`}
+              title={`${provider.name} provider actions`}
+              className={cn(
+                "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
+                menuOpen
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="size-4" />
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmOpen(true)}
+            >
+              <Trash2 />
+              Remove {provider.name}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <span className="text-muted-foreground text-[10px] uppercase">
+          Plugin
+        </span>
+      )}
 
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={`Remove ${provider.name}?`}
-        description={`This removes ${provider.name} from your configured providers. You can add it back later.`}
-        confirmLabel="Remove"
-        dimBackground={false}
-        onConfirm={() => {
-          setConfirmOpen(false);
-          void removeProvider(provider.id);
-        }}
-      />
+      {!provider.readOnly ? (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title={`Remove ${provider.name}?`}
+          description={`This removes ${provider.name} from your configured providers. You can add it back later.`}
+          confirmLabel="Remove"
+          dimBackground={false}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            void removeProvider(provider.id);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -558,6 +570,30 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     return (
       <div className="text-muted-foreground flex min-w-0 grow items-center justify-center text-sm">
         Select or add a provider from the left sidebar
+      </div>
+    );
+  }
+
+  if (provider.readOnly) {
+    return (
+      <div className="flex min-w-0 grow flex-col overflow-auto px-6 py-4">
+        <div className="flex items-center gap-2">
+          <h3 className="font-heading text-lg font-medium">{provider.name}</h3>
+          <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] uppercase">
+            Plugin · Read only
+          </span>
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs">{provider.id}</p>
+        <div className="mt-5 space-y-2">
+          {provider.models.map((model) => (
+            <div key={model.id} className="rounded-md border px-3 py-2 text-sm">
+              <div className="font-medium">{model.name}</div>
+              <div className="text-muted-foreground font-mono text-xs">
+                {model.id}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

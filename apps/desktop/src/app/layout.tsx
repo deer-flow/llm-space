@@ -1,11 +1,15 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
-import { ThemeProvider, useTheme } from "@llm-space/ui/components/theme-provider";
+import {
+  ThemeProvider,
+  useTheme,
+} from "@llm-space/ui/components/theme-provider";
 import "@llm-space/ui/styles/globals.css";
 import { Toaster } from "@llm-space/ui/ui/sonner";
 import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
+import { PluginCommandExecutionProvider } from "@/components/plugin-command-execution-provider";
 
 import { QueryProvider } from "./query-provider";
 
@@ -15,10 +19,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <ExperimentalProvider>
         <QueryProvider>
           <TooltipProvider delayDuration={1000}>
-            <div className="flex size-full flex-col">
-              <ThemedToaster />
-              {children}
-            </div>
+            <PluginCommandExecutionProvider>
+              <div className="flex size-full flex-col">
+                <ThemedToaster />
+                {children}
+              </div>
+            </PluginCommandExecutionProvider>
           </TooltipProvider>
         </QueryProvider>
       </ExperimentalProvider>

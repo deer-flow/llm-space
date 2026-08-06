@@ -168,6 +168,7 @@ export interface RuntimeClient {
   ): Promise<McpServerView[]>;
   mcpRemoveServer(serverId: string): Promise<McpServerView[]>;
   mcpDisconnectServer(serverId: string): Promise<McpServerView[]>;
+  mcpCancelTest(serverId: string): Promise<McpServerView[]>;
   mcpListTools(serverId: string): Promise<McpServerToolsResponse>;
   mcpCallTool(input: {
     serverId: string;
@@ -197,10 +198,21 @@ export interface RuntimeClient {
     skillName: string;
     hidden: boolean;
   }): MaybePromise<SkillsSettings>;
+  skillsSetPluginSkillHidden(input: {
+    pluginId: string;
+    skillName: string;
+    hidden: boolean;
+  }): MaybePromise<SkillsSettings>;
+  skillsSetAllPluginSkillsHidden(input: {
+    pluginId: string;
+    hidden: boolean;
+  }): MaybePromise<SkillsSettings>;
   skillsSetAllSkillsHidden(input: {
     path: string;
     hidden: boolean;
   }): MaybePromise<SkillsSettings>;
+  skillsListAvailable(): MaybePromise<SkillInfo[]>;
+  skillsListPluginSkills(): MaybePromise<SkillInfo[]>;
   skillsListSkills(path: string): MaybePromise<SkillInfo[]>;
   skillsReadSkill(path: string): MaybePromise<SkillContent>;
 

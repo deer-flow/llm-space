@@ -69,6 +69,7 @@ export async function* streamAgent(
       `Model "${request.model.provider}/${request.model.id}" not found`
     );
   }
+  const responseApiNativeTools = request.context.responseApiNativeTools ?? [];
   // Apply a user-configured base URL override for THIS run only. pi keeps a
   // process-global model registry, so `models.getModel()` hands back a shared
   // object; mutating its `baseUrl` permanently would leak across runs (e.g.
@@ -96,8 +97,8 @@ export async function* streamAgent(
 
   const agentStream = agentLoopContinue(
     {
-      ...request.context,
       systemPrompt: request.context.systemPrompt ?? "",
+      messages: request.context.messages,
       tools: _convertToAgentTools(request.context.tools, { stepByStep: true }),
     },
     {
@@ -124,18 +125,26 @@ export async function* streamAgent(
           ...streamOptions?.headers,
         };
       }
-      if (hasResponseFormat) {
-        // Chain onto any existing payload hook, then inject the response format.
+      if (responseApiNativeTools.length > 0 || hasResponseFormat) {
+        // Chain onto any existing payload hook, then inject app-owned request
+        // fields into the provider's fully-built payload. Native definitions
+        // stay opaque here: provider validation remains authoritative.
         const priorOnPayload = mergedOptions.onPayload;
         mergedOptions.onPayload = async (payload, payloadModel) => {
           const replaced = priorOnPayload
             ? await priorOnPayload(payload, payloadModel)
             : undefined;
-          return applyResponseFormat(
-            replaced ?? payload,
-            payloadModel,
-            responseType
-          );
+          let nextPayload = replaced ?? payload;
+          if (responseApiNativeTools.length > 0) {
+            nextPayload = _appendResponseApiNativeTools(
+              nextPayload,
+              responseApiNativeTools,
+              payloadModel
+            );
+          }
+          return hasResponseFormat
+            ? applyResponseFormat(nextPayload, payloadModel, responseType)
+            : nextPayload;
         };
       }
       return models.streamSimple(streamModel, streamContext, mergedOptions);
@@ -150,6 +159,46 @@ export async function* streamAgent(
     // Undo the per-run override on the shared model object (see above).
     model.baseUrl = originalBaseUrl;
   }
+}
+
+function _appendResponseApiNativeTools(
+  payload: unknown,
+  nativeTools: readonly Record<string, unknown>[],
+  model: Model<Api>
+): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  const body = payload as Record<string, unknown>;
+  if (model.api === "google-generative-ai" || model.api === "google-vertex") {
+    const config = _objectField(body.config);
+    return { ...body, config: _appendTools(config, nativeTools) };
+  }
+  if (model.api === "bedrock-converse-stream") {
+    const toolConfig = _objectField(body.toolConfig);
+    return { ...body, toolConfig: _appendTools(toolConfig, nativeTools) };
+  }
+  if (model.api === "pi-messages") {
+    const context = _objectField(body.context);
+    return { ...body, context: _appendTools(context, nativeTools) };
+  }
+  return _appendTools(body, nativeTools);
+}
+
+function _objectField(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function _appendTools(
+  container: Record<string, unknown>,
+  nativeTools: readonly Record<string, unknown>[]
+): Record<string, unknown> {
+  const tools: unknown[] = Array.isArray(container.tools)
+    ? (container.tools as unknown[])
+    : [];
+  return { ...container, tools: [...tools, ...nativeTools] };
 }
 
 function _convertToLlm(messages: AgentMessage[]): Message[] {

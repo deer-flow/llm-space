@@ -4,10 +4,16 @@ import type { ToolCallInput } from "@llm-space/core";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { ToolCallInputView } from "../../../../src/components/thread-playground/message/tool-call-input-view";
+import {
+  HostServicesProvider,
+  type HostServices,
+} from "../../../../src/host";
 
 function _render(input: ToolCallInput, streaming: boolean): string {
   return renderToStaticMarkup(
-    <ToolCallInputView input={input} streaming={streaming} />
+    <HostServicesProvider value={{} as HostServices}>
+      <ToolCallInputView input={input} streaming={streaming} />
+    </HostServicesProvider>
   );
 }
 
@@ -57,5 +63,21 @@ describe("ToolCallInputView", () => {
 
     expect(markup).not.toContain('data-slot="todo-write-view"');
     expect(markup).toContain("other_tool");
+  });
+
+  test("makes glob's home-relative target directory revealable", () => {
+    const markup = _render(
+      {
+        name: "glob",
+        arguments: {
+          glob_pattern: "*.ts",
+          target_directory: "~/Desktop/project",
+        },
+      },
+      false
+    );
+
+    expect(markup).toContain('title="Reveal in file manager"');
+    expect(markup).toContain("~/Desktop/project");
   });
 });

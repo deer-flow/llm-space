@@ -123,6 +123,7 @@ export class StreamThreadController {
               },
             ],
             tools: [],
+            responseApiNativeTools: [],
           },
         },
         {

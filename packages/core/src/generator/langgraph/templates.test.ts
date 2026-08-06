@@ -6,10 +6,19 @@ import {
   agentPy,
   applyTemplatePy,
   langgraphJson,
+  makefile,
   mcpEnvEntries,
   mcpModule,
   metaPromptMiddlewarePy,
 } from "./templates";
+
+describe("makefile", () => {
+  test("runs the LangGraph development server through uv", () => {
+    expect(makefile()).toBe(
+      ".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n"
+    );
+  });
+});
 
 const stdioServer: GeneratorMcpServer = {
   id: "s-playwright",
@@ -36,6 +45,22 @@ describe("mcpModule", () => {
     expect(py).toContain('"args": ["-y", "@playwright/mcp@latest"]');
     // Only the used tool is allowed.
     expect(py).toContain('"browser_click"');
+  });
+
+  test("stdio: expands home-relative command and cwd at runtime", () => {
+    const py = mcpModule(
+      [
+        {
+          ...stdioServer,
+          command: "~/bin/mcp-server",
+          cwd: "~/Desktop/project",
+        },
+      ],
+      []
+    );
+
+    expect(py).toContain('"command": os.path.expanduser("~/bin/mcp-server")');
+    expect(py).toContain('"cwd": os.path.expanduser("~/Desktop/project")');
   });
 
   test("streamableHttp → streamable_http, URL routed through env (no secret in source)", () => {

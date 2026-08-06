@@ -140,6 +140,10 @@ export interface ResolvedProviderConnection {
 export class ModelManager {
   private readonly _settingsDir: string;
   private readonly _config: ModelsConfig;
+  private _pluginProviders: {
+    pluginId: string;
+    provider: ProviderConfig;
+  }[] = [];
   private _models: Models | null = null;
 
   /** Load model settings from the normal app directory or an isolated test root. */
@@ -165,6 +169,34 @@ export class ModelManager {
   /** The `Models` registry of configured providers. Built once, then cached. */
   async getAvailableModels(): Promise<Models> {
     return (this._models ??= await Promise.resolve(this._buildModels()));
+  }
+
+  setPluginProviders(
+    entries: { pluginId: string; provider: ProviderConfig }[]
+  ): void {
+    const userIds = new Set(this._config.providers.map((entry) => entry.id));
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      counts.set(entry.provider.id, (counts.get(entry.provider.id) ?? 0) + 1);
+    }
+    this._pluginProviders = entries.filter(
+      (entry) =>
+        !userIds.has(entry.provider.id) && counts.get(entry.provider.id) === 1
+    );
+    this._models = null;
+  }
+
+  getProviderSource(providerId: string): {
+    source: "user" | "plugin";
+    readOnly: boolean;
+    pluginId?: string;
+  } {
+    const plugin = this._pluginProviders.find(
+      (entry) => entry.provider.id === providerId
+    );
+    return plugin
+      ? { source: "plugin", readOnly: true, pluginId: plugin.pluginId }
+      : { source: "user", readOnly: false };
   }
 
   /**
@@ -421,12 +453,14 @@ export class ModelManager {
 
   /** Renderer-safe copies of a provider's profiles in creation order. */
   getProfiles(providerId: string): ProviderProfile[] {
-    return this._profilesFor(this._providerEntry(providerId)).map(
-      (profile) => ({
-        ...profile,
-        ...(profile.headers ? { headers: { ...profile.headers } } : {}),
-      })
-    );
+    const entry = this._findProvider(providerId);
+    if (!entry) {
+      throw new Error(`Provider not configured: ${providerId}`);
+    }
+    return this._profilesFor(entry).map((profile) => ({
+      ...profile,
+      ...(profile.headers ? { headers: { ...profile.headers } } : {}),
+    }));
   }
 
   /** Resolve one immutable connection snapshot for a model or tool invocation. */
@@ -435,11 +469,7 @@ export class ModelManager {
     options: { fallbackApiKey?: string } = {}
   ): Promise<ResolvedProviderConnection> {
     const { providerId, profileId } = connection;
-    const configuredApiKey = await this.getApiKey(
-      providerId,
-      false,
-      profileId
-    );
+    const configuredApiKey = await this.getApiKey(providerId, false, profileId);
     const apiKey =
       configuredApiKey === undefined
         ? options.fallbackApiKey
@@ -467,9 +497,7 @@ export class ModelManager {
 
   /** The selected API compatibility mode for a custom provider. */
   getApi(providerId: string): CustomProviderApi | undefined {
-    const entry = this._config.providers.find(
-      (provider) => provider.id === providerId
-    );
+    const entry = this._findProvider(providerId);
     if (!entry || entry.builtin === true) {
       return undefined;
     }
@@ -478,10 +506,7 @@ export class ModelManager {
 
   /** The model ids the user has disabled for a provider (empty by default). */
   getDisabledModels(providerId: string): string[] {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.disabledModels ?? []
-    );
+    return this._findProvider(providerId)?.disabledModels ?? [];
   }
 
   /**
@@ -490,8 +515,7 @@ export class ModelManager {
    * id/name.
    */
   getProviderIcon(providerId: string): string | undefined {
-    return this._config.providers.find((entry) => entry.id === providerId)
-      ?.icon;
+    return this._findProvider(providerId)?.icon;
   }
 
   /** The saved Ark image-model inventory, or undefined without Ark. */
@@ -504,18 +528,12 @@ export class ModelManager {
 
   /** The ids of the user-added models for a provider (empty by default). */
   getCustomModels(providerId: string): string[] {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.customModels ?? []
-    );
+    return this._findProvider(providerId)?.customModels ?? [];
   }
 
   /** Whether a configured provider is one of the shipped builtin providers. */
   isBuiltin(providerId: string): boolean {
-    return (
-      this._config.providers.find((entry) => entry.id === providerId)
-        ?.builtin === true
-    );
+    return this._findProvider(providerId)?.builtin === true;
   }
 
   /**
@@ -745,13 +763,24 @@ export class ModelManager {
    */
   private _buildProviders(): Provider[] {
     const seen = new Set<string>();
-    return this._config.providers
+    return this._effectiveProviders()
       .filter((entry) =>
         seen.has(entry.id) ? false : (seen.add(entry.id), true)
       )
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((entry) => this._buildProvider(entry))
       .filter((provider): provider is Provider => provider !== null);
+  }
+
+  private _findProvider(providerId: string): ProviderConfig | undefined {
+    return this._effectiveProviders().find((entry) => entry.id === providerId);
+  }
+
+  private _effectiveProviders(): ProviderConfig[] {
+    return [
+      ...this._config.providers,
+      ...this._pluginProviders.map((entry) => entry.provider),
+    ];
   }
 
   /**
@@ -903,14 +932,28 @@ export class ModelManager {
   }
 
   private _profilesFor(entry: ProviderConfig): ProviderProfileConfig[] {
-    return (entry.profiles ??= [{ id: uuid(), name: "Default" }]);
+    return (entry.profiles ??= [
+      {
+        id: uuid(),
+        name: "Default",
+        ...(entry.apiKey !== undefined ? { apiKey: entry.apiKey } : {}),
+        ...(entry.baseUrl !== undefined ? { baseUrl: entry.baseUrl } : {}),
+        ...(entry.headers !== undefined
+          ? { headers: { ...entry.headers } }
+          : {}),
+      },
+    ]);
   }
 
   private _profileFor(
     providerId: string,
     profileId?: string
   ): ProviderProfileConfig {
-    const profiles = this._profilesFor(this._providerEntry(providerId));
+    const entry = this._findProvider(providerId);
+    if (!entry) {
+      throw new Error(`Provider not configured: ${providerId}`);
+    }
+    const profiles = this._profilesFor(entry);
     const profile = profileId
       ? profiles.find((candidate) => candidate.id === profileId)
       : profiles[0];

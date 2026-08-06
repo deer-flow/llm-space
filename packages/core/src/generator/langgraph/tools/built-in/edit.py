@@ -1,3 +1,5 @@
+import os
+
 from langchain.tools import tool
 
 
@@ -19,13 +21,15 @@ def edit(
     Args:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining the edit being made.
-        path: Absolute path to the file to edit.
+        path: Absolute path to the file to edit. A leading ~/ is expanded to
+            the current user's home directory.
         old_string: The exact text to replace (must be unique within the file
             unless replace_all is true).
         new_string: The replacement text (must differ from old_string).
         replace_all: Replace all occurrences of old_string. Defaults to false
             (first match only).
     """
+    path = os.path.expanduser(path)
     if old_string == new_string:
         raise ValueError("new_string must differ from old_string.")
     with open(path, "r", encoding="utf-8") as f:

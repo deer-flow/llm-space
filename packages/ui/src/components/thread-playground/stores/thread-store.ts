@@ -2,6 +2,8 @@
 import {
   AssistantMessage,
   getMessageText,
+  getToolDisplayName,
+  getToolKey,
   isDangerousBashCommand,
   isExecutableTool,
   Message,
@@ -14,6 +16,7 @@ import {
   type AgentEvent,
   type BuiltinTool,
   type McpTool,
+  type PluginTool,
   type MessageContent,
   type ModelConfig,
   type ModelConfigParams,
@@ -46,6 +49,7 @@ import {
   removePromptVariableSnapshotNames,
   removePromptVariableSnapshotPlaces,
   renderThreadPromptVariables,
+  resolveThreadPromptVariableValues,
   replaceThreadPromptVariableReferences,
   SYSTEM_PROMPT_PLACE_KEY,
   upsertEvaluation,
@@ -223,8 +227,14 @@ export function createThreadStore(
      * layer.
      */
     executeTool?: (
-      tool: McpTool | BuiltinTool,
-      args: Record<string, unknown>
+      tool: McpTool | BuiltinTool | PluginTool,
+      args: Record<string, unknown>,
+      context: {
+        thread: Thread;
+        variables: Awaited<
+          ReturnType<typeof resolveThreadPromptVariableValues>
+        >;
+      }
     ) => Promise<{
       content: ToolCallOutput["content"];
       isError: boolean;
@@ -488,7 +498,8 @@ export function createThreadStore(
       const hasContent = (message: AssistantMessage): boolean =>
         Boolean(message.thinking) ||
         message.content.length > 0 ||
-        (message.toolCalls?.length ?? 0) > 0;
+        (message.toolCalls?.length ?? 0) > 0 ||
+        (message.providerHostedToolActivities?.length ?? 0) > 0;
 
       /**
        * Auto-call the pending tool calls on the last message so a run can loop
@@ -517,14 +528,16 @@ export function createThreadStore(
           return null;
         }
         const toolsByName = new Map(
-          (get().thread.context?.tools ?? []).map((tool) => [tool.name, tool])
+          (get().thread.context?.tools ?? [])
+            .filter(isExecutableTool)
+            .map((tool) => [tool.name, tool])
         );
-        // Every tool call must map to an executable (MCP/built-in) tool; a
+        // Every tool call must map to an executable tool; a
         // single `function` stub means the turn needs a hand-written result, so
         // we bail and let the user fill it in.
         const executable: {
           toolCall: ToolCall;
-          tool: McpTool | BuiltinTool;
+          tool: McpTool | BuiltinTool | PluginTool;
         }[] = [];
         for (const toolCall of toolCalls) {
           const tool = toolsByName.get(toolCall.input.name);
@@ -554,6 +567,19 @@ export function createThreadStore(
         if (get().activeRunId !== runId) {
           return null;
         }
+        const owningThread = structuredClone(get().thread);
+        const variables = executable.some(({ tool }) => tool.type === "plugin")
+          ? await resolveThreadPromptVariableValues({
+              context: owningThread.context,
+              loadSkills: options.loadSkills ?? _noSkills,
+              loadFile: options.loadFile ?? _noFile,
+              fileExists: options.fileExists ?? _noFileExists,
+            })
+          : {};
+        const invocationContext = { thread: owningThread, variables };
+        if (signal.aborted || get().activeRunId !== runId) {
+          return null;
+        }
         set({
           executingToolCallIds: executable.map(({ toolCall }) => toolCall.id),
         });
@@ -563,7 +589,8 @@ export function createThreadStore(
               try {
                 const { content, isError } = await execute(
                   tool,
-                  toolCall.input.arguments
+                  toolCall.input.arguments,
+                  invocationContext
                 );
                 return {
                   id: toolCall.id,
@@ -907,9 +934,10 @@ export function createThreadStore(
         },
         addTool(tool) {
           const { thread } = get();
-          if (thread.context?.tools?.some((t) => t.name === tool.name)) {
+          const toolKey = getToolKey(tool);
+          if (thread.context?.tools?.some((t) => getToolKey(t) === toolKey)) {
             toast.error("Error", {
-              description: `Tool "${tool.name}" already exists`,
+              description: `Tool "${getToolDisplayName(tool)}" already exists`,
             });
             return false;
           }
@@ -921,16 +949,20 @@ export function createThreadStore(
         },
         updateTool(name, tool) {
           const tools = get().thread.context?.tools ?? [];
-          const index = tools.findIndex((t) => t.name === name);
+          const index = tools.findIndex((t) => getToolKey(t) === name);
           if (index === -1) {
             return false;
           }
           if (!validateTool(tool)) {
             return false;
           }
-          if (tool.name !== name && tools.some((t) => t.name === tool.name)) {
+          const nextKey = getToolKey(tool);
+          if (
+            nextKey !== name &&
+            tools.some((t) => getToolKey(t) === nextKey)
+          ) {
             toast.error("Error", {
-              description: `Tool "${tool.name}" already exists`,
+              description: `Tool "${getToolDisplayName(tool)}" already exists`,
             });
             return false;
           }
@@ -941,7 +973,9 @@ export function createThreadStore(
         },
         removeTool(name) {
           patchContext({
-            tools: get().thread.context?.tools?.filter((t) => t.name !== name),
+            tools: get().thread.context?.tools?.filter(
+              (tool) => getToolKey(tool) !== name
+            ),
           });
         },
         updateToolCallOutputTextContent(messageId, toolCallId, text, isError) {
@@ -1608,6 +1642,13 @@ export function createThreadStore(
 }
 
 function _isNonEmptyAssistantDelta(event: AgentEvent): boolean {
+  if (
+    event.type === "message_end" &&
+    event.message.role === "assistant" &&
+    (event.message.nativeToolActivities?.length ?? 0) > 0
+  ) {
+    return true;
+  }
   if (event.type !== "message_update") {
     return false;
   }

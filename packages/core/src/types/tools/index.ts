@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 
 import type { ToolCallOutput } from "../messages";
-import { JSONSchema } from "../shared";
+import { JSONSchema, JsonValue } from "../shared";
 
 const ToolBase = Type.Object({
   /**
@@ -92,10 +92,55 @@ const BuiltinTool = Type.Intersect([
 ]);
 export type BuiltinTool = Static<typeof BuiltinTool>;
 
+/**
+ * A function tool implemented by a locally installed Plugin. Its model-facing
+ * shape is the same as every other PI tool; the source ids are retained only
+ * so LLM Space can route persisted calls back to the owning Plugin.
+ */
+const PluginTool = Type.Intersect([
+  ToolBase,
+  Type.Object({
+    type: Type.Literal("plugin"),
+    pluginId: Type.String(),
+    toolId: Type.String(),
+  }),
+]);
+export type PluginTool = Static<typeof PluginTool>;
+
 /** Result returned by a built-in runtime tool across local or remote RPC. */
 export interface BuiltinToolCallResponse {
   /** Structured content persisted in the thread and forwarded to the model. */
   content: ToolCallOutput["content"];
+}
+
+export const ProviderHostedToolConfig = Type.Intersect([
+  Type.Object({
+    type: Type.String({
+      minLength: 1,
+      pattern: "^(?!(?:function|custom)$)\\S(?:.*\\S)?$",
+    }),
+  }),
+  Type.Record(Type.String(), JsonValue),
+]);
+export type ProviderHostedToolConfig = Static<
+  typeof ProviderHostedToolConfig
+> &
+  Record<string, JsonValue>;
+
+export const ProviderHostedTool = Type.Object({
+  type: Type.Literal("provider-hosted"),
+  config: ProviderHostedToolConfig,
+});
+export type ProviderHostedTool = Omit<
+  Static<typeof ProviderHostedTool>,
+  "config"
+> & {
+  config: ProviderHostedToolConfig;
+};
+
+export interface LegacyResponseApiNativeTool {
+  type: "response-api-native";
+  config: ProviderHostedToolConfig;
 }
 
 export interface LegacyMcpToolSource {
@@ -117,15 +162,34 @@ export interface LegacyMcpToolSource {
 /**
  * The union type of the tools.
  */
-export const Tool = Type.Union([FunctionTool, McpTool, BuiltinTool]);
-export type Tool = FunctionTool | McpTool | BuiltinTool;
+export const Tool = Type.Union([
+  FunctionTool,
+  McpTool,
+  BuiltinTool,
+  PluginTool,
+  ProviderHostedTool,
+]);
+export type Tool =
+  | FunctionTool
+  | McpTool
+  | BuiltinTool
+  | PluginTool
+  | ProviderHostedTool;
 
 export type LegacyTool = Omit<FunctionTool, "type"> & {
   type?: "function";
   source?: LegacyMcpToolSource;
 };
 
-export function normalizeTool(tool: Tool | LegacyTool): Tool {
+export function normalizeTool(
+  tool: Tool | LegacyTool | LegacyResponseApiNativeTool
+): Tool {
+  if (tool.type === "response-api-native") {
+    return { type: "provider-hosted", config: tool.config };
+  }
+  if (tool.type === "provider-hosted") {
+    return tool;
+  }
   if (tool.type === "builtin") {
     // Older persisted threads may predate the terminate flag. Preserve the
     // built-in's invariant when those snapshots are loaded so enabling the
@@ -136,6 +200,9 @@ export function normalizeTool(tool: Tool | LegacyTool): Tool {
     return tool;
   }
   if (tool.type === "mcp") {
+    return tool;
+  }
+  if (tool.type === "plugin") {
     return tool;
   }
   const legacySource = _getLegacyMcpSource(tool);
@@ -163,7 +230,9 @@ export function normalizeTool(tool: Tool | LegacyTool): Tool {
   };
 }
 
-export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
+export function normalizeTools(
+  tools: readonly (Tool | LegacyTool | LegacyResponseApiNativeTool)[]
+): Tool[] {
   return tools.map(normalizeTool);
 }
 
@@ -175,8 +244,10 @@ export function normalizeTools(tools: readonly (Tool | LegacyTool)[]): Tool[] {
  * require human input, so they are treated as non-executable too. The single
  * source of truth for "can be auto-executed".
  */
-export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
-  if (tool.type === "mcp") {
+export function isExecutableTool(
+  tool: Tool
+): tool is McpTool | BuiltinTool | PluginTool {
+  if (tool.type === "mcp" || tool.type === "plugin") {
     return true;
   }
   return (
@@ -184,6 +255,26 @@ export function isExecutableTool(tool: Tool): tool is McpTool | BuiltinTool {
     tool.name !== "ask_user_question" &&
     tool.terminate !== true
   );
+}
+
+export function isProviderHostedTool(
+  tool: Tool
+): tool is ProviderHostedTool {
+  return tool.type === "provider-hosted";
+}
+
+export function getToolKey(tool: Tool): string {
+  if (isProviderHostedTool(tool)) {
+    return `provider-hosted:${tool.config.type}`;
+  }
+  if (tool.type === "plugin") {
+    return tool.toolId;
+  }
+  return tool.name;
+}
+
+export function getToolDisplayName(tool: Tool): string {
+  return isProviderHostedTool(tool) ? tool.config.type : tool.name;
 }
 
 /**

@@ -48,8 +48,10 @@ def ls(description: str, path: str) -> str:
     Args:
         description: Must be the first parameter in the tool call. A short
             human-readable summary explaining why this directory is being listed.
-        path: Absolute path to the directory to list.
+        path: Absolute path to the directory to list. A leading ~/ is expanded
+            to the current user's home directory.
     """
+    path = os.path.expanduser(path)
     entries = [e for e in os.scandir(path) if not _is_ignored(e.name)]
     with_mtime: list[tuple[str, float]] = []
     for entry in entries:

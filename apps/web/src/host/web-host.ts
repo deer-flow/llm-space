@@ -17,6 +17,7 @@ export const webHost: HostServices = {
   executeTool: null,
   skills: {
     getSettings: () => Promise.resolve({ discoveryPaths: [] }),
+    listAvailable: () => Promise.resolve([]),
     listSkills: () => Promise.resolve([]),
   },
   mcp: {
@@ -26,6 +27,9 @@ export const webHost: HostServices = {
   builtinTools: {
     list: () => Promise.resolve([]),
     fsReveal: () => unavailable(),
+  },
+  pluginTools: {
+    list: () => Promise.resolve([]),
   },
   paths: {
     ensureRootDir: (relativePath) => Promise.resolve(relativePath),

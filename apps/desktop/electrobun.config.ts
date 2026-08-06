@@ -1,6 +1,7 @@
 import type { ElectrobunConfig } from "electrobun";
 
 import packageJson from "./package.json";
+import { resolveDeepLinkScheme } from "./src/shared/deep-link-scheme";
 
 // LLM_SPACE_DESKTOP_RENDERER=cef selects the Performance edition: it embeds
 // Chromium (CEF) instead of driving the system WebView. It ships as a separate
@@ -14,6 +15,9 @@ const isPerformanceEdition = Bun.env.LLM_SPACE_DESKTOP_RENDERER === "cef";
 // drive the renderer and read whatever is on screen — `dev:cef` passes the
 // port explicitly, release builds never do.
 const cdpPort = Bun.env.LLM_SPACE_DESKTOP_CDP_PORT;
+const deepLinkScheme = resolveDeepLinkScheme(
+  Bun.env.LLM_SPACE_DEEP_LINK_SCHEME
+);
 
 // Local-testing escape hatches — CI leaves all of these unset:
 //   LLM_SPACE_SKIP_SIGNING=1  → unsigned canary/stable build (no Apple creds
@@ -50,13 +54,9 @@ export default {
     // Single source of truth for the app version; release tags must match
     // (CI validates `v{version}` against the pushed tag).
     version: packageJson.version,
-    // Deep-link scheme for shared-thread imports
-    // (llm-space://shared/<connectorId>/threads/<threadId>). The CLI turns this
-    // into Info.plist CFBundleURLTypes. macOS only, and only registers once the
-    // app is in /Applications — so deep links don't resolve under `electrobun
-    // dev`. Both editions declare the same scheme; Launch Services arbitrates
-    // when both are installed.
-    urlSchemes: ["llm-space"],
+    // Dev scripts explicitly select `llm-space-dev`; packaged canary/stable
+    // builds leave the variable unset and continue to own `llm-space`.
+    urlSchemes: [deepLinkScheme],
   },
   build: {
     // Vite builds to dist/, we copy from there. `assets/` holds hashed,
@@ -67,6 +67,7 @@ export default {
       "dist/index.html": "views/mainview/index.html",
       "dist/assets": "views/mainview/assets",
       "dist/images": "views/mainview/images",
+      "../../packages/runtime/src/plugins/plugin-runner.ts": "plugin-runner.ts",
     },
     // Ignore Vite output in watch mode — HMR handles view rebuilds separately
     watchIgnore: ["dist/**"],

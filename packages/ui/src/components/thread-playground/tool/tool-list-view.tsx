@@ -1,12 +1,17 @@
 "use client";
 
 import {
+  getToolKey,
+  isProviderHostedTool,
   type BuiltinTool,
   type FunctionTool,
+  type PluginTool,
+  type ProviderHostedTool,
   type Tool,
 } from "@llm-space/core";
 import {
   CableIcon,
+  CloudIcon,
   FunctionSquareIcon,
   PackageCheckIcon,
   PlusIcon,
@@ -29,6 +34,8 @@ import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
 import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
 import { McpToolImportDialog } from "./mcp-tool-import-popover";
+import { PluginToolImportDialog } from "./plugin-tool-import-dialog";
+import { ProviderHostedToolEditorDialog } from "./provider-hosted-tool-editor-dialog";
 import { ToolEditorDialog } from "./tool-editor-dialog";
 import { ToolListItem } from "./tool-list-item";
 
@@ -44,8 +51,11 @@ export function ToolListView({
   const { addTool, removeTool, updateTool } = useThreadStoreActions();
   const { presentational } = useHostServices();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [providerHostedDialogOpen, setProviderHostedDialogOpen] =
+    useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [builtInOpen, setBuiltInOpen] = useState(false);
+  const [pluginOpen, setPluginOpen] = useState(false);
   const [initialMcpServerId, setInitialMcpServerId] = useState<string | null>(
     null
   );
@@ -55,9 +65,19 @@ export function ToolListView({
   const [initialBuiltInToolName, setInitialBuiltInToolName] = useState<
     string | null
   >(null);
+  const [initialPluginToolId, setInitialPluginToolId] = useState<string | null>(
+    null
+  );
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
+  const [editingProviderHostedTool, setEditingProviderHostedTool] =
+    useState<ProviderHostedTool | null>(null);
   const existingToolNames = useMemo(
-    () => new Set((tools ?? []).map((tool) => tool.name)),
+    () =>
+      new Set(
+        (tools ?? [])
+          .filter((tool) => !isProviderHostedTool(tool))
+          .map((tool) => tool.name)
+      ),
     [tools]
   );
   const existingBuiltInTools = useMemo(
@@ -77,7 +97,17 @@ export function ToolListView({
     setDialogOpen(true);
   }, []);
 
+  const openAddProviderHostedDialog = useCallback(() => {
+    setEditingProviderHostedTool(null);
+    setProviderHostedDialogOpen(true);
+  }, []);
+
   const openEditDialog = useCallback((tool: Tool) => {
+    if (tool.type === "provider-hosted") {
+      setEditingProviderHostedTool(tool);
+      setProviderHostedDialogOpen(true);
+      return;
+    }
     if (tool.type === "mcp") {
       setInitialMcpServerId(tool.serverId);
       setInitialMcpToolName(tool.name);
@@ -89,13 +119,18 @@ export function ToolListView({
       setBuiltInOpen(true);
       return;
     }
+    if (tool.type === "plugin") {
+      setInitialPluginToolId(tool.toolId);
+      setPluginOpen(true);
+      return;
+    }
     setEditingTool(tool);
     setDialogOpen(true);
   }, []);
 
   const handleRemoveTool = useCallback(
     (tool: Tool) => {
-      removeTool(tool.name);
+      removeTool(getToolKey(tool));
     },
     [removeTool]
   );
@@ -108,7 +143,7 @@ export function ToolListView({
       >
         {tools?.map((t) => (
           <ToolListItem
-            key={t.name}
+            key={getToolKey(t)}
             tool={t}
             readonly={readonly}
             onEdit={openEditDialog}
@@ -143,6 +178,15 @@ export function ToolListView({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
+                  setInitialPluginToolId(null);
+                  setPluginOpen(true);
+                }}
+              >
+                <PackageCheckIcon />
+                Add Plugin Tools
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
                   setInitialMcpServerId(null);
                   setInitialMcpToolName(null);
                   setMcpOpen(true);
@@ -152,6 +196,10 @@ export function ToolListView({
                 Add MCP Tools
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={openAddProviderHostedDialog}>
+                <CloudIcon />
+                Add Provider-Hosted Tool
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={openAddDialog}>
                 <FunctionSquareIcon />
                 Add Custom Function Tool
@@ -191,11 +239,33 @@ export function ToolListView({
           onUpdate={updateTool}
           onRemove={removeTool}
         />
+        <PluginToolImportDialog
+          open={pluginOpen}
+          onOpenChange={(open) => {
+            setPluginOpen(open);
+            if (!open) setInitialPluginToolId(null);
+          }}
+          initialToolId={initialPluginToolId}
+          existingToolNames={existingToolNames}
+          runtimeId={runtimeId}
+          onAdd={(tool: PluginTool) => addTool(tool)}
+          onRemove={(tool) => removeTool(getToolKey(tool))}
+        />
       </div>
       <ToolEditorDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         tool={editingTool}
+      />
+      <ProviderHostedToolEditorDialog
+        open={providerHostedDialogOpen}
+        onOpenChange={(open) => {
+          setProviderHostedDialogOpen(open);
+          if (!open) {
+            setEditingProviderHostedTool(null);
+          }
+        }}
+        tool={editingProviderHostedTool}
       />
     </>
   );

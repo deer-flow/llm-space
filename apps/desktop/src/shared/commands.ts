@@ -214,6 +214,7 @@ export type SettingsTab =
   | "remote"
   | "search"
   | "skills"
+  | "plugins"
   | "experimental";
 
 /** Open the Settings dialog, optionally on a specific `tab`. */

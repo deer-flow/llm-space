@@ -1,5 +1,6 @@
 export {
   checkUv,
+  openGeneratorDevTerminal,
   prepareGeneratorDir,
   removeProjectFile,
   runUv,

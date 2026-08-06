@@ -1,5 +1,4 @@
 import { readdirSync, readFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import {
@@ -11,6 +10,7 @@ import {
 } from "@llm-space/core";
 import {
   atomicWriteJsonFileSync,
+  expandHomePath,
   getSettingsDir,
   readJsonFileSync,
 } from "@llm-space/core/server";
@@ -25,6 +25,12 @@ const SkillsSettingsFileSchema = z.object({
         path: z.string(),
         hiddenSkills: z.array(z.string()).default([]),
       })
+    )
+    .optional(),
+  pluginSkills: z
+    .record(
+      z.string(),
+      z.object({ hiddenSkills: z.array(z.string()).default([]) })
     )
     .optional(),
 });
@@ -43,8 +49,16 @@ export interface SkillsManagerOptions {
   managedSkillsDir?: string;
 }
 
+export interface PluginSkillConflict {
+  pluginId: string;
+  path: string;
+  name: string;
+  conflictingPaths: string[];
+}
+
 export class SkillsManager {
   private _settings: SkillsSettings;
+  private _pluginSkills: { pluginId: string; path: string }[] = [];
 
   constructor(private readonly _options: SkillsManagerOptions = {}) {
     this._settings = this._loadConfig();
@@ -52,6 +66,50 @@ export class SkillsManager {
 
   getConfig(): SkillsSettings {
     return this._clone(this._settings);
+  }
+
+  setPluginPaths(
+    paths: { pluginId: string; path: string }[]
+  ): PluginSkillConflict[] {
+    const userSkills = this._settings.discoveryPaths.flatMap((entry) =>
+      this.listSkills(entry.path).map((skill) => ({
+        name: skill.name,
+        path: skill.path,
+      }))
+    );
+    const candidates = paths.flatMap((item) => {
+      try {
+        const name = this.readSkill(item.path).frontmatters.name;
+        return typeof name === "string" && name ? [{ ...item, name }] : [];
+      } catch {
+        return [];
+      }
+    });
+    const counts = new Map<string, number>();
+    for (const item of candidates) {
+      counts.set(item.name, (counts.get(item.name) ?? 0) + 1);
+    }
+    const conflicts = candidates.flatMap((item) => {
+      const conflictingPaths = [
+        ...userSkills
+          .filter((skill) => skill.name === item.name)
+          .map((skill) => skill.path),
+        ...candidates
+          .filter(
+            (candidate) =>
+              candidate.name === item.name && candidate.path !== item.path
+          )
+          .map((candidate) => candidate.path),
+      ];
+      return conflictingPaths.length > 0 ? [{ ...item, conflictingPaths }] : [];
+    });
+    const userNames = new Set(userSkills.map((skill) => skill.name));
+    this._pluginSkills = candidates
+      .filter(
+        (item) => !userNames.has(item.name) && counts.get(item.name) === 1
+      )
+      .map(({ pluginId, path }) => ({ pluginId, path }));
+    return conflicts;
   }
 
   /** Append a folder (trimmed, de-duplicated) with an empty hidden list. */
@@ -101,6 +159,53 @@ export class SkillsManager {
     return this.getConfig();
   }
 
+  /** Toggle one Plugin Skill without modifying the Plugin directory. */
+  setPluginSkillHidden(
+    pluginId: string,
+    skillName: string,
+    hidden: boolean
+  ): SkillsSettings {
+    const exists = this._pluginSkills.some((item) => {
+      if (item.pluginId !== pluginId) return false;
+      try {
+        return this.readSkill(item.path).frontmatters.name === skillName;
+      } catch {
+        return false;
+      }
+    });
+    if (!exists) return this.getConfig();
+
+    const pluginSkills = (this._settings.pluginSkills ??= {});
+    const entry = (pluginSkills[pluginId] ??= {
+      hiddenSkills: [],
+    });
+    const has = entry.hiddenSkills.includes(skillName);
+    if (hidden && !has) {
+      entry.hiddenSkills.push(skillName);
+      this._saveConfig();
+    } else if (!hidden && has) {
+      entry.hiddenSkills = entry.hiddenSkills.filter(
+        (name) => name !== skillName
+      );
+      this._saveConfig();
+    }
+    return this.getConfig();
+  }
+
+  /** Enable or disable every Skill from one currently active Plugin. */
+  setAllPluginSkillsHidden(pluginId: string, hidden: boolean): SkillsSettings {
+    const names = this.listPluginSkills()
+      .filter((skill) => skill.pluginId === pluginId)
+      .map((skill) => skill.name);
+    if (names.length === 0) return this.getConfig();
+
+    const pluginSkills = (this._settings.pluginSkills ??= {});
+    const entry = (pluginSkills[pluginId] ??= { hiddenSkills: [] });
+    entry.hiddenSkills = hidden ? names : [];
+    this._saveConfig();
+    return this.getConfig();
+  }
+
   /**
    * Enable or disable every skill in one folder at once. Enabling clears the
    * folder's `hiddenSkills`; disabling hides every skill currently discovered
@@ -134,7 +239,7 @@ export class SkillsManager {
       (e) => e.path === inputPath
     );
     const hidden = new Set(entry?.hiddenSkills ?? []);
-    const dir = this._expand(inputPath);
+    const dir = expandHomePath(inputPath);
 
     let dirents: import("node:fs").Dirent[];
     try {
@@ -182,6 +287,54 @@ export class SkillsManager {
     return skills;
   }
 
+  /** List every conflict-free Skill contributed by currently active Plugins. */
+  listPluginSkills(): SkillInfo[] {
+    const skills: SkillInfo[] = [];
+    for (const item of this._pluginSkills) {
+      try {
+        const content = this.readSkill(item.path);
+        const name = content.frontmatters.name;
+        const description = content.frontmatters.description;
+        if (typeof name !== "string" || typeof description !== "string") {
+          continue;
+        }
+        const hidden = new Set(
+          this._settings.pluginSkills?.[item.pluginId]?.hiddenSkills ?? []
+        );
+        skills.push({
+          name,
+          description,
+          path: item.path,
+          enabled: !hidden.has(name),
+          source: "plugin",
+          readOnly: true,
+          pluginId: item.pluginId,
+        });
+      } catch {
+        // Invalid plugin skills are excluded without affecting other skills.
+      }
+    }
+    return skills.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** List the enabled, conflict-free skills available to agents. */
+  listAvailableSkills(): SkillInfo[] {
+    const byName = new Map<string, SkillInfo>();
+    for (const entry of this._settings.discoveryPaths) {
+      for (const skill of this.listSkills(entry.path, { enabledOnly: true })) {
+        if (!byName.has(skill.name)) {
+          byName.set(skill.name, { ...skill, source: "user", readOnly: false });
+        }
+      }
+    }
+    for (const skill of this.listPluginSkills()) {
+      if (skill.enabled && !byName.has(skill.name)) {
+        byName.set(skill.name, skill);
+      }
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   /**
    * Resolve a skill by name across all discovery folders, returning its full
    * content, or `null` when no folder holds a matching skill. Folders are
@@ -198,6 +351,22 @@ export class SkillsManager {
       );
       if (match) {
         return this.readSkill(match.path);
+      }
+    }
+    for (const item of this._pluginSkills) {
+      const hidden = new Set(
+        this._settings.pluginSkills?.[item.pluginId]?.hiddenSkills ?? []
+      );
+      try {
+        const content = this.readSkill(item.path);
+        if (
+          content.frontmatters.name === name &&
+          (opts.enabledOnly === false || !hidden.has(name))
+        ) {
+          return content;
+        }
+      } catch {
+        // Invalid plugin skills are excluded without affecting other skills.
       }
     }
     return null;
@@ -218,23 +387,18 @@ export class SkillsManager {
     };
   }
 
-  /** Expand a leading `~` to the home directory. */
-  private _expand(p: string): string {
-    if (p === "~") {
-      return os.homedir();
-    }
-    if (p.startsWith("~/") || p.startsWith("~\\")) {
-      return path.join(os.homedir(), p.slice(2));
-    }
-    return p;
-  }
-
   private _clone(settings: SkillsSettings): SkillsSettings {
     return {
       discoveryPaths: settings.discoveryPaths.map((entry) => ({
         path: entry.path,
         hiddenSkills: [...entry.hiddenSkills],
       })),
+      pluginSkills: Object.fromEntries(
+        Object.entries(settings.pluginSkills ?? {}).map(([pluginId, entry]) => [
+          pluginId,
+          { hiddenSkills: [...entry.hiddenSkills] },
+        ])
+      ),
     };
   }
 
@@ -296,6 +460,21 @@ export class SkillsManager {
         : [];
       discoveryPaths.push({ path: p, hiddenSkills });
     }
-    return { discoveryPaths };
+    const pluginSkills = Object.fromEntries(
+      Object.entries(input.pluginSkills ?? {}).flatMap(([pluginId, entry]) => {
+        if (!pluginId || !Array.isArray(entry?.hiddenSkills)) return [];
+        return [
+          [
+            pluginId,
+            {
+              hiddenSkills: entry.hiddenSkills.filter(
+                (name): name is string => typeof name === "string"
+              ),
+            },
+          ],
+        ];
+      })
+    );
+    return { discoveryPaths, pluginSkills };
   }
 }

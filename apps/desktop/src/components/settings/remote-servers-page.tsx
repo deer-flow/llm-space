@@ -15,15 +15,25 @@ import { Separator } from "@llm-space/ui/ui/separator";
 import {
   Check,
   Circle,
+  FolderSync,
   ShieldAlert,
+  ShieldCheck,
+  Laptop,
   Loader2,
+  Network,
   Plus,
   RefreshCw,
   Server,
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import {
@@ -57,6 +67,7 @@ import {
   canRemoveRemoteServer,
   remoteConnectionFlow,
 } from "./remote-server-display";
+import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
 interface FormState {
@@ -95,6 +106,7 @@ export function RemoteServersPage({
   const [form, setForm] = useState<FormState | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [trustBusy, setTrustBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const selected = useMemo(
     () => servers.find((server) => server.id === selectedId) ?? null,
@@ -107,13 +119,18 @@ export function RemoteServersPage({
   }, []);
 
   const refresh = useCallback(async () => {
-    const next = await listRemoteServers();
-    updateServers(next);
-    setSelectedId((current) =>
-      current && next.some((server) => server.id === current)
-        ? current
-        : (next[0]?.id ?? null)
-    );
+    setLoading(true);
+    try {
+      const next = await listRemoteServers();
+      updateServers(next);
+      setSelectedId((current) =>
+        current && next.some((server) => server.id === current)
+          ? current
+          : (next[0]?.id ?? null)
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [updateServers]);
 
   useEffect(() => {
@@ -221,8 +238,7 @@ export function RemoteServersPage({
   const reportRunError = (id: string, error: unknown) => {
     const failed = serversRef.current.find((server) => server.id === id);
     toast.error(_failureTitle(failed), {
-      description:
-        error instanceof Error ? error.message : "Please try again.",
+      description: error instanceof Error ? error.message : "Please try again.",
     });
   };
 
@@ -292,12 +308,22 @@ export function RemoteServersPage({
     <SettingsPage
       title="Remote Servers"
       description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
-      className="p-0"
+      className={servers.length === 0 && !form ? undefined : "p-0"}
     >
-      <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] border-t">
+      {loading && servers.length === 0 && !form ? (
+        <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          Loading remote servers
+        </div>
+      ) : servers.length === 0 && !form ? (
+        <RemoteServersEmptyState onAdd={startAdd} />
+      ) : (
+        <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
         <aside className="bg-muted/20 flex min-h-0 flex-col border-r">
           <div className="flex h-11 items-center justify-between px-3">
-            <span className="text-sm font-medium">Servers</span>
+            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              SERVERS
+            </span>
             <div className="flex gap-1">
               <Button
                 size="icon-sm"
@@ -319,11 +345,7 @@ export function RemoteServersPage({
           </div>
           <Separator />
           <div className="min-h-0 flex-1 overflow-auto p-2">
-            {servers.length === 0 ? (
-              <div className="text-muted-foreground p-4 text-sm">
-                No remote servers. Click + to add one.
-              </div>
-            ) : (
+            {servers.length > 0 ? (
               <div className="space-y-2">
                 {servers.map((server) => (
                   <div
@@ -367,7 +389,7 @@ export function RemoteServersPage({
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </aside>
 
@@ -408,8 +430,7 @@ export function RemoteServersPage({
               onEdit={() => startEdit(selected)}
               onRemove={() =>
                 void runRemoteRuntimeActionIfAllowed({
-                  allowed: () =>
-                    canDisconnect?.(selected.runtimeId) ?? true,
+                  allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
                   acquire: acquireDisconnect
                     ? () => acquireDisconnect(selected.runtimeId)
                     : undefined,
@@ -432,11 +453,62 @@ export function RemoteServersPage({
               Select a server or click + to add one.
             </div>
           )}
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
     </SettingsPage>
   );
 }
+
+function RemoteServersEmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <SettingsEmptyState
+      icon={Server}
+      wallIcons={REMOTE_SERVER_WALL_ICONS}
+      label="No remote servers"
+      title="Bring another workspace within reach"
+      description="Connect over SSH to open a remote LLM Space workspace—threads, settings, and skills included."
+      actions={
+        <>
+          <Button onClick={onAdd}>
+            <Plus className="size-4" />
+            Add remote server
+          </Button>
+          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            Passwords and passphrases are never stored.
+          </p>
+        </>
+      }
+      capabilities={[
+        {
+          icon: FolderSync,
+          title: "Your workspace, anywhere",
+          description: "Open remote threads, settings, and skills in place.",
+        },
+        {
+          icon: Network,
+          title: "SSH-native",
+          description: "Use the secure connection already trusted by your team.",
+        },
+        {
+          icon: ShieldCheck,
+          title: "Credentials stay yours",
+          description: "Sensitive passwords and passphrases are not persisted.",
+        },
+      ]}
+    />
+  );
+}
+
+const REMOTE_SERVER_WALL_ICONS = [
+  Server,
+  Laptop,
+  Network,
+  FolderSync,
+  ShieldCheck,
+  RefreshCw,
+] as const;
 
 function RemoteServerDetails({
   server,
