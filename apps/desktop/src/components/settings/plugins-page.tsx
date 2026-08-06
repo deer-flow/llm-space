@@ -789,7 +789,7 @@ function PluginIcon({
     <img
       src={plugin.iconDataUrl}
       alt=""
-      className={cn("shrink-0 object-cover", className)}
+      className={cn("shrink-0 rounded-md object-cover", className)}
     />
   ) : (
     <span
