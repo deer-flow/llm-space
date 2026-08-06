@@ -8,7 +8,7 @@ import {
   EmptyTitle,
 } from "@llm-space/ui/ui/empty";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 const ICON_WALL_ROTATIONS = [-14, 8, -5, 13, -9, 4, 16, -11, 7, -3, 12, -16];
 
@@ -96,9 +96,49 @@ function SettingsEmptyIconWallLayer({
   const maskImage = blurred
     ? "radial-gradient(ellipse 72% 68% at 50% 50%, transparent 24%, rgba(0,0,0,0.45) 58%, black 100%)"
     : "radial-gradient(ellipse 58% 54% at 50% 50%, black 8%, rgba(0,0,0,0.9) 44%, transparent 82%)";
+  const layerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    if (!layer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const layerBounds = layer.getBoundingClientRect();
+    const centerX = layerBounds.left + layerBounds.width / 2;
+    const centerY = layerBounds.top + layerBounds.height / 2;
+    const animations = Array.from(
+      layer.querySelectorAll<HTMLElement>("[data-icon-wall-item]")
+    ).map((item, index) => {
+      const itemBounds = item.getBoundingClientRect();
+      const offsetX = centerX - (itemBounds.left + itemBounds.width / 2);
+      const offsetY = centerY - (itemBounds.top + itemBounds.height / 2);
+      const timingSeed = _randomUnit(index * 19 + (blurred ? 41 : 7));
+
+      return item.animate(
+        [
+          {
+            opacity: 0,
+            transform: `translate(${offsetX}px, ${offsetY}px) scale(0.16)`,
+          },
+          { opacity: 0.82, offset: 0.18 },
+          { opacity: 1, transform: "translate(0, 0) scale(1)" },
+        ],
+        {
+          duration: 850 + timingSeed * 380,
+          delay: timingSeed * 180 + (blurred ? 70 : 0),
+          easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+          fill: "both",
+        }
+      );
+    });
+
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [blurred]);
 
   return (
     <div
+      ref={layerRef}
       className={cn(
         "absolute -inset-10",
         blurred
@@ -107,29 +147,60 @@ function SettingsEmptyIconWallLayer({
       )}
       style={{ maskImage, WebkitMaskImage: maskImage }}
     >
-      <div className="grid size-full grid-cols-9 grid-rows-7 place-items-center gap-x-5 gap-y-6 p-5">
+      <div className="relative size-full">
         {Array.from({ length: 63 }, (_, index) => {
-          const WallIcon = icons[index % icons.length];
-          const opacity = 0.48 + (index % 4) * 0.06;
-          const rotation = ICON_WALL_ROTATIONS[index % ICON_WALL_ROTATIONS.length];
-          const scale = 0.82 + (index % 5) * 0.08;
+          const column = index % 9;
+          const row = Math.floor(index / 9);
+          const WallIcon =
+            icons[Math.floor(_randomUnit(index * 13 + 3) * icons.length)];
+          const opacity = 0.48 + _randomUnit(index * 17 + 5) * 0.18;
+          const rotation =
+            ICON_WALL_ROTATIONS[index % ICON_WALL_ROTATIONS.length];
+          const scale = 0.82 + _randomUnit(index * 23 + 11) * 0.32;
+          const left = _clamp(
+            ((column + 0.5) / 9) * 100 +
+              (_randomUnit(index * 29 + 17) - 0.5) * 7,
+            2,
+            98
+          );
+          const top = _clamp(
+            ((row + 0.5) / 7) * 100 +
+              (_randomUnit(index * 31 + 23) - 0.5) * 8,
+            2,
+            98
+          );
 
           return (
-            <WallIcon
-              // This is a fixed decorative grid; its position is its identity.
+            <span
+              // This is a fixed decorative field; its position is its identity.
               key={index}
-              className="size-7"
-              strokeWidth={1.45}
-              style={{
-                opacity,
-                transform: `rotate(${rotation}deg) scale(${scale})`,
-              }}
-            />
+              data-icon-wall-item
+              className="absolute -mt-3.5 -ml-3.5 block size-7 will-change-transform"
+              style={{ left: `${left}%`, top: `${top}%` }}
+            >
+              <WallIcon
+                className="size-7"
+                strokeWidth={1.45}
+                style={{
+                  opacity,
+                  transform: `rotate(${rotation}deg) scale(${scale})`,
+                }}
+              />
+            </span>
           );
         })}
       </div>
     </div>
   );
+}
+
+function _randomUnit(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function _clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function SettingsEmptyCapabilityCard({
