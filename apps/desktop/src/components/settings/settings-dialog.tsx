@@ -191,7 +191,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-5xl! gap-0 overflow-hidden p-0"
+        className="max-w-5xl! gap-0 overflow-hidden rounded-2xl p-0"
         onInteractOutside={(event) => {
           event.preventDefault();
         }}
