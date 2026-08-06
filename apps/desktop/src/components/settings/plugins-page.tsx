@@ -624,7 +624,7 @@ function PluginEditor({
                               {group.extensions.map((extension) => (
                                 <div
                                   key={extension.id}
-                                  className="flex min-w-0 items-center gap-3 px-3 py-2 pl-10 text-xs"
+                                  className="flex min-w-0 items-center gap-4 py-2 pr-3 pl-4 text-xs"
                                 >
                                   <span
                                     className={cn(
