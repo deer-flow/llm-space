@@ -23,8 +23,21 @@ export const LOCAL_STORAGE_KEYS = {
   fileTreeExpanded: "llm-space:fs-tree:expanded",
 } as const;
 
-export type LocalStorageKey =
+type StaticLocalStorageKey =
   (typeof LOCAL_STORAGE_KEYS)[keyof typeof LOCAL_STORAGE_KEYS];
+
+export type FileTreeExpandedLocalStorageKey =
+  `${typeof LOCAL_STORAGE_KEYS.fileTreeExpanded}:${string}`;
+
+export type LocalStorageKey =
+  | StaticLocalStorageKey
+  | FileTreeExpandedLocalStorageKey;
+
+export function fileTreeExpandedLocalStorageKey(
+  runtimeId: string
+): FileTreeExpandedLocalStorageKey {
+  return `${LOCAL_STORAGE_KEYS.fileTreeExpanded}:${runtimeId}`;
+}
 
 function _getLocalStorage(): Storage | null {
   if (typeof window === "undefined") {

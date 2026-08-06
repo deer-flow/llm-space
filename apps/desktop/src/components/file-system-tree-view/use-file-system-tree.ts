@@ -7,7 +7,11 @@ import {
   type Thread,
   type Tool,
 } from "@llm-space/core";
-import { LOCAL_STORAGE_KEYS } from "@llm-space/ui/lib/local-storage";
+import {
+  fileTreeExpandedLocalStorageKey,
+  readLocalStorage,
+  writeLocalStorage,
+} from "@llm-space/ui/lib/local-storage";
 import {
   basename,
   joinPath,
@@ -53,14 +57,9 @@ function _depth(path: string): number {
  * is always restored (and its listing loaded) before its descendants. Returns
  * `[]` when storage is unavailable or malformed.
  */
-function _persistedExpandedKey(runtimeId: RuntimeId): string {
-  return `${LOCAL_STORAGE_KEYS.fileTreeExpanded}:${runtimeId}`;
-}
-
 function _loadPersistedExpanded(runtimeId: RuntimeId): string[] {
-  if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(_persistedExpandedKey(runtimeId));
+    const raw = readLocalStorage(fileTreeExpandedLocalStorageKey(runtimeId));
     if (!raw) return [];
     const parsed = PersistedExpandedPathsSchema.parse(JSON.parse(raw));
     return parsed.sort((a, b) => _depth(a) - _depth(b));
@@ -71,15 +70,10 @@ function _loadPersistedExpanded(runtimeId: RuntimeId): string[] {
 
 /** Persist the expanded paths, ignoring any storage failure. */
 function _savePersistedExpanded(runtimeId: RuntimeId, paths: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      _persistedExpandedKey(runtimeId),
-      JSON.stringify(paths)
-    );
-  } catch {
-    // Storage unavailable (private mode, quota) => persistence is best-effort.
-  }
+  writeLocalStorage(
+    fileTreeExpandedLocalStorageKey(runtimeId),
+    JSON.stringify(paths)
+  );
 }
 
 /**

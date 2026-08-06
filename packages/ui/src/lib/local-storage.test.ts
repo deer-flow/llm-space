@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 
 import {
+  fileTreeExpandedLocalStorageKey,
   LOCAL_STORAGE_KEYS,
   readLocalStorage,
   removeLocalStorage,
@@ -64,6 +65,14 @@ describe("shared localStorage access", () => {
     expect(readLocalStorage(key)).toBe("tokens");
     expect(removeLocalStorage(key)).toBe(true);
     expect(readLocalStorage(key)).toBeNull();
+  });
+
+  test("reads and writes runtime-scoped file-tree keys", () => {
+    const key = fileTreeExpandedLocalStorageKey("ssh:development");
+
+    expect(key).toBe("llm-space:fs-tree:expanded:ssh:development");
+    expect(writeLocalStorage(key, '["prompts"]')).toBe(true);
+    expect(readLocalStorage(key)).toBe('["prompts"]');
   });
 
   test("persists the global message stats summary mode", () => {
