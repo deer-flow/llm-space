@@ -8,6 +8,12 @@ import type {
 } from "@llm-space/core";
 import { Link } from "@llm-space/ui/components/link";
 import { cn } from "@llm-space/ui/lib/utils";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@llm-space/ui/ui/accordion";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Empty,
@@ -108,6 +114,26 @@ const EXTENSION_KIND_ICONS: Record<PluginExtensionKind, LucideIcon> = {
   threadStorage: Database,
   settings: Settings2,
 };
+
+const EXTENSION_KIND_LABELS: Record<PluginExtensionKind, string> = {
+  skill: "Skills",
+  mcp: "MCP Servers",
+  model: "Models",
+  command: "Commands",
+  tool: "Tools",
+  threadStorage: "Thread Storage",
+  settings: "Settings",
+};
+
+const EXTENSION_KIND_ORDER: readonly PluginExtensionKind[] = [
+  "skill",
+  "mcp",
+  "model",
+  "command",
+  "tool",
+  "threadStorage",
+  "settings",
+];
 
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
@@ -422,6 +448,12 @@ function PluginEditor({
     (error, index, all) =>
       error && all.findIndex((item) => item?.id === error.id) === index
   );
+  const extensionGroups = EXTENSION_KIND_ORDER.map((kind) => ({
+    kind,
+    extensions: plugin.extensions.filter(
+      (extension) => extension.kind === kind
+    ),
+  })).filter((group) => group.extensions.length > 0);
 
   return (
     <div className="flex min-w-0 grow flex-col overflow-hidden pl-6">
@@ -564,40 +596,77 @@ function PluginEditor({
                   </span>
                 </div>
                 {plugin.extensions.length > 0 ? (
-                  <div className="min-w-0 divide-y overflow-hidden rounded-md border">
-                    {plugin.extensions.map((extension) => {
-                      const ExtensionIcon =
-                        EXTENSION_KIND_ICONS[extension.kind];
+                  <Accordion
+                    type="multiple"
+                    defaultValue={extensionGroups.map((group) => group.kind)}
+                    className="min-w-0 overflow-hidden rounded-md border"
+                  >
+                    {extensionGroups.map((group) => {
+                      const ExtensionIcon = EXTENSION_KIND_ICONS[group.kind];
                       return (
-                        <div
-                          key={`${extension.kind}:${extension.id}`}
-                          className="flex items-center gap-3 px-3 py-2 text-xs"
-                        >
-                          <ExtensionIcon
-                            className="text-muted-foreground size-4 shrink-0"
-                            aria-hidden="true"
-                          />
-                          {extension.sourcePath ? (
-                            <button
-                              type="button"
-                              className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
-                              title={`Reveal ${extension.sourcePath}`}
-                              onClick={() => _reveal(extension.sourcePath!)}
-                            >
-                              {extension.displayName}
-                            </button>
-                          ) : (
-                            <span className="grow truncate">
-                              {extension.displayName}
+                        <AccordionItem key={group.kind} value={group.kind}>
+                          <AccordionTrigger className="px-3 py-2.5 hover:no-underline">
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <ExtensionIcon
+                                className="text-muted-foreground size-4 shrink-0"
+                                aria-hidden="true"
+                              />
+                              <span className="truncate text-xs font-medium">
+                                {EXTENSION_KIND_LABELS[group.kind]}
+                              </span>
+                              <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none tabular-nums">
+                                {group.extensions.length}
+                              </span>
                             </span>
-                          )}
-                          <span className="text-muted-foreground uppercase">
-                            {extension.kind}
-                          </span>
-                        </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-0">
+                            <div className="divide-y border-t">
+                              {group.extensions.map((extension) => (
+                                <div
+                                  key={extension.id}
+                                  className="flex min-w-0 items-center gap-3 px-3 py-2 pl-10 text-xs"
+                                >
+                                  <span
+                                    className={cn(
+                                      "size-1.5 shrink-0 rounded-full",
+                                      extension.error
+                                        ? "bg-destructive"
+                                        : extension.active
+                                          ? "bg-emerald-500"
+                                          : "bg-muted-foreground/40"
+                                    )}
+                                    title={
+                                      extension.error
+                                        ? "Error"
+                                        : extension.active
+                                          ? "Active"
+                                          : "Inactive"
+                                    }
+                                  />
+                                  {extension.sourcePath ? (
+                                    <button
+                                      type="button"
+                                      className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
+                                      title={`Reveal ${extension.sourcePath}`}
+                                      onClick={() =>
+                                        _reveal(extension.sourcePath!)
+                                      }
+                                    >
+                                      {extension.displayName}
+                                    </button>
+                                  ) : (
+                                    <span className="grow truncate">
+                                      {extension.displayName}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
                       );
                     })}
-                  </div>
+                  </Accordion>
                 ) : (
                   <p className="text-muted-foreground text-xs">
                     This plugin has no discovered extensions.
