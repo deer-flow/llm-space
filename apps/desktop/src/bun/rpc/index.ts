@@ -15,6 +15,7 @@ import {
   runUv,
   writeProjectFile,
 } from "../fs";
+import type { PluginCommandExecutionController } from "../plugins/plugin-command-execution-controller";
 import {
   dismissGithubStarReminder,
   getNextFeatureReminder,
@@ -56,6 +57,7 @@ export interface MainWindowRPCDependencies {
   skillsManager: SkillsManager;
   updater: UpdaterService;
   pluginManager: PluginManager;
+  pluginCommandExecutions: PluginCommandExecutionController;
 }
 
 const MAX_REQUEST_TIME_MS = 5 * 60_000 + 10_000;
@@ -73,6 +75,7 @@ export function createMainWindowRPC({
   skillsManager,
   updater,
   pluginManager,
+  pluginCommandExecutions,
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
   const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
@@ -213,12 +216,18 @@ export function createMainWindowRPC({
           pluginManager.setSettings(pluginId, settings),
         pluginCommandsList: () =>
           Promise.resolve(pluginManager.commands.list()),
-        pluginCommandExecute: ({ commandId, arguments: args, activeTab }) =>
-          pluginManager.commands.executeWithContext(
+        pluginCommandExecute: ({
+          executionId,
+          commandId,
+          arguments: args,
+          activeTab,
+        }) =>
+          pluginCommandExecutions.execute({
+            executionId,
             commandId,
-            { activeTab },
-            args
-          ),
+            arguments: args,
+            context: { activeTab },
+          }),
         pluginToolsList: () => Promise.resolve(pluginManager.tools.list()),
         pluginToolExecute: ({ tool, thread, variables, arguments: args }) =>
           pluginManager.tools.execute(tool, { thread, variables }, args),

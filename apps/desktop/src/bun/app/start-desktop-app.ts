@@ -26,6 +26,10 @@ import { McpManager } from "../mcp";
 import { ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
 import {
+  PluginCommandExecutionController,
+  type PluginCommandReportInput,
+} from "../plugins/plugin-command-execution-controller";
+import {
   RemoteServerManager,
   registerConfiguredRemoteRuntime,
 } from "../remote";
@@ -95,6 +99,12 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   );
   let executePluginHostCommand = (type: string): Promise<unknown> =>
     Promise.reject(new Error(`Command execution is not ready: ${type}`));
+  let reportPluginCommand = (
+    input: PluginCommandReportInput
+  ): Promise<unknown> =>
+    Promise.reject(
+      new Error(`Command reporting is not ready: ${input.commandId}`)
+    );
   const pluginManager = await PluginManager.create({
     homePath,
     appVersion: packageJson.version,
@@ -139,9 +149,30 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       if (method === "executeHostCommand") {
         return executePluginHostCommand(_stringParam(params, "type"));
       }
+      if (method === "report") {
+        return reportPluginCommand({
+          executionId: _stringParam(params, "executionId"),
+          commandId: _stringParam(params, "commandId"),
+          report: _commandReportParam(params),
+        });
+      }
       throw new Error(`Unsupported plugin host operation: ${method}`);
     },
   });
+  const pluginCommandExecutions = new PluginCommandExecutionController({
+    execute: (commandId, context, args, executionId) =>
+      pluginManager.commands.executeWithContext(
+        commandId,
+        context,
+        args,
+        executionId
+      ),
+    send: (event) => getRpc().send.pluginCommandExecutionChanged(event),
+  });
+  reportPluginCommand = (input) => {
+    pluginCommandExecutions.report(input);
+    return Promise.resolve(null);
+  };
   pluginManager.threadStorages.registerBuiltin({
     id: "builtin:github-gist",
     displayName: "GitHub Gist",
@@ -242,6 +273,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       skillsManager,
       updater,
       pluginManager,
+      pluginCommandExecutions,
     });
     remoteServerManager.setStatusListener((payload) =>
       getRpc().send.remoteServerStatusChanged(payload)
@@ -284,6 +316,16 @@ function _stringParam(params: Record<string, unknown>, key: string): string {
     throw new Error(`Plugin host parameter must be a string: ${key}`);
   }
   return value;
+}
+
+function _commandReportParam(
+  params: Record<string, unknown>
+): PluginCommandReportInput["report"] {
+  const report = params.report;
+  if (!report || typeof report !== "object" || Array.isArray(report)) {
+    throw new Error("Plugin Command report must be an object.");
+  }
+  return report as PluginCommandReportInput["report"];
 }
 
 async function _stopDesktopApp(

@@ -54,11 +54,13 @@ export const listPluginCommands = (): Promise<PluginCommandView[]> =>
   _rpc().request.pluginCommandsList({});
 
 export const executePluginCommand = (
+  executionId: string,
   commandId: string,
   activeTab: Pick<PluginActiveTab, "filename" | "thread"> | null,
   args: string[]
 ): Promise<PluginCommandExecutionResult> =>
   _rpc().request.pluginCommandExecute({
+    executionId,
     commandId,
     activeTab,
     arguments: args,

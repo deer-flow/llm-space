@@ -15,6 +15,8 @@ import type {
   ThreadStorageView,
   PluginCommandView,
   PluginCommandExecutionResult,
+  PluginCommandReport,
+  PluginCommandUserMessage,
   PluginTool,
   PluginView,
   JsonObject,
@@ -70,6 +72,21 @@ export type StreamThreadResponsePayload =
 export interface AbortStreamThreadPayload extends RuntimeScopedParams {
   streamId: string;
 }
+
+export type PluginCommandExecutionEvent =
+  | {
+      executionId: string;
+      commandId: string;
+      type: "status";
+      status: "running" | "succeeded" | "failed";
+      userMessage?: PluginCommandUserMessage;
+    }
+  | {
+      executionId: string;
+      commandId: string;
+      type: "phase";
+      report: PluginCommandReport;
+    };
 
 export interface DesktopRPCType {
   bun: RPCSchema<{
@@ -282,6 +299,7 @@ export interface DesktopRPCType {
       };
       pluginCommandExecute: {
         params: {
+          executionId: string;
           commandId: string;
           arguments: string[];
           activeTab: { filename: string; thread: Thread } | null;
@@ -724,6 +742,7 @@ export interface DesktopRPCType {
       // Remote SSH connection progress and status updates from the bun side.
       remoteServerStatusChanged: RemoteServerStatusChangedPayload;
       pluginsChanged: Record<string, never>;
+      pluginCommandExecutionChanged: PluginCommandExecutionEvent;
     };
   }>;
 }

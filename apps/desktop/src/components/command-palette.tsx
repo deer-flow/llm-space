@@ -11,7 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { executePluginCommand, listPluginCommands } from "@/client/plugins";
+import { listPluginCommands } from "@/client/plugins";
 import type { PluginActiveTab } from "@/client/plugins";
 import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
@@ -21,6 +21,7 @@ import {
   type CommandType,
 } from "@/shared/commands";
 
+import { usePluginCommandExecution } from "./plugin-command-execution-provider";
 import {
   matchesCommandText,
   parsePluginCommandInvocation,
@@ -54,6 +55,7 @@ export function CommandPalette({
   ) => Promise<void>;
 }) {
   const { executeCommand } = useCommands();
+  const { runPluginCommand } = usePluginCommandExecution();
   const [pluginCommands, setPluginCommands] = useState<
     Awaited<ReturnType<typeof listPluginCommands>>
   >([]);
@@ -155,33 +157,12 @@ export function CommandPalette({
                 }
                 onOpenChange(false);
                 const activeTab = getActiveTab();
-                void executePluginCommand(
-                  command.id,
-                  activeTab
-                    ? {
-                        filename: activeTab.filename,
-                        thread: activeTab.thread,
-                      }
-                    : null,
-                  args
-                )
-                  .then(async ({ activeTabThreadUpdate }) => {
-                    if (activeTabThreadUpdate === undefined) return;
-                    if (!activeTab) {
-                      throw new Error(
-                        "Plugin Command cannot write without an active tab."
-                      );
-                    }
-                    await writeActiveTabThread(
-                      activeTab,
-                      activeTabThreadUpdate
-                    );
-                  })
-                  .catch((error) =>
-                    toast.error(
-                      error instanceof Error ? error.message : String(error)
-                    )
-                  );
+                runPluginCommand({
+                  command,
+                  activeTab,
+                  arguments: args,
+                  writeActiveTabThread,
+                });
               }}
             >
               <div className="flex min-w-0 flex-col">
