@@ -6,7 +6,6 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -64,6 +63,7 @@ import {
 } from "@/client/plugins";
 import { electrobun } from "@/lib/electrobun";
 
+import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
 const PLUGIN_DOCUMENTATION_URL =
@@ -92,17 +92,6 @@ const PLUGIN_WALL_ICONS: readonly LucideIcon[] = [
   Cable,
   Command,
 ];
-
-const PLUGIN_WALL_ROTATIONS = [
-  -14, 8, -5, 13, -9, 4, 16, -11, 7, -3, 12, -16,
-];
-
-const PLUGIN_WALL_ITEMS = Array.from({ length: 63 }, (_, index) => ({
-  Icon: PLUGIN_WALL_ICONS[index % PLUGIN_WALL_ICONS.length],
-  opacity: 0.68 + (index % 4) * 0.08,
-  rotation: PLUGIN_WALL_ROTATIONS[index % PLUGIN_WALL_ROTATIONS.length],
-  scale: 0.82 + (index % 5) * 0.08,
-}));
 
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
@@ -161,7 +150,7 @@ export function PluginsPage() {
             href={PLUGIN_DOCUMENTATION_URL}
             className="text-foreground underline underline-offset-2"
           >
-            Plugin development guide
+            plugin development guide
           </Link>
           .
         </span>
@@ -174,82 +163,61 @@ export function PluginsPage() {
         </div>
       ) : null}
       {!loading && plugins.length === 0 ? (
-        <div className="relative isolate flex h-full min-h-0 flex-col gap-4">
-          <_PluginIconWall />
-          <Empty className="relative z-10 min-h-80 flex-1 border-0 p-8">
-            <div className="relative z-10 flex w-full max-w-lg flex-col items-center gap-5 px-8 py-7">
-              <EmptyHeader className="max-w-md gap-2.5">
-                <EmptyMedia
-                  variant="icon"
-                  className="bg-background/45 text-primary ring-primary/20 size-11 rounded-xl shadow-sm ring-1 backdrop-blur-md dark:bg-background/35"
-                >
-                  <Puzzle className="size-5" />
-                </EmptyMedia>
-                <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
-                  No plugins installed
-                </span>
-                <EmptyTitle className="text-2xl">
-                  Add new powers to LLM Space
-                </EmptyTitle>
-                <EmptyDescription className="max-w-md">
-                  Plugins bundle tools, skills, model providers, MCP servers,
-                  commands, and custom thread storage into installable
-                  extensions.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent className="max-w-lg gap-3">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    className="bg-background/60 hover:bg-background/85 border-border/80 shadow-sm backdrop-blur-md"
-                    disabled={!pluginsPath}
-                    onClick={() => pluginsPath && _reveal(pluginsPath)}
-                  >
-                    <FolderOpen />
-                    Open plugins folder
-                  </Button>
-                  <Button
-                    disabled={refreshing}
-                    onClick={() => void refresh()}
-                  >
-                    <RefreshCw
-                      className={refreshing ? "animate-spin" : undefined}
-                    />
-                    Refresh plugins
-                  </Button>
-                </div>
+        <SettingsEmptyState
+          icon={Puzzle}
+          wallIcons={PLUGIN_WALL_ICONS}
+          label="No plugins installed"
+          title="Add new powers to LLM Space"
+          description="Plugins bundle tools, skills, model providers, MCP servers, commands, and custom thread storage into installable extensions."
+          actions={
+            <>
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button
-                  variant="link"
-                  asChild
-                  className="text-muted-foreground"
-                  size="sm"
+                  variant="outline"
+                  className="bg-background/60 hover:bg-background/85 border-border/80 shadow-sm backdrop-blur-md"
+                  disabled={!pluginsPath}
+                  onClick={() => pluginsPath && _reveal(pluginsPath)}
                 >
-                  <Link href={PLUGIN_DOCUMENTATION_URL}>
-                    Learn more <ArrowUpRightIcon />
-                  </Link>
+                  <FolderOpen />
+                  Open plugins folder
                 </Button>
-              </EmptyContent>
-            </div>
-          </Empty>
-
-          <div className="relative z-10 grid shrink-0 gap-3 sm:grid-cols-3">
-            <_PluginCapability
-              icon={Wrench}
-              title="Tools & skills"
-              description="Give the model new actions and reusable expertise."
-            />
-            <_PluginCapability
-              icon={Cable}
-              title="Models & connections"
-              description="Add model providers and connect MCP servers."
-            />
-            <_PluginCapability
-              icon={Command}
-              title="Commands & storage"
-              description="Customize workflows and how threads are saved."
-            />
-          </div>
-        </div>
+                <Button disabled={refreshing} onClick={() => void refresh()}>
+                  <RefreshCw
+                    className={refreshing ? "animate-spin" : undefined}
+                  />
+                  Refresh plugins
+                </Button>
+              </div>
+              <Button
+                variant="link"
+                asChild
+                className="text-muted-foreground"
+                size="sm"
+              >
+                <Link href={PLUGIN_DOCUMENTATION_URL}>
+                  Learn more <ArrowUpRightIcon />
+                </Link>
+              </Button>
+            </>
+          }
+          capabilities={[
+            {
+              icon: Wrench,
+              title: "Tools & skills",
+              description: "Give the model new actions and reusable expertise.",
+            },
+            {
+              icon: Cable,
+              title: "Models & connections",
+              description: "Add model providers and connect MCP servers.",
+            },
+            {
+              icon: Command,
+              title: "Commands & storage",
+              description: "Customize workflows and how threads are saved.",
+            },
+          ]}
+        />
       ) : null}
       {!loading && plugins.length > 0 ? (
         <>
@@ -268,78 +236,6 @@ export function PluginsPage() {
         </>
       ) : null}
     </SettingsPage>
-  );
-}
-
-function _PluginIconWall() {
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 -top-6 -bottom-6 overflow-hidden"
-    >
-      <div className="bg-primary/12 dark:bg-primary/8 absolute top-1/2 left-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" />
-      <_PluginIconWallLayer />
-      <_PluginIconWallLayer blurred />
-    </div>
-  );
-}
-
-function _PluginIconWallLayer({ blurred = false }: { blurred?: boolean }) {
-  const maskImage = blurred
-    ? "radial-gradient(ellipse 72% 68% at 50% 50%, transparent 24%, rgba(0,0,0,0.45) 58%, black 100%)"
-    : "radial-gradient(ellipse 58% 54% at 50% 50%, black 8%, rgba(0,0,0,0.9) 44%, transparent 82%)";
-
-  return (
-    <div
-      className={cn(
-        "absolute -inset-10",
-        blurred
-          ? "text-primary opacity-[0.11] blur-[3px] dark:text-foreground/80 dark:opacity-[0.09]"
-          : "text-primary opacity-[0.3] dark:text-foreground dark:opacity-[0.25]"
-      )}
-      style={{ maskImage, WebkitMaskImage: maskImage }}
-    >
-      <div className="grid size-full grid-cols-9 grid-rows-7 place-items-center gap-x-5 gap-y-6 p-5">
-        {PLUGIN_WALL_ITEMS.map(
-          ({ Icon, opacity, rotation, scale }, index) => (
-            <Icon
-              // This is a fixed decorative grid; its position is its identity.
-              key={index}
-              className="size-7"
-              strokeWidth={1.45}
-              style={{
-                opacity,
-                transform: `rotate(${rotation}deg) scale(${scale})`,
-              }}
-            />
-          )
-        )}
-      </div>
-    </div>
-  );
-}
-
-function _PluginCapability({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="bg-card/80 flex min-w-0 items-start gap-3 rounded-xl border p-4 shadow-sm dark:bg-card/50 dark:shadow-none">
-      <div className="bg-muted text-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
-        <Icon className="size-4" />
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <h3 className="text-sm font-medium">{title}</h3>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          {description}
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -391,7 +287,8 @@ function PluginList({
               </EmptyMedia>
               <EmptyTitle>No matching plugins</EmptyTitle>
               <EmptyDescription className="text-xs">
-                No plugin matches &quot;{query.trim()}&quot;. Try another search.
+                No plugin matches &quot;{query.trim()}&quot;. Try another
+                search.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

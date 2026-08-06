@@ -10,18 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@llm-space/ui/ui/empty";
 import { Input } from "@llm-space/ui/ui/input";
 import { Separator } from "@llm-space/ui/ui/separator";
 import {
-  ArrowRight,
   Check,
   Circle,
   FolderSync,
@@ -42,7 +33,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import { toast } from "sonner";
 
@@ -77,6 +67,7 @@ import {
   canRemoveRemoteServer,
   remoteConnectionFlow,
 } from "./remote-server-display";
+import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
 interface FormState {
@@ -317,7 +308,7 @@ export function RemoteServersPage({
     <SettingsPage
       title="Remote Servers"
       description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
-      className="p-0"
+      className={servers.length === 0 && !form ? undefined : "p-0"}
     >
       {loading && servers.length === 0 && !form ? (
         <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
@@ -471,40 +462,15 @@ export function RemoteServersPage({
 
 function RemoteServersEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Empty className="relative h-full overflow-hidden rounded-none border-0 p-0">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute top-[5%] left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-cyan-500/8 blur-3xl dark:bg-cyan-400/7" />
-        <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-cyan-500/8" />
-      </div>
-
-      <div className="relative z-10 flex w-full max-w-4xl flex-col items-center gap-8 px-5 py-8">
-        <EmptyHeader className="max-w-xl gap-3">
-          <EmptyMedia className="relative mb-1 h-24 w-72" aria-hidden>
-            <div className="border-border/70 bg-background/70 absolute top-1/2 left-0 flex size-14 -translate-y-1/2 items-center justify-center rounded-2xl border shadow-lg backdrop-blur-xl">
-              <Laptop className="size-6" />
-            </div>
-            <div className="absolute top-1/2 right-14 left-14 -translate-y-1/2 border-t border-dashed border-cyan-500/45" />
-            <div className="bg-background text-muted-foreground absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold tracking-widest uppercase shadow-sm backdrop-blur-xl">
-              SSH <ArrowRight className="size-3" />
-            </div>
-            <div className="border-cyan-500/25 bg-background/70 absolute top-1/2 right-0 flex size-14 -translate-y-1/2 items-center justify-center rounded-2xl border shadow-lg shadow-cyan-500/10 backdrop-blur-xl">
-              <Server className="size-6 text-cyan-600 dark:text-cyan-400" />
-            </div>
-          </EmptyMedia>
-          <span className="text-muted-foreground text-xs font-semibold tracking-[0.22em] uppercase">
-            No remote servers
-          </span>
-          <EmptyTitle className="text-foreground text-3xl font-semibold sm:text-4xl">
-            Bring another workspace within reach
-          </EmptyTitle>
-          <EmptyDescription className="max-w-xl text-base leading-relaxed">
-            Connect over SSH to open a remote LLM Space workspace—threads,
-            settings, and skills included.
-          </EmptyDescription>
-        </EmptyHeader>
-
-        <EmptyContent className="max-w-none gap-3">
-          <Button size="lg" onClick={onAdd}>
+    <SettingsEmptyState
+      icon={Server}
+      wallIcons={REMOTE_SERVER_WALL_ICONS}
+      label="No remote servers"
+      title="Bring another workspace within reach"
+      description="Connect over SSH to open a remote LLM Space workspace—threads, settings, and skills included."
+      actions={
+        <>
+          <Button onClick={onAdd}>
             <Plus className="size-4" />
             Add remote server
           </Button>
@@ -512,53 +478,37 @@ function RemoteServersEmptyState({ onAdd }: { onAdd: () => void }) {
             <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
             Passwords and passphrases are never stored.
           </p>
-        </EmptyContent>
-
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-          <RemoteEmptyFeature
-            icon={<FolderSync />}
-            title="Your workspace, anywhere"
-            description="Open remote threads, settings, and skills in place."
-          />
-          <RemoteEmptyFeature
-            icon={<Network />}
-            title="SSH-native"
-            description="Use the secure connection already trusted by your team."
-          />
-          <RemoteEmptyFeature
-            icon={<ShieldCheck />}
-            title="Credentials stay yours"
-            description="Sensitive passwords and passphrases are not persisted."
-          />
-        </div>
-      </div>
-    </Empty>
+        </>
+      }
+      capabilities={[
+        {
+          icon: FolderSync,
+          title: "Your workspace, anywhere",
+          description: "Open remote threads, settings, and skills in place.",
+        },
+        {
+          icon: Network,
+          title: "SSH-native",
+          description: "Use the secure connection already trusted by your team.",
+        },
+        {
+          icon: ShieldCheck,
+          title: "Credentials stay yours",
+          description: "Sensitive passwords and passphrases are not persisted.",
+        },
+      ]}
+    />
   );
 }
 
-function RemoteEmptyFeature({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="border-border/70 bg-card/55 flex gap-3 rounded-xl border p-4 text-left shadow-sm backdrop-blur-md">
-      <div className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-4">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
+const REMOTE_SERVER_WALL_ICONS = [
+  Server,
+  Laptop,
+  Network,
+  FolderSync,
+  ShieldCheck,
+  RefreshCw,
+] as const;
 
 function RemoteServerDetails({
   server,

@@ -16,14 +16,6 @@ import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@llm-space/ui/ui/empty";
 import { Input } from "@llm-space/ui/ui/input";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
@@ -36,6 +28,8 @@ import {
 import { Switch } from "@llm-space/ui/ui/switch";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
+  Braces,
+  Cable,
   CircleAlert,
   CircleDot,
   Copy,
@@ -44,14 +38,17 @@ import {
   EyeOff,
   FileText,
   Loader2,
+  Network,
   Plus,
   RefreshCw,
-  Search,
+  Server,
   ServerCog,
   Sparkles,
+  Terminal,
   Trash2,
   Unplug,
   Waypoints,
+  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -76,6 +73,7 @@ import {
 } from "@/client/mcp";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
 interface Row {
@@ -679,96 +677,51 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
 
 function McpEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Empty className="relative h-full overflow-hidden rounded-none border-0 p-0">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="bg-primary/10 absolute top-[8%] left-1/2 size-[28rem] -translate-x-1/2 rounded-full blur-3xl dark:bg-blue-500/10" />
-        <div className="absolute inset-x-[8%] top-[8%] h-[58%] bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--color-primary)_13%,transparent),transparent_68%)]" />
-      </div>
-
-      <div className="relative z-10 flex w-full max-w-4xl flex-col items-center gap-8 px-5 py-8">
-        <EmptyHeader className="max-w-xl gap-3">
-          <EmptyMedia className="relative mb-1 size-32" aria-hidden>
-            <div className="border-primary/20 bg-background/70 shadow-primary/10 absolute inset-[25%] z-10 flex items-center justify-center rounded-2xl border shadow-xl backdrop-blur-xl">
-              <ServerCog className="text-primary size-7" />
-            </div>
-            {[
-              { Icon: Search, className: "top-0 left-1/2 -translate-x-1/2" },
-              { Icon: Database, className: "bottom-1 left-1" },
-              { Icon: FileText, className: "right-1 bottom-1" },
-            ].map(({ Icon, className }, index) => (
-              <div
-                key={index}
-                className={`border-border/70 bg-background/65 text-muted-foreground absolute flex size-9 items-center justify-center rounded-xl border shadow-sm backdrop-blur-md ${className}`}
-              >
-                <Icon className="size-4" />
-              </div>
-            ))}
-            <Waypoints className="text-primary/25 absolute inset-0 size-full stroke-[0.7]" />
-          </EmptyMedia>
-          <span className="text-muted-foreground text-xs font-semibold tracking-[0.22em] uppercase">
-            No MCP servers
-          </span>
-          <EmptyTitle className="text-foreground text-3xl font-semibold sm:text-4xl">
-            Connect tools through MCP
-          </EmptyTitle>
-          <EmptyDescription className="max-w-lg text-base leading-relaxed">
-            Add a local command or remote endpoint, discover its tools, and make
-            those capabilities available to your threads.
-          </EmptyDescription>
-        </EmptyHeader>
-
-        <EmptyContent className="max-w-none">
-          <Button size="lg" onClick={onAdd}>
-            <Plus className="size-4" />
-            Add MCP server
-          </Button>
-        </EmptyContent>
-
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-          <EmptyFeature
-            icon={<ServerCog />}
-            title="Local or remote"
-            description="Connect with stdio, HTTP, or SSE transports."
-          />
-          <EmptyFeature
-            icon={<Sparkles />}
-            title="Discover tools"
-            description="Test the connection and inspect exposed capabilities."
-          />
-          <EmptyFeature
-            icon={<Waypoints />}
-            title="Use in threads"
-            description="Choose the tools each thread can call."
-          />
-        </div>
-      </div>
-    </Empty>
+    <SettingsEmptyState
+      icon={ServerCog}
+      wallIcons={MCP_WALL_ICONS}
+      title="Connect tools through MCP"
+      description="Add a local command or remote endpoint, discover its tools, and make those capabilities available to your threads."
+      actions={
+        <Button onClick={onAdd}>
+          <Plus className="size-4" />
+          Add MCP server
+        </Button>
+      }
+      capabilities={[
+        {
+          icon: ServerCog,
+          title: "Local or remote",
+          description: "Connect with stdio, HTTP, or SSE transports.",
+        },
+        {
+          icon: Sparkles,
+          title: "Discover tools",
+          description: "Test the connection and inspect exposed capabilities.",
+        },
+        {
+          icon: Waypoints,
+          title: "Use in threads",
+          description: "Choose the tools each thread can call.",
+        },
+      ]}
+    />
   );
 }
 
-function EmptyFeature({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="border-border/70 bg-card/55 flex gap-3 rounded-xl border p-4 text-left shadow-sm backdrop-blur-md">
-      <div className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-4">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
+const MCP_WALL_ICONS = [
+  ServerCog,
+  Cable,
+  Wrench,
+  Database,
+  Terminal,
+  Braces,
+  Network,
+  FileText,
+  Server,
+  Waypoints,
+  Sparkles,
+] as const;
 
 function ServerEditor({
   form,
