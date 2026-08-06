@@ -620,11 +620,11 @@ function PluginEditor({
                             </span>
                           </AccordionTrigger>
                           <AccordionContent className="pb-0">
-                            <div className="divide-y border-t">
+                            <div className="min-w-0 divide-y overflow-hidden border-t">
                               {group.extensions.map((extension) => (
                                 <div
                                   key={extension.id}
-                                  className="bg-muted/10 hover:bg-muted/20 flex min-w-0 items-start gap-4 py-2 pr-3 pl-4 text-xs transition-colors"
+                                  className="bg-muted/10 hover:bg-muted/20 flex min-w-0 items-start gap-4 overflow-hidden py-2 pr-3 pl-4 text-xs transition-colors"
                                 >
                                   <span
                                     className={cn(
@@ -646,18 +646,18 @@ function PluginEditor({
                                   {extension.sourcePath ? (
                                     <button
                                       type="button"
-                                      className="hover:text-foreground flex min-w-0 grow cursor-pointer flex-col text-left underline-offset-2"
+                                      className="hover:text-foreground flex w-0 min-w-0 grow cursor-pointer flex-col overflow-hidden text-left underline-offset-2"
                                       title={`Reveal ${extension.sourcePath}`}
                                       onClick={() =>
                                         _reveal(extension.sourcePath!)
                                       }
                                     >
-                                      <span className="max-w-full truncate hover:underline">
+                                      <span className="block w-full truncate hover:underline">
                                         {extension.displayName}
                                       </span>
                                       {extension.description ? (
                                         <span
-                                          className="text-muted-foreground max-w-full truncate text-[11px] leading-4"
+                                          className="text-muted-foreground line-clamp-2 w-full text-[11px] leading-4"
                                           title={extension.description}
                                         >
                                           {extension.description}
@@ -665,13 +665,13 @@ function PluginEditor({
                                       ) : null}
                                     </button>
                                   ) : (
-                                    <span className="flex min-w-0 grow flex-col">
-                                      <span className="max-w-full truncate">
+                                    <span className="flex w-0 min-w-0 grow flex-col overflow-hidden">
+                                      <span className="block w-full truncate">
                                         {extension.displayName}
                                       </span>
                                       {extension.description ? (
                                         <span
-                                          className="text-muted-foreground max-w-full truncate text-[11px] leading-4"
+                                          className="text-muted-foreground line-clamp-2 w-full text-[11px] leading-4"
                                           title={extension.description}
                                         >
                                           {extension.description}
