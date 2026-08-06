@@ -4,6 +4,44 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2026-08-07
+
+This release adds Seedream image generation and provider connection profiles,
+makes local Plugin commands more transparent, and turns Plugin and MCP settings
+into clearer, more informative management surfaces.
+
+### Added
+
+- Volcengine Ark providers can configure Seedream image models and use the new
+  `generate_image` built-in Tool to create images with provider credentials.
+- Model providers support multiple named connection profiles, with profile-aware
+  model selection, connection testing, streaming, and built-in Tool execution.
+- Plugin commands can publish progress, success, and failure feedback while
+  they run, with lifecycle handling shared across the command palette and
+  desktop runtime.
+- Plugin settings group Commands, Tools, and MCP Servers into expandable
+  sections with type-specific icons and extension descriptions.
+- MCP settings expose the Plugin that owns each bundled server and cache Plugin
+  tool discovery to avoid repeated subprocess work.
+
+### Changed
+
+- Settings empty states use a reusable animated layout across Plugins, MCP
+  Servers, and Remote Servers, with refined selection, contrast, spacing, and
+  artwork treatment.
+- The onboarding experience has a smaller image payload and more polished
+  layout and interaction details.
+- The desktop and web builds now use Vite 8, alongside refreshed React,
+  Tailwind CSS, CodeMirror, MCP SDK, and UI dependencies.
+- Plugin development documentation now covers command feedback APIs.
+
+### Fixed
+
+- Opening a shared deep link reliably activates the desktop window before
+  navigating to its content.
+- Plugin artwork preserves native icon shapes, and long extension descriptions
+  stay within their settings rows.
+
 ## [4.8.5] - 2026-08-06
 
 This patch release restores tool-call continuation for OpenAI Responses-compatible
