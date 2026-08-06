@@ -84,7 +84,7 @@ function _PreviewDialog({
               <iframe
                 className="size-full rounded-lg border bg-white"
                 referrerPolicy="no-referrer"
-                sandbox=""
+                sandbox="allow-scripts"
                 srcDoc={value}
                 title={`${title} HTML preview`}
               />
