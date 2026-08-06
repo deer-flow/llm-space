@@ -134,6 +134,12 @@ export function createMainWindowRPC({
           });
           return groups;
         },
+        addProviderProfile: ({ runtimeId, providerId }) =>
+          getRuntime(runtimeId).addProviderProfile(providerId),
+        updateProviderProfile: (input) =>
+          getRuntime(input.runtimeId).updateProviderProfile(input),
+        removeProviderProfile: (input) =>
+          getRuntime(input.runtimeId).removeProviderProfile(input),
         updateProvider: (input) =>
           getRuntime(input.runtimeId).updateProvider(input),
         setModelEnabled: (input) =>
@@ -147,11 +153,13 @@ export function createMainWindowRPC({
         testModelConnection: async ({
           runtimeId,
           providerId,
+          profileId,
           modelId,
           candidate,
         }) => {
           await getRuntime(runtimeId).testModelConnection({
             providerId,
+            profileId,
             modelId,
             candidate,
           });
@@ -306,8 +314,12 @@ export function createMainWindowRPC({
         },
         generatorOpenDevTerminal: ({ rootDir }) =>
           openGeneratorDevTerminal(rootDir),
-        generatorResolveEnv: ({ runtimeId, providerId, envNames }) =>
-          getRuntime(runtimeId).resolveGeneratorEnv({ providerId, envNames }),
+        generatorResolveEnv: ({ runtimeId, providerId, profileId, envNames }) =>
+          getRuntime(runtimeId).resolveGeneratorEnv({
+            providerId,
+            profileId,
+            envNames,
+          }),
         mcpListServers: ({ runtimeId }) =>
           getRuntime(runtimeId).mcpListServers(),
         mcpAddServer: async ({ runtimeId, server }) => {
@@ -333,8 +345,19 @@ export function createMainWindowRPC({
           }),
         builtInListTools: ({ runtimeId }) =>
           Promise.resolve(getRuntime(runtimeId).builtInListTools()),
-        builtInCallTool: ({ runtimeId, name, arguments: args }) =>
-          getRuntime(runtimeId).builtInCallTool({ name, arguments: args }),
+        builtInCallTool: ({
+          runtimeId,
+          name,
+          arguments: args,
+          config,
+          connection,
+        }) =>
+          getRuntime(runtimeId).builtInCallTool({
+            name,
+            arguments: args,
+            config,
+            connection,
+          }),
         getAnalyticsSettings: () => Promise.resolve(analytics.getSettings()),
         setAnalyticsSettings: ({ enabled }) =>
           Promise.resolve(analytics.setEnabled(enabled)),

@@ -30,11 +30,22 @@ export class StreamThreadController {
     const startedAt = Date.now();
     let outcome: "completed" | "error" | "aborted" = "error";
     try {
+      const connectionRef = payload.connection ?? {
+        providerId: request.model.provider,
+      };
+      if (connectionRef.providerId !== request.model.provider) {
+        throw new Error(
+          `Model ${request.model.provider}/${request.model.id} cannot use provider connection ${connectionRef.providerId}.`
+        );
+      }
+      const connection = await this._modelManager.resolveConnection(
+        connectionRef
+      );
       for await (const event of streamAgent(request, {
         models: await this._modelManager.getAvailableModels(),
-        getApiKey: this._modelManager.getApiKey.bind(this._modelManager),
-        getBaseUrl: this._modelManager.getBaseUrl.bind(this._modelManager),
-        getHeaders: this._modelManager.getHeaders.bind(this._modelManager),
+        getApiKey: () => connection.apiKey,
+        getBaseUrl: () => connection.baseUrl,
+        getHeaders: () => connection.headers,
         signal: abortController.signal,
       })) {
         send({ streamId, type: "event", event });
@@ -80,10 +91,12 @@ export class StreamThreadController {
   /** Verify a provider with a minimal completion through the normal agent path. */
   async testModelConnection({
     providerId,
+    profileId,
     modelId,
     candidate,
   }: {
     providerId: string;
+    profileId?: string;
     modelId: string;
     candidate?: CustomModel;
   }): Promise<void> {
@@ -91,6 +104,10 @@ export class StreamThreadController {
       ? this._modelManager.buildModelsWithCandidate(providerId, candidate)
       : await this._modelManager.getAvailableModels();
     const targetId = candidate?.id ?? modelId;
+    const connection = await this._modelManager.resolveConnection({
+      providerId,
+      profileId,
+    });
     const abortController = new AbortController();
     try {
       for await (const event of streamAgent(
@@ -111,9 +128,9 @@ export class StreamThreadController {
         },
         {
           models,
-          getApiKey: this._modelManager.getApiKey.bind(this._modelManager),
-          getBaseUrl: this._modelManager.getBaseUrl.bind(this._modelManager),
-          getHeaders: this._modelManager.getHeaders.bind(this._modelManager),
+          getApiKey: () => connection.apiKey,
+          getBaseUrl: () => connection.baseUrl,
+          getHeaders: () => connection.headers,
           signal: abortController.signal,
         }
       )) {
@@ -135,6 +152,7 @@ export class StreamThreadController {
     }
   }
 
+  /** Keep telemetry useful without recording custom provider or model names. */
   private _scrubModelForTelemetry(model: { provider: string; id: string }): {
     provider: string;
     model: string;

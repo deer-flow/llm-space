@@ -28,6 +28,7 @@ const PROVIDERS = [
   {
     id: "provider",
     name: "Provider",
+    profiles: [],
     models: [_model("provider", "default-model", "Default Model")],
   },
 ] satisfies ModelProviderGroup[];
@@ -93,6 +94,7 @@ function _handlerFixture(input?: {
     {
       id: "local-provider",
       name: "Local Provider",
+      profiles: [],
       models: [_model("local-provider", "local-model", "Local Model")],
     },
   ] satisfies ModelProviderGroup[];
@@ -100,6 +102,7 @@ function _handlerFixture(input?: {
     {
       id: "remote-provider",
       name: "Remote Provider",
+      profiles: [],
       models: [_model("remote-provider", "remote-model", "Remote Model")],
     },
   ] satisfies ModelProviderGroup[];
@@ -226,9 +229,7 @@ describe("createShareThreadHandler", () => {
     }
 
     expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).message).toBe(
-      "Runtime not found: remote:missing"
-    );
+    expect((thrown as Error).message).toBe("Runtime not found: remote:missing");
     expect(writes).toEqual([]);
   });
 

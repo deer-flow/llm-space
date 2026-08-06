@@ -242,7 +242,7 @@ function _TraceTabPane({
   return (
     <div className={cn("flex size-full flex-col", !active && "hidden")}>
       <ThreadPlayground
-        key={reloadKey}
+        storeKey={reloadKey}
         className="bg-background min-h-0 flex-1 shadow-lg"
         loading={isLoading || !data}
         path={`trace/${projectId}/${traceKey}/workbench.json`}

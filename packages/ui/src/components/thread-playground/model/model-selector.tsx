@@ -158,7 +158,7 @@ export function ModelSelector({
         ref={inputRef}
         aria-label="Model selector"
         className={cn(
-          "hover:bg-secondary! group/model-select h-6! w-75 border-0 bg-transparent! font-mono",
+          "hover:bg-secondary! group/model-select h-6! w-full max-w-75 min-w-0 border-0 bg-transparent! font-mono",
           !readonly && "cursor:pointer hover:bg-secondary"
         )}
         triggerClassName="opacity-0! group-hover/model-select:opacity-100"

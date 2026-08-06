@@ -134,6 +134,7 @@ function _providers(provider: string, modelId: string): ModelProviderGroup[] {
       id: provider,
       name: provider,
       models: [_model(provider, modelId)],
+      profiles: [{ id: `${provider}-default`, name: "Default" }],
     },
   ];
 }
@@ -151,6 +152,9 @@ function _client(
     removeProvider: unchanged,
     addProvider: unchanged,
     addCustomProvider: unchanged,
+    addProviderProfile: unchanged,
+    updateProviderProfile: unchanged,
+    removeProviderProfile: unchanged,
     updateProvider: unchanged,
     setModelEnabled: unchanged,
     setAllModelsEnabled: unchanged,
@@ -470,7 +474,9 @@ describe("ModelProvider runtime switches", () => {
     activeRoot = _createRoot();
 
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     let staleRefresh: Promise<void> | null = null;
@@ -478,11 +484,15 @@ describe("ModelProvider runtime switches", () => {
       staleRefresh = refresh?.() ?? null;
     });
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={bClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
 
@@ -537,21 +547,29 @@ describe("ModelProvider runtime switches", () => {
     activeRoot = _createRoot();
 
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     expect(snapshots.at(-1)?.defaultModel?.id).toBe("a-old");
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={bClient}>{probe}</ModelProvider>
+      );
     });
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     await act(async () => {
       // An unrelated parent render after A commits must not make A epoch 1's
       // still-cached snapshot visible while A epoch 3 is loading.
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
     });
 
     expect(snapshots.at(-1)).toEqual({
@@ -733,7 +751,9 @@ describe("ModelProvider runtime switches", () => {
     );
     activeRoot = _createRoot();
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     const oldEpochMutation = actions.setModelEnabled(
@@ -742,11 +762,15 @@ describe("ModelProvider runtime switches", () => {
       false
     );
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={bClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={bClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     await act(async () => {
-      activeRoot?.render(<ModelProvider client={aClient}>{probe}</ModelProvider>);
+      activeRoot?.render(
+        <ModelProvider client={aClient}>{probe}</ModelProvider>
+      );
       await Promise.resolve();
     });
     expect(modelIds.at(-1)).toBeNull();

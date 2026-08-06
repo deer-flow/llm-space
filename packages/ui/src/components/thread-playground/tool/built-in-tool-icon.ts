@@ -9,6 +9,7 @@ import {
   FolderSearchIcon,
   FolderTreeIcon,
   GlobeIcon,
+  ImageIcon,
   ListTodoIcon,
   ListTreeIcon,
   PackageCheckIcon,
@@ -35,6 +36,7 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
   "cloud-sun": CloudSunIcon,
   files: FilesIcon,
   "list-todo": ListTodoIcon,
+  image: ImageIcon,
 };
 
 /** Fallback for tools persisted before the `icon` field existed. */
@@ -54,6 +56,7 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   present_files: "files",
   todo_write: "list-todo",
   ask_user_question: "circle-help",
+  generate_image: "image",
 };
 
 /**

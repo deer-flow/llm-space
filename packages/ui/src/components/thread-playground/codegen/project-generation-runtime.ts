@@ -19,7 +19,8 @@ export interface ProjectGenerationRuntime {
   getSearchSettings(): Promise<SearchSettings>;
   resolveEnv(
     providerId: string,
-    envNames: string[]
+    envNames: string[],
+    profileId?: string
   ): Promise<{ modelApiKey: string; envValues: Record<string, string> }>;
 }
 
@@ -53,7 +54,7 @@ export function bindProjectGenerationRuntime({
       listEnabledPromptVariableSkills(skills, { runtimeId }),
     listMcpServers: () => mcp.listServers({ runtimeId }),
     getSearchSettings: () => generator.getSearchSettings({ runtimeId }),
-    resolveEnv: (providerId, envNames) =>
-      generator.resolveEnv(providerId, envNames, { runtimeId }),
+    resolveEnv: (providerId, envNames, profileId) =>
+      generator.resolveEnv(providerId, envNames, { runtimeId, profileId }),
   };
 }

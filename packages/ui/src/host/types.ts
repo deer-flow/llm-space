@@ -7,6 +7,7 @@
 
 import type {
   AgentTransport,
+  ArkImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
@@ -17,6 +18,8 @@ import type {
   JsonValue,
   ModelConfig,
   ModelProviderGroup,
+  ProviderConnectionRef,
+  ProviderProfilePatch,
   SearchSettings,
   SkillInfo,
   SkillsSettings,
@@ -45,6 +48,8 @@ export interface ShareThreadActionInput {
 }
 
 export interface ExecuteToolOptions extends RuntimeScopedHostOptions {
+  /** Ephemeral provider connection used by provider-backed built-in tools. */
+  connection?: ProviderConnectionRef;
   /** Owning Thread snapshot and one resolved variable map for this call batch. */
   thread: Thread;
   variables: Record<string, JsonValue>;
@@ -176,7 +181,7 @@ export interface GeneratorHost {
   resolveEnv(
     providerId: string,
     envNames: string[],
-    options: RuntimeOwnedHostOptions
+    options: RuntimeOwnedHostOptions & { profileId?: string }
   ): Promise<{ modelApiKey: string; envValues: Record<string, string> }>;
 }
 
@@ -244,16 +249,24 @@ export interface ModelClient {
     name: string;
     baseUrl: string;
   }): Promise<ModelProviderGroup[]>;
+  addProviderProfile(providerId: string): Promise<ModelProviderGroup[]>;
+  updateProviderProfile(
+    providerId: string,
+    profileId: string,
+    fields: ProviderProfilePatch
+  ): Promise<ModelProviderGroup[]>;
+  removeProviderProfile(
+    providerId: string,
+    profileId: string
+  ): Promise<ModelProviderGroup[]>;
   updateProvider(
     providerId: string,
     fields: {
-      apiKey?: string | null;
-      baseUrl?: string | null;
-      headers?: Record<string, string> | null;
       name?: string | null;
       api?:
         "anthropic-messages" | "openai-completions" | "openai-responses" | null;
       icon?: string | null;
+      imageGeneration?: ArkImageGenerationConfig;
     }
   ): Promise<ModelProviderGroup[]>;
   setModelEnabled(
@@ -268,7 +281,8 @@ export interface ModelClient {
   testModelConnection(
     providerId: string,
     modelId: string,
-    candidate?: CustomModel
+    candidate?: CustomModel,
+    profileId?: string
   ): Promise<void>;
   removeCustomModel(
     providerId: string,

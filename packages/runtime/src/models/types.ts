@@ -1,4 +1,9 @@
-import type { CustomModel, ModelConfig } from "@llm-space/core";
+import type {
+  ArkImageGenerationConfig,
+  CustomModel,
+  ModelConfig,
+  ProviderProfile,
+} from "@llm-space/core";
 
 export type CustomProviderApi =
   "anthropic-messages" | "openai-completions" | "openai-responses";
@@ -14,6 +19,8 @@ export const DEFAULT_CUSTOM_PROVIDER_API: CustomProviderApi =
  */
 export type CustomModelConfig = CustomModel;
 
+export type ProviderProfileConfig = ProviderProfile;
+
 /** One provider entry in `settings/models.json`. */
 export interface ProviderConfig {
   id: string;
@@ -21,13 +28,13 @@ export interface ProviderConfig {
   name?: string;
   /** Whether this is a builtin provider shipped with the app. */
   builtin?: boolean;
+  /** Connection profiles in creation order. Index 0 is the fixed default. */
+  profiles?: ProviderProfileConfig[];
+  /** @deprecated Legacy field migrated into the first profile on load. */
   apiKey?: string;
-  /** Custom base URL override for this provider. Absent means the default. */
+  /** @deprecated Legacy field migrated into the first profile on load. */
   baseUrl?: string;
-  /**
-   * Extra HTTP headers sent with every request to this provider. Merged into
-   * the stream options at request time (per-run values win on collision).
-   */
+  /** @deprecated Legacy field migrated into the first profile on load. */
   headers?: Record<string, string>;
   /** API compatibility mode for a custom provider. */
   api?: CustomProviderApi;
@@ -51,6 +58,8 @@ export interface ProviderConfig {
    * so these models can later be singled out for deletion.
    */
   customModels?: string[];
+  /** Native Ark image-model inventory; only valid on the builtin Ark provider. */
+  imageGeneration?: ArkImageGenerationConfig;
 }
 
 /** Shape of `settings/models.json`. */

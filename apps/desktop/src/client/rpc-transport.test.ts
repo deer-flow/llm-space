@@ -72,9 +72,12 @@ const REQUEST: AgentStreamRequest = {
 const START: AgentEvent = { type: "agent_start" };
 const TURN: AgentEvent = { type: "turn_start" };
 
-function _startIterator(signal?: AbortSignal) {
+function _startIterator(signal?: AbortSignal, profileId?: string) {
   const iterator = createRpcTransport()(REQUEST, {
     signal,
+    connection: profileId
+      ? { providerId: REQUEST.model.provider, profileId }
+      : undefined,
   })[Symbol.asyncIterator]();
   const next = iterator.next();
   const streamId = RPC.starts.at(-1)?.streamId;
@@ -112,14 +115,23 @@ describe("createRpcTransport", () => {
     expect(RPC.aborts).toEqual([]);
   });
 
+  test("forwards an ephemeral provider profile with the run request", async () => {
+    const { next, streamId } = _startIterator(undefined, "profile-work");
+    expect(RPC.starts[0]).toMatchObject({
+      streamId,
+      connection: { providerId: "test", profileId: "profile-work" },
+      request: REQUEST,
+    });
+    RPC.emit({ streamId, type: "done" });
+    expect(await next).toEqual({ value: undefined, done: true });
+  });
+
   test("rejects remote errors and removes its listener", async () => {
     const { next, streamId } = _startIterator();
 
     RPC.emit({ streamId, type: "error", message: "remote exploded" });
 
-    expect(await _captureRejection(next)).toEqual(
-      new Error("remote exploded")
-    );
+    expect(await _captureRejection(next)).toEqual(new Error("remote exploded"));
     expect(RPC.listenerCount).toBe(0);
     expect(RPC.aborts).toEqual([]);
   });

@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
+  ArkImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
@@ -12,6 +13,8 @@ import type {
   ModelConfig,
   ModelProviderGroup,
   NetworkSettings,
+  ProviderProfilePatch,
+  ProviderConnectionRef,
   SearchSettings,
   SkillContent,
   SkillInfo,
@@ -62,6 +65,12 @@ export interface RuntimeScopedParams {
 export interface RuntimeStreamRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
+  connection?: ProviderConnectionRef;
+}
+
+export interface UpdateProviderProfileInput extends ProviderProfilePatch {
+  providerId: string;
+  profileId: string;
 }
 
 export interface RuntimeAbortStreamPayload extends RuntimeScopedParams {
@@ -88,15 +97,21 @@ export interface RuntimeClient {
     baseUrl: string;
     api?: "anthropic-messages" | "openai-completions" | "openai-responses";
   }): Promise<ModelProviderGroup[]>;
+  addProviderProfile(providerId: string): Promise<ModelProviderGroup[]>;
+  updateProviderProfile(
+    input: UpdateProviderProfileInput
+  ): Promise<ModelProviderGroup[]>;
+  removeProviderProfile(input: {
+    providerId: string;
+    profileId: string;
+  }): Promise<ModelProviderGroup[]>;
   updateProvider(input: {
     providerId: string;
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    headers?: Record<string, string> | null;
     name?: string | null;
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }): Promise<ModelProviderGroup[]>;
   setModelEnabled(input: {
     providerId: string;
@@ -111,10 +126,12 @@ export interface RuntimeClient {
   setDefaultModel(model: ModelConfig | null): Promise<ModelConfig | null>;
   resolveGeneratorEnv(input: {
     providerId: string;
+    profileId?: string;
     envNames: string[];
   }): Promise<{ modelApiKey: string; envValues: Record<string, string> }>;
   testModelConnection(input: {
     providerId: string;
+    profileId?: string;
     modelId: string;
     candidate?: CustomModel;
   }): Promise<void>;
@@ -163,6 +180,8 @@ export interface RuntimeClient {
   builtInCallTool(input: {
     name: string;
     arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    connection?: ProviderConnectionRef;
   }): Promise<BuiltinToolCallResponse>;
 
   getSearchSettings(): MaybePromise<SearchSettings>;

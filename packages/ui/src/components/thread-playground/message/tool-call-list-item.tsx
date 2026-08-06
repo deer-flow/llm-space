@@ -32,9 +32,8 @@ import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Input } from "@llm-space/ui/ui/input";
-import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 
-import { useThreadStoreActions } from "../stores";
+import { useThreadStore, useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ImageContentView } from "./image-content-view";
@@ -73,6 +72,10 @@ function _ToolCallListItem({
   const tool = resolveTool(toolCall.input.name);
   const executable = tool !== undefined && isExecutableTool(tool);
   const [calling, setCalling] = useState(false);
+  const autoCalling = useThreadStore((state) =>
+    state.executingToolCallIds.includes(toolCall.id)
+  );
+  const isCalling = calling || autoCalling;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [argsPreviewOpen, setArgsPreviewOpen] = useState(false);
   const outputText = useMemo(() => getToolCallOutputText(toolCall), [toolCall]);
@@ -178,16 +181,19 @@ function _ToolCallListItem({
             </Button>
           </Tooltip>
           {executable && !presentational ? (
-            <Tooltip content="Call this tool">
+            <Tooltip content={isCalling ? "Calling tool" : "Call this tool"}>
               <Button
-                className="invisible shrink-0 group-hover/message:visible"
+                className={cn(
+                  "shrink-0",
+                  !isCalling && "invisible group-hover/message:visible"
+                )}
                 size="icon"
                 variant="secondary"
-                disabled={readonly || calling}
+                disabled={readonly || isCalling}
                 onClick={() => void handleCall()}
               >
-                {calling ? (
-                  <Loader2 className="animate-spin" />
+                {isCalling ? (
+                  <Loader2 className="size-3 animate-spin" />
                 ) : (
                   <PlayIcon className="size-3" />
                 )}
@@ -199,22 +205,17 @@ function _ToolCallListItem({
       <hr />
       <div className="flex w-full flex-col gap-1">
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
-          <Marker role="status" className="gap-1">
-            <MarkerContent className="flex items-center text-xs">
-              Response
-              <Tooltip content="Preview response">
-                <Button
-                  className="invisible shrink-0 group-hover/message:visible"
-                  size="xs"
-                  variant="ghost"
-                  disabled={outputText === ""}
-                  onClick={() => setPreviewOpen(true)}
-                >
-                  <EyeIcon className="size-3" />
-                </Button>
-              </Tooltip>
-            </MarkerContent>
-          </Marker>
+          <Tooltip content="Preview response">
+            <Button
+              className="invisible shrink-0 group-hover/message:visible"
+              size="xs"
+              variant="ghost"
+              disabled={outputText === ""}
+              onClick={() => setPreviewOpen(true)}
+            >
+              <EyeIcon className="size-3" />
+            </Button>
+          </Tooltip>
           {!presentational && (
             <div className="flex items-center">
               <Button
@@ -246,7 +247,7 @@ function _ToolCallListItem({
         <ToolCallResponseEditor
           input={toolCall.input}
           plain={fidelity === "lite"}
-          readonly={readonly}
+          readonly={readonly || isCalling}
           value={outputText}
           extraExtensions={variableExtension}
           onChange={handleOutputChange}

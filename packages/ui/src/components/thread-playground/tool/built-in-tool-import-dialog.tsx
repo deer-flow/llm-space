@@ -1,16 +1,25 @@
 "use client";
 
-import { type BuiltinTool } from "@llm-space/core";
+import {
+  getArkImageModelDefinitions,
+  SEEDREAM_IMAGE_SIZES,
+  type BuiltinTool,
+  type GenerateImageToolConfig,
+  type SeedreamImageModelDefinition,
+  type SeedreamImageSize,
+} from "@llm-space/core";
 import {
   CloudSunIcon,
   FilesIcon,
   GlobeIcon,
+  ImageIcon,
   SearchIcon,
   type LucideIcon,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useModels } from "@llm-space/ui/components/model-provider";
 import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
@@ -21,13 +30,25 @@ import {
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
 import { Input } from "@llm-space/ui/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { ProviderProfileSelector } from "../model/provider-profile-selector";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
+import {
+  getToolConnectionProviderId,
+  toolProfileSelectionScope,
+} from "./tool-executor";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
-type BuiltInToolCategoryId = "fileSystem" | "web" | "misc";
+type BuiltInToolCategoryId = "fileSystem" | "web" | "media" | "misc";
 
 interface BuiltInToolCategory {
   id: BuiltInToolCategoryId;
@@ -38,6 +59,7 @@ interface BuiltInToolCategory {
 const BUILT_IN_TOOL_CATEGORIES: BuiltInToolCategory[] = [
   { id: "fileSystem", label: "File system", icon: FilesIcon },
   { id: "web", label: "Web", icon: GlobeIcon },
+  { id: "media", label: "Media", icon: ImageIcon },
   { id: "misc", label: "Misc", icon: CloudSunIcon },
 ];
 
@@ -54,24 +76,26 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
   "present_files",
 ]);
 
-const WEB_TOOL_NAMES = new Set([
-  "web_fetch",
-  "web_search",
-  "weather_report",
-]);
+const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search", "weather_report"]);
+
+const MEDIA_TOOL_NAMES = new Set(["generate_image"]);
 
 function _BuiltInToolImportDialog({
   existingToolNames,
+  existingTools,
   initialToolName,
   onAdd,
+  onUpdate,
   onRemove,
   runtimeId,
   open,
   onOpenChange,
 }: {
   existingToolNames: Set<string>;
+  existingTools: Map<string, BuiltinTool>;
   initialToolName?: string | null;
   onAdd: (tool: BuiltinTool) => boolean;
+  onUpdate: (name: string, tool: BuiltinTool) => boolean;
   onRemove: (toolName: string) => void;
   runtimeId?: string;
   open: boolean;
@@ -84,8 +108,29 @@ function _BuiltInToolImportDialog({
   const [highlightedToolName, setHighlightedToolName] = useState<string | null>(
     null
   );
+  const [generateImageConfig, setGenerateImageConfig] =
+    useState<GenerateImageToolConfig | null>(null);
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
+  const providers = useModels();
+  const generateImageTool = tools.find((tool) => tool.name === "generate_image");
+  const imageProviderId = generateImageTool
+    ? getToolConnectionProviderId(generateImageTool)
+    : undefined;
+  const imageProvider = useMemo(
+    () => providers.find((provider) => provider.id === imageProviderId),
+    [imageProviderId, providers]
+  );
+  const enabledImageModels = useMemo(() => {
+    const config = imageProvider?.imageGeneration;
+    if (!config) {
+      return [];
+    }
+    const disabled = new Set(config.disabledModels ?? []);
+    return getArkImageModelDefinitions(config).filter(
+      (model) => !disabled.has(model.id)
+    );
+  }, [imageProvider]);
 
   const loadTools = useCallback(async () => {
     try {
@@ -130,12 +175,56 @@ function _BuiltInToolImportDialog({
     return () => window.clearTimeout(timeout);
   }, [initialToolName, open, tools]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const existing = existingTools.get("generate_image");
+    if (existing) {
+      setGenerateImageConfig(_readGenerateImageConfig(existing.config));
+      return;
+    }
+    const first = enabledImageModels[0];
+    setGenerateImageConfig(
+      first
+        ? {
+            model: first.id,
+            size: first.defaultSize,
+            watermark: true,
+          }
+        : null
+    );
+  }, [enabledImageModels, existingTools, open]);
+
+  /** Persist config immediately for an existing tool or keep it as an add draft. */
+  const handleGenerateImageConfigChange = (config: GenerateImageToolConfig) => {
+    setGenerateImageConfig(config);
+    const existing = existingTools.get("generate_image");
+    if (existing) {
+      onUpdate(existing.name, { ...existing, config: { ...config } });
+    }
+  };
+
   const handleToggleTool = (tool: BuiltinTool, checked: boolean) => {
     if (!checked) {
       onRemove(tool.name);
       return;
     }
-    onAdd(tool);
+    if (tool.name !== "generate_image") {
+      onAdd(tool);
+      return;
+    }
+    const model = enabledImageModels.find(
+      (candidate) => candidate.id === generateImageConfig?.model
+    );
+    if (!model || !generateImageConfig) {
+      toast.error("Choose an enabled image model", {
+        description:
+          "Enable an Ark image model in Settings, then select it here.",
+      });
+      return;
+    }
+    onAdd({ ...tool, config: { ...generateImageConfig } });
   };
   const filteredTools = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -192,50 +281,50 @@ function _BuiltInToolImportDialog({
               />
             </div>
             <div className="flex flex-col gap-1">
-            {BUILT_IN_TOOL_CATEGORIES.map((category) => {
-              const CategoryIcon = category.icon;
-              const categoryTools = toolsByCategory.get(category.id) ?? [];
-              const selected = category.id === selectedCategoryId;
-              return (
-                <div
-                  key={category.id}
-                  className={cn(
-                    "group/row relative flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors",
-                    selected
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
-                  )}
-                >
-                  <button
-                    type="button"
-                    aria-label={category.label}
-                    className="focus-visible:ring-ring/30 absolute inset-0 rounded-md outline-none focus-visible:ring-2"
-                    onClick={() => setSelectedCategoryId(category.id)}
-                  />
-                  <CategoryIcon className="size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">
-                    {category.label}
-                  </span>
-                  <ToolImportSidebarActions
-                    count={categoryTools.length}
-                    onEnableAll={() => {
-                      for (const tool of categoryTools) {
-                        if (!existingToolNames.has(tool.name)) {
-                          onAdd(tool);
+              {BUILT_IN_TOOL_CATEGORIES.map((category) => {
+                const CategoryIcon = category.icon;
+                const categoryTools = toolsByCategory.get(category.id) ?? [];
+                const selected = category.id === selectedCategoryId;
+                return (
+                  <div
+                    key={category.id}
+                    className={cn(
+                      "group/row relative flex min-h-8 items-center gap-2 rounded-md px-2 text-left text-xs transition-colors",
+                      selected
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-label={category.label}
+                      className="focus-visible:ring-ring/30 absolute inset-0 rounded-md outline-none focus-visible:ring-2"
+                      onClick={() => setSelectedCategoryId(category.id)}
+                    />
+                    <CategoryIcon className="size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {category.label}
+                    </span>
+                    <ToolImportSidebarActions
+                      count={categoryTools.length}
+                      onEnableAll={() => {
+                        for (const tool of categoryTools) {
+                          if (!existingToolNames.has(tool.name)) {
+                            handleToggleTool(tool, true);
+                          }
                         }
-                      }
-                    }}
-                    onDisableAll={() => {
-                      for (const tool of categoryTools) {
-                        if (existingToolNames.has(tool.name)) {
-                          onRemove(tool.name);
+                      }}
+                      onDisableAll={() => {
+                        for (const tool of categoryTools) {
+                          if (existingToolNames.has(tool.name)) {
+                            onRemove(tool.name);
+                          }
                         }
-                      }
-                    }}
-                  />
-                </div>
-              );
-            })}
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
@@ -251,6 +340,12 @@ function _BuiltInToolImportDialog({
                   const exists = existingToolNames.has(tool.name);
                   const ToolIcon = getBuiltInToolIcon(tool);
                   const highlighted = highlightedToolName === tool.name;
+                  const configuredImageModel = enabledImageModels.find(
+                    (model) => model.id === generateImageConfig?.model
+                  );
+                  const canAdd =
+                    tool.name !== "generate_image" ||
+                    Boolean(configuredImageModel && generateImageConfig);
                   return (
                     <div
                       key={tool.name}
@@ -262,13 +357,13 @@ function _BuiltInToolImportDialog({
                         }
                       }}
                       className={cn(
-                        "flex min-w-0 items-center gap-3 border-b px-3 py-2 transition-colors duration-500 last:border-b-0",
+                        "flex min-w-0 items-start gap-3 border-b px-3 py-3 transition-colors duration-500 last:border-b-0",
                         highlighted && "bg-primary/10 text-primary"
                       )}
                     >
                       <ToolIcon
                         className={cn(
-                          "size-4 shrink-0",
+                          "mt-0.5 size-4 shrink-0",
                           highlighted ? "text-primary" : "text-muted-foreground"
                         )}
                       />
@@ -288,9 +383,23 @@ function _BuiltInToolImportDialog({
                             {tool.description}
                           </div>
                         ) : null}
+                        {tool.name === "generate_image" && (
+                          <_GenerateImageConfigFields
+                            config={generateImageConfig}
+                            enabledModels={enabledImageModels}
+                            showProfileSelector={
+                              (imageProvider?.profiles.length ?? 0) > 1
+                            }
+                            providerId={imageProviderId}
+                            selectedModel={configuredImageModel}
+                            onChange={handleGenerateImageConfigChange}
+                          />
+                        )}
                       </div>
                       <Switch
+                        className="mt-0.5"
                         checked={exists}
+                        disabled={!exists && !canAdd}
                         aria-label={`${exists ? "Remove" : "Add"} ${tool.name}`}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
@@ -310,12 +419,163 @@ function _BuiltInToolImportDialog({
 
 export const BuiltInToolImportDialog = memo(_BuiltInToolImportDialog);
 
+/** Configure the user-owned defaults persisted with one generate_image tool. */
+function _GenerateImageConfigFields({
+  config,
+  enabledModels,
+  showProfileSelector,
+  providerId,
+  selectedModel,
+  onChange,
+}: {
+  config: GenerateImageToolConfig | null;
+  enabledModels: readonly SeedreamImageModelDefinition[];
+  showProfileSelector: boolean;
+  providerId?: string;
+  selectedModel?: SeedreamImageModelDefinition;
+  onChange: (config: GenerateImageToolConfig) => void;
+}) {
+  const handleModelChange = (modelId: string) => {
+    const model = enabledModels.find((candidate) => candidate.id === modelId);
+    if (!model) {
+      return;
+    }
+    onChange({
+      model: model.id,
+      size:
+        config && model.supportedSizes.includes(config.size)
+          ? config.size
+          : model.defaultSize,
+      watermark: config?.watermark ?? true,
+    });
+  };
+
+  return (
+    <div
+      className={cn(
+        "mt-3 grid gap-3",
+        showProfileSelector
+          ? "grid-cols-[minmax(0,1fr)_8rem_7rem_auto]"
+          : "grid-cols-[minmax(0,1fr)_7rem_auto]"
+      )}
+    >
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="text-muted-foreground text-xs">Model</span>
+        <Select
+          value={selectedModel?.id}
+          disabled={enabledModels.length === 0}
+          onValueChange={handleModelChange}
+        >
+          <SelectTrigger
+            className="w-full"
+            size="sm"
+            aria-label="Generate image model"
+          >
+            <SelectValue placeholder="Choose model" />
+          </SelectTrigger>
+          <SelectContent
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
+            {enabledModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {showProfileSelector && providerId ? (
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-muted-foreground text-xs">Profile</span>
+          <ProviderProfileSelector
+            providerId={providerId}
+            className="max-w-none"
+            selectionScope={toolProfileSelectionScope("generate_image")}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground text-xs">Default size</span>
+        <Select
+          value={selectedModel ? config?.size : undefined}
+          disabled={!selectedModel}
+          onValueChange={(size) => {
+            if (config) {
+              onChange({ ...config, size: size as SeedreamImageSize });
+            }
+          }}
+        >
+          <SelectTrigger size="sm" aria-label="Default image size">
+            <SelectValue placeholder="Size" />
+          </SelectTrigger>
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
+            {selectedModel?.supportedSizes.map((size) => (
+              <SelectItem key={size} value={size}>
+                {size}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground text-xs">Watermark</span>
+        <div className="flex h-7 items-center justify-between gap-2">
+          <Switch
+            size="sm"
+            checked={config?.watermark ?? true}
+            disabled={!selectedModel || !config}
+            aria-label="Add AI-generated watermark"
+            onCheckedChange={(watermark) => {
+              if (config) {
+                onChange({ ...config, watermark });
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {enabledModels.length === 0 ? (
+        <p className="text-destructive col-span-full text-xs">
+          Enable an Ark image model in Settings before adding this tool.
+        </p>
+      ) : !config || !selectedModel ? (
+        <p className="text-destructive col-span-full text-xs">
+          Choose an enabled image model for this tool.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Parse persisted generate_image config without silently repairing stale ids. */
+function _readGenerateImageConfig(
+  value: Record<string, unknown> | undefined
+): GenerateImageToolConfig | null {
+  const model = value?.model;
+  const size = value?.size;
+  const watermark = value?.watermark;
+  if (
+    typeof model !== "string" ||
+    !SEEDREAM_IMAGE_SIZES.some((candidate) => candidate === size) ||
+    typeof watermark !== "boolean"
+  ) {
+    return null;
+  }
+  return { model, size: size as SeedreamImageSize, watermark };
+}
+
 function _categoryForTool(toolName: string): BuiltInToolCategoryId {
   if (FILE_SYSTEM_TOOL_NAMES.has(toolName)) {
     return "fileSystem";
   }
   if (WEB_TOOL_NAMES.has(toolName)) {
     return "web";
+  }
+  if (MEDIA_TOOL_NAMES.has(toolName)) {
+    return "media";
   }
   return "misc";
 }

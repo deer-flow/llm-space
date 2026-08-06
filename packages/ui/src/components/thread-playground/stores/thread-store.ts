@@ -109,6 +109,8 @@ export interface ThreadState {
   status: ThreadStoreStatus;
   abortController: AbortController | null;
   activeRunId: string | null;
+  /** Auto-executing tool calls for in-flight UI feedback; never persisted. */
+  executingToolCallIds: string[];
   collapsedMessageIds: string[];
   runValidationIssue: RunValidationIssue | null;
   /**
@@ -203,6 +205,8 @@ export function createThreadStore(
     resolveModel?: (
       saved: ModelConfig | null | undefined
     ) => ModelConfig | null;
+    /** Resolve the current tab's ephemeral connection choice for a provider. */
+    getProfileId?: (providerId: string) => string | undefined;
     /**
      * Whether a run should automatically execute a model turn's pending tool
      * calls (instead of waiting for the user to click "Call tools"). Read fresh
@@ -508,7 +512,8 @@ export function createThreadStore(
        */
       const executePendingToolCalls = async (
         messages: Message[],
-        signal: AbortSignal
+        signal: AbortSignal,
+        runId: string
       ): Promise<Message[] | null> => {
         const execute = options.executeTool;
         if (!execute) {
@@ -527,7 +532,7 @@ export function createThreadStore(
             .filter(isExecutableTool)
             .map((tool) => [tool.name, tool])
         );
-        // Every tool call must map to an executable (MCP/built-in) tool; a
+        // Every tool call must map to an executable tool; a
         // single `function` stub means the turn needs a hand-written result, so
         // we bail and let the user fill it in.
         const executable: {
@@ -559,6 +564,9 @@ export function createThreadStore(
           }
           executable.push({ toolCall, tool });
         }
+        if (get().activeRunId !== runId) {
+          return null;
+        }
         const owningThread = structuredClone(get().thread);
         const variables = executable.some(({ tool }) => tool.type === "plugin")
           ? await resolveThreadPromptVariableValues({
@@ -569,52 +577,64 @@ export function createThreadStore(
             })
           : {};
         const invocationContext = { thread: owningThread, variables };
-        const results = await Promise.all(
-          executable.map(async ({ toolCall, tool }) => {
-            try {
-              const { content, isError } = await execute(
-                tool,
-                toolCall.input.arguments,
-                invocationContext
-              );
-              return {
-                id: toolCall.id,
-                content,
-                isError,
-              };
-            } catch (error) {
-              const text =
-                error instanceof Error ? error.message : "Tool call failed";
-              return {
-                id: toolCall.id,
-                content: [{ type: "text" as const, text }],
-                isError: true,
-              };
-            }
-          })
-        );
-        // An abort could have landed while tools were in flight; drop the
-        // results and let the run's abort handling take over.
-        if (signal.aborted) {
+        if (signal.aborted || get().activeRunId !== runId) {
           return null;
         }
-        const resultById = new Map(results.map((r) => [r.id, r]));
-        const nextLast: AssistantMessage = {
-          ...last,
-          toolCalls: toolCalls.map((toolCall) => {
-            const result = resultById.get(toolCall.id)!;
-            return {
-              ...toolCall,
-              output: {
-                content: result.content,
-                isError: result.isError,
-              },
-            };
-          }),
-        };
-        const next = [...messages.slice(0, -1), nextLast];
-        setMessages(next);
-        return next;
+        set({
+          executingToolCallIds: executable.map(({ toolCall }) => toolCall.id),
+        });
+        try {
+          const results = await Promise.all(
+            executable.map(async ({ toolCall, tool }) => {
+              try {
+                const { content, isError } = await execute(
+                  tool,
+                  toolCall.input.arguments,
+                  invocationContext
+                );
+                return {
+                  id: toolCall.id,
+                  content,
+                  isError,
+                };
+              } catch (error) {
+                const text =
+                  error instanceof Error ? error.message : "Tool call failed";
+                return {
+                  id: toolCall.id,
+                  content: [{ type: "text" as const, text }],
+                  isError: true,
+                };
+              }
+            })
+          );
+          // An abort could have landed while tools were in flight; drop the
+          // results and let the run's abort handling take over.
+          if (signal.aborted) {
+            return null;
+          }
+          const resultById = new Map(results.map((r) => [r.id, r]));
+          const nextLast: AssistantMessage = {
+            ...last,
+            toolCalls: toolCalls.map((toolCall) => {
+              const result = resultById.get(toolCall.id)!;
+              return {
+                ...toolCall,
+                output: {
+                  content: result.content,
+                  isError: result.isError,
+                },
+              };
+            }),
+          };
+          const next = [...messages.slice(0, -1), nextLast];
+          setMessages(next);
+          return next;
+        } finally {
+          if (get().activeRunId === runId) {
+            set({ executingToolCallIds: [] });
+          }
+        }
       };
 
       // --- store --------------------------------------------------------------
@@ -626,6 +646,7 @@ export function createThreadStore(
         status: "idle",
         abortController: null,
         activeRunId: null,
+        executingToolCallIds: [],
         collapsedMessageIds: [],
         runValidationIssue: null,
         autoFocusMessageId: null,
@@ -1100,6 +1121,7 @@ export function createThreadStore(
             abortController,
             activeRunId: runId,
             streamingMessage: null,
+            executingToolCallIds: [],
           });
 
           // Commit the truncation while running so it folds into the run's
@@ -1156,6 +1178,7 @@ export function createThreadStore(
               status: "idle",
               abortController: null,
               activeRunId: null,
+              executingToolCallIds: [],
             });
             stopActiveRun = null;
 
@@ -1245,6 +1268,7 @@ export function createThreadStore(
               promptSnapshot = context.snapshot;
               const now = options.now ?? (() => performance.now());
               const turnStartedAt = now();
+              const profileId = options.getProfileId?.(model.provider);
               const response = streamThread(
                 {
                   context,
@@ -1253,6 +1277,10 @@ export function createThreadStore(
                 {
                   signal: abortController.signal,
                   transport: options.transport,
+                  connection: {
+                    providerId: model.provider,
+                    ...(profileId ? { profileId } : {}),
+                  },
                 }
               );
               for await (const chunk of response) {
@@ -1362,7 +1390,8 @@ export function createThreadStore(
               }
               const withResults = await executePendingToolCalls(
                 messages,
-                abortController.signal
+                abortController.signal,
+                runId
               );
               if (!isActiveRun()) {
                 break;

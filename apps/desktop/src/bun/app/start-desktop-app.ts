@@ -25,7 +25,7 @@ import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
 import { McpManager } from "../mcp";
-import { ModelManager } from "../models";
+import { createConfiguredArkImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
 import {
   PluginCommandExecutionController,
@@ -63,6 +63,10 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
+  const generateImage = createConfiguredArkImageGenerator({
+    modelManager,
+    env: process.env,
+  });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager({
     managedSkillsDir: getManagedSkillsDir(),
@@ -189,6 +193,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       createBuiltInToolsModule({
         env: process.env,
         findSkill: skillsManager.findSkill.bind(skillsManager),
+        generateImage,
         getSearchSettings: searchSettings.get.bind(searchSettings),
         workspaceRoot: workspacePath,
         openPath,

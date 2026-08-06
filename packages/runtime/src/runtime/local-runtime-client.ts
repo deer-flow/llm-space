@@ -83,6 +83,26 @@ export class LocalRuntimeClient implements RuntimeClient {
     return this.availableModels();
   }
 
+  async addProviderProfile(providerId: string) {
+    this._deps.modelManager.addProfile(providerId);
+    return this.availableModels();
+  }
+
+  async updateProviderProfile(
+    input: Parameters<RuntimeClient["updateProviderProfile"]>[0]
+  ) {
+    const { providerId, profileId, ...fields } = input;
+    this._deps.modelManager.updateProfile(providerId, profileId, fields);
+    return this.availableModels();
+  }
+
+  async removeProviderProfile(
+    input: Parameters<RuntimeClient["removeProviderProfile"]>[0]
+  ) {
+    this._deps.modelManager.removeProfile(input.providerId, input.profileId);
+    return this.availableModels();
+  }
+
   async updateProvider(input: Parameters<RuntimeClient["updateProvider"]>[0]) {
     const { providerId, ...fields } = input;
     this._deps.modelManager.updateProvider(providerId, fields);
@@ -123,7 +143,12 @@ export class LocalRuntimeClient implements RuntimeClient {
     input: Parameters<RuntimeClient["resolveGeneratorEnv"]>[0]
   ) {
     const modelApiKey =
-      (await this._deps.modelManager.getApiKey(input.providerId, true)) ?? "";
+      (
+        await this._deps.modelManager.resolveConnection({
+          providerId: input.providerId,
+          profileId: input.profileId,
+        })
+      ).apiKey ?? "";
     const envValues: Record<string, string> = {};
     for (const name of input.envNames) {
       envValues[name] = process.env[name] ?? "";

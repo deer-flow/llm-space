@@ -8,13 +8,7 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
-import {
-  act,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useState,
-} from "react";
+import { act, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { runRemoteRuntimeActionIfAllowed } from "@/components/remote-runtime-actions";
@@ -127,6 +121,9 @@ function _client(): ModelClient {
     removeProvider: unchanged,
     addProvider: unchanged,
     addCustomProvider: unchanged,
+    addProviderProfile: unchanged,
+    updateProviderProfile: unchanged,
+    removeProviderProfile: unchanged,
     updateProvider: unchanged,
     setModelEnabled: unchanged,
     setAllModelsEnabled: unchanged,
@@ -223,11 +220,7 @@ function _RuntimePaneRenderHarness({
   const getPaneKey = useCallback((pane: TestPane) => pane.id, []);
   const renderPane = useCallback(
     (pane: TestPane, active: boolean) => (
-      <_RenderCountPane
-        active={active}
-        onRender={onRender}
-        pane={pane}
-      />
+      <_RenderCountPane active={active} onRender={onRender} pane={pane} />
     ),
     [onRender]
   );
@@ -361,10 +354,7 @@ describe("WorkspaceModelScope", () => {
     ]);
     const clientCreations = new Map<RuntimeId, number>();
     const createClient = (runtimeId: RuntimeId) => {
-      clientCreations.set(
-        runtimeId,
-        (clientCreations.get(runtimeId) ?? 0) + 1
-      );
+      clientCreations.set(runtimeId, (clientCreations.get(runtimeId) ?? 0) + 1);
       const client = clients.get(runtimeId);
       if (!client) throw new Error(`Missing test client for ${runtimeId}`);
       return client;
@@ -554,7 +544,11 @@ describe("RuntimePaneHost", () => {
     activeRoot = _createRoot();
     await act(async () => {
       activeRoot?.render(
-        <_StoreEventBridge store={store} callbacks={callbacks} onMount={() => () => undefined} />
+        <_StoreEventBridge
+          store={store}
+          callbacks={callbacks}
+          onMount={() => () => undefined}
+        />
       );
     });
 
@@ -610,8 +604,7 @@ describe("RuntimePaneHost", () => {
           callbacks={{
             onStreamingStart: (runId) =>
               tracker.beginRun("local-pane", "local", runId),
-            onStreamingEnd: (runId) =>
-              tracker.settleRun("local-pane", runId),
+            onStreamingEnd: (runId) => tracker.settleRun("local-pane", runId),
           }}
           onLayout={() => {
             run = store.getState().run();
@@ -936,12 +929,7 @@ describe("RuntimePaneHost", () => {
     const replacementOwner = {};
     tracker.setPersistenceBusy("local-pane", "local", oldOwner, true);
     tracker.setPersistenceBusy("local-pane", "local", replacementOwner, true);
-    tracker.setPersistenceBusy(
-      "local-pane",
-      "local",
-      replacementOwner,
-      false
-    );
+    tracker.setPersistenceBusy("local-pane", "local", replacementOwner, false);
 
     expect(tracker.reservePanes(["local-pane"])).toBeNull();
     tracker.setPersistenceBusy("local-pane", "local", oldOwner, false);
@@ -1204,9 +1192,7 @@ describe("RuntimePaneHost", () => {
       local: 2,
       "remote:server-1": 2,
     });
-    expect(openTabs.map((tab) => tab.id)).toEqual(
-      panes.map((pane) => pane.id)
-    );
+    expect(openTabs.map((tab) => tab.id)).toEqual(panes.map((pane) => pane.id));
     expect(stores.get("local-hidden")).toBe(originalLocalHidden);
     expect(stores.get("remote-hidden")).toBe(originalRemoteHidden);
     stores.get("local-hidden")?.getState().undo();

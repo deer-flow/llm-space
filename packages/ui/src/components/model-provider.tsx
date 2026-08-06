@@ -2,9 +2,11 @@
 
 import type * as pi from "@earendil-works/pi-ai";
 import type {
+  ArkImageGenerationConfig,
   CustomModel,
   ModelConfig,
   ModelProviderGroup,
+  ProviderProfilePatch,
 } from "@llm-space/core";
 import { uuid } from "@llm-space/core";
 import { resolveModelConfig } from "@llm-space/core/thread";
@@ -27,18 +29,24 @@ interface ModelContextValue {
   removeProvider: (providerId: string) => Promise<void>;
   addProvider: (providerId: string) => Promise<void>;
   addCustomProvider: (name: string, baseUrl: string) => Promise<string>;
+  addProviderProfile: (providerId: string) => Promise<string>;
+  updateProviderProfile: (
+    providerId: string,
+    profileId: string,
+    fields: ProviderProfilePatch
+  ) => Promise<void>;
+  removeProviderProfile: (
+    providerId: string,
+    profileId: string
+  ) => Promise<void>;
   updateProvider: (
     providerId: string,
     fields: {
-      apiKey?: string | null;
-      baseUrl?: string | null;
       name?: string | null;
       api?:
-        | "anthropic-messages"
-        | "openai-completions"
-        | "openai-responses"
-        | null;
+        "anthropic-messages" | "openai-completions" | "openai-responses" | null;
       icon?: string | null;
+      imageGeneration?: ArkImageGenerationConfig;
     }
   ) => Promise<void>;
   setModelEnabled: (
@@ -50,7 +58,8 @@ interface ModelContextValue {
   testModelConnection: (
     providerId: string,
     modelId: string,
-    candidate?: CustomModel
+    candidate?: CustomModel,
+    profileId?: string
   ) => Promise<void>;
   removeCustomModel: (providerId: string, modelId: string) => Promise<void>;
   upsertCustomModel: (
@@ -115,9 +124,7 @@ export function ModelProvider({
   const committedScopeRef = useRef({ client, epoch: 1 });
   const nextEpochRef = useRef(1);
   const latestRequestGenerationRef = useRef(0);
-  const mutationTailsRef = useRef(
-    new WeakMap<ModelClient, Promise<void>>()
-  );
+  const mutationTailsRef = useRef(new WeakMap<ModelClient, Promise<void>>());
   useLayoutEffect(() => {
     if (committedScopeRef.current.client === client) return;
     const nextScope = {
@@ -147,9 +154,7 @@ export function ModelProvider({
 
   const isCurrentScope = useCallback((lease: ModelRequestLease) => {
     const scope = committedScopeRef.current;
-    return (
-      scope.client === lease.client && scope.epoch === lease.epoch
-    );
+    return scope.client === lease.client && scope.epoch === lease.epoch;
   }, []);
   const isCurrentRequest = useCallback(
     (lease: ModelRequestLease) =>
@@ -165,7 +170,8 @@ export function ModelProvider({
     ): Promise<{ lease: ModelRequestLease; value: T } | null> => {
       const lease = beginRequest(source);
       if (!lease) return null;
-      const previous = mutationTailsRef.current.get(source) ?? Promise.resolve();
+      const previous =
+        mutationTailsRef.current.get(source) ?? Promise.resolve();
       const result = previous.then(async () => ({
         lease,
         value: await mutate(),
@@ -194,8 +200,7 @@ export function ModelProvider({
           ? {
               client: lease.client,
               defaultModel:
-                current.client === lease.client &&
-                current.epoch === lease.epoch
+                current.client === lease.client && current.epoch === lease.epoch
                   ? current.defaultModel
                   : null,
               epoch: lease.epoch,
@@ -263,13 +268,54 @@ export function ModelProvider({
     [client, commitProviders, enqueueMutation]
   );
 
+  const addProviderProfile = useCallback(
+    async (providerId: string) => {
+      const result = await enqueueMutation(client, () =>
+        client.addProviderProfile(providerId)
+      );
+      if (!result) {
+        throw new Error("Model provider scope changed while adding a profile.");
+      }
+      commitProviders(result.lease, result.value);
+      const profile = result.value
+        .find((provider) => provider.id === providerId)
+        ?.profiles.at(-1);
+      if (!profile) {
+        throw new Error(`Failed to add profile for provider: ${providerId}`);
+      }
+      return profile.id;
+    },
+    [client, commitProviders, enqueueMutation]
+  );
+
+  const updateProviderProfile = useCallback(
+    async (
+      providerId: string,
+      profileId: string,
+      fields: ProviderProfilePatch
+    ) => {
+      const result = await enqueueMutation(client, () =>
+        client.updateProviderProfile(providerId, profileId, fields)
+      );
+      if (result) commitProviders(result.lease, result.value);
+    },
+    [client, commitProviders, enqueueMutation]
+  );
+
+  const removeProviderProfile = useCallback(
+    async (providerId: string, profileId: string) => {
+      const result = await enqueueMutation(client, () =>
+        client.removeProviderProfile(providerId, profileId)
+      );
+      if (result) commitProviders(result.lease, result.value);
+    },
+    [client, commitProviders, enqueueMutation]
+  );
+
   const updateProvider = useCallback(
     async (
       providerId: string,
       fields: {
-        apiKey?: string | null;
-        baseUrl?: string | null;
-        headers?: Record<string, string> | null;
         name?: string | null;
         api?:
           | "anthropic-messages"
@@ -277,6 +323,7 @@ export function ModelProvider({
           | "openai-responses"
           | null;
         icon?: string | null;
+        imageGeneration?: ArkImageGenerationConfig;
       }
     ) => {
       const result = await enqueueMutation(client, () =>
@@ -308,8 +355,18 @@ export function ModelProvider({
   );
 
   const testModelConnection = useCallback(
-    async (providerId: string, modelId: string, candidate?: CustomModel) => {
-      await client.testModelConnection(providerId, modelId, candidate);
+    async (
+      providerId: string,
+      modelId: string,
+      candidate?: CustomModel,
+      profileId?: string
+    ) => {
+      await client.testModelConnection(
+        providerId,
+        modelId,
+        candidate,
+        profileId
+      );
     },
     [client]
   );
@@ -382,12 +439,11 @@ export function ModelProvider({
     committedScope.client === client &&
     snapshot.client === client &&
     snapshot.epoch === committedScope.epoch;
-  const providers =
-    snapshotMatchesCommittedScope
-      ? snapshot.providers
-      : snapshot.providers === null
-        ? null
-        : EMPTY_MODEL_PROVIDERS;
+  const providers = snapshotMatchesCommittedScope
+    ? snapshot.providers
+    : snapshot.providers === null
+      ? null
+      : EMPTY_MODEL_PROVIDERS;
   const defaultModel = snapshotMatchesCommittedScope
     ? snapshot.defaultModel
     : null;
@@ -402,6 +458,9 @@ export function ModelProvider({
       removeProvider,
       addProvider,
       addCustomProvider,
+      addProviderProfile,
+      updateProviderProfile,
+      removeProviderProfile,
       updateProvider,
       setModelEnabled,
       setAllModelsEnabled,
@@ -419,6 +478,9 @@ export function ModelProvider({
     removeProvider,
     addProvider,
     addCustomProvider,
+    addProviderProfile,
+    updateProviderProfile,
+    removeProviderProfile,
     updateProvider,
     setModelEnabled,
     setAllModelsEnabled,
@@ -518,19 +580,35 @@ export function useFetchBuiltinProviders(): () => Promise<
   return useModelProvider().builtinProviders;
 }
 
+export function useAddProviderProfile(): (
+  providerId: string
+) => Promise<string> {
+  return useModelProvider().addProviderProfile;
+}
+
+export function useUpdateProviderProfile(): (
+  providerId: string,
+  profileId: string,
+  fields: ProviderProfilePatch
+) => Promise<void> {
+  return useModelProvider().updateProviderProfile;
+}
+
+export function useRemoveProviderProfile(): (
+  providerId: string,
+  profileId: string
+) => Promise<void> {
+  return useModelProvider().removeProviderProfile;
+}
+
 export function useUpdateProvider(): (
   providerId: string,
   fields: {
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    headers?: Record<string, string> | null;
     name?: string | null;
     api?:
-      | "anthropic-messages"
-      | "openai-completions"
-      | "openai-responses"
-      | null;
+      "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }
 ) => Promise<void> {
   return useModelProvider().updateProvider;
@@ -554,7 +632,8 @@ export function useSetAllModelsEnabled(): (
 export function useTestModelConnection(): (
   providerId: string,
   modelId: string,
-  candidate?: CustomModel
+  candidate?: CustomModel,
+  profileId?: string
 ) => Promise<void> {
   return useModelProvider().testModelConnection;
 }

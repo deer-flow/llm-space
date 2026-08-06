@@ -1,4 +1,4 @@
-import type { Thread } from "@llm-space/core";
+import type { ProviderConnectionRef, Thread } from "@llm-space/core";
 import type { RuntimeClient } from "@llm-space/runtime/runtime";
 
 import { ServerError, toServerError } from "./errors";
@@ -93,6 +93,18 @@ async function _dispatch(
       return runtime.addCustomProvider(
         params as Parameters<RuntimeClient["addCustomProvider"]>[0]
       );
+    case "models.addProviderProfile":
+      return runtime.addProviderProfile(_stringParam(params, "providerId"));
+    case "models.updateProviderProfile":
+      return runtime.updateProviderProfile(
+        params as unknown as Parameters<
+          RuntimeClient["updateProviderProfile"]
+        >[0]
+      );
+    case "models.removeProviderProfile":
+      return runtime.removeProviderProfile(
+        params as Parameters<RuntimeClient["removeProviderProfile"]>[0]
+      );
     case "models.updateProvider":
       return runtime.updateProvider(
         params as Parameters<RuntimeClient["updateProvider"]>[0]
@@ -110,6 +122,9 @@ async function _dispatch(
     case "models.resolveGeneratorEnv":
       return runtime.resolveGeneratorEnv({
         providerId: _stringParam(params, "providerId"),
+        ...(_optionalStringParam(params, "profileId")
+          ? { profileId: _optionalStringParam(params, "profileId") }
+          : {}),
         envNames: _stringArrayParam(params, "envNames"),
       });
     case "models.setDefault":
@@ -166,6 +181,8 @@ async function _dispatch(
       return runtime.builtInCallTool({
         name: _stringParam(params, "name"),
         arguments: _recordParam(params, "arguments"),
+        config: _optionalRecordParam(params, "config"),
+        connection: _optionalProviderConnectionParam(params),
       });
     case "search.get":
       return runtime.getSearchSettings();
@@ -287,6 +304,20 @@ function _stringParam(params: Record<string, unknown>, name: string): string {
   return value;
 }
 
+function _optionalStringParam(
+  params: Record<string, unknown>,
+  name: string
+): string | undefined {
+  const value = params[name];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    throw new ServerError("invalid_request", `${name} must be a string.`);
+  }
+  return value;
+}
+
 function _stringArrayParam(
   params: Record<string, unknown>,
   name: string
@@ -324,4 +355,26 @@ function _recordParam(
     );
   }
   return value as Record<string, unknown>;
+}
+
+/** Read an optional object parameter without accepting arrays or primitives. */
+function _optionalRecordParam(
+  params: Record<string, unknown>,
+  name: string
+): Record<string, unknown> | undefined {
+  return params[name] === undefined ? undefined : _recordParam(params, name);
+}
+
+function _optionalProviderConnectionParam(
+  params: Record<string, unknown>
+): ProviderConnectionRef | undefined {
+  const connection = _optionalRecordParam(params, "connection");
+  if (!connection) {
+    return undefined;
+  }
+  const profileId = _optionalStringParam(connection, "profileId");
+  return {
+    providerId: _stringParam(connection, "providerId"),
+    ...(profileId ? { profileId } : {}),
+  };
 }

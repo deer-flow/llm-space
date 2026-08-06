@@ -1,7 +1,7 @@
 # LLM Space Capability Map
 
-- Last updated: 2026-07-12
-- Map status: refreshed after Headless Thread Semantics V1. A dedicated browser-safe `@llm-space/core/thread` entrypoint now owns prompt materialization, usage arithmetic, and persisted run/evaluation lifecycle rules; desktop retains UI/session and host-specific adapters. Public or dynamically loaded plugins remain absent.
+- Last updated: 2026-07-31
+- Map status: refreshed after native Ark Seedream Image Generation V1, image-model management parity, and per-Thread tool configuration. The desktop and headless runtimes share a first-party `generate_image` tool; Ark manages curated and custom image inventory separately from Chat models, while each Thread tool owns model/size/watermark policy. Reference images, multi-image generation, streaming, video, and public plugins remain absent.
 - Evidence rule: entries marked `confirmed` cite current rendered-product or current-code evidence. Entries marked `stale` rely on previous logs or code paths not fully re-inspected in this loop. Entries marked `unknown` need a future product-surface check before they can drive a recommendation.
 
 ## First-Run Model Setup
@@ -404,11 +404,44 @@
 
 - Status: operational settings surface
 - Freshness: confirmed
-- Last checked: 2026-07-03
+- Last checked: 2026-07-31
 - Evidence:
   - Current first-run CEF flow added `OpenAI Codex` through onboarding and persisted provider settings in the isolated root.
   - Previous log `logs/2026-07-02-195244-first-run-model-setup-v1.md` verified provider add/persist flows through onboarding and settings.
+  - Current CEF screenshot `audits/2026-07-31-125706-seedream-discovery/01-ark-model-settings-current.png` shows the VolcEngine Ark settings surface exposing API key, base URL, and five chat models, with no image-generation configuration.
+  - Current implementation screenshot `audits/2026-07-31-140829-seedream-image-generation-v1/01-ark-image-settings.png` shows the separate Ark Image generation card with Seedream 5.0 Pro and 2K defaults while chat models remain a distinct list.
+  - Current correction screenshots `audits/2026-07-31-151134-seedream-image-model-parity/01-image-and-chat-model-parity.png` and `02-custom-image-model-editor.png` show Image models parallel to Chat models, with independent defaults, add/edit controls, per-row switches, counts, filtering/bulk actions, icons, and supported/default-size editing.
+  - Real CEF interaction added `ep-seedream-custom`, persisted it across a full restart, supported a `0/5` all-disabled state, and opened a confirmation before deletion.
+  - `packages/runtime/src/models/model-manager.test.ts` verifies custom image-model inventory without Chat-model registration, reload, duplicate-id rejection, and size/default validation.
+  - Current CEF screenshot `audits/2026-07-31-161048-generate-image-tool-config/03-settings-no-defaults.png` confirms Ark Settings owns Image models and Chat models but no longer exposes provider-level image-generation defaults.
+  - `packages/runtime/src/models/model-manager.test.ts` now verifies legacy provider defaults migrate to inventory-only configuration.
   - `apps/desktop/src/components/settings/models-page.tsx` owns provider/model CRUD UI.
-- Boundary: manage builtin/custom providers and enabled models through local settings.
-- Explicit non-goals: account management, cloud sync, provider billing/quota checks.
-- Visible gaps: no V1 connectivity validation after a provider is configured.
+- Boundary: manage builtin/custom chat providers and enabled Chat models through local settings; VolcEngine Ark additionally manages a separate curated/custom Image model inventory with add, edit, delete confirmation, enable/disable, bulk actions, filtering, count, and icon behavior. Provider settings do not choose `generate_image` execution defaults; each Thread tool owns that model/size/watermark policy, and image models never enter Chat model selection.
+- Explicit non-goals: account management, cloud sync, provider billing/quota checks, or a paid connection-test action on image-model rows.
+- Visible gaps: no image-specific connectivity or quota validation after a provider is configured; very large modality catalogs may need search/collapse; hover-revealed custom-model actions are less discoverable on touch-only input; the curated Seedream capability table requires maintenance as Ark evolves.
+
+## Agent Image Generation
+
+- Status: shipped native Ark Seedream V1
+- Freshness: confirmed
+- Last checked: 2026-07-31
+- Evidence:
+  - Current CEF screenshot `audits/2026-07-31-125706-seedream-discovery/01-ark-model-settings-current.png` shows no Seedream or image-generation section under VolcEngine Ark.
+  - Current CEF screenshot `audits/2026-07-31-125706-seedream-discovery/02-built-in-tools-current.png` shows 16 built-in tools across File system, Web, and Misc, with no Media category or `generate_image` tool.
+  - `packages/runtime/src/models/providers/ark.ts` defines Ark only as an OpenAI-compatible chat-completions provider.
+  - `packages/runtime/src/tools/built-in/built-in-tools-module.ts` registers only web, filesystem, and misc contributions.
+  - Existing `BuiltinToolCallResponse`, pi converters, Tool Result UI, and image-blob persistence already preserve native image content end to end, so the missing boundary is provider configuration and execution rather than rendering or storage.
+  - Primary-source research in `research/seedream-primary-sources.md` confirms Ark's synchronous `POST /api/v3/images/generations`, Bearer API-key authentication, current Seedream model IDs, and base64 response option.
+  - Current screenshot `audits/2026-07-31-140829-seedream-image-generation-v1/02-media-tool-picker.png` shows the Media category and enabled `generate_image` tool.
+  - Current screenshots `03-generated-image-result.png` and `04-persisted-image-after-restart.png` show compact actual model/size metadata plus native inline image content before and after a full desktop restart.
+  - The deterministic Ark fixture observed `doubao-seedream-5-0-pro-260628`, the exact Tool Call prompt, `size: "2K"`, `watermark: true`, `response_format: "b64_json"`, and `stream: false` from the real CEF/RPC/runtime path.
+  - Current correction screenshots `audits/2026-07-31-151134-seedream-image-model-parity/03-all-disabled-tool-error.png`, `04-custom-model-success.png`, and `05-persisted-custom-result-after-restart.png` show actionable local failure with every image model disabled, successful generation through a custom endpoint id, retained image output after restart, and an unchanged Doubao Chat-model selection.
+  - The correction fixture received no request for the all-disabled Tool Call, then received `ep-seedream-custom`, `2K`, watermark enabled, base64 output, and `stream: false` after re-enabling the custom model.
+  - `packages/runtime/src/models/ark-image-generation.test.ts`, `packages/runtime/src/models/model-manager.test.ts`, `packages/runtime/src/tools/built-in/built-in-tools-module.test.ts`, and the full 386-test suite cover native request/result/error behavior, custom and disabled model behavior, structured output, and registration.
+  - Current CEF screenshots `audits/2026-07-31-161048-generate-image-tool-config/01-tool-config-defaults.png` and `02-tool-config-selected.png` show enabled image-model, default-size, and watermark configuration directly beneath `generate_image` in Add built-in tools.
+  - Current screenshots `04-native-image-result.png` and `05-disabled-model-error.png` show a persisted native result after restart and an actionable Tool Call error after the selected model is disabled.
+  - The deterministic fixture received `ep-seedream-large`, `4K`, watermark disabled, base64 output, and `stream: false`; after that model was disabled, the failure path sent no image-generation request.
+  - Full verification on 2026-07-31 passed 386 Bun tests, lint, root/runtime/server TypeScript, and the production renderer build; UI/desktop TypeScript still reports the unrelated existing `DraggableStyle` baseline in `message-list-view.tsx:287`.
+- Boundary: a user can manage curated and custom Ark Seedream image models, add or manage `generate_image` from Media, bind one enabled image model plus default size/watermark policy to that Thread tool, let an Agent request one synchronous non-streaming image from a required prompt and optional size preset, inspect compact actual model/size metadata plus native image content, and retain both tool policy and result across restart. Disabled/deleted saved bindings remain explicit and report an actionable Tool Call error without sending an image-generation request.
+- Explicit non-goals: reference-image editing, multi-image generation, partial/SSE previews, Access Key signing, OpenRouter, video generation, a new confirmation framework, or standalone image export.
+- Visible gaps: no paid Ark account smoke test, image-specific connectivity check, prompt-aware preview accessible name, or representative-latency audit of the running state; builtin model capabilities remain curated rather than remotely discovered.

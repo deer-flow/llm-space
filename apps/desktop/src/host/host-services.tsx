@@ -66,6 +66,21 @@ export function createElectrobunModelClient(
       _rpc().request.addProvider({ ...scope(), providerId }),
     addCustomProvider: (input) =>
       _rpc().request.addCustomProvider({ ...scope(), ...input }),
+    addProviderProfile: (providerId) =>
+      _rpc().request.addProviderProfile({ ...scope(), providerId }),
+    updateProviderProfile: (providerId, profileId, fields) =>
+      _rpc().request.updateProviderProfile({
+        ...scope(),
+        providerId,
+        profileId,
+        ...fields,
+      }),
+    removeProviderProfile: (providerId, profileId) =>
+      _rpc().request.removeProviderProfile({
+        ...scope(),
+        providerId,
+        profileId,
+      }),
     updateProvider: (providerId, fields) =>
       _rpc().request.updateProvider({ ...scope(), providerId, ...fields }),
     setModelEnabled: (providerId, modelId, enabled) =>
@@ -77,10 +92,11 @@ export function createElectrobunModelClient(
       }),
     setAllModelsEnabled: (providerId, enabled) =>
       _rpc().request.setAllModelsEnabled({ ...scope(), providerId, enabled }),
-    testModelConnection: async (providerId, modelId, candidate) => {
+    testModelConnection: async (providerId, modelId, candidate, profileId) => {
       await _rpc().request.testModelConnection({
         ...scope(),
         providerId,
+        profileId,
         modelId,
         candidate,
       });
@@ -159,11 +175,12 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
         resolveEnv: (
           providerId: string,
           envNames: string[],
-          options: { runtimeId: string }
+          options: { runtimeId: string; profileId?: string }
         ) =>
           resolveGeneratorEnv(
             providerId,
             envNames,
+            options.profileId,
             options.runtimeId as RuntimeId
           ),
       },

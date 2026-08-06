@@ -8,10 +8,7 @@ import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import { startSshRemoteRuntime } from "./ssh-remote-runtime";
 
 let scenario:
-  | "missing-runtime-binary"
-  | "non-runtime-failure"
-  | "port-in-use"
-  | "success";
+  "missing-runtime-binary" | "non-runtime-failure" | "port-in-use" | "success";
 let installCalls = 0;
 let serverSpawnCalls = 0;
 let stopCalls = 0;
@@ -277,9 +274,7 @@ describe("startSshRemoteRuntime", () => {
       const reconnectedEndpoint = remote.latestEndpoint();
 
       expect(reconnectedEndpoint.localPort).toBe(41002);
-      expect(reconnectedEndpoint.remotePort).not.toBe(
-        firstEndpoint.remotePort
-      );
+      expect(reconnectedEndpoint.remotePort).not.toBe(firstEndpoint.remotePort);
       expect(reconnectedEndpoint.token).not.toBe(firstEndpoint.token);
       expect(remote.endpointState(secondEndpoint)).toBe("stopped");
       expect(remote.endpointState(reconnectedEndpoint)).toBe("healthy");
@@ -367,10 +362,7 @@ describe("startSshRemoteRuntime", () => {
     const remote = new StatefulSshFake();
     remote.collideEveryServer = true;
 
-    await _expectRejects(
-      remote.start(),
-      "no existing listener was stopped"
-    );
+    await _expectRejects(remote.start(), "no existing listener was stopped");
 
     expect(remote.serverProcesses()).toHaveLength(5);
     expect(remote.processes.every((process) => process.stopCompleted)).toBe(
@@ -430,7 +422,8 @@ describe("startSshRemoteRuntime", () => {
 
 function _serverPort(args: string[]): number {
   const match = /--port\s+(\d+)/.exec(args.at(-1) ?? "");
-  if (!match) throw new Error(`Missing remote server port in ${args.join(" ")}`);
+  if (!match)
+    throw new Error(`Missing remote server port in ${args.join(" ")}`);
   return Number(match[1]);
 }
 
@@ -538,7 +531,9 @@ class StatefulSshFake {
   }
 
   serverProcesses(): StatefulFakeProcess[] {
-    return this.processes.filter((process) => process.label === "remote server");
+    return this.processes.filter(
+      (process) => process.label === "remote server"
+    );
   }
 
   tunnelProcesses(): StatefulFakeProcess[] {
@@ -601,7 +596,8 @@ class StatefulSshFake {
   private _spawnTunnel(args: string[]): ManagedProcess {
     const forward = args[args.indexOf("-L") + 1] ?? "";
     const match = /^127\.0\.0\.1:(\d+):127\.0\.0\.1:(\d+)$/.exec(forward);
-    if (!match) throw new Error(`Missing tunnel endpoints in ${args.join(" ")}`);
+    if (!match)
+      throw new Error(`Missing tunnel endpoints in ${args.join(" ")}`);
     const localPort = Number(match[1]);
     const remotePort = Number(match[2]);
     const server = this.processes.find(

@@ -61,10 +61,8 @@ import { Input } from "../../../ui/input";
 import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
-import {
-  useThreadStore,
-  useThreadStoreApi,
-} from "../stores/thread-store";
+import { useProviderProfileSelection } from "../model/provider-profile-selection-provider";
+import { useThreadStore, useThreadStoreApi } from "../stores/thread-store";
 
 import { createGenerateProjectPromptPreparer } from "./generate-project-prompt-preparer";
 import {
@@ -128,6 +126,9 @@ export function GenerateProjectButton({
   const fallbackModel = useFirstAvailableModel();
   const providers = useModels();
   const model = savedModel ?? fallbackModel;
+  const { selectedProfileId } = useProviderProfileSelection(
+    model?.provider ?? ""
+  );
   const preparePromptContext = useMemo(
     () => createGenerateProjectPromptPreparer({ files, store }),
     [files, store]
@@ -250,6 +251,10 @@ export function GenerateProjectButton({
         const workflow = createWorkflowContext({
           runOneShot: createOneShotRunner({
             transport: generationRuntime.transport,
+            connection: {
+              providerId: model.provider,
+              ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
+            },
           }),
           defaultModel: model,
           signal: controller.signal,
@@ -268,9 +273,8 @@ export function GenerateProjectButton({
         // Resolve the thread's MCP tools to their server configs (transport,
         // command/URL) from settings so the generated project connects for real.
         // Best-effort — a failure here shouldn't abort generation.
-        const mcpServers = await _resolveMcpServers(
-          context,
-          () => generationRuntime.listMcpServers()
+        const mcpServers = await _resolveMcpServers(context, () =>
+          generationRuntime.listMcpServers()
         );
         setLastMcpServers(mcpServers);
         const outcome = await definition.run(workflow, {
@@ -283,7 +287,7 @@ export function GenerateProjectButton({
           skills: skillList.map((s) => ({ name: s.name, path: s.path })),
           renderedVariableValues,
           model,
-          modelInfo: _resolveModelInfo(providers, model),
+          modelInfo: _resolveModelInfo(providers, model, selectedProfileId),
           searchInfo,
           mcpServers,
           capabilities,
@@ -307,6 +311,7 @@ export function GenerateProjectButton({
       preparePromptContext,
       framework,
       providers,
+      selectedProfileId,
       mcp,
       useMetaUserPrompt,
     ]
@@ -394,7 +399,7 @@ export function GenerateProjectButton({
     setWritingEnv(true);
     let envCreated = false;
     try {
-      const modelInfo = _resolveModelInfo(providers, model);
+      const modelInfo = _resolveModelInfo(providers, model, selectedProfileId);
       const usesWebTools = (context?.tools ?? []).some(
         (t) =>
           t.type === "builtin" &&
@@ -417,7 +422,8 @@ export function GenerateProjectButton({
       }
       const { modelApiKey, envValues } = await generationRuntime.resolveEnv(
         model.provider,
-        envNames
+        envNames,
+        selectedProfileId
       );
       const resolveKey = (raw: string | undefined) =>
         !raw ? "" : raw.startsWith("$") ? (envValues[raw.slice(1)] ?? "") : raw;
@@ -466,6 +472,7 @@ export function GenerateProjectButton({
     model,
     result,
     providers,
+    selectedProfileId,
     context,
     lastSearch,
     lastMcpServers,
@@ -1421,18 +1428,22 @@ function ProgressLine({ event }: { event: WorkflowEvent }) {
  */
 function _resolveModelInfo(
   providers: ModelProviderGroup[],
-  model: ModelConfig
+  model: ModelConfig,
+  profileId?: string
 ): GeneratorModelInfo {
   const group = providers.find((g) => g.id === model.provider);
   const piModel = group?.models.find((m) => m.id === model.id);
+  const profile =
+    group?.profiles.find((candidate) => candidate.id === profileId) ??
+    group?.profiles[0];
   // `compat.requiresReasoningContentOnAssistantMessages` marks DeepSeek-style
   // reasoning models served over an OpenAI-compatible API.
   const compat = piModel?.compat as
     { requiresReasoningContentOnAssistantMessages?: boolean } | undefined;
   return {
     name: piModel?.name ?? model.id,
-    baseUrl: group?.baseUrl || piModel?.baseUrl || undefined,
-    apiKey: group?.apiKey,
+    baseUrl: profile?.baseUrl || piModel?.baseUrl || undefined,
+    apiKey: profile?.apiKey,
     anthropic: piModel?.api === "anthropic-messages",
     deepseekThinking:
       compat?.requiresReasoningContentOnAssistantMessages === true,

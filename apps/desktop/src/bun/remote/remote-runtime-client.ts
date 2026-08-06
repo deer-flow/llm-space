@@ -1,4 +1,5 @@
 import type {
+  ArkImageGenerationConfig,
   AgentEvent,
   BuiltinTool,
   CustomModel,
@@ -10,6 +11,7 @@ import type {
   ModelConfig,
   ModelProviderGroup,
   NetworkSettings,
+  ProviderConnectionRef,
   SearchSettings,
   SkillContent,
   SkillInfo,
@@ -179,7 +181,10 @@ export class RemoteRuntimeClient implements RuntimeClient {
       const response = await fetch(`${this._baseUrl}/stream`, {
         method: "POST",
         headers: this._headers(),
-        body: JSON.stringify({ request: payload.request }),
+        body: JSON.stringify({
+          request: payload.request,
+          ...(payload.connection ? { connection: payload.connection } : {}),
+        }),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -258,15 +263,34 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }) {
     return this._rpc<ModelProviderGroup[]>("models.addCustomProvider", input);
   }
+  addProviderProfile(providerId: string) {
+    return this._rpc<ModelProviderGroup[]>("models.addProviderProfile", {
+      providerId,
+    });
+  }
+  updateProviderProfile(
+    input: Parameters<RuntimeClient["updateProviderProfile"]>[0]
+  ) {
+    return this._rpc<ModelProviderGroup[]>(
+      "models.updateProviderProfile",
+      input
+    );
+  }
+  removeProviderProfile(
+    input: Parameters<RuntimeClient["removeProviderProfile"]>[0]
+  ) {
+    return this._rpc<ModelProviderGroup[]>(
+      "models.removeProviderProfile",
+      input
+    );
+  }
   updateProvider(input: {
     providerId: string;
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    headers?: Record<string, string> | null;
     name?: string | null;
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
+    imageGeneration?: ArkImageGenerationConfig;
   }) {
     return this._rpc<ModelProviderGroup[]>("models.updateProvider", input);
   }
@@ -283,11 +307,9 @@ export class RemoteRuntimeClient implements RuntimeClient {
   setDefaultModel(model: ModelConfig | null) {
     return this._rpc<ModelConfig | null>("models.setDefault", { model });
   }
-  async testModelConnection(input: {
-    providerId: string;
-    modelId: string;
-    candidate?: CustomModel;
-  }) {
+  async testModelConnection(
+    input: Parameters<RuntimeClient["testModelConnection"]>[0]
+  ) {
     await this._rpc<null>("models.testConnection", input);
   }
   removeCustomModel(input: { providerId: string; modelId: string }) {
@@ -334,7 +356,12 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }) {
     return this._rpc<McpCallToolResponse>("mcp.callTool", input);
   }
-  builtInCallTool(input: { name: string; arguments: Record<string, unknown> }) {
+  builtInCallTool(input: {
+    name: string;
+    arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    connection?: ProviderConnectionRef;
+  }) {
     return this._rpc<Awaited<ReturnType<RuntimeClient["builtInCallTool"]>>>(
       "builtinTools.call",
       input

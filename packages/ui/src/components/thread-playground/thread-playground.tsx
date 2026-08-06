@@ -51,6 +51,11 @@ import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
+import {
+  ProviderProfileSelectionProvider,
+  useGetProviderProfileId,
+  useProviderProfileSelections,
+} from "./model/provider-profile-selection-provider";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
 import { createRuntimePromptFiles } from "./runtime-prompt-files";
@@ -67,6 +72,7 @@ import {
 } from "./stores";
 import { ThreadShareButton } from "./thread-share-button";
 import { ToolListView } from "./tool/tool-list-view";
+import { useToolExecutor } from "./tool/use-tool-executor";
 import { useShortcuts } from "./use-shortcuts";
 import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
 import { listEnabledPromptVariableSkills } from "./variable/prompt-variable-skills";
@@ -97,6 +103,8 @@ export interface ThreadPlaygroundProps {
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
   runtimeId?: string;
+  /** Recreate only the thread store while preserving per-tab UI selections. */
+  storeKey?: string | number;
 
   onChange?: (thread: Thread) => void;
   onRenameTitle?: (title: string) => Promise<boolean>;
@@ -129,7 +137,17 @@ export function ThreadPlayground({
   );
 }
 
-function _ThreadPlayground({
+function _ThreadPlayground({ storeKey, ...props }: ThreadPlaygroundProps) {
+  const providers = useModels();
+  const profileSelections = useProviderProfileSelections(providers);
+  return (
+    <ProviderProfileSelectionProvider value={profileSelections}>
+      <_ThreadPlaygroundStore key={storeKey} {...props} />
+    </ProviderProfileSelectionProvider>
+  );
+}
+
+function _ThreadPlaygroundStore({
   initialValue,
   transport,
   runtimeId,
@@ -148,7 +166,9 @@ function _ThreadPlayground({
   const defaultModel = useDefaultModel();
   const defaultModelRef = useRef(defaultModel);
   defaultModelRef.current = defaultModel;
-  const { executeTool, skills, files } = useHostServices();
+  const getProfileId = useGetProviderProfileId();
+  const { skills, files } = useHostServices();
+  const toolExecutor = useToolExecutor(ownerRuntimeId);
   const [store] = useState(() => {
     const promptFiles = createRuntimePromptFiles(files, ownerRuntimeId);
     return createThreadStore(initialValue, {
@@ -161,14 +181,9 @@ function _ThreadPlayground({
         ),
       getAutoRunTools,
       getReactLoop,
+      getProfileId,
       runtimeId: ownerRuntimeId,
-      executeTool: executeTool
-        ? (tool, args, context) =>
-            executeTool(tool, args, {
-              runtimeId: ownerRuntimeId,
-              ...context,
-            })
-        : undefined,
+      executeTool: toolExecutor ?? undefined,
       loadSkills: () =>
         listEnabledPromptVariableSkills(skills, {
           runtimeId: ownerRuntimeId,

@@ -2,6 +2,7 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { parseServerSentEvents, type ServerSentEvent } from "parse-sse";
 
 import type { AgentStreamRequest } from "../types/agent";
+import type { ProviderConnectionRef } from "../types/models";
 
 /**
  * The streaming primitive behind `streamThread`. Given an already-prepared
@@ -12,7 +13,7 @@ import type { AgentStreamRequest } from "../types/agent";
  */
 export type AgentTransport = (
   request: AgentStreamRequest,
-  options: { signal?: AbortSignal }
+  options: { signal?: AbortSignal; connection?: ProviderConnectionRef }
 ) => AsyncIterable<AgentEvent>;
 
 /**
@@ -22,13 +23,16 @@ export type AgentTransport = (
 export function createHttpTransport(
   endpoint = "/api/pi/agent/stream"
 ): AgentTransport {
-  return async function* httpTransport(request, { signal }) {
+  return async function* httpTransport(request, { signal, connection }) {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        request,
+        ...(connection ? { connection } : {}),
+      }),
       signal,
     });
     if (!res.ok) {

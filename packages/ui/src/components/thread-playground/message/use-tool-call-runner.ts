@@ -10,6 +10,7 @@ import { isFirecrawlLimitError } from "@llm-space/ui/lib/firecrawl";
 
 import { createRuntimePromptFiles } from "../runtime-prompt-files";
 import { useThreadStore, useThreadStoreActions } from "../stores";
+import { useToolExecutor } from "../tool/use-tool-executor";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
 export interface ToolCallOutcome {
@@ -24,10 +25,11 @@ export interface ToolCallOutcome {
  * stays at the call site — only detection and plumbing are shared here.
  */
 export function useToolCallRunner(messageId: string) {
-  const { executeTool, files, skills } = useHostServices();
+  const { files, skills } = useHostServices();
   const tools = useThreadStore((state) => state.thread.context?.tools);
   const thread = useThreadStore((state) => state.thread);
   const runtimeId = useThreadStore((state) => state.runtimeId);
+  const executeTool = useToolExecutor(runtimeId);
   const ownerRuntimeId = runtimeId ?? "local";
   const { updateToolCallOutput, updateToolCallOutputText } =
     useThreadStoreActions();
@@ -35,9 +37,7 @@ export function useToolCallRunner(messageId: string) {
   const toolsByName = useMemo(
     () =>
       new Map(
-        (tools ?? [])
-          .filter(isExecutableTool)
-          .map((tool) => [tool.name, tool])
+        (tools ?? []).filter(isExecutableTool).map((tool) => [tool.name, tool])
       ),
     [tools]
   );
@@ -70,7 +70,7 @@ export function useToolCallRunner(messageId: string) {
         const { content, isError } = await executeTool(
           tool,
           toolCall.input.arguments,
-          { runtimeId: ownerRuntimeId, thread: owningThread, variables }
+          { thread: owningThread, variables }
         );
         updateToolCallOutput(messageId, toolCall.id, content, isError);
         const text = getToolResultText(content);

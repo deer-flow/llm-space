@@ -44,6 +44,9 @@ function createRuntime(): RuntimeClient {
     removeProvider: () => Promise.resolve([]),
     addProvider: () => Promise.resolve([]),
     addCustomProvider: () => Promise.resolve([]),
+    addProviderProfile: () => Promise.resolve([]),
+    updateProviderProfile: () => Promise.resolve([]),
+    removeProviderProfile: () => Promise.resolve([]),
     updateProvider: () => Promise.resolve([]),
     setModelEnabled: () => Promise.resolve([]),
     setAllModelsEnabled: () => Promise.resolve([]),
@@ -173,6 +176,33 @@ describe("handleRuntimeRpc", () => {
         method: "runtime.info",
       })
     ).toMatchObject({ id: "1", ok: true, result: { name: "Test" } });
+  });
+
+  test("forwards an ephemeral provider connection to built-in tool calls", async () => {
+    const runtime = createRuntime();
+    let received: Parameters<RuntimeClient["builtInCallTool"]>[0] | undefined;
+    runtime.builtInCallTool = (input) => {
+      received = input;
+      return Promise.resolve({ content: [] });
+    };
+
+    await handleRuntimeRpc(runtime, {
+      id: "1",
+      method: "builtinTools.call",
+      params: {
+        name: "generate_image",
+        arguments: { prompt: "fixture" },
+        config: { model: "seedream-fixture" },
+        connection: { providerId: "ark", profileId: "profile-work" },
+      },
+    });
+
+    expect(received).toEqual({
+      name: "generate_image",
+      arguments: { prompt: "fixture" },
+      config: { model: "seedream-fixture" },
+      connection: { providerId: "ark", profileId: "profile-work" },
+    });
   });
 
   test("returns method_not_found for unknown methods", async () => {

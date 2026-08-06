@@ -22,6 +22,117 @@ function _event(value: unknown): AgentEvent {
 }
 
 describe("auto-run tool results", () => {
+  test("waits for generate_image before completing the run", async () => {
+    const events = [
+      _event({
+        type: "message_start",
+        message: { role: "assistant" },
+      }),
+      _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_start",
+          contentIndex: 0,
+          partial: {
+            content: [
+              {
+                type: "toolCall",
+                id: "tool-image",
+                name: "generate_image",
+                arguments: {},
+              },
+            ],
+          },
+        },
+      }),
+      _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "toolcall_end",
+          contentIndex: 0,
+          toolCall: {
+            type: "toolCall",
+            id: "tool-image",
+            name: "generate_image",
+            arguments: { prompt: "A red circle" },
+          },
+        },
+      }),
+      _event({
+        type: "message_end",
+        message: { role: "assistant" },
+      }),
+    ];
+    const transport: AgentTransport = async function* () {
+      yield* events;
+    };
+    let resolveImage: (() => void) | undefined;
+    const imageGate = new Promise<void>((resolve) => {
+      resolveImage = resolve;
+    });
+    let markExecutionStarted: (() => void) | undefined;
+    const executionStarted = new Promise<void>((resolve) => {
+      markExecutionStarted = resolve;
+    });
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Generate an image" }],
+            },
+          ],
+          tools: [
+            {
+              type: "builtin",
+              name: "generate_image",
+              description: "Generate an image.",
+              parameters: { type: "object", properties: {} },
+            },
+          ],
+        },
+      },
+      {
+        transport,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        getAutoRunTools: () => true,
+        executeTool: async () => {
+          markExecutionStarted?.();
+          await imageGate;
+          return {
+            content: [
+              { type: "image", data: "cG5nLWJ5dGVz", mimeType: "image/png" },
+            ],
+            isError: false,
+          };
+        },
+      }
+    );
+
+    let runSettled = false;
+    const run = store
+      .getState()
+      .run()
+      .finally(() => {
+        runSettled = true;
+      });
+    await executionStarted;
+    await Promise.resolve();
+
+    expect(runSettled).toBe(false);
+    expect(store.getState().status).toBe("running");
+    expect(store.getState().executingToolCallIds).toEqual(["tool-image"]);
+
+    resolveImage?.();
+    await run;
+
+    expect(runSettled).toBe(true);
+    expect(store.getState().status).toBe("idle");
+    expect(store.getState().executingToolCallIds).toEqual([]);
+  });
+
   test("preserves structured image content returned by a built-in tool", async () => {
     const events = [
       _event({

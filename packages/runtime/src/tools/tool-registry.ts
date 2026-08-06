@@ -1,8 +1,22 @@
-import type { BuiltinTool, BuiltinToolCallResponse } from "@llm-space/core";
+import type {
+  BuiltinTool,
+  BuiltinToolCallResponse,
+  ProviderConnectionRef,
+} from "@llm-space/core";
 
 export interface ToolEntry {
   tool: BuiltinTool;
-  execute(this: void, args: Record<string, unknown>): Promise<unknown>;
+  execute(
+    this: void,
+    args: Record<string, unknown>,
+    config?: Record<string, unknown>,
+    context?: ToolExecutionContext
+  ): Promise<unknown>;
+}
+
+export interface ToolExecutionContext {
+  /** Ephemeral provider connection selected for this invocation. */
+  connection?: ProviderConnectionRef;
 }
 
 export interface ToolContribution {
@@ -96,15 +110,27 @@ export class ToolRegistry {
   async call({
     name,
     arguments: args,
+    config,
+    connection,
   }: {
     name: string;
     arguments: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    connection?: ProviderConnectionRef;
   }): Promise<ToolCallResponse> {
     const entry = this._entriesByName.get(name);
     if (!entry) {
       throw new Error(`Built-in tool not found: ${name}`);
     }
-    const result = await entry.execute(args);
+    if (
+      connection &&
+      entry.tool.connection?.providerId !== connection.providerId
+    ) {
+      throw new Error(
+        `Built-in tool ${name} does not use provider: ${connection.providerId}`
+      );
+    }
+    const result = await entry.execute(args, config, { connection });
     if (_isToolCallResponse(result)) {
       return { content: result.content };
     }

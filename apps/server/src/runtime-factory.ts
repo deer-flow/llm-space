@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   createBuiltInToolsModule,
+  createConfiguredArkImageGenerator,
   createLocalFileSystem,
   LocalRuntimeClient,
   McpManager,
@@ -32,6 +33,10 @@ export async function createServerRuntime(
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
+  const generateImage = createConfiguredArkImageGenerator({
+    modelManager,
+    env: process.env,
+  });
   const searchSettings = new SearchSettingsManager();
   const skillsManager = new SkillsManager();
   const localFs = createLocalFileSystem(homePath);
@@ -41,6 +46,7 @@ export async function createServerRuntime(
   createBuiltInToolsModule({
     env: process.env,
     findSkill: skillsManager.findSkill.bind(skillsManager),
+    generateImage,
     getSearchSettings: searchSettings.get.bind(searchSettings),
     workspaceRoot: workspacePath,
   }).register(tools);

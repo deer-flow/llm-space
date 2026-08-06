@@ -151,10 +151,17 @@ describe("RemoteRuntimeClient", () => {
 
   test("posts filesystem, tool, MCP, and settings methods", async () => {
     const methods: string[] = [];
+    let builtInParams: unknown;
     await _withFetch(
       async (request) => {
-        const body = (await request.json()) as { method: string };
+        const body = (await request.json()) as {
+          method: string;
+          params?: unknown;
+        };
         methods.push(body.method);
+        if (body.method === "builtinTools.call") {
+          builtInParams = body.params;
+        }
         return Response.json({
           id: "1",
           ok: true,
@@ -171,7 +178,12 @@ describe("RemoteRuntimeClient", () => {
         await client.fsCp("a", "b");
         await client.fsMv("b", "c");
         await client.fsRm("c");
-        await client.builtInCallTool({ name: "ls", arguments: {} });
+        await client.builtInCallTool({
+          name: "generate_image",
+          arguments: { prompt: "fixture" },
+          config: { model: "seedream-fixture" },
+          connection: { providerId: "ark", profileId: "profile-work" },
+        });
         await client.mcpListTools("server-1");
         await client.mcpCancelTest("server-1");
         await client.mcpCallTool({
@@ -198,6 +210,12 @@ describe("RemoteRuntimeClient", () => {
       "mcp.callTool",
       "search.set",
     ]);
+    expect(builtInParams).toEqual({
+      name: "generate_image",
+      arguments: { prompt: "fixture" },
+      config: { model: "seedream-fixture" },
+      connection: { providerId: "ark", profileId: "profile-work" },
+    });
   });
 
   test("uses remote prompt-file operations without a local fallback", async () => {
@@ -239,8 +257,10 @@ describe("RemoteRuntimeClient", () => {
 
   test("parses SSE stream events", async () => {
     const events: AgentEvent[] = [];
+    let requestBody: unknown;
     await _withFetch(
-      () => {
+      async (request) => {
+        requestBody = await request.json();
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
             const encoder = new TextEncoder();
@@ -264,7 +284,14 @@ describe("RemoteRuntimeClient", () => {
           token: "secret",
         });
         await client.streamThread(
-          { streamId: "s1", request: {} as AgentStreamRequest },
+          {
+            streamId: "s1",
+            request: {} as AgentStreamRequest,
+            connection: {
+              providerId: "test",
+              profileId: "profile-work",
+            },
+          },
           (message) => {
             if (message.type === "event") {
               events.push(message.event);
@@ -275,6 +302,10 @@ describe("RemoteRuntimeClient", () => {
     );
 
     expect(events).toEqual([{ type: "agent_start" }]);
+    expect(requestBody).toEqual({
+      request: {},
+      connection: { providerId: "test", profileId: "profile-work" },
+    });
   });
 
   test("does not complete after a remote stream error", async () => {

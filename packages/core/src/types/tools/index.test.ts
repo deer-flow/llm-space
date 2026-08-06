@@ -36,6 +36,21 @@ describe("ask_user_question termination", () => {
   });
 });
 
+describe("built-in tool configuration", () => {
+  test("preserves Thread-owned configuration during normalization", () => {
+    const tool: BuiltinTool = {
+      type: "builtin",
+      name: "generate_image",
+      description: "Generate an image.",
+      parameters: { type: "object", properties: {} },
+      config: { model: "seedream-fixture", size: "2K", watermark: true },
+    };
+
+    expect(Compile(Tool).Check(tool)).toBe(true);
+    expect(normalizeTool(tool)).toEqual(tool);
+  });
+});
+
 describe("Plugin Tools", () => {
   test("preserves source identity while exposing an executable PI shape", () => {
     const tool = {

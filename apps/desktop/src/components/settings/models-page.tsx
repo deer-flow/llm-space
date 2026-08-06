@@ -1,19 +1,30 @@
 "use client";
 
-import type { CustomModel, ModelProviderGroup } from "@llm-space/core";
+import {
+  formatProviderProfileLabel,
+  getArkImageModelDefinitions,
+  type ArkImageGenerationConfig,
+  type CustomModel,
+  type ModelProviderGroup,
+  type ProviderProfile,
+  type SeedreamImageModelDefinition,
+} from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Link } from "@llm-space/ui/components/link";
 import {
   useAddCustomProvider,
   useAddProvider,
+  useAddProviderProfile,
   useFetchBuiltinProviders,
   useModels,
   useRemoveCustomModel,
   useRemoveProvider,
+  useRemoveProviderProfile,
   useSetAllModelsEnabled,
   useSetModelEnabled,
   useTestModelConnection,
   useUpdateProvider,
+  useUpdateProviderProfile,
 } from "@llm-space/ui/components/model-provider";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
@@ -21,6 +32,13 @@ import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@llm-space/ui/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -54,11 +72,18 @@ import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@llm-space/ui/ui/tabs";
 import {
   Ban,
   CableIcon,
@@ -71,6 +96,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -81,6 +107,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_API,
   type CustomProviderApi,
 } from "./custom-provider-api";
+import { ImageModelEditorDialog } from "./image-model-editor-dialog";
 import { ModelEditorDialog } from "./model-editor-dialog";
 import { SettingsPage } from "./settings-page";
 
@@ -457,12 +484,15 @@ function ProviderListItem({
 
 function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const updateProvider = useUpdateProvider();
+  const addProviderProfile = useAddProviderProfile();
+  const removeProviderProfile = useRemoveProviderProfile();
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
   const [iconDraft, setIconDraft] = useState(provider?.icon ?? "");
-  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
-    Boolean(provider?.baseUrl)
+  const [selectedProfileId, setSelectedProfileId] = useState(
+    provider?.profiles[0]?.id ?? ""
   );
+  const [removeProfileId, setRemoveProfileId] = useState<string | null>(null);
   const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
     "all"
   );
@@ -497,18 +527,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   useEffect(() => {
     setApiValue(provider?.api ?? DEFAULT_CUSTOM_PROVIDER_API);
   }, [provider?.api, provider?.id]);
-
-  // Persist on blur, but only when the value actually changed. An empty field
-  // clears the key (stored as `null`).
-  const handleApiKeyBlur = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (!provider) return;
-    const value = event.target.value.trim();
-    const next = value === "" ? null : value;
-    const current = provider.apiKey ?? null;
-    if (next !== current) {
-      void updateProvider(provider.id, { apiKey: next });
-    }
-  };
 
   const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
     if (!provider) return;
@@ -545,26 +563,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     const current = provider.icon ?? null;
     if (next !== current) {
       void updateProvider(provider.id, { icon: next });
-    }
-  };
-
-  // Persist the custom base URL on blur when changed. Empty ⇒ use the default.
-  const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (!provider) return;
-    const value = event.target.value.trim();
-    const next = value === "" ? null : value;
-    const current = provider.baseUrl ?? null;
-    if (next !== current) {
-      void updateProvider(provider.id, { baseUrl: next });
-    }
-  };
-
-  // The switch reveals/hides the base URL input; turning it off clears the
-  // stored value (⇒ use the provider default).
-  const handleBaseUrlToggle = (enabled: boolean) => {
-    setBaseUrlEnabled(enabled);
-    if (!enabled && provider) {
-      void updateProvider(provider.id, { baseUrl: null });
     }
   };
 
@@ -611,6 +609,37 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
     return true;
   });
   const isBuiltin = provider.builtin === true;
+  const selectedProfile =
+    provider.profiles.find((profile) => profile.id === selectedProfileId) ??
+    provider.profiles[0];
+  const profilePendingRemoval = provider.profiles.find(
+    (profile) => profile.id === removeProfileId
+  );
+
+  const handleAddProfile = async () => {
+    try {
+      setSelectedProfileId(await addProviderProfile(provider.id));
+    } catch (error) {
+      toast.error("Failed to add connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const handleRemoveProfile = async (profile: ProviderProfile) => {
+    try {
+      await removeProviderProfile(provider.id, profile.id);
+      if (selectedProfile.id === profile.id) {
+        setSelectedProfileId(provider.profiles[0].id);
+      }
+    } catch (error) {
+      toast.error("Failed to remove connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
 
   // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
   // providers are recognized by their models' API; custom providers follow the
@@ -618,10 +647,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const usesAnthropicApi = isBuiltin
     ? provider.models.some((model) => model.api === "anthropic-messages")
     : apiValue === "anthropic-messages";
-  const baseUrlPlaceholder = usesAnthropicApi
-    ? "https://api.example.com"
-    : "https://api.example.com/v1";
-
   return (
     <div className="flex min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
@@ -650,7 +675,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
           {!isBuiltin && (
             <>
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Name</span>
+                <span className="text-sm font-medium">Provider name</span>
                 <Input
                   defaultValue={provider.name}
                   placeholder="Custom provider"
@@ -674,11 +699,13 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CUSTOM_PROVIDER_API_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {CUSTOM_PROVIDER_API_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -715,82 +742,81 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
-          {provider.id !== "openai-codex" && (
-            <ApiKeyField
-              label="API key"
-              getKeyUrl={provider.websiteLink}
-              defaultValue={provider.apiKey ?? ""}
-              placeholder={`Input API Key for ${provider.name}.`}
-              aria-label={`${provider.name} API key`}
-              onBlur={handleApiKeyBlur}
-              description={
-                <div className="text-muted-foreground pl-5 text-xs">
-                  <div className="list-item">
-                    {
-                      'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
-                    }
-                  </div>
-                  <div className="list-item">
-                    Leave it blank to use the official {provider.name}{" "}
-                    environment variable
-                  </div>
-                </div>
-              }
-            />
-          )}
-
-          {isBuiltin ? (
+          <Tabs
+            value={selectedProfile.id}
+            onValueChange={setSelectedProfileId}
+            className="gap-3"
+          >
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Custom base URL</span>
-                <Switch
-                  aria-label={
-                    baseUrlEnabled
-                      ? `Disable custom base URL for ${provider.name}`
-                      : `Enable custom base URL for ${provider.name}`
-                  }
-                  checked={baseUrlEnabled}
-                  onCheckedChange={handleBaseUrlToggle}
-                />
+              <div className="flex min-w-0 items-center gap-2">
+                <TabsList variant="line" className="h-8! min-w-0 grow flex-row! justify-start overflow-x-auto">
+                  {provider.profiles.map((profile, index) => (
+                    <div
+                      key={profile.id}
+                      className="flex shrink-0 items-center"
+                    >
+                      <TabsTrigger value={profile.id} className="w-auto!">
+                        {formatProviderProfileLabel(profile, index)}
+                      </TabsTrigger>
+                      {index > 0 ? (
+                        <Tooltip content={`Remove ${profile.name}`}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`Remove ${profile.name} connection profile`}
+                            onClick={() => setRemoveProfileId(profile.id)}
+                          >
+                            <X data-icon="inline-start" />
+                          </Button>
+                        </Tooltip>
+                      ) : null}
+                    </div>
+                  ))}
+                </TabsList>
+                <Tooltip content="Add connection profile">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Add connection profile"
+                    onClick={() => void handleAddProfile()}
+                  >
+                    <Plus data-icon="inline-start" />
+                  </Button>
+                </Tooltip>
               </div>
-              {baseUrlEnabled && (
-                <>
-                  <Input
-                    defaultValue={provider.baseUrl ?? ""}
-                    placeholder={baseUrlPlaceholder}
-                    aria-label={`${provider.name} custom base URL`}
-                    onBlur={handleBaseUrlBlur}
-                  />
-                  <div className="text-muted-foreground text-xs">
-                    Leave empty to use the default endpoint.
-                    {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
-                  </div>
-                </>
-              )}
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Base URL</span>
-              <Input
-                required
-                defaultValue={provider.baseUrl ?? ""}
-                placeholder={baseUrlPlaceholder}
-                aria-label={`${provider.name} base URL`}
-                onBlur={handleBaseUrlBlur}
-              />
-              {usesAnthropicApi && (
-                <div className="text-muted-foreground text-xs">
-                  {ANTHROPIC_BASE_URL_HINT}
-                </div>
-              )}
-            </div>
-          )}
 
-          {!isBuiltin && <ProviderHeadersEditor provider={provider} />}
+            {provider.profiles.map((profile, index) => (
+              <TabsContent key={profile.id} value={profile.id}>
+                <Card size="sm" className="bg-muted/30">
+                  <CardHeader className="border-b">
+                    <CardTitle>
+                      {formatProviderProfileLabel(profile, index)}
+                    </CardTitle>
+                    <CardDescription>
+                      API key, base URL, and headers for this connection.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <_ProviderProfileEditor
+                      provider={provider}
+                      profile={profile}
+                      isBuiltin={isBuiltin}
+                      usesAnthropicApi={usesAnthropicApi}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Models</span>
+              <span className="text-sm font-medium">
+                {provider.id === "ark" ? "Chat models" : "Models"}
+              </span>
               <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                 {enabledModels === totalModels
                   ? totalModels
@@ -870,6 +896,7 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
                     key={model.id}
                     providerId={provider.id}
                     providerName={provider.name}
+                    profileId={selectedProfile.id}
                     model={model}
                     enabled={!disabledModels.has(model.id)}
                     isCustom={customModels.has(model.id)}
@@ -882,6 +909,10 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
               )}
             </div>
           </div>
+
+          {provider.id === "ark" && (
+            <_ArkImageGenerationEditor provider={provider} />
+          )}
         </div>
       </ScrollArea>
 
@@ -889,22 +920,477 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
         open={editorOpen}
         onOpenChange={setEditorOpen}
         providerId={provider.id}
+        profileId={selectedProfile.id}
         providerApi={isBuiltin ? undefined : apiValue}
         model={editingModel}
+      />
+      <ConfirmDialog
+        open={profilePendingRemoval !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setRemoveProfileId(null);
+        }}
+        title={`Remove ${profilePendingRemoval?.name ?? "profile"}?`}
+        description={`This permanently removes the connection profile "${profilePendingRemoval?.name ?? "profile"}" from ${provider.name}.`}
+        confirmLabel="Remove"
+        dimBackground={false}
+        onConfirm={() => {
+          const profile = profilePendingRemoval;
+          setRemoveProfileId(null);
+          if (profile) void handleRemoveProfile(profile);
+        }}
       />
     </div>
   );
 }
 
-/**
- * Key-value editor for a custom provider's extra HTTP headers. Rows live in
- * local state so half-typed entries survive re-renders; only rows with a
- * non-empty name are persisted, on blur or row removal.
- */
-function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
+function _ProviderProfileEditor({
+  provider,
+  profile,
+  isBuiltin,
+  usesAnthropicApi,
+}: {
+  provider: ModelProviderGroup;
+  profile: ProviderProfile;
+  isBuiltin: boolean;
+  usesAnthropicApi: boolean;
+}) {
+  const updateProviderProfile = useUpdateProviderProfile();
+  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
+    Boolean(profile.baseUrl)
+  );
+  const baseUrlPlaceholder = usesAnthropicApi
+    ? "https://api.example.com"
+    : "https://api.example.com/v1";
+
+  const update = (
+    fields: Parameters<ReturnType<typeof useUpdateProviderProfile>>[2]
+  ) => updateProviderProfile(provider.id, profile.id, fields);
+
+  const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    if (!value || value === profile.name) {
+      event.target.value = profile.name;
+      return;
+    }
+    void update({ name: value }).catch((error) => {
+      event.target.value = profile.name;
+      toast.error("Failed to rename connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  };
+
+  const handleApiKeyBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    const next = value === "" ? null : value;
+    if (next !== (profile.apiKey ?? null)) {
+      void update({ apiKey: next });
+    }
+  };
+
+  const handleBaseUrlBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+    const next = value === "" ? null : value;
+    if (next !== (profile.baseUrl ?? null)) {
+      void update({ baseUrl: next });
+    }
+  };
+
+  const handleBaseUrlToggle = (enabled: boolean) => {
+    setBaseUrlEnabled(enabled);
+    if (!enabled) {
+      void update({ baseUrl: null });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">Profile name</span>
+        <Input
+          defaultValue={profile.name}
+          placeholder="Profile name"
+          aria-label={`${provider.name} profile name`}
+          onBlur={handleNameBlur}
+        />
+      </div>
+
+      {provider.id !== "openai-codex" ? (
+        <ApiKeyField
+          label="API key"
+          getKeyUrl={provider.websiteLink}
+          defaultValue={profile.apiKey ?? ""}
+          placeholder={`Input API Key for ${provider.name}.`}
+          aria-label={`${profile.name} API key`}
+          onBlur={handleApiKeyBlur}
+          description={
+            <div className="text-muted-foreground pl-5 text-xs">
+              <div className="list-item">
+                {
+                  'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
+                }
+              </div>
+              <div className="list-item">
+                Leave it blank to use the official {provider.name} environment
+                variable
+              </div>
+            </div>
+          }
+        />
+      ) : null}
+
+      {isBuiltin ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Custom base URL</span>
+            <Switch
+              aria-label={
+                baseUrlEnabled
+                  ? `Disable custom base URL for ${profile.name}`
+                  : `Enable custom base URL for ${profile.name}`
+              }
+              checked={baseUrlEnabled}
+              onCheckedChange={handleBaseUrlToggle}
+            />
+          </div>
+          {baseUrlEnabled ? (
+            <>
+              <Input
+                defaultValue={profile.baseUrl ?? ""}
+                placeholder={baseUrlPlaceholder}
+                aria-label={`${profile.name} custom base URL`}
+                onBlur={handleBaseUrlBlur}
+              />
+              <div className="text-muted-foreground text-xs">
+                Leave empty to use the default endpoint.
+                {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Base URL</span>
+          <Input
+            required
+            defaultValue={profile.baseUrl ?? ""}
+            placeholder={baseUrlPlaceholder}
+            aria-label={`${profile.name} base URL`}
+            onBlur={handleBaseUrlBlur}
+          />
+          {usesAnthropicApi ? (
+            <div className="text-muted-foreground text-xs">
+              {ANTHROPIC_BASE_URL_HINT}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <_ProviderHeadersEditor
+        providerId={provider.id}
+        providerName={provider.name}
+        profile={profile}
+      />
+    </div>
+  );
+}
+
+/** Chat-model-parity inventory management for Ark image models. */
+function _ArkImageGenerationEditor({
+  provider,
+}: {
+  provider: ModelProviderGroup;
+}) {
   const updateProvider = useUpdateProvider();
+  const config = provider.imageGeneration ?? {};
+  const models = getArkImageModelDefinitions(config);
+  const disabledModels = new Set(config.disabledModels ?? []);
+  const enabledModels = models.filter((model) => !disabledModels.has(model.id));
+  const customModels = new Set((config.models ?? []).map((model) => model.id));
+  const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
+    "all"
+  );
+  const [modelListRef] = useAutoAnimation<HTMLDivElement>();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingModel, setEditingModel] =
+    useState<SeedreamImageModelDefinition | null>(null);
+
+  const visibleModels = models.filter((model) => {
+    if (modelView === "enabled") return !disabledModels.has(model.id);
+    if (modelView === "disabled") return disabledModels.has(model.id);
+    return true;
+  });
+
+  const update = (imageGeneration: ArkImageGenerationConfig) => {
+    void updateProvider(provider.id, { imageGeneration }).catch((error) => {
+      toast.error("Failed to update image generation", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  };
+
+  /** Enable or disable one image model without changing Thread tool bindings. */
+  const handleModelEnabled = (modelId: string, enabled: boolean) => {
+    const disabled = new Set(config.disabledModels ?? []);
+    if (enabled) disabled.delete(modelId);
+    else disabled.add(modelId);
+    update({
+      ...config,
+      ...(disabled.size > 0
+        ? { disabledModels: [...disabled] }
+        : { disabledModels: undefined }),
+    });
+  };
+
+  /** Apply the existing list-wide enable policy to every image model. */
+  const handleAllModelsEnabled = (enabled: boolean) => {
+    update({
+      ...config,
+      disabledModels: enabled ? undefined : models.map((model) => model.id),
+    });
+  };
+
+  /** Add or replace a custom image model and preserve its disabled state. */
+  const handleSaveCustomModel = (
+    model: SeedreamImageModelDefinition,
+    originalId?: string
+  ) => {
+    const custom = (config.models ?? []).filter(
+      (candidate) => candidate.id !== (originalId ?? model.id)
+    );
+    const disabled = (config.disabledModels ?? []).map((modelId) =>
+      originalId && modelId === originalId ? model.id : modelId
+    );
+    update({
+      ...config,
+      models: [...custom, model],
+      ...(disabled.length > 0
+        ? { disabledModels: disabled }
+        : { disabledModels: undefined }),
+    });
+  };
+
+  /** Remove one custom image model without repairing Thread tool bindings. */
+  const handleDeleteCustomModel = (modelId: string) => {
+    const custom = (config.models ?? []).filter(
+      (candidate) => candidate.id !== modelId
+    );
+    const disabled = (config.disabledModels ?? []).filter(
+      (candidate) => candidate !== modelId
+    );
+    update({
+      ...config,
+      models: custom.length > 0 ? custom : undefined,
+      disabledModels: disabled.length > 0 ? disabled : undefined,
+    });
+  };
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Image models</span>
+          <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+            {enabledModels.length === models.length
+              ? models.length
+              : `${enabledModels.length}/${models.length}`}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <Tooltip content="Add custom image model">
+              <button
+                type="button"
+                aria-label="Add custom image model"
+                onClick={() => {
+                  setEditingModel(null);
+                  setEditorOpen(true);
+                }}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+              >
+                <Plus className="size-4" />
+              </button>
+            </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Image model list actions for ${provider.name}`}
+                  className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  onSelect={() => handleAllModelsEnabled(false)}
+                >
+                  <Ban />
+                  Disable All
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleAllModelsEnabled(true)}>
+                  <CheckCheck />
+                  Enable All
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {(
+                  [
+                    ["enabled", "Show Enabled Only"],
+                    ["disabled", "Show Disabled Only"],
+                    ["all", "Show All"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <DropdownMenuItem
+                    key={value}
+                    onSelect={() => setModelView(value)}
+                  >
+                    <Check
+                      className={cn(
+                        "size-3.5",
+                        modelView !== value && "invisible"
+                      )}
+                    />
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+        <div ref={modelListRef} className="flex flex-col gap-1.5">
+          {visibleModels.length === 0 ? (
+            <div className="text-muted-foreground px-1 py-2 text-xs">
+              No image models to show.
+            </div>
+          ) : (
+            visibleModels.map((model) => (
+              <_ImageModelListItem
+                key={model.id}
+                providerName={provider.name}
+                model={model}
+                enabled={!disabledModels.has(model.id)}
+                isCustom={customModels.has(model.id)}
+                onToggle={(enabled) => handleModelEnabled(model.id, enabled)}
+                onEdit={() => {
+                  setEditingModel(model);
+                  setEditorOpen(true);
+                }}
+                onDelete={() => handleDeleteCustomModel(model.id)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      <ImageModelEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        model={editingModel}
+        existingIds={models.map((model) => model.id)}
+        onSave={handleSaveCustomModel}
+      />
+    </>
+  );
+}
+
+/** Image-model row matching the existing Chat model management interaction. */
+function _ImageModelListItem({
+  providerName,
+  model,
+  enabled,
+  isCustom,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  providerName: string;
+  model: SeedreamImageModelDefinition;
+  enabled: boolean;
+  isCustom: boolean;
+  onToggle: (enabled: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  return (
+    <Item variant="muted" size="sm" className="group">
+      <ItemMedia>
+        <ModelAvatar
+          id={model.id}
+          name={model.name}
+          icon={model.icon}
+          size={20}
+        />
+      </ItemMedia>
+      <ItemContent className={cn(!enabled && "opacity-50")}>
+        <ItemTitle className="font-mono">{model.name}</ItemTitle>
+      </ItemContent>
+      <ItemActions>
+        {isCustom && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+            <button
+              type="button"
+              aria-label={`Edit ${model.name}`}
+              onClick={onEdit}
+              className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Delete ${model.name}`}
+              onClick={() => setConfirmOpen(true)}
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex size-6 items-center justify-center rounded transition-colors"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        )}
+        <Switch
+          size="sm"
+          checked={enabled}
+          onCheckedChange={onToggle}
+          aria-label={
+            enabled ? `Disable ${model.name}` : `Enable ${model.name}`
+          }
+        />
+      </ItemActions>
+      {isCustom && (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title={`Delete ${model.name}?`}
+          description={`This permanently removes the custom image model "${model.name}" from ${providerName}.`}
+          confirmLabel="Delete"
+          dimBackground={false}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            onDelete();
+          }}
+        />
+      )}
+    </Item>
+  );
+}
+
+/**
+ * Key-value editor for a profile's extra HTTP headers. Rows live in local state
+ * so half-typed entries survive re-renders; only rows with a non-empty name are
+ * persisted, on blur or row removal.
+ */
+function _ProviderHeadersEditor({
+  providerId,
+  providerName,
+  profile,
+}: {
+  providerId: string;
+  providerName: string;
+  profile: ProviderProfile;
+}) {
+  const updateProviderProfile = useUpdateProviderProfile();
   const [rows, setRows] = useState<{ key: string; value: string }[]>(() =>
-    Object.entries(provider.headers ?? {}).map(([key, value]) => ({
+    Object.entries(profile.headers ?? {}).map(([key, value]) => ({
       key,
       value,
     }))
@@ -922,13 +1408,13 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
       const key = row.key.trim();
       if (key !== "") headers[key] = row.value;
     }
-    const current = provider.headers ?? {};
+    const current = profile.headers ?? {};
     const currentKeys = Object.keys(current);
     const same =
       Object.keys(headers).length === currentKeys.length &&
       currentKeys.every((key) => headers[key] === current[key]);
     if (same) return;
-    void updateProvider(provider.id, {
+    void updateProviderProfile(providerId, profile.id, {
       headers: Object.keys(headers).length > 0 ? headers : null,
     });
   };
@@ -947,14 +1433,14 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
           <Input
             value={row.key}
             placeholder="X-Header-Name"
-            aria-label={`${provider.name} header ${index + 1} name`}
+            aria-label={`${providerName} header ${index + 1} name`}
             onChange={(e) => setRow(index, { ...row, key: e.target.value })}
             onBlur={() => persist(rows)}
           />
           <Input
             value={row.value}
             placeholder="Value"
-            aria-label={`${provider.name} header ${index + 1} value`}
+            aria-label={`${providerName} header ${index + 1} value`}
             onChange={(e) => setRow(index, { ...row, value: e.target.value })}
             onBlur={() => persist(rows)}
           />
@@ -980,7 +1466,7 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
         <Plus /> Add header
       </Button>
       <div className="text-muted-foreground text-xs">
-        Sent with every request to this provider.
+        Sent with every request made through this profile.
       </div>
     </div>
   );
@@ -994,6 +1480,7 @@ function ProviderHeadersEditor({ provider }: { provider: ModelProviderGroup }) {
 function ModelListItem({
   providerId,
   providerName,
+  profileId,
   model,
   enabled,
   isCustom,
@@ -1002,6 +1489,7 @@ function ModelListItem({
 }: {
   providerId: string;
   providerName: string;
+  profileId: string;
   model: ModelProviderGroup["models"][number];
   enabled: boolean;
   isCustom: boolean;
@@ -1016,7 +1504,7 @@ function ModelListItem({
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      await testModelConnection(providerId, model.id);
+      await testModelConnection(providerId, model.id, undefined, profileId);
       toast.success("Model connected successfully", {
         description: model.name,
       });

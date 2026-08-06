@@ -1,4 +1,5 @@
 import type {
+  ArkImageGenerationConfig,
   AgentEvent,
   AgentStreamRequest,
   BuiltinTool,
@@ -8,6 +9,8 @@ import type {
   ModelConfig,
   ModelProviderGroup,
   NetworkSettings,
+  ProviderProfilePatch,
+  ProviderConnectionRef,
   SearchSettings,
   SystemProxyDetection,
   Thread,
@@ -60,6 +63,8 @@ import type { UpdateMode, UpdateStatusChangedPayload } from "./updates";
 export interface StreamThreadRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
+  /** Per-tab connection choice; never persisted into the thread. */
+  connection?: ProviderConnectionRef;
 }
 
 /** A bun→webview chunk of a streaming agent run, keyed by `streamId`. */
@@ -168,12 +173,27 @@ export interface DesktopRPCType {
         };
         response: ModelProviderGroup[];
       };
+      addProviderProfile: {
+        params: RuntimeScopedParams & { providerId: string };
+        response: ModelProviderGroup[];
+      };
+      updateProviderProfile: {
+        params: RuntimeScopedParams & {
+          providerId: string;
+          profileId: string;
+        } & ProviderProfilePatch;
+        response: ModelProviderGroup[];
+      };
+      removeProviderProfile: {
+        params: RuntimeScopedParams & {
+          providerId: string;
+          profileId: string;
+        };
+        response: ModelProviderGroup[];
+      };
       updateProvider: {
         params: RuntimeScopedParams & {
           providerId: string;
-          apiKey?: string | null;
-          baseUrl?: string | null;
-          headers?: Record<string, string> | null;
           name?: string | null;
           api?:
             | "anthropic-messages"
@@ -181,6 +201,7 @@ export interface DesktopRPCType {
             | "openai-responses"
             | null;
           icon?: string | null;
+          imageGeneration?: ArkImageGenerationConfig;
         };
         response: ModelProviderGroup[];
       };
@@ -212,6 +233,7 @@ export interface DesktopRPCType {
       testModelConnection: {
         params: RuntimeScopedParams & {
           providerId: string;
+          profileId?: string;
           modelId: string;
           candidate?: CustomModel;
         };
@@ -445,6 +467,7 @@ export interface DesktopRPCType {
       generatorResolveEnv: {
         params: RuntimeScopedParams & {
           providerId: string;
+          profileId?: string;
           envNames: string[];
         };
         response: { modelApiKey: string; envValues: Record<string, string> };
@@ -496,6 +519,8 @@ export interface DesktopRPCType {
         params: RuntimeScopedParams & {
           name: string;
           arguments: Record<string, unknown>;
+          config?: Record<string, unknown>;
+          connection?: ProviderConnectionRef;
         };
         response: BuiltinToolCallResponse;
       };

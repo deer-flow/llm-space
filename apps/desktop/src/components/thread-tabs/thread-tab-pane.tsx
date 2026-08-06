@@ -225,9 +225,9 @@ function _ThreadTabPane({
     };
   }, [consumeDiscardedPane, flushPending, paneId, persistence]);
 
-  // "Refresh" the thread from disk: re-read the file and remount the playground
-  // on a fresh store (via reloadKey), discarding any in-memory edits. Driven by
-  // the per-tab refreshNonce, so it works even for an inactive (hidden) pane.
+  // "Refresh" the thread from disk: re-read the file and recreate only its
+  // store, discarding in-memory edits while preserving transient tab choices
+  // such as the selected provider profile.
   const [reloadKey, setReloadKey] = useState(0);
   const appliedRefreshRef = useRef(refreshNonce);
   const { markCommitPending, settleWithoutCommit } =
@@ -341,7 +341,7 @@ function _ThreadTabPane({
   return (
     <div className={cn("size-full", !active && "hidden")}>
       <ThreadPlayground
-        key={reloadKey}
+        storeKey={reloadKey}
         className="bg-background size-full shadow-lg"
         loading={isLoading}
         path={path}
