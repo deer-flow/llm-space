@@ -597,9 +597,9 @@ function VariableListRow({
   return (
     <div
       className={cn(
-        "group/variable-row relative rounded-md transition-colors",
+        "group/variable-row relative rounded-md border border-transparent transition-all",
         selected
-          ? "bg-accent text-accent-foreground"
+          ? "border-primary/25 bg-primary/10 text-primary dark:border-input dark:bg-input/30 dark:text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground",
         item.warning && !selected && "text-destructive"
       )}

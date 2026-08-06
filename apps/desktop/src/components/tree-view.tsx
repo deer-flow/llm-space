@@ -13,7 +13,7 @@ const treeVariants = cva(
 );
 
 const selectedTreeVariants = cva(
-  "bg-accent/70 text-accent-foreground opacity-100"
+  "bg-foreground/5 text-accent-foreground opacity-100 hover:bg-foreground/5 dark:bg-accent/70 dark:hover:bg-accent/70"
 );
 
 const dragOverVariants = cva("bg-primary/20 text-primary-foreground");

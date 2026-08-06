@@ -191,7 +191,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-5xl! gap-0 p-0"
+        className="max-w-5xl! gap-0 overflow-hidden p-0"
         onInteractOutside={(event) => {
           event.preventDefault();
         }}
@@ -225,7 +225,7 @@ export function SettingsDialog({
                         <TabsTrigger
                           key={value}
                           value={value}
-                          className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary w-full pl-5 data-active:shadow-sm dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:shadow-none"
+                          className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full pl-5 dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
                         >
                           <Icon />
                           {label}
@@ -241,7 +241,7 @@ export function SettingsDialog({
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary w-full data-active:shadow-sm dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:shadow-none"
+                      className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
                     >
                       <Icon />
                       {label}
