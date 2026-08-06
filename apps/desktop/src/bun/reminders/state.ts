@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 import {
@@ -24,6 +25,11 @@ interface GithubStarReminder {
   lastShownDate?: number;
   // How many times the reminder has been shown; capped at MAX_SHOWN_COUNT.
   shownCount?: number;
+  // Id and decision for the latest real app launch. Renderer effects may ask
+  // more than once (for example under React Strict Mode); repeated requests
+  // for the same launch must return the same answer without bumping counters.
+  lastResolvedLaunchId?: string;
+  lastResolvedShow?: boolean;
   // Retired for good — set when the user clicks through to GitHub, or once the
   // nag cap is reached. Never shown again after this.
   dismissedForever?: boolean;
@@ -36,13 +42,14 @@ interface RemindersState {
   featureRemindersSeen?: string[];
 }
 
-const STATE_PATH = join(getSettingsDir(), "reminders.json");
 const RemindersStateSchema: z.ZodType<RemindersState> = z.object({
   githubStar: z
     .object({
       openCount: z.number().optional(),
       lastShownDate: z.number().optional(),
       shownCount: z.number().optional(),
+      lastResolvedLaunchId: z.string().optional(),
+      lastResolvedShow: z.boolean().optional(),
       dismissedForever: z.boolean().optional(),
     })
     .optional(),
@@ -54,10 +61,12 @@ let stateQueue: Promise<unknown> = Promise.resolve();
 const REMINDER_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
 /** Give up (retire the reminder) after this many shows, click or no click. */
 const MAX_SHOWN_COUNT = 3;
+/** Stable for this Bun process; a real app restart receives a new id. */
+const REMINDER_LAUNCH_ID = randomUUID();
 
 async function _load(): Promise<RemindersState> {
   return (
-    await readJsonFile(STATE_PATH, {
+    await readJsonFile(join(getSettingsDir(), "reminders.json"), {
       schema: RemindersStateSchema,
       recovery: "best-effort",
       fallback: () => ({}),
@@ -73,7 +82,10 @@ function _update<T>(
     .catch(() => undefined)
     .then(async () => {
       const update = mutate(await _load());
-      await atomicWriteJsonFile(STATE_PATH, update.state);
+      await atomicWriteJsonFile(
+        join(getSettingsDir(), "reminders.json"),
+        update.state
+      );
       return update.result;
     });
   stateQueue = operation;
@@ -111,9 +123,18 @@ function _shouldShow(
  * - Later appearances are throttled to once every 2 days since the last show.
  * - Retire permanently once the user clicks through, or after 3 shows.
  */
-export async function resolveGithubStarReminder(): Promise<{ show: boolean }> {
+export async function resolveGithubStarReminder(
+  launchId: string = REMINDER_LAUNCH_ID
+): Promise<{ show: boolean }> {
   return _update((state) => {
     const star = state.githubStar ?? {};
+    if (star.lastResolvedLaunchId === launchId) {
+      return {
+        state,
+        result: { show: star.lastResolvedShow ?? false },
+      };
+    }
+
     const now = Date.now();
     const openCount = (star.openCount ?? 0) + 1;
     const show = _shouldShow(star, openCount, now);
@@ -122,9 +143,15 @@ export async function resolveGithubStarReminder(): Promise<{ show: boolean }> {
           openCount,
           lastShownDate: now,
           shownCount: (star.shownCount ?? 0) + 1,
+          lastResolvedLaunchId: launchId,
+          lastResolvedShow: show,
           dismissedForever: (star.shownCount ?? 0) + 1 >= MAX_SHOWN_COUNT,
         }
-      : { openCount };
+      : {
+          openCount,
+          lastResolvedLaunchId: launchId,
+          lastResolvedShow: show,
+        };
     return {
       state: { ...state, githubStar: { ...star, ...patch } },
       result: { show },
