@@ -66,13 +66,13 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/three": "^0.165.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "postcss": "^8.5.3",
     "react-scan": "^0.5.7",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^8.2.0"
   }
 }

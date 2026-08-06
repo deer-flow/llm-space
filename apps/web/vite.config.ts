@@ -24,6 +24,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Preserve the browser range used by Vite 6 instead of silently adopting
+    // the newer Vite 8 baseline during this build-tool migration.
+    target: ["chrome87", "edge88", "firefox78", "safari14"],
     chunkSizeWarningLimit: 900,
   },
   server: {

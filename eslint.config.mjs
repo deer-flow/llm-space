@@ -27,7 +27,7 @@ export default defineConfig([
       // typed-lint project service can't resolve them.
       "packages/ui/src/**/*.test.ts",
       "packages/ui/src/**/*.test.tsx",
-      "apps/desktop/vite.config.ts",
+      "apps/desktop/vite.config.mts",
       "apps/web/vite.config.ts",
       "apps/web/postcss.config.js",
       // Vendored marketing page migrated from the gh-pages branch (its own
