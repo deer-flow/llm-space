@@ -27,6 +27,7 @@ export interface PluginExtensionView {
   id: string;
   kind: PluginExtensionKind;
   displayName: string;
+  description?: string;
   /** Local file or directory that declares this extension, when known. */
   sourcePath?: string;
   active: boolean;

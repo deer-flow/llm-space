@@ -33,7 +33,7 @@ describe("PluginManager", () => {
     mkdirSync(path.join(root, "commands"));
     writeFileSync(
       path.join(root, "commands", "hello.ts"),
-      `export default class Hello { displayName = "Hello"; execute() { return "hello"; } }`
+      `export default class Hello { displayName = "Hello"; description = "Say hello"; execute() { return "hello"; } }`
     );
     writeFileSync(
       path.join(root, "commands", "broken.ts"),
@@ -52,7 +52,7 @@ describe("PluginManager", () => {
     mkdirSync(path.join(root, "thread-storages"));
     writeFileSync(
       path.join(root, "thread-storages", "memory.ts"),
-      `export default class Memory { displayName = "Memory"; capabilities = { read: false, write: false }; }`
+      `export default class Memory { displayName = "Memory"; description = "Keep threads in memory"; capabilities = { read: false, write: false }; }`
     );
 
     const { manager } = await _manager(home);
@@ -103,10 +103,17 @@ describe("PluginManager", () => {
     });
     expect(
       plugin?.extensions.find(
-        (extension) =>
-          extension.id === "plugin:mixed-plugin:command:hello"
-      )?.sourcePath
-    ).toBe(path.join(root, "commands", "hello.ts"));
+        (extension) => extension.id === "plugin:mixed-plugin:command:hello"
+      )
+    ).toMatchObject({
+      description: "Say hello",
+      sourcePath: path.join(root, "commands", "hello.ts"),
+    });
+    expect(
+      plugin?.extensions.find(
+        (extension) => extension.id === "plugin:mixed-plugin:tool:project-info"
+      )?.description
+    ).toBe("Read project information");
     expect(
       plugin?.extensions.find(
         (extension) => extension.id === "plugin:mixed-plugin:command:broken"
@@ -116,8 +123,11 @@ describe("PluginManager", () => {
       plugin?.extensions.find(
         (extension) =>
           extension.id === "plugin:mixed-plugin:thread-storage:memory"
-      )?.sourcePath
-    ).toBe(path.join(root, "thread-storages", "memory.ts"));
+      )
+    ).toMatchObject({
+      description: "Keep threads in memory",
+      sourcePath: path.join(root, "thread-storages", "memory.ts"),
+    });
     const logPath = plugin?.extensions.find((extension) => extension.error)
       ?.error?.logPath;
     expect(logPath).toBeString();
@@ -193,6 +203,11 @@ describe("PluginManager", () => {
       mcp: path.join(root, "mcp.json"),
       model: path.join(root, "models.json"),
     });
+    expect(
+      state.manager
+        .listPlugins()[0]
+        .extensions.find((extension) => extension.kind === "skill")?.description
+    ).toBe("Review code");
 
     await state.manager.setEnabled("declarative", false);
     expect(state.skillPaths).toEqual([]);
@@ -289,6 +304,15 @@ async function _manager(
     appVersion: "4.7.1",
     runnerPath: path.join(import.meta.dir, "plugin-runner.ts"),
     skillsManager: {
+      readSkill: (skillPath) => {
+        const raw = readFileSync(path.join(skillPath, "SKILL.md"), "utf8");
+        const description = /^description:\s*(.+)$/m.exec(raw)?.[1] ?? "";
+        return {
+          frontmatters: { description },
+          content: raw,
+          path: skillPath,
+        };
+      },
       setPluginPaths: (entries) => {
         skillPaths = entries;
         return skillConflicts;

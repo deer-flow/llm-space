@@ -624,11 +624,11 @@ function PluginEditor({
                               {group.extensions.map((extension) => (
                                 <div
                                   key={extension.id}
-                                  className="bg-muted/10 hover:bg-muted/20 flex min-w-0 items-center gap-4 py-2 pr-3 pl-4 text-xs transition-colors"
+                                  className="bg-muted/10 hover:bg-muted/20 flex min-w-0 items-start gap-4 py-2 pr-3 pl-4 text-xs transition-colors"
                                 >
                                   <span
                                     className={cn(
-                                      "size-1.5 shrink-0 rounded-full",
+                                      "mt-1.5 size-1.5 shrink-0 rounded-full",
                                       extension.error
                                         ? "bg-destructive"
                                         : extension.active
@@ -646,17 +646,37 @@ function PluginEditor({
                                   {extension.sourcePath ? (
                                     <button
                                       type="button"
-                                      className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
+                                      className="hover:text-foreground flex min-w-0 grow cursor-pointer flex-col text-left underline-offset-2"
                                       title={`Reveal ${extension.sourcePath}`}
                                       onClick={() =>
                                         _reveal(extension.sourcePath!)
                                       }
                                     >
-                                      {extension.displayName}
+                                      <span className="max-w-full truncate hover:underline">
+                                        {extension.displayName}
+                                      </span>
+                                      {extension.description ? (
+                                        <span
+                                          className="text-muted-foreground max-w-full truncate text-[11px] leading-4"
+                                          title={extension.description}
+                                        >
+                                          {extension.description}
+                                        </span>
+                                      ) : null}
                                     </button>
                                   ) : (
-                                    <span className="grow truncate">
-                                      {extension.displayName}
+                                    <span className="flex min-w-0 grow flex-col">
+                                      <span className="max-w-full truncate">
+                                        {extension.displayName}
+                                      </span>
+                                      {extension.description ? (
+                                        <span
+                                          className="text-muted-foreground max-w-full truncate text-[11px] leading-4"
+                                          title={extension.description}
+                                        >
+                                          {extension.description}
+                                        </span>
+                                      ) : null}
                                     </span>
                                   )}
                                 </div>

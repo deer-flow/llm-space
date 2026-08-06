@@ -80,7 +80,7 @@ export interface PluginManagerOptions {
   homePath: string;
   appVersion: string;
   runnerPath: string;
-  skillsManager: Pick<SkillsManager, "setPluginPaths">;
+  skillsManager: Pick<SkillsManager, "readSkill" | "setPluginPaths">;
   mcpManager: Pick<McpManager, "setPluginServers">;
   modelManager: Pick<ModelManager, "setPluginProviders">;
   commandRegistry?: PluginCommandRegistry;
@@ -322,7 +322,8 @@ export class PluginManager {
         "settings",
         "settings",
         "Settings",
-        record.settingsSchemaPath
+        record.settingsSchemaPath,
+        typeof schema.description === "string" ? schema.description : undefined
       );
     } catch (error) {
       this._extensionError(
@@ -337,14 +338,25 @@ export class PluginManager {
   }
 
   private _loadSkills(record: PluginRecord): void {
-    for (const skillPath of record.skillPaths)
+    for (const skillPath of record.skillPaths) {
+      let description: string | undefined;
+      try {
+        const value =
+          this._options.skillsManager.readSkill(skillPath).frontmatters
+            .description;
+        description = typeof value === "string" ? value : undefined;
+      } catch {
+        // Invalid Skills are diagnosed by SkillsManager and remain visible here.
+      }
       this._extension(
         record,
         "skill",
         path.basename(skillPath),
         path.basename(skillPath),
-        skillPath
+        skillPath,
+        description
       );
+    }
   }
 
   private _loadMcp(record: PluginRecord): void {
@@ -456,7 +468,8 @@ export class PluginManager {
           "command",
           command.id,
           command.displayName,
-          commandSourcePaths.get(command.id)
+          commandSourcePaths.get(command.id),
+          command.description
         );
       for (const tool of result.tools)
         this._extension(
@@ -464,7 +477,8 @@ export class PluginManager {
           "tool",
           tool.id,
           tool.name,
-          toolSourcePaths.get(tool.id)
+          toolSourcePaths.get(tool.id),
+          tool.description
         );
       for (const storage of result.storages)
         this._extension(
@@ -472,7 +486,8 @@ export class PluginManager {
           "threadStorage",
           storage.id,
           storage.displayName,
-          storageSourcePaths.get(storage.id)
+          storageSourcePaths.get(storage.id),
+          storage.description
         );
       for (const failure of result.errors) {
         const error = new Error(failure.message);
@@ -611,12 +626,14 @@ export class PluginManager {
     kind: PluginExtensionKind,
     id: string,
     displayName: string,
-    sourcePath?: string
+    sourcePath?: string,
+    description?: string
   ): void {
     record.extensions.push({
       id,
       kind,
       displayName,
+      description,
       sourcePath,
       active: true,
     });
