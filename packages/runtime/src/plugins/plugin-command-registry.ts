@@ -53,24 +53,27 @@ export class PluginCommandRegistry {
   }
 
   async execute(id: string): Promise<JsonValue> {
-    return (await this.executeWithContext(id, { activeTab: null }, []))
-      .result;
+    return (await this.executeWithContext(id, { activeTab: null }, [])).result;
   }
 
   async executeWithContext(
     id: string,
     context: PluginCommandInvocationContext,
-    args: string[]
+    args: string[],
+    executionId: string = crypto.randomUUID()
   ): Promise<PluginCommandExecutionResult> {
     const entry = this._entries.get(id);
     if (!entry) throw new Error(`Plugin command is unavailable: ${id}`);
     try {
       const response = await entry.host.call<PluginCommandExecutionResult>(
         "command.execute",
-        { id, activeTab: context.activeTab, arguments: args }
+        { executionId, id, activeTab: context.activeTab, arguments: args }
       );
       return {
         result: response.result ?? null,
+        ...(response.userMessage === undefined
+          ? {}
+          : { userMessage: response.userMessage }),
         ...(response.activeTabThreadUpdate === undefined
           ? {}
           : {

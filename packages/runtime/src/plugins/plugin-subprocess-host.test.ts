@@ -160,6 +160,71 @@ describe("PluginSubprocessHost", () => {
     });
   });
 
+  test("reports command phases and unwraps explicit user messages", async () => {
+    const root = _root();
+    const command = path.join(root, "commands", "report.ts");
+    mkdirSync(path.dirname(command));
+    writeFileSync(
+      command,
+      `export default class ReportCommand {
+        displayName = "Report";
+        async execute(ctx, args) {
+          await ctx.report({ phase: "downloading", message: "Downloading skills" });
+          if (ctx.activeTab) {
+            const thread = { ...ctx.activeTab.thread, title: "updated" };
+            await ctx.activeTab.writeThread(thread);
+          }
+          return ctx.createResult({ level: args[0], message: "Finished" });
+        }
+      }`
+    );
+    const reports: { method: string; params: unknown }[] = [];
+    const host = _host((method, params) => {
+      reports.push({ method, params });
+      return Promise.resolve(null);
+    });
+    await host.call("initialize", {
+      settings: {},
+      commands: [{ id: "plugin:demo:command:report", path: command }],
+      storages: [],
+    });
+
+    expect(
+      await host.call<unknown>("command.execute", {
+        executionId: "execution-1",
+        id: "plugin:demo:command:report",
+        arguments: ["success"],
+        activeTab: { filename: "thread.json", thread: { title: "old" } },
+      })
+    ).toEqual({
+      result: null,
+      userMessage: { level: "success", message: "Finished" },
+      activeTabThreadUpdate: { title: "updated" },
+    });
+    expect(reports).toEqual([
+      {
+        method: "report",
+        params: {
+          executionId: "execution-1",
+          commandId: "plugin:demo:command:report",
+          report: { phase: "downloading", message: "Downloading skills" },
+        },
+      },
+    ]);
+
+    expect(
+      await host.call<unknown>("command.execute", {
+        executionId: "execution-2",
+        id: "plugin:demo:command:report",
+        arguments: ["error"],
+        activeTab: { filename: "thread.json", thread: { title: "old" } },
+      })
+    ).toEqual({
+      result: null,
+      userMessage: { level: "error", message: "Finished" },
+    });
+  });
+
   test("executes Plugin Tools with frozen owning context and structured results", async () => {
     const root = _root();
     const tool = path.join(root, "tools", "project-info.ts");
@@ -357,11 +422,16 @@ function _root(): string {
   return root;
 }
 
-function _host(): PluginSubprocessHost {
+function _host(
+  handleHostRequest: (
+    method: string,
+    params: unknown
+  ) => Promise<unknown> = () => Promise.resolve(null)
+): PluginSubprocessHost {
   const host = new PluginSubprocessHost(
     path.join(import.meta.dir, "plugin-runner.ts"),
     "demo",
-    () => Promise.resolve(null)
+    handleHostRequest
   );
   hosts.push(host);
   return host;

@@ -8,13 +8,7 @@ export type PluginStatus =
   "disabled" | "active" | "degraded" | "error" | "incompatible";
 
 export type PluginExtensionKind =
-  | "skill"
-  | "mcp"
-  | "model"
-  | "command"
-  | "tool"
-  | "threadStorage"
-  | "settings";
+  "skill" | "mcp" | "model" | "command" | "tool" | "threadStorage" | "settings";
 
 export interface PluginSafeError {
   id: string;
@@ -39,6 +33,27 @@ export interface PluginCommandView {
   pluginId: string;
   displayName: string;
   description?: string;
+}
+
+export interface PluginCommandReport {
+  /** Stable, command-defined identifier for the current execution phase. */
+  phase: string;
+  /** Optional human-readable detail shown while this phase is active. */
+  message?: string;
+}
+
+export type PluginCommandMessageLevel = "success" | "warning" | "error";
+
+export interface PluginCommandUserMessage {
+  level: PluginCommandMessageLevel;
+  message: string;
+}
+
+declare const pluginCommandResultBrand: unique symbol;
+
+/** Opaque user-visible result created by Plugin Command context.createResult(). */
+export interface PluginCommandResult {
+  readonly [pluginCommandResultBrand]: true;
 }
 
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown
@@ -75,10 +90,7 @@ export interface PluginToolExtension {
   execute(
     context: PluginToolContext,
     args: Record<string, unknown>
-  ):
-    | JsonValue
-    | PluginToolResult
-    | Promise<JsonValue | PluginToolResult>;
+  ): JsonValue | PluginToolResult | Promise<JsonValue | PluginToolResult>;
   dispose?(): void | Promise<void>;
 }
 
@@ -96,6 +108,7 @@ export interface PluginCommandInvocationContext {
 /** Internal result envelope used to apply a command's staged thread write. */
 export interface PluginCommandExecutionResult {
   result: JsonValue;
+  userMessage?: PluginCommandUserMessage;
   activeTabThreadUpdate?: Thread;
 }
 
@@ -113,6 +126,25 @@ export interface PluginCommandContext extends ThreadStorageContext {
   arguments: readonly string[];
   /** The active thread tab captured at invocation, or null. */
   activeTab: PluginCommandActiveTab | null;
+  /** Report the command-defined phase currently being executed. */
+  report(report: PluginCommandReport): Promise<void>;
+  /** Create an explicit user-visible terminal message. */
+  createResult(message: PluginCommandUserMessage): PluginCommandResult;
+}
+
+/** Optional compile-time contract for a class exported from commands/*.ts. */
+export interface PluginCommandExtension {
+  displayName: string;
+  description?: string;
+  execute(
+    context: PluginCommandContext,
+    args: readonly string[]
+  ):
+    | JsonValue
+    | PluginCommandResult
+    | void
+    | Promise<JsonValue | PluginCommandResult | void>;
+  dispose?(): void | Promise<void>;
 }
 
 export interface ThreadStorageCapabilities {

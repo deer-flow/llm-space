@@ -42,6 +42,7 @@ process.stdout.write = (chunk: unknown) => {
 const commands = new Map<string, any>();
 const tools = new Map<string, any>();
 const storages = new Map<string, any>();
+const STRUCTURED_COMMAND_RESULT = Symbol("structuredCommandResult");
 const STRUCTURED_TOOL_RESULT = Symbol("structuredToolResult");
 const pendingHost = new Map<
   string,
@@ -82,6 +83,8 @@ function context(signal?: AbortSignal) {
 }
 
 function commandContext(
+  executionId: unknown,
+  commandId: unknown,
   initialActiveTab: any,
   initialArguments: unknown
 ) {
@@ -106,18 +109,70 @@ function commandContext(
       Array.isArray(initialArguments) ? [...initialArguments] : []
     ),
     activeTab,
+    report: (report: unknown) => {
+      if (!isCommandReport(report)) {
+        throw new Error("Plugin Command report is invalid.");
+      }
+      return hostCall("report", {
+        executionId: _string(executionId),
+        commandId: _string(commandId),
+        report,
+      });
+    },
+    createResult: (message: unknown) => {
+      if (!isCommandUserMessage(message)) {
+        throw new Error("Plugin Command user message is invalid.");
+      }
+      return { [STRUCTURED_COMMAND_RESULT]: true, message };
+    },
   });
   return {
     value,
     result(result: any) {
+      const structured =
+        result &&
+        typeof result === "object" &&
+        result[STRUCTURED_COMMAND_RESULT] === true;
+      const userMessage = structured ? result.message : undefined;
       return {
-        result: result ?? null,
-        ...(activeTabThreadUpdated
+        result: structured ? null : (result ?? null),
+        ...(userMessage ? { userMessage } : {}),
+        ...(activeTabThreadUpdated && userMessage?.level !== "error"
           ? { activeTabThreadUpdate: activeTabThread }
           : {}),
       };
     },
   };
+}
+
+function _string(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function isCommandReport(
+  value: unknown
+): value is { phase: string; message?: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const report = value as Record<string, unknown>;
+  return (
+    typeof report.phase === "string" &&
+    report.phase.trim().length > 0 &&
+    (report.message === undefined || typeof report.message === "string")
+  );
+}
+
+function isCommandUserMessage(
+  value: unknown
+): value is { level: "success" | "warning" | "error"; message: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const message = value as Record<string, unknown>;
+  return (
+    (message.level === "success" ||
+      message.level === "warning" ||
+      message.level === "error") &&
+    typeof message.message === "string" &&
+    message.message.trim().length > 0
+  );
 }
 
 function toolContext(initialThread: unknown, initialVariables: unknown) {
@@ -240,9 +295,7 @@ async function handle(method: string, params: any): Promise<any> {
           name: instance.name,
           description: instance.description,
           parameters: structuredClone(instance.parameters),
-          ...(instance.strict === undefined
-            ? {}
-            : { strict: instance.strict }),
+          ...(instance.strict === undefined ? {} : { strict: instance.strict }),
         });
       } catch (error) {
         errors.push({
@@ -318,7 +371,12 @@ async function handle(method: string, params: any): Promise<any> {
   if (method === "command.execute") {
     const command = commands.get(params.id);
     if (!command) throw new Error(`Unknown plugin command: ${params.id}`);
-    const invocation = commandContext(params.activeTab, params.arguments);
+    const invocation = commandContext(
+      params.executionId,
+      params.id,
+      params.activeTab,
+      params.arguments
+    );
     const result = await command.execute(
       invocation.value,
       invocation.value.arguments
