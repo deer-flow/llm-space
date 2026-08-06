@@ -1,5 +1,10 @@
 "use client";
 
+/* Hallmark · component: MCP settings panel · genre: modern-minimal · theme: existing app system
+ * states: default · hover · focus · active · disabled · loading · error · success
+ * contrast: pass (46–50) · pre-emit critique: P5 H5 E5 S5 R5 V4
+ */
+
 import {
   buildMcpToolName,
   getMcpReadinessLabel,
@@ -447,214 +452,151 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         <McpEmptyState onAdd={createServer} />
       ) : (
         <div className="flex h-full min-h-0 gap-6">
-        <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              SERVERS
-            </span>
-            <div className="flex items-center gap-1">
-              <Tooltip content="Refresh servers">
-                <button
-                  type="button"
-                  aria-label="Refresh MCP servers"
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
-                  onClick={() => void refresh()}
-                >
-                  {loading ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-3.5" />
-                  )}
-                </button>
-              </Tooltip>
-              <Tooltip content="Add MCP server">
-                <button
-                  type="button"
-                  aria-label="Add MCP server"
-                  disabled={saving || dirty || testingServerId !== null}
-                  className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
-                  onClick={createServer}
-                >
-                  <Plus className="size-4" />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
-          <ScrollArea className="min-h-0 grow">
-            <div className="flex flex-col gap-1 pr-2">
-              {userServers.map((server) => (
-                <button
-                  key={server.id}
-                  type="button"
-                  disabled={saving || dirty || testingServerId !== null}
-                  className={cn(
-                    "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
-                    selectedId === server.id && "bg-accent"
-                  )}
-                  onClick={() => {
-                    setCreating(false);
-                    setFormError(null);
-                    setSelectedId(server.id);
-                  }}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <StatusDot server={server} />
-                    <span className="truncate text-sm font-medium">
-                      {server.name}
-                    </span>
-                  </span>
-                  <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
-                    {server.transport}
-                  </span>
-                  <span className="text-muted-foreground truncate pl-4 text-xs">
-                    {_sidebarReadiness(server)}
-                  </span>
-                </button>
-              ))}
-              {creating ? (
-                <button
-                  type="button"
-                  className="bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left"
-                >
-                  <span className="truncate text-sm font-medium">
-                    Unsaved server
-                  </span>
-                </button>
-              ) : null}
-              {pluginServers.length > 0 ? (
-                <>
-                  <div className="text-muted-foreground mt-5 px-2 text-xs font-medium tracking-wide uppercase">
-                    MCPs in Plugins
-                  </div>
-                  {pluginServers.map((server) => (
-                    <button
-                      key={server.id}
-                      type="button"
-                      disabled={saving || dirty || testingServerId !== null}
-                      className={cn(
-                        "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
-                        selectedId === server.id && "bg-accent"
-                      )}
-                      onClick={() => {
-                        setCreating(false);
-                        setFormError(null);
-                        setSelectedId(server.id);
-                      }}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <StatusDot server={server} />
-                        <span className="truncate text-sm font-medium">
-                          {server.name}
-                        </span>
-                      </span>
-                      <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
-                        {server.transport}
-                      </span>
-                      <span className="text-muted-foreground truncate pl-4 text-xs">
-                        {_sidebarReadiness(server)}
-                      </span>
-                    </button>
-                  ))}
-                </>
-              ) : null}
-            </div>
-          </ScrollArea>
-        </aside>
-
-        <main className="min-w-0 grow">
-          {selectedServer?.readOnly ? (
-            <div className="flex h-full flex-col gap-4 overflow-auto p-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-heading text-lg font-medium">
-                    {selectedServer.name}
-                  </h3>
-                  <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] uppercase">
-                    Plugin · Read only
-                  </span>
-                </div>
-                <p className="text-muted-foreground mt-1 font-mono text-xs">
-                  {selectedServer.id}
-                </p>
-              </div>
-              <div className="text-sm">
-                <span className="text-muted-foreground">Transport: </span>
-                {selectedServer.transport}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={testing ? "outline" : "secondary"}
-                  onClick={() =>
-                    testing ? void cancelTest() : void testServer()
-                  }
-                  disabled={disconnecting || cancellingTest}
-                >
-                  {testing ? (
-                    cancellingTest ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <X />
-                    )
-                  ) : (
-                    <RefreshCw />
-                  )}
-                  {testing
-                    ? "Cancel"
-                    : selectedServer.connected
-                      ? "Retest"
-                      : "Connect & Test"}
-                </Button>
-                {selectedServer.connected ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void disconnectServer()}
-                    disabled={testing || disconnecting}
+          <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                SERVERS
+              </span>
+              <div className="flex items-center gap-1">
+                <Tooltip content="Refresh servers">
+                  <button
+                    type="button"
+                    aria-label="Refresh MCP servers"
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+                    onClick={() => void refresh()}
                   >
-                    {disconnecting ? (
-                      <Loader2 className="animate-spin" />
+                    {loading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
                     ) : (
-                      <Unplug />
+                      <RefreshCw className="size-3.5" />
                     )}
-                    Disconnect
-                  </Button>
+                  </button>
+                </Tooltip>
+                <Tooltip content="Add MCP server">
+                  <button
+                    type="button"
+                    aria-label="Add MCP server"
+                    disabled={saving || dirty || testingServerId !== null}
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
+                    onClick={createServer}
+                  >
+                    <Plus className="size-4" />
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+            <ScrollArea className="min-h-0 grow">
+              <div className="flex flex-col gap-1 pr-2">
+                {userServers.map((server) => (
+                  <button
+                    key={server.id}
+                    type="button"
+                    disabled={saving || dirty || testingServerId !== null}
+                    className={cn(
+                      "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+                      selectedId === server.id && "bg-accent"
+                    )}
+                    onClick={() => {
+                      setCreating(false);
+                      setFormError(null);
+                      setSelectedId(server.id);
+                    }}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <StatusDot server={server} />
+                      <span className="truncate text-sm font-medium">
+                        {server.name}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
+                      {server.transport}
+                    </span>
+                    <span className="text-muted-foreground truncate pl-4 text-xs">
+                      {_sidebarReadiness(server)}
+                    </span>
+                  </button>
+                ))}
+                {creating ? (
+                  <button
+                    type="button"
+                    className="bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left"
+                  >
+                    <span className="truncate text-sm font-medium">
+                      Unsaved server
+                    </span>
+                  </button>
+                ) : null}
+                {pluginServers.length > 0 ? (
+                  <>
+                    <div className="text-muted-foreground mt-5 px-2 text-xs font-medium tracking-wide uppercase">
+                      MCPs in Plugins
+                    </div>
+                    {pluginServers.map((server) => (
+                      <button
+                        key={server.id}
+                        type="button"
+                        disabled={saving || dirty || testingServerId !== null}
+                        className={cn(
+                          "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+                          selectedId === server.id && "bg-accent"
+                        )}
+                        onClick={() => {
+                          setCreating(false);
+                          setFormError(null);
+                          setSelectedId(server.id);
+                        }}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <StatusDot server={server} />
+                          <span className="truncate text-sm font-medium">
+                            {server.name}
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
+                          {server.transport}
+                        </span>
+                        <span className="text-muted-foreground truncate pl-4 text-xs">
+                          {_sidebarReadiness(server)}
+                        </span>
+                      </button>
+                    ))}
+                  </>
                 ) : null}
               </div>
-              <ReadinessPanel
+            </ScrollArea>
+          </aside>
+
+          <main className="min-w-0 grow">
+            {creating || selectedId ? (
+              <ServerEditor
+                form={form}
+                normalizedName={normalizedName}
                 server={selectedServer}
-                liveToolsLoaded={tools.length > 0}
+                readOnly={selectedServer?.readOnly === true}
+                formError={formError}
+                saving={saving}
+                dirty={dirty}
+                testing={testing}
+                cancellingTest={cancellingTest}
+                disconnecting={disconnecting}
+                creating={creating}
+                tools={tools}
+                onFormChange={(nextForm) => {
+                  setFormError(null);
+                  setForm(nextForm);
+                  setDirty(true);
+                }}
+                onTest={() => void testServer()}
+                onCancelTest={() => void cancelTest()}
+                onDisconnect={() => void disconnectServer()}
+                onCancel={cancelCreate}
+                onRemove={() => setRemoveOpen(true)}
               />
-            </div>
-          ) : creating || selectedId ? (
-            <ServerEditor
-              form={form}
-              normalizedName={normalizedName}
-              server={selectedServer}
-              formError={formError}
-              saving={saving}
-              dirty={dirty}
-              testing={testing}
-              cancellingTest={cancellingTest}
-              disconnecting={disconnecting}
-              creating={creating}
-              tools={tools}
-              onFormChange={(nextForm) => {
-                setFormError(null);
-                setForm(nextForm);
-                setDirty(true);
-              }}
-              onTest={() => void testServer()}
-              onCancelTest={() => void cancelTest()}
-              onDisconnect={() => void disconnectServer()}
-              onCancel={cancelCreate}
-              onRemove={() => setRemoveOpen(true)}
-            />
-          ) : (
-            <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-              Select or add an MCP server
-            </div>
-          )}
+            ) : (
+              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                Select or add an MCP server
+              </div>
+            )}
           </main>
         </div>
       )}
@@ -727,6 +669,7 @@ function ServerEditor({
   form,
   normalizedName,
   server,
+  readOnly,
   formError,
   saving,
   dirty,
@@ -745,6 +688,7 @@ function ServerEditor({
   form: ServerForm;
   normalizedName: string;
   server: McpServerView | null;
+  readOnly: boolean;
   formError: string | null;
   saving: boolean;
   dirty: boolean;
@@ -782,18 +726,31 @@ function ServerEditor({
   return (
     <ScrollArea className="h-full">
       <div className="flex max-w-2xl flex-col gap-6 pb-6">
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <div className="min-w-0 grow">
-            <h3 className="font-heading truncate text-lg font-medium">
-              {form.name || "MCP Server"}
-            </h3>
-            <div className="text-muted-foreground font-mono text-xs">
-              {form.useOriginalToolNames
-                ? "tool"
-                : normalizedName
+            <div className="flex min-w-0 items-center gap-2">
+              <h3 className="font-heading truncate text-lg font-medium">
+                {form.name || "MCP Server"}
+              </h3>
+              {readOnly ? (
+                <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase">
+                  Plugin · Read only
+                </span>
+              ) : null}
+            </div>
+            {server ? (
+              <div className="text-muted-foreground truncate font-mono text-xs">
+                {server.id}
+              </div>
+            ) : null}
+            {!form.useOriginalToolNames ? (
+              <div className="text-muted-foreground mt-1 font-mono text-xs">
+                <span>Tool names: </span>
+                {normalizedName
                   ? `mcp__${normalizedName}__tool`
                   : "mcp__server__tool"}
-            </div>
+              </div>
+            ) : null}
           </div>
           {creating ? (
             <Button
@@ -843,16 +800,18 @@ function ServerEditor({
                   Disconnect
                 </Button>
               ) : null}
-              <Tooltip content="Remove MCP server">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Remove MCP server"
-                  onClick={onRemove}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </Tooltip>
+              {!readOnly ? (
+                <Tooltip content="Remove MCP server">
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Remove MCP server"
+                    onClick={onRemove}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </Tooltip>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -872,6 +831,7 @@ function ServerEditor({
           <Input
             value={form.name}
             aria-label="MCP server name"
+            readOnly={readOnly}
             onChange={(event) => patch({ name: event.target.value })}
           />
         </Field>
@@ -886,6 +846,7 @@ function ServerEditor({
           <Switch
             checked={form.useOriginalToolNames}
             aria-label="Use original MCP tool names without a prefix"
+            disabled={readOnly}
             onCheckedChange={(useOriginalToolNames) =>
               patch({ useOriginalToolNames })
             }
@@ -895,6 +856,7 @@ function ServerEditor({
         <Field label="Transport">
           <Select
             value={form.transport}
+            disabled={readOnly}
             onValueChange={(value) =>
               patch({ transport: value as McpTransportType })
             }
@@ -917,6 +879,7 @@ function ServerEditor({
                 value={form.command}
                 aria-label="MCP stdio command"
                 placeholder="npx"
+                readOnly={readOnly}
                 onChange={(event) => patch({ command: event.target.value })}
               />
             </Field>
@@ -926,6 +889,7 @@ function ServerEditor({
                 value={form.argsText}
                 aria-label="MCP stdio args"
                 placeholder={"-y\n@modelcontextprotocol/server-filesystem"}
+                readOnly={readOnly}
                 onChange={(event) => patch({ argsText: event.target.value })}
               />
             </Field>
@@ -933,6 +897,7 @@ function ServerEditor({
               <Input
                 value={form.cwd}
                 aria-label="MCP stdio working directory"
+                readOnly={readOnly}
                 onChange={(event) => patch({ cwd: event.target.value })}
               />
             </Field>
@@ -943,6 +908,7 @@ function ServerEditor({
               revealValue
               namePlaceholder="KEY"
               valuePlaceholder="$TOKEN"
+              readOnly={readOnly}
               onChange={(env) => patch({ env })}
             />
           </>
@@ -953,6 +919,7 @@ function ServerEditor({
                 value={form.url}
                 aria-label="MCP remote URL"
                 placeholder="https://example.com/mcp"
+                readOnly={readOnly}
                 onChange={(event) => patch({ url: event.target.value })}
               />
             </Field>
@@ -960,8 +927,10 @@ function ServerEditor({
               label="Headers"
               rows={form.headers}
               valueType="password"
+              revealValue
               namePlaceholder="Authorization"
               valuePlaceholder="Bearer $TOKEN"
+              readOnly={readOnly}
               onChange={(headers) => patch({ headers })}
             />
           </>
@@ -1195,6 +1164,7 @@ function KeyValueRows({
   revealValue = false,
   namePlaceholder,
   valuePlaceholder,
+  readOnly = false,
   onChange,
 }: {
   label: string;
@@ -1203,6 +1173,7 @@ function KeyValueRows({
   revealValue?: boolean;
   namePlaceholder: string;
   valuePlaceholder: string;
+  readOnly?: boolean;
   onChange: (rows: Row[]) => void;
 }) {
   const setRow = (index: number, row: Row) =>
@@ -1219,6 +1190,7 @@ function KeyValueRows({
             value={row.key}
             placeholder={namePlaceholder}
             aria-label={`${label} ${index + 1} name`}
+            readOnly={readOnly}
             onChange={(event) =>
               setRow(index, { ...row, key: event.target.value })
             }
@@ -1229,29 +1201,34 @@ function KeyValueRows({
             value={row.value}
             placeholder={valuePlaceholder}
             aria-label={`${label} ${index + 1} value`}
+            readOnly={readOnly}
             onChange={(value) => setRow(index, { ...row, value })}
           />
-          <Tooltip content={`Remove ${label.toLowerCase()} row`}>
-            <button
-              type="button"
-              aria-label={`Remove ${label} row ${index + 1}`}
-              className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
-              onClick={() => removeRow(index)}
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </Tooltip>
+          {!readOnly ? (
+            <Tooltip content={`Remove ${label.toLowerCase()} row`}>
+              <button
+                type="button"
+                aria-label={`Remove ${label} row ${index + 1}`}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
+                onClick={() => removeRow(index)}
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </Tooltip>
+          ) : null}
         </div>
       ))}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="self-start"
-        onClick={() => onChange([...rows, _createRow()])}
-      >
-        <Plus /> Add {label.toLowerCase()}
-      </Button>
+      {!readOnly ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => onChange([...rows, _createRow()])}
+        >
+          <Plus /> Add {label.toLowerCase()}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -1262,6 +1239,7 @@ function SecretValueInput({
   value,
   placeholder,
   "aria-label": ariaLabel,
+  readOnly,
   onChange,
 }: {
   type: "text" | "password";
@@ -1269,6 +1247,7 @@ function SecretValueInput({
   value: string;
   placeholder: string;
   "aria-label": string;
+  readOnly?: boolean;
   onChange: (value: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
@@ -1279,6 +1258,7 @@ function SecretValueInput({
         value={value}
         placeholder={placeholder}
         aria-label={ariaLabel}
+        readOnly={readOnly}
         className={revealable ? "pr-9" : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
