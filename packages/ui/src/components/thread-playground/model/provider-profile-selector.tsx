@@ -62,8 +62,10 @@ export function ProviderProfileSelector({
           className
         )}
         size="sm"
-        noIcon={ variant=== "compact" }
-        aria-label={`${provider?.name ?? providerId} connection profile: ${selectedProfile?.name ?? "Default"}`}
+        noIcon={variant === "compact"}
+        aria-label={`${provider?.name ?? providerId} connection profile: ${
+          selectedProfile?.name ?? "Default"
+        }`}
       >
         {variant === "compact" ? (
           <SelectValue>
