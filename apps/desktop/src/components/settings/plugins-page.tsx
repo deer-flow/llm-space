@@ -1,6 +1,11 @@
 "use client";
 
-import type { JsonObject, JsonValue, PluginView } from "@llm-space/core";
+import type {
+  JsonObject,
+  JsonValue,
+  PluginExtensionKind,
+  PluginView,
+} from "@llm-space/core";
 import { Link } from "@llm-space/ui/components/link";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -43,6 +48,7 @@ import {
   ScrollText,
   Search,
   Server,
+  Settings2,
   Sparkles,
   Terminal,
   Workflow,
@@ -92,6 +98,16 @@ const PLUGIN_WALL_ICONS: readonly LucideIcon[] = [
   Cable,
   Command,
 ];
+
+const EXTENSION_KIND_ICONS: Record<PluginExtensionKind, LucideIcon> = {
+  skill: Sparkles,
+  mcp: Cable,
+  model: BrainCircuit,
+  command: Command,
+  tool: Wrench,
+  threadStorage: Database,
+  settings: Settings2,
+};
 
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
@@ -549,40 +565,38 @@ function PluginEditor({
                 </div>
                 {plugin.extensions.length > 0 ? (
                   <div className="min-w-0 divide-y overflow-hidden rounded-md border">
-                    {plugin.extensions.map((extension) => (
-                      <div
-                        key={`${extension.kind}:${extension.id}`}
-                        className="flex items-center gap-3 px-3 py-2 text-xs"
-                      >
-                        <span
-                          className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            extension.error
-                              ? "bg-destructive"
-                              : extension.active
-                                ? "bg-emerald-500"
-                                : "bg-muted-foreground/40"
+                    {plugin.extensions.map((extension) => {
+                      const ExtensionIcon =
+                        EXTENSION_KIND_ICONS[extension.kind];
+                      return (
+                        <div
+                          key={`${extension.kind}:${extension.id}`}
+                          className="flex items-center gap-3 px-3 py-2 text-xs"
+                        >
+                          <ExtensionIcon
+                            className="text-muted-foreground size-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                          {extension.sourcePath ? (
+                            <button
+                              type="button"
+                              className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
+                              title={`Reveal ${extension.sourcePath}`}
+                              onClick={() => _reveal(extension.sourcePath!)}
+                            >
+                              {extension.displayName}
+                            </button>
+                          ) : (
+                            <span className="grow truncate">
+                              {extension.displayName}
+                            </span>
                           )}
-                        />
-                        {extension.sourcePath ? (
-                          <button
-                            type="button"
-                            className="hover:text-foreground min-w-0 grow cursor-pointer truncate text-left underline-offset-2 hover:underline"
-                            title={`Reveal ${extension.sourcePath}`}
-                            onClick={() => _reveal(extension.sourcePath!)}
-                          >
-                            {extension.displayName}
-                          </button>
-                        ) : (
-                          <span className="grow truncate">
-                            {extension.displayName}
+                          <span className="text-muted-foreground uppercase">
+                            {extension.kind}
                           </span>
-                        )}
-                        <span className="text-muted-foreground uppercase">
-                          {extension.kind}
-                        </span>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-xs">
