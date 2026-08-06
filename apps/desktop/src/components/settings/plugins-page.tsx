@@ -605,7 +605,7 @@ function PluginEditor({
                       const ExtensionIcon = EXTENSION_KIND_ICONS[group.kind];
                       return (
                         <AccordionItem key={group.kind} value={group.kind}>
-                          <AccordionTrigger className="px-3 py-2.5 hover:no-underline">
+                          <AccordionTrigger className="bg-muted/30 data-[state=open]:bg-muted/40 hover:bg-muted/40 rounded-none px-3 py-2.5 hover:no-underline">
                             <span className="flex min-w-0 items-center gap-2.5">
                               <ExtensionIcon
                                 className="text-muted-foreground size-4 shrink-0"
@@ -624,7 +624,7 @@ function PluginEditor({
                               {group.extensions.map((extension) => (
                                 <div
                                   key={extension.id}
-                                  className="flex min-w-0 items-center gap-4 py-2 pr-3 pl-4 text-xs"
+                                  className="bg-muted/10 hover:bg-muted/20 flex min-w-0 items-center gap-4 py-2 pr-3 pl-4 text-xs transition-colors"
                                 >
                                   <span
                                     className={cn(
