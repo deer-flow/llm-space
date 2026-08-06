@@ -450,12 +450,12 @@ the same Thread and resolved-variable snapshot.
 
 `context.variables` resolves all configured variables at invocation time:
 
-| Variable type | Resolved value |
-| --- | --- |
-| Custom, working directory, current date | String |
-| Skills | Formatted string using the configured format |
-| File | UTF-8 file contents |
-| JSON | Parsed JSON value |
+| Variable type                           | Resolved value                               |
+| --------------------------------------- | -------------------------------------------- |
+| Custom, working directory, current date | String                                       |
+| Skills                                  | Formatted string using the configured format |
+| File                                    | UTF-8 file contents                          |
+| JSON                                    | Parsed JSON value                            |
 
 Empty or unresolvable variables are omitted. Original definitions remain under
 `context.thread.context.variables`; custom variants remain under
@@ -518,6 +518,8 @@ context.arguments;
 context.activeTab?.filename;
 context.activeTab?.thread;
 await context.activeTab?.writeThread(thread);
+await context.report({ phase: "loading", message: "Loading records…" });
+return context.createResult({ level: "success", message: "Import complete" });
 ```
 
 The palette accepts shell-style arguments after either the command's display
@@ -551,6 +553,41 @@ export default class CreateReadmeCommand {
 ```
 
 Plugin Commands currently appear only in the Command Palette. They do not automatically receive native menu entries, shortcuts, or context-menu entries.
+
+### 10.2 Execution feedback and user-visible results
+
+LLM Space owns the Command execution status. It shows a persistent running
+notification when execution starts and changes it to a success or error state
+when `execute()` settles. A Command can provide more specific in-progress
+feedback with `report()`:
+
+```ts
+await context.report({
+  phase: "downloading",
+  message: "Downloading the latest skills…",
+});
+```
+
+`phase` is a stable Command-defined identifier. `message` is optional display
+copy. Reporting is scoped to the current invocation and is delivered to the UI
+without waiting for the Command to finish.
+
+Ordinary return values remain available to the host but are not displayed. To
+show an explicit terminal message, return the opaque result made by
+`createResult()`:
+
+```ts
+return context.createResult({
+  level: "success", // "success" | "warning" | "error"
+  message: "Synced 6 skills.",
+});
+```
+
+`success` and `warning` complete normally with their corresponding visual
+style. `error` is a controlled failure: it displays the supplied message and
+does not commit a staged `activeTab.writeThread()` update. Throwing remains the
+right choice for unexpected failures. Only one invocation of a given Plugin
+Command may run at a time; different Commands may run concurrently.
 
 ## 11. Thread Storages
 
