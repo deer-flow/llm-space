@@ -150,6 +150,22 @@ State is **persisted to disk** under the llm-space root (`~/.llm-space` by defau
 - `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`), `window.json` (frame/zoom/maximized), and `reminders.json` (`featureRemindersSeen` ids + GitHub-star reminder state, owned by `bun/reminders/`).
 
+Renderer and web UI preferences stored in browser `localStorage` must go through
+`@llm-space/ui/lib/local-storage`: register static keys in `LOCAL_STORAGE_KEYS`,
+use a typed key factory for runtime-scoped or otherwise dynamic keys, and call
+`readLocalStorage`, `writeLocalStorage`, or `removeLocalStorage` instead of
+accessing `window.localStorage` directly. Keep each feature's existing
+serialization, defaults, validation, legacy migration, and failure behavior at
+the call site. New static keys use the `llm-space:<name>` form; scoped or
+dynamic keys use `llm-space:<feature>:<scope>` and must be produced by their
+typed key factory. These naming rules are forward-looking: preserve existing
+legacy key strings as-is unless a change explicitly includes a compatibility
+migration. The synchronous appearance bootstrap in
+`apps/desktop/src/mainview/index.html` is the intentional exception: it reads
+the theme, primary color, and rendering-fidelity keys inline before module
+loading to prevent a wrong-theme flash, so keep those literals synchronized
+with `LOCAL_STORAGE_KEYS`.
+
 ### Releases & auto-update
 
 The app version has a **single source of truth: `apps/desktop/package.json`** — `electrobun.config.ts` imports it, and release CI fails if the pushed tag doesn't match. Cut releases with `mise run release` (stable) or `mise run release:canary`; the script (`scripts/release.ts`) runs `commit-and-tag-version` (conventional-commits-driven version bump + commit + `v*` tag, config in `.versionrc.json`) and pushes atomically. Automated changelog generation is off (`skip.changelog`) — the `CHANGELOG.md` at the repo root is **hand-curated** (Keep a Changelog format), so before cutting a stable release, add a `## [x.y.z]` section for it. CI builds each versioned release's GitHub notes by extracting that version's `CHANGELOG.md` section (no `--generate-notes`, which would dump commits/authors) and appending the install blurb; prereleases with no changelog entry (canary) fall back to install-only notes. The tag triggers `.github/workflows/release.yml`: build → codesign/notarize (canary/stable only; needs the `MACOS_*`/`ASC_*` signing secrets, mapped to electrobun's `ELECTROBUN_*` env vars in the workflow) → smoke test → upload. Artifacts land in two GitHub releases: the rolling `updates` release is the machine-readable update feed (`release.baseUrl` points at it; **never delete its `.patch` files** — old installs chain through them), and a versioned release carries the DMG for humans. In-app auto-update lives in `bun/updates/` (background check → silent download → "restart to update" toast via the `updateStatusChanged` message); the dev channel never updates.
