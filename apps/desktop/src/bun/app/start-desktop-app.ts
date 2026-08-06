@@ -15,10 +15,12 @@ import Electrobun, {
 
 import packageJson from "../../../package.json";
 import type { Command } from "../../shared/commands";
+import { resolveDeepLinkScheme } from "../../shared/deep-link-scheme";
 import { Analytics } from "../analytics";
 import { GitHubAuthManager } from "../auth";
 import { executeCommandInBun } from "../commands";
 import { createDeepLinkHandler, type DeepLinkHandler } from "../deep-link";
+import { activateWindowForDeepLink } from "../deep-link/activate-window";
 import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
@@ -288,7 +290,13 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       threadStorages: pluginManager.threadStorages,
       getRpc,
     });
-    setDeepLinkHandler((url) => void deepLink?.handle(url));
+    const deepLinkScheme = resolveDeepLinkScheme(
+      process.env.LLM_SPACE_DEEP_LINK_SCHEME
+    );
+    setDeepLinkHandler((url) => {
+      activateWindowForDeepLink(getMainWindow(), url, deepLinkScheme);
+      void deepLink?.handle(url);
+    });
 
     analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
     void updater.start();

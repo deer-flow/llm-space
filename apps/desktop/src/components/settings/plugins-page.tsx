@@ -31,7 +31,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@llm-space/ui/ui/tabs";
-import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   ArrowUpRightIcon,
   Blocks,
@@ -410,9 +409,6 @@ function PluginEditor({
   onChanged: (plugins: PluginView[]) => void;
 }) {
   const [settings, setSettings] = useState<JsonObject>(plugin?.settings ?? {});
-  const [json, setJson] = useState(
-    JSON.stringify(plugin?.settings ?? {}, null, 2)
-  );
   const [reloading, setReloading] = useState(false);
   const settingsError = plugin?.extensions.find(
     (extension) => extension.kind === "settings" && extension.error
@@ -421,7 +417,6 @@ function PluginEditor({
   useEffect(() => {
     if (!plugin) return;
     setSettings(plugin.settings);
-    setJson(JSON.stringify(plugin.settings, null, 2));
   }, [plugin, plugin?.settings]);
 
   if (!plugin) {
@@ -533,12 +528,14 @@ function PluginEditor({
             >
               General
             </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
-            >
-              Settings
-            </TabsTrigger>
+            {plugin.settingsSchema || settingsError ? (
+              <TabsTrigger
+                value="settings"
+                className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
+              >
+                Settings
+              </TabsTrigger>
+            ) : null}
           </TabsList>
         </div>
 
@@ -746,7 +743,7 @@ function PluginEditor({
             </p>
           ) : plugin.settingsSchema ? (
             <ScrollArea className="h-full">
-              <div className="pr-3">
+              <div className="max-w-xl pr-3 pb-4">
                 <SchemaFields
                   schema={plugin.settingsSchema}
                   value={settings}
@@ -755,23 +752,7 @@ function PluginEditor({
                 />
               </div>
             </ScrollArea>
-          ) : (
-            <Textarea
-              className="size-full min-h-0 resize-none font-mono text-xs"
-              value={json}
-              onChange={(event) => setJson(event.target.value)}
-              onBlur={() => {
-                try {
-                  const next = _parseObject(json);
-                  setSettings(next);
-                  void saveSettings(next);
-                } catch (error) {
-                  _showError(error);
-                }
-              }}
-              aria-label={`${plugin.displayName} settings JSON`}
-            />
-          )}
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
@@ -824,7 +805,7 @@ function SchemaFields({
 }) {
   const properties = _asObject(schema.properties) ?? {};
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {Object.entries(properties).map(([key, raw]) => {
         const field = _asObject(raw);
         if (!field) return null;
@@ -846,96 +827,116 @@ function SchemaFields({
           ? field.enum.filter(_isPrimitive)
           : undefined;
         return (
-          <label key={path} className="block space-y-1 text-xs">
-            <span className="font-medium">{title}</span>
-            {enumValues ? (
-              <select
-                className="bg-background h-8 w-full rounded border px-2"
-                value={_displayValue(current)}
-                onChange={(event) => {
-                  const selected = enumValues.find(
-                    (item) => _displayValue(item) === event.target.value
-                  );
-                  if (selected === undefined || !_isPrimitive(selected)) return;
-                  const next = _set(value, path, selected);
-                  onChange(next);
-                  onCommit(next);
-                }}
-              >
-                {enumValues.map((item) => (
-                  <option key={_displayValue(item)} value={_displayValue(item)}>
-                    {_displayValue(item)}
-                  </option>
-                ))}
-              </select>
-            ) : field.type === "boolean" ? (
-              <Switch
-                checked={Boolean(current ?? field.default)}
-                onCheckedChange={(checked) => {
-                  const next = _set(value, path, checked);
-                  onChange(next);
-                  onCommit(next);
-                }}
-              />
-            ) : field.type === "array" ? (
-              <Input
-                value={JSON.stringify(current ?? field.default ?? [])}
-                onChange={(event) => {
-                  try {
-                    const parsed: unknown = JSON.parse(event.target.value);
-                    if (_isJsonValue(parsed))
-                      onChange(_set(value, path, parsed));
-                  } catch {
-                    /* Keep the last valid value while typing. */
-                  }
-                }}
-                onBlur={(event) => {
-                  try {
-                    const parsed: unknown = JSON.parse(event.target.value);
-                    if (_isJsonValue(parsed))
-                      onCommit(_set(value, path, parsed));
-                  } catch {
-                    _showError(new Error(`${title} must be valid JSON.`));
-                  }
-                }}
-              />
-            ) : (
-              <Input
-                type={
-                  field.type === "number" || field.type === "integer"
-                    ? "number"
-                    : "text"
-                }
-                value={_displayValue(current ?? field.default)}
-                onChange={(event) =>
-                  onChange(
-                    _set(
-                      value,
-                      path,
-                      field.type === "number" || field.type === "integer"
-                        ? Number(event.target.value)
-                        : event.target.value
-                    )
-                  )
-                }
-                onBlur={(event) =>
-                  onCommit(
-                    _set(
-                      value,
-                      path,
-                      field.type === "number" || field.type === "integer"
-                        ? Number(event.target.value)
-                        : event.target.value
-                    )
-                  )
-                }
-              />
+          <label
+            key={path}
+            className={cn(
+              "bg-muted/15 block rounded-lg border p-4 text-xs",
+              field.type === "boolean" &&
+                "flex items-center justify-between gap-4"
             )}
-            {typeof field.description === "string" ? (
-              <span className="text-muted-foreground block">
-                {field.description}
-              </span>
-            ) : null}
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{title}</span>
+              {typeof field.description === "string" ? (
+                <span className="text-muted-foreground mt-1 block leading-5">
+                  {field.description}
+                </span>
+              ) : null}
+            </span>
+            <span
+              className={cn(
+                "block",
+                field.type === "boolean" ? "shrink-0" : "mt-3"
+              )}
+            >
+              {enumValues ? (
+                <select
+                  className="bg-background h-8 w-full rounded border px-2"
+                  value={_displayValue(current)}
+                  onChange={(event) => {
+                    const selected = enumValues.find(
+                      (item) => _displayValue(item) === event.target.value
+                    );
+                    if (selected === undefined || !_isPrimitive(selected))
+                      return;
+                    const next = _set(value, path, selected);
+                    onChange(next);
+                    onCommit(next);
+                  }}
+                >
+                  {enumValues.map((item) => (
+                    <option
+                      key={_displayValue(item)}
+                      value={_displayValue(item)}
+                    >
+                      {_displayValue(item)}
+                    </option>
+                  ))}
+                </select>
+              ) : field.type === "boolean" ? (
+                <Switch
+                  checked={Boolean(current ?? field.default)}
+                  onCheckedChange={(checked) => {
+                    const next = _set(value, path, checked);
+                    onChange(next);
+                    onCommit(next);
+                  }}
+                />
+              ) : field.type === "array" ? (
+                <Input
+                  value={JSON.stringify(current ?? field.default ?? [])}
+                  onChange={(event) => {
+                    try {
+                      const parsed: unknown = JSON.parse(event.target.value);
+                      if (_isJsonValue(parsed))
+                        onChange(_set(value, path, parsed));
+                    } catch {
+                      /* Keep the last valid value while typing. */
+                    }
+                  }}
+                  onBlur={(event) => {
+                    try {
+                      const parsed: unknown = JSON.parse(event.target.value);
+                      if (_isJsonValue(parsed))
+                        onCommit(_set(value, path, parsed));
+                    } catch {
+                      _showError(new Error(`${title} must be valid JSON.`));
+                    }
+                  }}
+                />
+              ) : (
+                <Input
+                  type={
+                    field.type === "number" || field.type === "integer"
+                      ? "number"
+                      : "text"
+                  }
+                  value={_displayValue(current ?? field.default)}
+                  onChange={(event) =>
+                    onChange(
+                      _set(
+                        value,
+                        path,
+                        field.type === "number" || field.type === "integer"
+                          ? Number(event.target.value)
+                          : event.target.value
+                      )
+                    )
+                  }
+                  onBlur={(event) =>
+                    onCommit(
+                      _set(
+                        value,
+                        path,
+                        field.type === "number" || field.type === "integer"
+                          ? Number(event.target.value)
+                          : event.target.value
+                      )
+                    )
+                  }
+                />
+              )}
+            </span>
           </label>
         );
       })}
@@ -969,13 +970,6 @@ function _set(value: JsonObject, dotted: string, next: JsonValue): JsonObject {
   }
   current[parts.at(-1)!] = next;
   return clone;
-}
-
-function _parseObject(text: string): JsonObject {
-  const value: unknown = JSON.parse(text);
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Settings must be a JSON object.");
-  return value as JsonObject;
 }
 
 function _isPrimitive(
