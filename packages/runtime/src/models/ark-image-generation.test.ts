@@ -249,12 +249,12 @@ describe("Ark image generation", () => {
 
   test("propagates the abort signal to fetch", () => {
     const controller = new AbortController();
-    controller.abort();
     let receivedSignal: AbortSignal | null | undefined;
     const generate = createArkImageGenerator(
       _dependencies({
         fetch: (_input, init) => {
           receivedSignal = init?.signal;
+          controller.abort();
           return Promise.reject(new DOMException("Aborted", "AbortError"));
         },
       })

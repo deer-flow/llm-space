@@ -1010,6 +1010,7 @@ export class ModelManager {
             env: (name) => Promise.resolve(env[name]),
             fileExists: (path) => Promise.resolve(existsSync(path)),
           },
+          signal: new AbortController().signal,
         });
         if (res?.auth.apiKey) {
           potentialProviders.push(provider.id);

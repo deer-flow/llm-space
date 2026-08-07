@@ -1,5 +1,5 @@
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index a6a07c1..3597a40 100644
+index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e44a8efa59 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
 @@ -72,7 +72,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
@@ -99,7 +99,7 @@ index a6a07c1..3597a40 100644
          if (response?.id) {
              output.responseId = response.id;
          }
-@@ -454,6 +517,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -459,6 +522,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
              output.responseId = event.response.id;
          }
          else if (event.type === "response.output_item.added") {
@@ -107,7 +107,7 @@ index a6a07c1..3597a40 100644
              createSlot(event.output_index, event.item);
          }
          else if (event.type === "response.reasoning_summary_text.delta") {
-@@ -551,6 +615,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -556,6 +620,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
          }
          else if (event.type === "response.output_item.done") {
              const item = event.item;
@@ -115,7 +115,7 @@ index a6a07c1..3597a40 100644
              applyMessagePhaseStopReason(item);
              const slot = getOrCreateSlot(event.output_index, item);
              if (item.type === "reasoning" && slot?.type === "thinking") {
-@@ -569,6 +634,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -574,6 +639,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              }
              else if (item.type === "message" && slot?.type === "text") {
                  slot.block.text = item.content?.map((c) => (c.type === "output_text" ? c.text : c.refusal)).join("") || "";
@@ -125,15 +125,8 @@ index a6a07c1..3597a40 100644
                  slot.block.textSignature = encodeTextSignatureV1(item.id, item.phase ?? undefined);
                  stream.push({
                      type: "text_end",
-@@ -649,4 +717,4 @@ function mapStopReason(status) {
-         }
-     }
- }
--//# sourceMappingURL=openai-responses-shared.js.map
-\ No newline at end of file
-+//# sourceMappingURL=openai-responses-shared.js.map
 diff --git a/dist/api/openai-responses.d.ts b/dist/api/openai-responses.d.ts
-index 41267bd..4ec81bb 100644
+index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e46221e2c 100644
 --- a/dist/api/openai-responses.d.ts
 +++ b/dist/api/openai-responses.d.ts
 @@ -5,6 +5,7 @@ export interface OpenAIResponsesOptions extends StreamOptions {
@@ -145,7 +138,7 @@ index 41267bd..4ec81bb 100644
  /**
   * Generate function for OpenAI Responses API
 diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
-index 26680b4..d562ebc 100644
+index 7b578e03bbe2edf0f32908483a58997f83768c2f..abf0384359479466a1565ef7beca6095f71270fa 100644
 --- a/dist/api/openai-responses.js
 +++ b/dist/api/openai-responses.js
 @@ -150,6 +150,9 @@ export const streamSimple = (model, context, options) => {
@@ -175,11 +168,11 @@ index 26680b4..d562ebc 100644
      if (options?.toolChoice !== undefined) {
          params.tool_choice = options.toolChoice;
 diff --git a/dist/types.d.ts b/dist/types.d.ts
-index f5d413c..cc48ccd 100644
+index 6ea9e391ecbf6a54c111170ad74653dcc9135085..6c2fce9e33aebe798bfd44d0f7efd607b0e29b0b 100644
 --- a/dist/types.d.ts
 +++ b/dist/types.d.ts
-@@ -223,6 +223,8 @@ export interface SimpleStreamOptions extends StreamOptions {
-     reasoning?: ThinkingLevel;
+@@ -216,6 +216,8 @@ export interface SimpleStreamOptions extends StreamOptions {
+     };
      /** Custom token budgets for thinking levels (token-based providers only) */
      thinkingBudgets?: ThinkingBudgets;
 +    /** Raw provider-hosted tool definitions forwarded only by Responses adapters. */
@@ -187,7 +180,7 @@ index f5d413c..cc48ccd 100644
  }
  export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (model: Model<TApi>, context: Context, options?: TOptions) => AssistantMessageEventStream;
  export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> = (model: ImagesModel<TApi>, context: ImagesContext, options?: TOptions) => Promise<AssistantImages>;
-@@ -235,7 +237,30 @@ export interface TextContent {
+@@ -228,7 +230,30 @@ export interface TextContent {
      type: "text";
      text: string;
      textSignature?: string;
@@ -219,8 +212,8 @@ index f5d413c..cc48ccd 100644
  export interface ThinkingContent {
      type: "thinking";
      thinking: string;
-@@ -298,6 +323,8 @@ export interface AssistantMessage {
-     stopReason: StopReason;
+@@ -306,6 +331,8 @@ export interface AssistantMessage {
+     deferred?: DeferredHandle;
      errorMessage?: string;
      rawStopReason?: string;
 +    nativeToolActivities?: NativeToolActivity[];
@@ -228,10 +221,3 @@ index f5d413c..cc48ccd 100644
      timestamp: number;
  }
  export interface ToolResultMessage<TDetails = any> {
-@@ -669,4 +696,4 @@ export interface ImagesModel<TApi extends ImagesApi> extends Omit<Model<Api>, "a
-     provider: ImagesProviderId;
-     output: ("text" | "image")[];
- }
--//# sourceMappingURL=types.d.ts.map
-\ No newline at end of file
-+//# sourceMappingURL=types.d.ts.map

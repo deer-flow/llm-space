@@ -40,6 +40,7 @@ describe("openaiCodexProvider", () => {
         env: () => Promise.resolve(undefined),
         fileExists: () => Promise.resolve(false),
       },
+      signal: new AbortController().signal,
     });
     expect(auth).toMatchObject({
       auth: { apiKey: "codex-cli-api-key" },
