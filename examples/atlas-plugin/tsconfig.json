@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "paths": {
+      "@llm-space/core": ["../../packages/core/src/index.ts"],
+      "@modelcontextprotocol/sdk/*": [
+        "../../packages/runtime/node_modules/@modelcontextprotocol/sdk/dist/esm/*"
+      ],
+      "zod": ["../../packages/runtime/node_modules/zod/index.d.ts"]
+    }
+  },
+  "include": [
+    "commands/**/*.ts",
+    "servers/**/*.ts",
+    "thread-storages/**/*.ts",
+    "tools/**/*.ts"
+  ]
+}

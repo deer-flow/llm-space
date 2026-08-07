@@ -63,6 +63,8 @@ packages/
   core/       # 共享逻辑：类型、agent loop、thread storage
 apps/
   desktop/    # 桌面应用：Electrobun shell + React UI
+examples/
+  atlas-plugin/ # 覆盖全部 Extension 类型的完整 Plugin 示例
 ```
 
 ## 下载
@@ -107,6 +109,10 @@ mise run build:canary
 - [快速开始](./docs/get-started.zh-CN.md)
 - [用户手册](./docs/index.zh-CN.md)
 - [核心概念](./docs/core-concepts.zh-CN.md)
+- [Plugin 开发指南](./docs/plugins.zh-CN.md)
+- [完整 Atlas Plugin 示例](./examples/atlas-plugin/README.zh-CN.md) —— 包含两套
+  Skills、MCP servers、Model providers、Plugin Tools、Commands 和 Thread
+  Storages，以及包含多项字段的 Settings Schema。
 
 ## 参与贡献
 

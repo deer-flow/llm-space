@@ -21,6 +21,7 @@ Plugin
     ├── MCP server
     ├── Model provider
     ├── Command
+    ├── Plugin Tool
     └── Thread Storage
 ```
 
@@ -1121,6 +1122,18 @@ export default class HelloCommand {
 ```
 
 Settings tab 会出现 Audience 输入框，修改后自动保存并重载 Plugin。
+
+### 16.1 完整 Plugin 示例：Atlas
+
+需要一个可以直接复制、并组合全部 Extension 点的示例时，请查看
+[Atlas Plugin](../examples/atlas-plugin/README.zh-CN.md)。它包含两个 Skills、两个
+MCP servers 及四个 MCP Tools、两个 Model providers 及四个 Models、两个本地
+Plugin Tools、两个 Commands 和两个 Thread Storages。Settings 是唯一的单例
+Extension 点，因此 Atlas 使用一个包含七项字段的 Schema 来展示它。
+
+该示例还包含两个可运行的 stdio MCP servers、类型化 TypeScript contracts、中英文
+文档和安装说明。测试前需要把它复制为真实目录而不是 symlink，使用 Bun 安装内置
+server 依赖，并在 Settings 中填写 MCP server directory 的绝对路径。
 
 ## 17. 开发检查清单
 

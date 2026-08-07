@@ -1,0 +1,82 @@
+{
+  "providers": [
+    {
+      "id": "atlas-openai",
+      "name": "Atlas OpenAI",
+      "api": "openai-responses",
+      "baseUrl": "${settings.openaiBaseUrl}",
+      "apiKey": "$OPENAI_API_KEY",
+      "models": [
+        {
+          "id": "example-openai-reasoner",
+          "name": "Example OpenAI Reasoner",
+          "api": "openai-responses",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 400000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "example-openai-fast",
+          "name": "Example OpenAI Fast Model",
+          "api": "openai-responses",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 400000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "atlas-anthropic",
+      "name": "Atlas Anthropic",
+      "api": "anthropic-messages",
+      "baseUrl": "${settings.anthropicBaseUrl}",
+      "apiKey": "$ANTHROPIC_API_KEY",
+      "models": [
+        {
+          "id": "example-anthropic-reasoner",
+          "name": "Example Anthropic Reasoner",
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 200000,
+          "maxTokens": 64000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "example-anthropic-fast",
+          "name": "Example Anthropic Fast Model",
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 200000,
+          "maxTokens": 64000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  ]
+}

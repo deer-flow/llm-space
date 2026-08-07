@@ -21,6 +21,7 @@ Plugin
     ├── MCP server
     ├── Model provider
     ├── Command
+    ├── Plugin Tool
     └── Thread Storage
 ```
 
@@ -1124,6 +1125,20 @@ Optionally add `config.schema.json`:
 ```
 
 The Settings tab now displays an Audience field. Editing it saves automatically and reloads the Plugin.
+
+### 16.1 Complete Plugin example: Atlas
+
+For a copyable example that combines every supported Extension point, see the
+[Atlas Plugin](../examples/atlas-plugin/README.md). It contributes two Skills,
+two MCP servers with four MCP Tools, two model providers with four models, two
+local Plugin Tools, two Commands, and two Thread Storages. Settings is the only
+singleton Extension point, so Atlas demonstrates it with one schema containing
+seven fields.
+
+The example also includes two runnable stdio MCP servers, typed TypeScript
+contracts, bilingual documentation, and installation instructions. Copy it as
+a real directory rather than a symlink, install its bundled server dependencies
+with Bun, and set its absolute MCP server directory before testing it.
 
 ## 17. Development checklist
 

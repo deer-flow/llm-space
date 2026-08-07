@@ -17,7 +17,8 @@ This is the English user manual for LLM Space. Start with the quick start guide,
 | [Variables and Templates](./variables-and-templates.md) | Reuse content with `{{variables}}` and add logic with templates: `@include`, conditionals, and loops. |
 | [UI Layout](./ui-layout.md)                             | Explains the major areas of the main interface.                                                       |
 | [Settings](./settings.md)                               | Introduces the Settings entry point and the General, Models, MCP, Search, and Skills pages.           |
-| [Plugin Development Guide](./plugins.md)                | Build local Plugins with Skills, MCP servers, models, commands, and Thread Storages.                  |
+| [Plugin Development Guide](./plugins.md)                | Build local Plugins with Skills, MCP servers, models, Tools, commands, and Thread Storages.           |
+| [Complete Atlas Plugin](../examples/atlas-plugin/README.md) | Explore a working example with multiple contributions for every repeatable Extension type.         |
 | [Remote Runtime over SSH](./remote-runtime.md)          | Connect the desktop app to a Linux runtime through system OpenSSH config.                             |
 | [Shortcut Keys](./shortcut-keys.md)                     | Introduces menu shortcuts, the command palette, and Thread run shortcuts.                             |
 

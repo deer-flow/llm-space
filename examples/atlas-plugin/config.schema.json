@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "title": "Atlas Settings",
+  "description": "Shared settings used by the Atlas Commands, Tools, MCP servers, and model providers.",
+  "properties": {
+    "teamName": {
+      "type": "string",
+      "title": "Team name",
+      "description": "Human-readable team name included in generated briefs and Tool results.",
+      "default": "Example Team"
+    },
+    "projectName": {
+      "type": "string",
+      "title": "Project name",
+      "description": "Default project selected by Atlas extensions.",
+      "default": "Project Atlas"
+    },
+    "notesDirectory": {
+      "type": "string",
+      "title": "Notes directory",
+      "description": "Workspace-relative directory used by Atlas Commands and Tools.",
+      "default": "atlas"
+    },
+    "serverDirectory": {
+      "type": "string",
+      "title": "MCP server directory",
+      "description": "Absolute path to the installed atlas-plugin directory. Required for the bundled stdio MCP servers.",
+      "default": ""
+    },
+    "openaiBaseUrl": {
+      "type": "string",
+      "title": "OpenAI-compatible base URL",
+      "default": "https://api.openai.com/v1"
+    },
+    "anthropicBaseUrl": {
+      "type": "string",
+      "title": "Anthropic-compatible base URL",
+      "default": "https://api.anthropic.com"
+    },
+    "notificationsEnabled": {
+      "type": "boolean",
+      "title": "Show completion notifications",
+      "default": true
+    }
+  },
+  "required": [
+    "teamName",
+    "projectName",
+    "notesDirectory",
+    "serverDirectory",
+    "openaiBaseUrl",
+    "anthropicBaseUrl",
+    "notificationsEnabled"
+  ],
+  "additionalProperties": false
+}

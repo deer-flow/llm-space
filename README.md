@@ -63,6 +63,8 @@ packages/
   core/       # Shared logic: types, the agent loop, thread storage
 apps/
   desktop/    # The desktop app (Electrobun shell + React UI)
+examples/
+  atlas-plugin/ # Complete Plugin example covering every Extension type
 ```
 
 ## Download
@@ -107,6 +109,10 @@ The user guide lives in this repository:
 - [Quick start](./docs/get-started.md)
 - [User manual](./docs/index.md)
 - [Core concepts](./docs/core-concepts.md)
+- [Plugin development guide](./docs/plugins.md)
+- [Complete Atlas Plugin example](./examples/atlas-plugin/README.md) — two
+  Skills, MCP servers, model providers, Plugin Tools, Commands, and Thread
+  Storages, plus a multi-field Settings schema.
 
 ## Contributing
 

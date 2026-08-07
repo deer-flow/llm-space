@@ -1,0 +1,26 @@
+{
+  "servers": [
+    {
+      "id": "catalog",
+      "name": "Atlas Catalog",
+      "transport": "stdio",
+      "command": "bun",
+      "args": ["run", "./servers/catalog-server.ts"],
+      "cwd": "${settings.serverDirectory}",
+      "env": {
+        "ATLAS_TEAM": "${settings.teamName}"
+      }
+    },
+    {
+      "id": "metrics",
+      "name": "Atlas Metrics",
+      "transport": "stdio",
+      "command": "bun",
+      "args": ["run", "./servers/metrics-server.ts"],
+      "cwd": "${settings.serverDirectory}",
+      "env": {
+        "ATLAS_PROJECT": "${settings.projectName}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "atlas-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "displayName": "Atlas",
+  "description": "A complete example Plugin for project knowledge, operations, and Thread workflows.",
+  "author": "LLM Space Contributors",
+  "license": "MIT",
+  "homepage": "https://deer-flow.github.io/llm-space/",
+  "engines": {
+    "llm-space": ">=4.9.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "^4.4.3"
+  }
+}
