@@ -653,6 +653,7 @@ const BASH_MAX_TIMEOUT_MS = 600_000;
 
 export async function bash(
   command: string,
+  workspaceRoot: string,
   timeout?: number
 ): Promise<{
   stdout: string;
@@ -666,7 +667,8 @@ export async function bash(
   const { stdout, stderr, code } = await _run(
     "bash",
     ["-c", command],
-    timeoutMs
+    timeoutMs,
+    workspaceRoot
   );
   return { stdout, stderr, exitCode: code };
 }
@@ -852,6 +854,7 @@ export function createFsBuiltInTools(
       async execute(args: Record<string, unknown>) {
         return bash(
           _requireString(args, "command"),
+          workspaceRoot,
           _optionalNumber(args, "timeout")
         );
       },
@@ -870,10 +873,14 @@ export function createFsBuiltInTools(
 function _run(
   command: string,
   args: string[],
-  timeoutMs?: number
+  timeoutMs?: number,
+  cwd?: string
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     let timedOut = false;

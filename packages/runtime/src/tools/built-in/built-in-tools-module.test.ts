@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -18,6 +18,42 @@ afterEach(async () => {
 });
 
 describe("built-in tools module", () => {
+  test("runs bash commands from the workspace root", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "bash-tool-"));
+    TEMP_DIRS.push(directory);
+    const expectedDirectory = await realpath(directory);
+    const tools = new ToolRegistry();
+    createBuiltInToolsModule({
+      env: {},
+      findSkill: () => null,
+      generateImage: () => Promise.reject(new Error("unused")),
+      getSearchSettings: () => ({
+        provider: "firecrawl",
+        braveApiKey: "",
+        firecrawlApiKey: "",
+        tavilyApiKey: "",
+      }),
+      workspaceRoot: directory,
+    }).register(tools);
+    tools.freeze();
+
+    const result = await tools.call({
+      name: "bash",
+      arguments: { description: "Print working directory", command: "pwd" },
+    });
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(
+          { stdout: `${expectedDirectory}\n`, stderr: "", exitCode: 0 },
+          null,
+          2
+        ),
+      },
+    ]);
+  });
+
   test("contributes the existing tools in their RPC list order", async () => {
     const tools = new ToolRegistry();
     let generatedInput: unknown;
