@@ -110,6 +110,24 @@ LLM Space 只从固定位置发现扩展：
 
 不需要为了满足结构而创建空目录。一个只提供 Skill 的 Plugin 只需 `package.json` 和相应的 Skill 目录。
 
+### 2.3 Settings 中的 Extensions
+
+Settings → Plugins 会按类型分组展示已发现的 Extensions，并显示类型图标、数量、
+启用状态和加载诊断。选中 Extension 可以定位其来源文件或目录。建议为扩展提供简洁
+描述，让用户在启用或执行前就能理解其用途：
+
+| Extension | 描述来源 |
+| --- | --- |
+| Skill | `SKILL.md` frontmatter 中的 `description` |
+| Settings | `config.schema.json` 顶层的 `description` |
+| Command | class 的 `description` 属性 |
+| Plugin Tool | class 的 `description` 属性 |
+| Thread Storage | class 的 `description` 属性 |
+| MCP server / Model provider | server 或 provider 的 `name` |
+
+描述只是界面文案，不是标识符。稳定 ID 仍由 Plugin 包名及声明扩展的文件名或对象
+ID 决定。
+
 ## 3. `package.json`
 
 最小可用 metadata：
@@ -366,6 +384,11 @@ plugin:@example/team-tools:mcp:knowledge-base
 
 不要在 `mcp.json` 中手动拼接这个前缀。Plugin MCP 在设置页标记为只读；用户不能在那里改写它，应通过 Plugin Settings 或环境变量配置。禁用 Plugin 时，其 MCP 连接会关闭，新调用也会被拒绝。
 
+MCP 页面会标明所属 Plugin，并显示连接信息、就绪状态、已发现的 Tool 数量及名称。
+LLM Space 会缓存成功的就绪检查和 Tool 发现结果，避免每次刷新界面都重新连接。
+Plugin 配置变化后，旧快照会被标记为 stale；下一次连接测试或 Tool 发现会向 server
+重新获取结果。
+
 Plugin 可以通过 `tools/*.{ts,js,mjs}` 提供本地可执行 Tools，也可以通过 MCP 暴露远程或共享工具。
 
 ## 8. Models
@@ -413,45 +436,98 @@ Plugin 只能声明配置，不能加载自定义 provider JavaScript。最终 p
 
 ## 9. Plugin Tools
 
-Plugin Tool 是可以加入本地 Thread 并由模型调用的 PI 兼容工具。每个直接位于
-`tools/*.{ts,js,mjs}` 下的文件必须 default export 一个无参数 class：
+Plugin Tool 是模型可以在本地 Thread 中调用的 PI 兼容工具。适合用来实现可重复、
+参数化的操作；如果某项操作应由用户在 Command Palette 中明确发起，则使用 Command。
+每个直接位于 `tools/*.{ts,js,mjs}` 下的文件必须 default export 一个无参数 class。
+开发 Plugin 时可以实现可选的类型契约，以便尽早发现定义错误：
 
 ```ts
-export default class ProjectInfoTool {
-  name = "project_info";
-  description = "Read information about the current project.";
+import type {
+  PluginToolContext,
+  PluginToolExtension,
+} from "@llm-space/core";
+
+export default class ReadProjectFileTool implements PluginToolExtension {
+  name = "read_project_file";
+  description = "Read a UTF-8 file from the LLM Space workspace.";
   parameters = {
     type: "object",
-    properties: {},
+    properties: {
+      path: {
+        type: "string",
+        description: "Workspace-relative path, for example docs/plan.md.",
+      },
+      maxChars: {
+        type: "integer",
+        minimum: 1,
+        maximum: 50000,
+        default: 12000,
+      },
+    },
+    required: ["path"],
     additionalProperties: false,
-  };
+  } as const;
   strict = true;
 
-  async execute(context, args) {
-    const cwd = context.variables.current_working_directory;
-    const rawDefinition =
-      context.thread.context?.variables?.current_working_directory;
-    return { cwd, rawDefinition, args };
+  async execute(
+    context: PluginToolContext,
+    args: Record<string, unknown>
+  ) {
+    const path = String(args.path ?? "");
+    const requestedMaxChars = Number(args.maxChars ?? 12000);
+    if (!path) throw new Error("path is required.");
+    if (!Number.isInteger(requestedMaxChars) || requestedMaxChars < 1) {
+      throw new Error("maxChars must be a positive integer.");
+    }
+    const maxChars = Math.min(requestedMaxChars, 50000);
+
+    const content = await context.readWorkspaceFile(path);
+    return {
+      path,
+      content: content.slice(0, maxChars),
+      truncated: content.length > maxChars,
+    };
   }
 }
 ```
 
-文件名决定稳定 Extension ID，并随 Tool 定义持久化到 Thread：
+`name` 是模型看到的 Tool 名称，应保持稳定、语义明确并使用 snake_case；
+`description` 说明何时应该调用它；`parameters` 是输入 JSON Schema。建议同时声明
+`required` 和 `additionalProperties: false`，并在 `execute()` 内再次校验业务约束。
+`strict` 会请求支持该能力的模型 provider 严格遵循 Schema。
+
+文件名则独立决定持久化到 Thread 的稳定 Extension ID：
 
 ```text
-tools/project-info.ts
-→ plugin:@example/team-tools:tool:project-info
+tools/read-project-file.ts
+→ plugin:@example/team-tools:tool:read-project-file
 ```
 
-每次加载 Plugin 时 class 只实例化一次，并可实现 `dispose()`。修改 Plugin 包名或
-Tool 文件名会使已保存的引用失效。禁用或删除 Plugin 不会从 Thread 中删除 Tool；
-Plugin 恢复前，调用会明确返回 unavailable 错误。
+修改包名、文件名或模型侧的 `name` 都可能破坏已保存 Thread 或 Prompt 中的引用。
+禁用或删除 Plugin 不会从已保存 Thread 中删除 Tool；Plugin 恢复前，调用会明确返回
+unavailable 错误。
 
-### 9.1 Tool context 与 variables
+### 9.1 Tool context 与已解析 variables
 
-`execute(context, args)` 获得产生本次 Tool Call 的 owning Thread，而不是 UI 当前
-选中的 Tab。`context.thread` 是独立且深度冻结的快照，不包含 filename、Tab API 或
-写入方法。同一批并行 Tool Calls 共享同一份 Thread 与 variables 快照。
+`execute(context, args)` 得到产生本次 Tool Call 的 owning Thread，而不是 UI 当前
+选中的 Tab。主要能力如下：
+
+```ts
+context.settings; // 只读 Plugin Settings 快照
+context.signal; // 可选 AbortSignal
+context.thread; // 独立、深度冻结的 owning Thread
+context.variables; // 已解析的 Prompt Variables
+context.notify(message);
+context.openLink(url);
+context.pickFile(options);
+context.readWorkspaceFile(path);
+context.writeWorkspaceFile(path, content);
+context.executeHostCommand(type, args);
+context.createResult(content);
+```
+
+Thread 快照不包含 filename、Tab API 或写入方法，不能直接修改。同一批并行 Tool
+Calls 共享同一份 Thread 与已解析 variables 快照。
 
 `context.variables` 在调用开始时解析所有已配置变量：
 
@@ -462,52 +538,108 @@ Plugin 恢复前，调用会明确返回 unavailable 错误。
 | File | UTF-8 文件内容 |
 | JSON | 解析后的 JSON 值 |
 
-空值或无法解析的变量会被省略。原始定义仍可通过
-`context.thread.context.variables` 读取，custom variant 数据位于
-`context.thread.context.variableVariants`。Tool context 还提供 Plugin 的只读
-`settings`，以及 `notify`、`openLink`、`readWorkspaceFile`、
-`writeWorkspaceFile` 等通用 host 方法。
+空值或无法解析的变量会被省略。原始定义仍在
+`context.thread.context.variables`，custom variant 数据仍在
+`context.thread.context.variableVariants`。
 
-普通 string/JSON 返回值会自动序列化为文本。需要显式返回 text/image 内容时使用：
+例如，Tool 可以组合 Settings、已解析 variables 和调用参数，而不依赖当前 UI Tab：
+
+```ts
+async execute(context: PluginToolContext, args: Record<string, unknown>) {
+  return {
+    project: context.settings.project ?? null,
+    cwd: context.variables.current_working_directory ?? null,
+    query: typeof args.query === "string" ? args.query : null,
+    owningThreadTitle: context.thread.title,
+  };
+}
+```
+
+### 9.2 返回值、富内容与错误
+
+普通结果直接返回 JSON 兼容值，LLM Space 会将其序列化为模型可见的 Tool output。
+需要明确组合 text 和 image 内容时，使用 `createResult()`：
 
 ```ts
 return context.createResult([
-  { type: "text", text: "Completed" },
-  { type: "image", data: base64Data, mimeType: "image/png" },
+  { type: "text", text: "Rendered architecture diagram." },
+  {
+    type: "image",
+    data: pngBytesAsBase64,
+    mimeType: "image/png",
+  },
 ]);
 ```
 
-Plugin Tools 首版仅支持本地 Runtime：remote Thread 不会列出本地 Plugin Tools，
-不能在 remote Runtime 执行，也暂时不能导出到 LangGraph 项目。
+参数无效或操作失败时抛出 `Error`，错误信息应可操作且不能包含 secret。每次 Plugin
+加载时 Tool class 只实例化一次，因此多个调用可能进入同一个实例。把单次调用状态放在
+`execute()` 的局部变量中，并确保共享 cache 可以安全并发。如果实例拥有 process、
+timer 或 connection，可在 `dispose()` 中释放：
+
+```ts
+async dispose() {
+  await this.client?.close();
+}
+```
+
+Plugin Tools 只支持本地 Runtime：remote Thread 不会列出本地 Plugin Tools，不能在
+remote Runtime 执行，也暂时不能导出到 LangGraph。MCP Tools 使用 MCP server 自己
+的 transport 和 Schema，不使用上述 class API；已有独立或共享 MCP server 时，应在
+`mcp.json` 中声明。
 
 ## 10. Commands
 
-Commands 是出现在 Command Palette 中的动态操作。每个 `commands/*.{ts,js,mjs}` 文件必须 default export 一个无参数 class。
+Command 是由用户从 Command Palette 主动触发的操作。每个直接位于
+`commands/*.{ts,js,mjs}` 下的文件必须 default export 一个无参数 class：
 
 ```ts
-export default class OpenDocumentationCommand {
+import type {
+  PluginCommandContext,
+  PluginCommandExtension,
+} from "@llm-space/core";
+
+export default class OpenDocumentationCommand
+  implements PluginCommandExtension
+{
   displayName = "Open example documentation";
   description = "Open the public documentation in the default browser.";
 
-  async execute(context) {
+  async execute(context: PluginCommandContext) {
     await context.openLink("https://example.com/docs");
-    await context.notify("Documentation opened");
+    return context.createResult({
+      level: "success",
+      message: "Documentation opened.",
+    });
   }
 }
 ```
 
-文件名决定稳定 ID：
+文件名决定稳定 ID 和文件名别名：
 
 ```text
 commands/open-documentation.ts
 → plugin:@example/team-tools:command:open-documentation
+→ palette alias: open-documentation
 ```
 
-每次加载 Plugin 时，每个 class 只实例化一次。实例可以持有短期内存状态，并可选实现 `dispose()`，在 Plugin 禁用、重载或应用退出时清理资源。
+每次加载 Plugin 时，class 只实例化一次。实例可以持有短期且并发安全的内存状态，
+也可以实现 `dispose()`，在 Plugin 禁用、重载或应用退出时释放资源。
+
+下文的进度和终态结果 API 要求 LLM Space 4.9.0 或更高版本。使用它们时应声明兼容
+范围：
+
+```json
+{
+  "engines": {
+    "llm-space": ">=4.9.0"
+  }
+}
+```
 
 ### 10.1 Command context
 
-`execute(context)` 可以使用：
+`execute(context, arguments)` 可以使用通用 host 能力，以及本次调用的参数、活跃
+Tab 快照和反馈 API：
 
 ```ts
 context.settings;
@@ -522,38 +654,206 @@ context.arguments;
 context.activeTab?.filename;
 context.activeTab?.thread;
 await context.activeTab?.writeThread(thread);
+await context.report({ phase: "loading", message: "Loading records…" });
+return context.createResult({ level: "success", message: "Import complete." });
 ```
 
-Command Palette 支持在 Command 显示名或稳定文件名别名后输入 shell 风格参数。
-例如，`sync skill "abc" '123'` 会将 `["skill", "abc", "123"]` 同时作为
-`context.arguments` 和可选的第二个 `execute(context, arguments)` 参数传入；
-引号只负责组合参数，不会进入参数值。
+工作区文件路径相对于 LLM Space workspace 解析。目前允许调用的 host Commands 是
+`openSettings` 和 `refreshTree`，其他类型会被拒绝。
 
-`context.activeTab` 是 Command 启动时活跃的 Thread Tab；如果当前活跃 Tab 不是
-Thread，则为 `null`。其中 `filename` 是文件名，`thread` 是完整 `Thread` 的独立
-快照，包括模型、Prompt Variables、消息、工具、Run History 和 Evaluations。
-`activeTab.writeThread(thread)` 暂存一次完整 Thread 替换：仅当 Command 成功结束、
-同一个 Tab 仍处于活跃状态，且 Pane 没有正在运行或持久化的操作时，LLM Space 才会
-校验并提交写入，然后用提交后的内容刷新当前 Pane。
+### 10.2 Palette 参数
 
-目前允许调用的 LLM Space Commands 是 `openSettings` 和 `refreshTree`。其他类型会被拒绝。工作区文件方法中的路径相对于 LLM Space workspace 解析。
+用户可以在完整显示名或文件名别名后追加 shell 风格参数。以下两行都会调用
+`commands/sync-active-thread.ts`：
 
-例如，创建一份工作区说明：
+```text
+Sync active thread production "Release 4.9" --dry-run
+sync-active-thread production 'Release 4.9' --dry-run
+```
+
+Command 收到的数组为：
 
 ```ts
-export default class CreateReadmeCommand {
-  displayName = "Create example README";
+["production", "Release 4.9", "--dry-run"]
+```
 
-  async execute(context) {
-    const content = `# Example\n\nCreated by a Plugin command.\n`;
-    await context.writeWorkspaceFile("examples/README.md", content);
-    await context.executeHostCommand("refreshTree");
-    await context.notify("README created");
+同一份冻结数组会同时出现在 `context.arguments` 和可选的第二个 `execute()` 参数中。
+单引号和双引号负责组合空格；反斜杠会转义下一个字符，单引号内部除外。未闭合引号或
+末尾反斜杠会直接在 Palette 中报错，不会执行不完整的 Command。
+
+应主动校验参数，并为预期中的用户输入错误返回受控结果：
+
+```ts
+async execute(context: PluginCommandContext, args: readonly string[]) {
+  const [environment, ...flags] = args;
+  if (!environment) {
+    return context.createResult({
+      level: "warning",
+      message: "Usage: sync-active-thread <environment> [--dry-run]",
+    });
+  }
+
+  const dryRun = flags.includes("--dry-run");
+  await context.report({
+    phase: "validated",
+    message: dryRun ? "Validated dry-run arguments." : "Arguments validated.",
+  });
+  // Continue with validated values…
+}
+```
+
+### 10.3 读取并事务化更新活跃 Thread
+
+`context.activeTab` 是 Command 开始执行时活跃的 Thread Tab；当前活跃 Tab 不是
+Thread 时为 `null`。其中的 `thread` 是完整 `Thread` 的独立快照，包括模型、
+Prompt Variables、消息、Tools、Run History 和 Evaluations。
+
+`activeTab.writeThread(nextThread)` 暂存一次完整 Thread 替换，不会立即修改 UI。
+只有 Command 成功、同一个 Tab 仍然活跃且 Pane 没有进行中的 Run 或持久化操作时，
+LLM Space 才会校验和提交它。修改前始终先 clone 快照：
+
+```ts
+import type { PluginCommandContext, Thread } from "@llm-space/core";
+
+async function prefixActiveTitle(
+  context: PluginCommandContext,
+  prefix: string
+) {
+  if (!context.activeTab) {
+    return context.createResult({
+      level: "warning",
+      message: "Open a Thread before running this command.",
+    });
+  }
+
+  const nextThread = structuredClone(context.activeTab.thread) as Thread;
+  nextThread.title = `${prefix}: ${nextThread.title}`;
+  await context.activeTab.writeThread(nextThread);
+  return context.createResult({
+    level: "success",
+    message: `Updated ${context.activeTab.filename}.`,
+  });
+}
+```
+
+只会提交最后一次暂存的替换。受控 `error` 结果、异常或 host 侧的提交冲突都会丢弃
+暂存内容。
+
+### 10.4 进度与终态反馈
+
+Command 启动时，LLM Space 会创建一条持久反馈。在较长操作中使用 `report()` 更新
+同一条反馈：
+
+```ts
+await context.report({ phase: "reading", message: "Reading local metadata…" });
+await context.report({ phase: "uploading", message: "Uploading 3 records…" });
+await context.report({ phase: "refreshing" });
+```
+
+`phase` 必须是非空且稳定的 Command 自定义标识符；`message` 是可选的用户可见文案。
+Report 只属于当前调用，并会在 `execute()` 结束前到达 UI。
+
+普通 JSON 返回值可供 host 使用，但不会显示。需要自定义终态文案时，返回
+`createResult()` 创建的不透明值：
+
+```ts
+return context.createResult({
+  level: "success", // "success" | "warning" | "error"
+  message: "Synced 6 records.",
+});
+```
+
+| 结束方式 | 用户反馈 | 暂存的 Thread 写入 |
+| --- | --- | --- |
+| 返回 `success` | success 样式和自定义文案 | 条件仍安全时提交 |
+| 返回 `warning` | warning 样式和自定义文案 | 条件仍安全时提交 |
+| 返回 `error` | 受控失败和自定义文案 | 丢弃 |
+| 返回 JSON 或 `void` | 默认完成文案 | 条件仍安全时提交 |
+| 抛出 `Error` | 非预期失败文案 | 丢弃 |
+
+对预期且可操作的结果使用 `warning` 或 `error`；网络协议损坏等非预期失败应抛出
+异常。Report、result 和 error 中都不能包含凭据。
+
+### 10.5 完整示例：同步并更新 Thread
+
+下面的示例组合了 Settings、参数、进度、网络访问、暂存 Thread 更新和终态结果：
+
+```ts
+import type {
+  PluginCommandContext,
+  PluginCommandExtension,
+  Thread,
+} from "@llm-space/core";
+
+export default class SyncActiveThreadCommand
+  implements PluginCommandExtension
+{
+  displayName = "Sync active thread";
+  description = "Fetch the canonical title and apply it to the active Thread.";
+
+  async execute(context: PluginCommandContext, args: readonly string[]) {
+    const [environment = "production"] = args;
+    const endpoint = String(context.settings.endpoint ?? "").replace(/\/$/, "");
+
+    if (!endpoint) {
+      return context.createResult({
+        level: "warning",
+        message: "Configure endpoint in Plugin Settings first.",
+      });
+    }
+    if (!context.activeTab) {
+      return context.createResult({
+        level: "warning",
+        message: "Open a Thread before running this command.",
+      });
+    }
+
+    await context.report({
+      phase: "fetching",
+      message: `Fetching ${environment} metadata…`,
+    });
+
+    const response = await fetch(
+      `${endpoint}/threads/${encodeURIComponent(context.activeTab.filename)}`
+    );
+    if (!response.ok) {
+      throw new Error(`Metadata request failed (${response.status}).`);
+    }
+
+    const payload = (await response.json()) as { title?: unknown };
+    if (typeof payload.title !== "string" || !payload.title.trim()) {
+      return context.createResult({
+        level: "error",
+        message: "The server response did not contain a valid title.",
+      });
+    }
+
+    await context.report({ phase: "updating", message: "Updating the Thread…" });
+    const nextThread = structuredClone(context.activeTab.thread) as Thread;
+    nextThread.title = payload.title.trim();
+    await context.activeTab.writeThread(nextThread);
+
+    return context.createResult({
+      level: "success",
+      message: `Updated ${context.activeTab.filename}.`,
+    });
   }
 }
 ```
 
-Commands 当前只进入 Command Palette，不会自动进入系统菜单、快捷键或右键菜单。
+修改工作区文件时，应明确写入文件并刷新文件树：
+
+```ts
+await context.writeWorkspaceFile(
+  "examples/README.md",
+  "# Example\n\nCreated by a Plugin Command.\n"
+);
+await context.executeHostCommand("refreshTree");
+return context.createResult({ level: "success", message: "README created." });
+```
+
+同一个 Plugin Command 同时只能有一个调用；不同 Commands 可以并发。Plugin
+Commands 当前只进入 Command Palette，不会自动获得系统菜单项、快捷键或右键菜单项。
 
 ## 11. Thread Storages
 
@@ -670,6 +970,7 @@ Plugin Storage deep link 的作用是导入本地 workspace。它不会自动获
 | MCP             | 按 `mcp.json` 建立和管理连接      |
 | Models          | 加入可用 providers 和 models 列表 |
 | Commands        | 在 Bun 环境中加载和执行           |
+| Plugin Tools    | 在 Bun 中加载，由本地 Agent Runtime 调用 |
 | Thread Storages | 在 Bun 环境中加载和执行           |
 
 加载时，LLM Space 会逐个 import 文件、调用无参数 constructor 并检查 contract。一个文件 import 失败、constructor 抛错或 contract 不合法，只会禁用对应 Extension，不影响其他 Plugin 和应用启动。
@@ -691,6 +992,7 @@ Plugin Storage deep link 的作用是导入本地 workspace。它不会自动获
 plugin:@example/team-tools:mcp:knowledge-base
 plugin:@example/team-tools:model-provider:example-cloud
 plugin:@example/team-tools:command:open-documentation
+plugin:@example/team-tools:tool:read-project-file
 plugin:@example/team-tools:thread-storage:team-library
 ```
 
@@ -779,7 +1081,7 @@ plugins/hello-space/
   "displayName": "Hello Space",
   "description": "A minimal LLM Space Plugin example.",
   "engines": {
-    "llm-space": ">=4.7.1"
+    "llm-space": ">=4.9.0"
   }
 }
 ```
@@ -793,7 +1095,10 @@ export default class HelloCommand {
 
   async execute(context) {
     const audience = String(context.settings.audience ?? "LLM Space");
-    await context.notify(`Hello, ${audience}!`);
+    return context.createResult({
+      level: "success",
+      message: `Hello, ${audience}!`,
+    });
   }
 }
 ```
@@ -830,7 +1135,13 @@ Settings tab 会出现 Audience 输入框，修改后自动保存并重载 Plugi
 - Secrets 均来自环境变量。
 - MCP 的 stdio command、cwd 和远端 URL 在干净环境中可用。
 - Models 使用受支持的 API adapter，模型字段完整。
-- Command 和 Thread Storage 的 constructor 不需要参数。
+- Command、Plugin Tool 和 Thread Storage 的 constructor 都不需要参数。
+- 每个 Plugin Tool 都有稳定的 snake_case `name`、准确描述、严格的参数 Schema，
+  并返回 JSON 兼容值或显式富内容。
+- Command 会校验 Palette 参数，为耗时操作通过 `report()` 报告有意义的阶段，并在
+  需要自定义文案时返回明确的终态结果。
+- Command 的受控失败和异常都不会提交暂存的 Thread 写入。
+- 并行 Tool calls 和不同 Commands 的并发调用不会破坏实例共享状态。
 - 可读 Storage 返回合法 `Thread`，可写 Storage 返回合法 `ThreadLocator`。
 - Deep link 使用唯一且稳定的 `deepLinkId`，并对任意后缀做校验。
 - 单个 Extension 故障不会让其他 Extensions 无法使用。

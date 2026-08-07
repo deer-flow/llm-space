@@ -110,6 +110,25 @@ A complete Plugin might look like this:
 
 Do not create empty directories merely to satisfy the layout. A Skill-only Plugin needs only `package.json` and its Skill directory.
 
+### 2.3 Extensions in Settings
+
+Settings → Plugins groups discovered Extensions by type, with an icon, count,
+activation status, and any load diagnostic. Select an Extension to reveal its
+source file or directory. Add concise descriptions so users can understand a
+Plugin before enabling or running it:
+
+| Extension | Description source |
+| --- | --- |
+| Skill | `description` in `SKILL.md` frontmatter |
+| Settings | top-level `description` in `config.schema.json` |
+| Command | class `description` property |
+| Plugin Tool | class `description` property |
+| Thread Storage | class `description` property |
+| MCP server / Model provider | server or provider `name` |
+
+Descriptions are UI copy, not identifiers. Stable IDs still come from the
+Plugin package name and the declaring file or object ID.
+
 ## 3. Metadata in `package.json`
 
 Minimal metadata:
@@ -358,6 +377,12 @@ plugin:@example/team-tools:mcp:knowledge-base
 
 Do not include this prefix in `mcp.json`. Plugin MCP definitions cannot be edited or removed from the MCP page; configure them with Plugin Settings or environment variables. Disabling the Plugin closes its MCP connections and rejects new calls.
 
+The MCP page identifies the owning Plugin and shows connection details,
+readiness, discovered Tool count, and Tool names. LLM Space caches successful
+readiness and Tool discovery results to avoid reconnecting during every UI
+refresh. A Plugin configuration change marks that snapshot as stale; the next
+connection test or Tool discovery refreshes it from the server.
+
 Plugins can contribute local executable Tools through `tools/*.{ts,js,mjs}` or expose remote and shared tools through MCP.
 
 ## 8. Models
@@ -405,105 +430,219 @@ A Plugin can declare configuration but cannot load a custom provider implementat
 
 ## 9. Plugin Tools
 
-Plugin Tools are executable PI-compatible tools that can be added to a local
-Thread. Every direct `tools/*.{ts,js,mjs}` file must default-export a class with
-a zero-argument constructor:
+Plugin Tools are PI-compatible tools that the model can call in a local Thread.
+Use them for repeatable, parameterized operations; use Commands when a person
+should explicitly start an action from the Command Palette. Every direct
+`tools/*.{ts,js,mjs}` file must default-export a zero-argument class. Importing
+the optional contract catches definition errors while developing the Plugin:
 
 ```ts
-export default class ProjectInfoTool {
-  name = "project_info";
-  description = "Read information about the current project.";
+import type {
+  PluginToolContext,
+  PluginToolExtension,
+} from "@llm-space/core";
+
+export default class ReadProjectFileTool implements PluginToolExtension {
+  name = "read_project_file";
+  description = "Read a UTF-8 file from the LLM Space workspace.";
   parameters = {
     type: "object",
-    properties: {},
+    properties: {
+      path: {
+        type: "string",
+        description: "Workspace-relative path, for example docs/plan.md.",
+      },
+      maxChars: {
+        type: "integer",
+        minimum: 1,
+        maximum: 50000,
+        default: 12000,
+      },
+    },
+    required: ["path"],
     additionalProperties: false,
-  };
+  } as const;
   strict = true;
 
-  async execute(context, args) {
-    const cwd = context.variables.current_working_directory;
-    const rawDefinition =
-      context.thread.context?.variables?.current_working_directory;
-    return { cwd, rawDefinition, args };
+  async execute(
+    context: PluginToolContext,
+    args: Record<string, unknown>
+  ) {
+    const path = String(args.path ?? "");
+    const requestedMaxChars = Number(args.maxChars ?? 12000);
+    if (!path) throw new Error("path is required.");
+    if (!Number.isInteger(requestedMaxChars) || requestedMaxChars < 1) {
+      throw new Error("maxChars must be a positive integer.");
+    }
+    const maxChars = Math.min(requestedMaxChars, 50000);
+
+    const content = await context.readWorkspaceFile(path);
+    return {
+      path,
+      content: content.slice(0, maxChars),
+      truncated: content.length > maxChars,
+    };
   }
 }
 ```
 
-The file name determines the stable Extension ID persisted with the Tool:
+`name` is the model-facing Tool name and should be stable, descriptive, and
+snake_case. `description` explains when to call it. `parameters` is its JSON
+Schema; prefer `required` plus `additionalProperties: false`, and validate any
+semantic constraints again inside `execute()`. `strict` asks compatible model
+providers to enforce the Schema strictly.
+
+The file name independently determines the stable Extension ID persisted with
+the Tool:
 
 ```text
-tools/project-info.ts
-→ plugin:@example/team-tools:tool:project-info
+tools/read-project-file.ts
+→ plugin:@example/team-tools:tool:read-project-file
 ```
 
-The class is instantiated once per Plugin load and may implement `dispose()`.
-Changing the Plugin package name or Tool file name breaks persisted references.
-Disabling or removing a Plugin does not delete its Tools from saved Threads;
-calls fail as unavailable until the Plugin returns.
+Changing the package name, file name, or model-facing `name` can break saved
+Threads or prompts. Disabling or removing a Plugin does not delete its Tools
+from saved Threads; calls fail as unavailable until the Plugin returns.
 
-### 9.1 Tool context and variables
+### 9.1 Tool context and resolved variables
 
 `execute(context, args)` receives the Thread that owns the Tool Call, not the
-selected UI tab. `context.thread` is a detached, deeply frozen snapshot and has
-no filename, tab API, or write method. Parallel Tool Calls in one batch share
-the same Thread and resolved-variable snapshot.
+currently selected tab. The important fields are:
 
-`context.variables` resolves all configured variables at invocation time:
+```ts
+context.settings; // read-only Plugin Settings snapshot
+context.signal; // optional AbortSignal
+context.thread; // detached, deeply frozen owning Thread
+context.variables; // resolved Prompt Variables
+context.notify(message);
+context.openLink(url);
+context.pickFile(options);
+context.readWorkspaceFile(path);
+context.writeWorkspaceFile(path, content);
+context.executeHostCommand(type, args);
+context.createResult(content);
+```
 
-| Variable type                           | Resolved value                               |
-| --------------------------------------- | -------------------------------------------- |
-| Custom, working directory, current date | String                                       |
-| Skills                                  | Formatted string using the configured format |
-| File                                    | UTF-8 file contents                          |
-| JSON                                    | Parsed JSON value                            |
+The Thread snapshot has no filename, tab API, or write method. Do not mutate it.
+Parallel Tool Calls in one model batch share the same Thread and resolved
+variable snapshot.
 
-Empty or unresolvable variables are omitted. Original definitions remain under
-`context.thread.context.variables`; custom variants remain under
-`context.thread.context.variableVariants`. The context also exposes read-only
-Plugin `settings` and common host methods such as `notify`, `openLink`,
-`readWorkspaceFile`, and `writeWorkspaceFile`.
+`context.variables` resolves configured variables at invocation time:
 
-Ordinary string and JSON return values become text. For explicit text/image
-Tool content, use:
+| Variable type | Resolved value |
+| --- | --- |
+| Custom, working directory, current date | String |
+| Skills | Formatted string using the configured format |
+| File | UTF-8 file contents |
+| JSON | Parsed JSON value |
+
+Empty or unresolvable variables are omitted. Original definitions remain at
+`context.thread.context.variables`; custom variants remain at
+`context.thread.context.variableVariants`.
+
+For example, a Tool can combine Settings, resolved variables, and call
+arguments without relying on the UI's active tab:
+
+```ts
+async execute(context: PluginToolContext, args: Record<string, unknown>) {
+  return {
+    project: context.settings.project ?? null,
+    cwd: context.variables.current_working_directory ?? null,
+    query: typeof args.query === "string" ? args.query : null,
+    owningThreadTitle: context.thread.title,
+  };
+}
+```
+
+### 9.2 Return values, rich content, and errors
+
+Return JSON-compatible values for ordinary results. LLM Space serializes them
+as Tool output for the model. Use `createResult()` when the result needs
+explicit text and image parts:
 
 ```ts
 return context.createResult([
-  { type: "text", text: "Completed" },
-  { type: "image", data: base64Data, mimeType: "image/png" },
+  { type: "text", text: "Rendered architecture diagram." },
+  {
+    type: "image",
+    data: pngBytesAsBase64,
+    mimeType: "image/png",
+  },
 ]);
 ```
 
+Throw an `Error` for an invalid call or an operation that failed. Keep messages
+actionable and do not include secrets. A Tool class is instantiated once per
+Plugin load, so multiple calls may reach the same instance. Keep invocation
+state local to `execute()` and make shared caches concurrency-safe. If the
+instance owns a process, timer, or connection, clean it up in `dispose()`:
+
+```ts
+async dispose() {
+  await this.client?.close();
+}
+```
+
 Plugin Tools are local-runtime only. They are not listed for remote Threads,
-cannot execute remotely, and cannot currently be exported to LangGraph.
+cannot execute remotely, and cannot currently be exported to LangGraph. MCP
+Tools follow the MCP server's transport and schema instead of the class API
+above; use `mcp.json` when the Tool already lives in a separate or shared MCP
+server.
 
 ## 10. Commands
 
-Commands are dynamic actions shown in the Command Palette. Every `commands/*.{ts,js,mjs}` file must default-export a class with a zero-argument constructor.
+Commands are user-triggered actions shown in the Command Palette. Every direct
+`commands/*.{ts,js,mjs}` file must default-export a zero-argument class:
 
 ```ts
-export default class OpenDocumentationCommand {
+import type {
+  PluginCommandContext,
+  PluginCommandExtension,
+} from "@llm-space/core";
+
+export default class OpenDocumentationCommand
+  implements PluginCommandExtension
+{
   displayName = "Open example documentation";
   description = "Open the public documentation in the default browser.";
 
-  async execute(context) {
+  async execute(context: PluginCommandContext) {
     await context.openLink("https://example.com/docs");
-    await context.notify("Documentation opened");
+    return context.createResult({
+      level: "success",
+      message: "Documentation opened.",
+    });
   }
 }
 ```
 
-The file name determines the stable ID:
+The file name determines the stable ID and file-stem alias:
 
 ```text
 commands/open-documentation.ts
 → plugin:@example/team-tools:command:open-documentation
+→ palette alias: open-documentation
 ```
 
-Each class is instantiated once per Plugin load. An instance may hold short-lived in-memory state and may implement `dispose()` to clean up resources when the Plugin is disabled, reloaded, or the app exits.
+The class is instantiated once per Plugin load. It may hold short-lived,
+concurrency-safe state and implement `dispose()` for resources that must be
+released when the Plugin is disabled, reloaded, or the app exits.
+
+The progress and terminal-result APIs documented below require LLM Space 4.9.0
+or later. Declare that compatibility when using them:
+
+```json
+{
+  "engines": {
+    "llm-space": ">=4.9.0"
+  }
+}
+```
 
 ### 10.1 Command context
 
-`execute(context)` can use:
+`execute(context, arguments)` receives common host capabilities plus the
+invocation-specific arguments, active tab snapshot, and feedback APIs:
 
 ```ts
 context.settings;
@@ -519,75 +658,216 @@ context.activeTab?.filename;
 context.activeTab?.thread;
 await context.activeTab?.writeThread(thread);
 await context.report({ phase: "loading", message: "Loading records…" });
-return context.createResult({ level: "success", message: "Import complete" });
+return context.createResult({ level: "success", message: "Import complete." });
 ```
 
-The palette accepts shell-style arguments after either the command's display
-name or its stable file-stem alias. For example,
-`sync skill "abc" '123'` exposes `["skill", "abc", "123"]` as both
-`context.arguments` and the optional second `execute(context, arguments)`
-parameter. Quotes group values and are not included in them.
+Workspace file paths are resolved relative to the LLM Space workspace. The
+currently allowed host Commands are `openSettings` and `refreshTree`; other
+types are rejected.
 
-`context.activeTab` is the thread tab that was active when the command started,
-or `null` when the active tab is not a thread. Its `filename` identifies the
-file and `thread` is a detached snapshot of the complete `Thread`, including
-model, prompt variables, messages, tools, run history, and evaluations.
-`activeTab.writeThread(thread)` stages a whole-thread replacement. LLM Space
-validates and commits it only when the command succeeds, the same tab is still
-active, and the pane has no run or persistence operation in progress; the
-mounted pane is then refreshed from the committed value.
+### 10.2 Palette arguments
 
-The currently allowed host Commands are `openSettings` and `refreshTree`. Other command types are rejected. Workspace file paths are resolved relative to the LLM Space workspace.
+Users may append shell-style arguments to either the full display name or the
+file-stem alias. Both of these invoke `commands/sync-active-thread.ts`:
+
+```text
+Sync active thread production "Release 4.9" --dry-run
+sync-active-thread production 'Release 4.9' --dry-run
+```
+
+The Command receives:
 
 ```ts
-export default class CreateReadmeCommand {
-  displayName = "Create example README";
+["production", "Release 4.9", "--dry-run"]
+```
 
-  async execute(context) {
-    const content = `# Example\n\nCreated by a Plugin command.\n`;
-    await context.writeWorkspaceFile("examples/README.md", content);
-    await context.executeHostCommand("refreshTree");
-    await context.notify("README created");
+The same frozen array is available as `context.arguments` and as the optional
+second `execute()` parameter. Single and double quotes group whitespace;
+backslashes escape the next character except inside single quotes. An unclosed
+quote or trailing escape is reported in the palette and does not execute a
+partial command.
+
+Validate arguments and return a controlled message for expected user mistakes:
+
+```ts
+async execute(context: PluginCommandContext, args: readonly string[]) {
+  const [environment, ...flags] = args;
+  if (!environment) {
+    return context.createResult({
+      level: "warning",
+      message: "Usage: sync-active-thread <environment> [--dry-run]",
+    });
   }
+
+  const dryRun = flags.includes("--dry-run");
+  await context.report({
+    phase: "validated",
+    message: dryRun ? "Validated dry-run arguments." : "Arguments validated.",
+  });
+  // Continue with validated values…
 }
 ```
 
-Plugin Commands currently appear only in the Command Palette. They do not automatically receive native menu entries, shortcuts, or context-menu entries.
+### 10.3 Reading and transactionally updating the active Thread
 
-### 10.2 Execution feedback and user-visible results
+`context.activeTab` is the Thread tab that was active when execution started,
+or `null` when the active tab is not a Thread. Its `thread` is a detached
+snapshot of the complete `Thread`, including model, Prompt Variables, messages,
+Tools, Run History, and Evaluations.
 
-LLM Space owns the Command execution status. It shows a persistent running
-notification when execution starts and changes it to a success or error state
-when `execute()` settles. A Command can provide more specific in-progress
-feedback with `report()`:
+`activeTab.writeThread(nextThread)` stages a complete Thread replacement; it
+does not mutate the UI immediately. LLM Space validates and commits the staged
+value only after the Command succeeds, the same tab is still active, and the
+pane has no Run or persistence operation in progress. Always clone the snapshot
+before editing it:
 
 ```ts
-await context.report({
-  phase: "downloading",
-  message: "Downloading the latest skills…",
-});
+import type { PluginCommandContext, Thread } from "@llm-space/core";
+
+async function prefixActiveTitle(
+  context: PluginCommandContext,
+  prefix: string
+) {
+  if (!context.activeTab) {
+    return context.createResult({
+      level: "warning",
+      message: "Open a Thread before running this command.",
+    });
+  }
+
+  const nextThread = structuredClone(context.activeTab.thread) as Thread;
+  nextThread.title = `${prefix}: ${nextThread.title}`;
+  await context.activeTab.writeThread(nextThread);
+  return context.createResult({
+    level: "success",
+    message: `Updated ${context.activeTab.filename}.`,
+  });
+}
 ```
 
-`phase` is a stable Command-defined identifier. `message` is optional display
-copy. Reporting is scoped to the current invocation and is delivered to the UI
-without waiting for the Command to finish.
+Only the final staged replacement is committed. A controlled `error` result,
+an exception, or a host-side commit conflict discards it.
 
-Ordinary return values remain available to the host but are not displayed. To
-show an explicit terminal message, return the opaque result made by
-`createResult()`:
+### 10.4 Progress and terminal feedback
+
+LLM Space creates one persistent feedback item when a Command starts. Update
+that same item during longer work with `report()`:
+
+```ts
+await context.report({ phase: "reading", message: "Reading local metadata…" });
+await context.report({ phase: "uploading", message: "Uploading 3 records…" });
+await context.report({ phase: "refreshing" });
+```
+
+`phase` must be a non-empty, stable Command-defined identifier. `message` is
+optional user-facing copy. Reports are scoped to the current invocation and
+reach the UI before `execute()` finishes.
+
+Ordinary JSON return values are available to the host but are not displayed.
+Return the opaque value created by `createResult()` for explicit terminal copy:
 
 ```ts
 return context.createResult({
   level: "success", // "success" | "warning" | "error"
-  message: "Synced 6 skills.",
+  message: "Synced 6 records.",
 });
 ```
 
-`success` and `warning` complete normally with their corresponding visual
-style. `error` is a controlled failure: it displays the supplied message and
-does not commit a staged `activeTab.writeThread()` update. Throwing remains the
-right choice for unexpected failures. Only one invocation of a given Plugin
-Command may run at a time; different Commands may run concurrently.
+| Outcome | User feedback | Staged Thread write |
+| --- | --- | --- |
+| Return `success` | success styling and custom message | committed if still safe |
+| Return `warning` | warning styling and custom message | committed if still safe |
+| Return `error` | controlled failure and custom message | discarded |
+| Return JSON or `void` | default completion message | committed if still safe |
+| Throw `Error` | unexpected failure message | discarded |
+
+Use `warning` or `error` for expected, actionable outcomes. Throw for unexpected
+failures such as a broken network contract. Never include credentials in a
+report, result, or thrown error.
+
+### 10.5 Complete example: synchronize and update a Thread
+
+This example combines Settings, arguments, progress, network access, a staged
+Thread update, and a terminal result:
+
+```ts
+import type {
+  PluginCommandContext,
+  PluginCommandExtension,
+  Thread,
+} from "@llm-space/core";
+
+export default class SyncActiveThreadCommand
+  implements PluginCommandExtension
+{
+  displayName = "Sync active thread";
+  description = "Fetch the canonical title and apply it to the active Thread.";
+
+  async execute(context: PluginCommandContext, args: readonly string[]) {
+    const [environment = "production"] = args;
+    const endpoint = String(context.settings.endpoint ?? "").replace(/\/$/, "");
+
+    if (!endpoint) {
+      return context.createResult({
+        level: "warning",
+        message: "Configure endpoint in Plugin Settings first.",
+      });
+    }
+    if (!context.activeTab) {
+      return context.createResult({
+        level: "warning",
+        message: "Open a Thread before running this command.",
+      });
+    }
+
+    await context.report({
+      phase: "fetching",
+      message: `Fetching ${environment} metadata…`,
+    });
+
+    const response = await fetch(
+      `${endpoint}/threads/${encodeURIComponent(context.activeTab.filename)}`
+    );
+    if (!response.ok) {
+      throw new Error(`Metadata request failed (${response.status}).`);
+    }
+
+    const payload = (await response.json()) as { title?: unknown };
+    if (typeof payload.title !== "string" || !payload.title.trim()) {
+      return context.createResult({
+        level: "error",
+        message: "The server response did not contain a valid title.",
+      });
+    }
+
+    await context.report({ phase: "updating", message: "Updating the Thread…" });
+    const nextThread = structuredClone(context.activeTab.thread) as Thread;
+    nextThread.title = payload.title.trim();
+    await context.activeTab.writeThread(nextThread);
+
+    return context.createResult({
+      level: "success",
+      message: `Updated ${context.activeTab.filename}.`,
+    });
+  }
+}
+```
+
+For workspace changes, write the file and refresh the tree explicitly:
+
+```ts
+await context.writeWorkspaceFile(
+  "examples/README.md",
+  "# Example\n\nCreated by a Plugin Command.\n"
+);
+await context.executeHostCommand("refreshTree");
+return context.createResult({ level: "success", message: "README created." });
+```
+
+Only one invocation of a given Plugin Command may run at a time; distinct
+Commands may run concurrently. Plugin Commands currently appear only in the
+Command Palette and do not automatically receive native menu entries,
+shortcuts, or context-menu entries.
 
 ## 11. Thread Storages
 
@@ -700,6 +980,7 @@ A Plugin Storage deep link imports into the local workspace. It does not automat
 | MCP             | connections managed from `mcp.json`                |
 | Models          | merged into the effective provider and model lists |
 | Commands        | loaded and executed in a Bun runtime               |
+| Plugin Tools    | loaded in Bun and invoked by the local Agent runtime |
 | Thread Storages | loaded and executed in a Bun runtime               |
 
 LLM Space imports code files one at a time, invokes their zero-argument constructors, and validates their contracts. An import, constructor, or contract error disables only that Extension. It does not crash the application or disable unrelated Plugins.
@@ -721,6 +1002,7 @@ Stable Extension IDs are derived from the Plugin ID and a file name or local ID:
 plugin:@example/team-tools:mcp:knowledge-base
 plugin:@example/team-tools:model-provider:example-cloud
 plugin:@example/team-tools:command:open-documentation
+plugin:@example/team-tools:tool:read-project-file
 plugin:@example/team-tools:thread-storage:team-library
 ```
 
@@ -802,7 +1084,7 @@ plugins/hello-space/
   "displayName": "Hello Space",
   "description": "A minimal LLM Space Plugin example.",
   "engines": {
-    "llm-space": ">=4.7.1"
+    "llm-space": ">=4.9.0"
   }
 }
 ```
@@ -816,7 +1098,10 @@ export default class HelloCommand {
 
   async execute(context) {
     const audience = String(context.settings.audience ?? "LLM Space");
-    await context.notify(`Hello, ${audience}!`);
+    return context.createResult({
+      level: "success",
+      message: `Hello, ${audience}!`,
+    });
   }
 }
 ```
@@ -853,7 +1138,14 @@ Before distributing a Plugin, verify that:
 - secrets come from environment variables;
 - MCP commands, working directories, and remote URLs work in a clean environment;
 - models use supported adapters and include all required fields;
-- Command and Thread Storage constructors require no arguments;
+- Command, Plugin Tool, and Thread Storage constructors require no arguments;
+- every Plugin Tool has a stable snake_case `name`, an accurate description,
+  a restrictive parameter Schema, and JSON-compatible or rich-content output;
+- Commands validate palette arguments, use `report()` for meaningful long-run
+  phases, and return an explicit terminal result when custom copy is useful;
+- controlled Command failures and exceptions do not commit staged Thread writes;
+- parallel Tool calls and distinct concurrent Commands do not corrupt shared
+  instance state;
 - readable Storages return valid Threads and writable Storages return valid locators;
 - deep links use a unique, stable `deepLinkId` and validate arbitrary suffixes;
 - one failed Extension does not prevent other Extensions from working;
