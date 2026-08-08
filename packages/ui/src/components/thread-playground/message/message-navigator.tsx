@@ -174,7 +174,7 @@ function _MessageNavigator({
   return (
     <nav
       aria-label="Message navigation"
-      className="pointer-events-none absolute top-1/2 -left-2 z-100 -translate-y-1/2"
+      className="pointer-events-none absolute top-1/2 -left-2 z-50 -translate-y-1/2"
     >
       <div className="hover:bg-background/70 focus-within:bg-background/70 pointer-events-auto flex max-h-[45vh] w-7 flex-col items-start gap-px overflow-hidden hover:overflow-y-auto rounded-full py-1 pl-1.5 opacity-65 transition-[background-color,opacity] focus-within:opacity-100 hover:opacity-100">
         {messages.map((message, index) => {
