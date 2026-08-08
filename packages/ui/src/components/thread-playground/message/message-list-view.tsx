@@ -25,6 +25,7 @@ import {
   type ImageDisplayContextValue,
 } from "./image-display-context";
 import { MessageListItem } from "./message-list-item";
+import { MessageNavigator } from "./message-navigator";
 
 export function MessageListView({
   className,
@@ -110,76 +111,83 @@ export function MessageListView({
     }
   }, [status, scrollToBottom]);
 
+  const showNavigator = messages.length > 1;
+
   return (
-    <ScrollArea type="auto" className={cn("size-full", className)}>
-      <ImageDisplayProvider value={imageDisplay}>
-        <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
-          {isSnapshotView ? (
-            <StaticMessageList
-              context={contextFromProps}
-              messages={messages}
-              readonly={readonly}
-            />
-          ) : (
-            <DragDropContext
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <Droppable droppableId="message-list">
-                {(droppableProvided) => (
-                  <DroppableMessageList
-                    droppableProvided={droppableProvided}
-                    messages={messages}
-                    readonly={readonly}
-                    autoFocusMessageId={autoFocusMessageId}
-                    collapsedMessageIds={collapsedMessageIds}
-                    runValidationIssue={runValidationIssue}
-                  />
+    <div className={cn("relative size-full", className)}>
+      <ScrollArea type="auto" className="size-full">
+        <ImageDisplayProvider value={imageDisplay}>
+          <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
+            {isSnapshotView ? (
+              <StaticMessageList
+                context={contextFromProps}
+                messages={messages}
+                readonly={readonly}
+              />
+            ) : (
+              <DragDropContext
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <Droppable droppableId="message-list">
+                  {(droppableProvided) => (
+                    <DroppableMessageList
+                      droppableProvided={droppableProvided}
+                      messages={messages}
+                      readonly={readonly}
+                      autoFocusMessageId={autoFocusMessageId}
+                      collapsedMessageIds={collapsedMessageIds}
+                      runValidationIssue={runValidationIssue}
+                    />
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
+            {!isSnapshotView && (
+              <StreamingMessageListItem streaming={status === "running"} />
+            )}
+            <div className="relative rounded-lg">
+              <Button
+                // No top margin: the preceding message / streaming item (or, in the
+                // empty state, the list's own top padding) already provides the gap.
+                className={cn(
+                  "text-muted-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_2%)]! hover:text-accent-foreground w-full justify-start rounded-lg py-5",
+                  dragging && "invisible",
+                  readonly && "hidden"
                 )}
-              </Droppable>
-            </DragDropContext>
-          )}
-          {!isSnapshotView && (
-            <StreamingMessageListItem streaming={status === "running"} />
-          )}
-          <div className="relative rounded-lg">
-            <Button
-              // No top margin: the preceding message / streaming item (or, in the
-              // empty state, the list's own top padding) already provides the gap.
-              className={cn(
-                "text-muted-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_2%)]! hover:text-accent-foreground w-full justify-start rounded-lg py-5",
-                dragging && "invisible",
-                readonly && "hidden"
-              )}
-              disabled={readonly}
-              variant="secondary"
-              size="lg"
-              onClick={
-                addMessageSuggested ? resolveRunValidationIssue : appendMessage
-              }
-            >
-              <PlusIcon className="size-4" />
-              Add message
-            </Button>
-            {addMessageSuggested && !dragging && !readonly ? (
-              <>
-                <ShineBorder
-                  borderWidth={1}
-                  duration={14}
-                  shineColor="var(--primary)"
-                />
-                <ShineBorder
-                  borderWidth={1}
-                  duration={14}
-                  shineColor="var(--primary)"
-                  style={{ animationDelay: "-7s" }}
-                />
-              </>
-            ) : null}
+                disabled={readonly}
+                variant="secondary"
+                size="lg"
+                onClick={
+                  addMessageSuggested ? resolveRunValidationIssue : appendMessage
+                }
+              >
+                <PlusIcon className="size-4" />
+                Add message
+              </Button>
+              {addMessageSuggested && !dragging && !readonly ? (
+                <>
+                  <ShineBorder
+                    borderWidth={1}
+                    duration={14}
+                    shineColor="var(--primary)"
+                  />
+                  <ShineBorder
+                    borderWidth={1}
+                    duration={14}
+                    shineColor="var(--primary)"
+                    style={{ animationDelay: "-7s" }}
+                  />
+                </>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </ImageDisplayProvider>
-    </ScrollArea>
+        </ImageDisplayProvider>
+      </ScrollArea>
+      {showNavigator ? (
+        <MessageNavigator contentRef={contentRef} messages={messages} />
+      ) : null}
+    </div>
   );
 }
 
