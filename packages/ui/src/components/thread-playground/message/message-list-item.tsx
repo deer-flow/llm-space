@@ -201,6 +201,8 @@ function _MessageListItem({
     <div
       aria-describedby={runValidationIssue ? validationErrorId : undefined}
       aria-invalid={Boolean(runValidationIssue) || undefined}
+      data-message-id={message.id}
+      data-navigation-anchor-id={`message:${message.id}`}
       className={cn(
         "hover:border-accent-foreground/20 focus-within:border-ring! group group/message relative flex size-full flex-col items-center rounded-lg border bg-(--textarea) transition-[padding-bottom,border-color,box-shadow]",
         runValidationIssue?.level === "warning" &&
