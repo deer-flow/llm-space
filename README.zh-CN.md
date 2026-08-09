@@ -109,6 +109,7 @@ mise run build:canary
 - [快速开始](./docs/get-started.zh-CN.md)
 - [用户手册](./docs/index.zh-CN.md)
 - [核心概念](./docs/core-concepts.zh-CN.md)
+- [对话压缩](./docs/compaction.zh-CN.md)
 - [Plugin 开发指南](./docs/plugins.zh-CN.md)
 - [完整 Atlas Plugin 示例](./examples/atlas-plugin/README.zh-CN.md) —— 包含两套
   Skills、MCP servers、Model providers、Plugin Tools、Commands 和 Thread

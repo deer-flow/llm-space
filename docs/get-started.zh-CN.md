@@ -130,6 +130,7 @@ LLM Space 的核心价值不只是“跑通一次对话”，而是让你能直�
 
 - [核心概念](./core-concepts.zh-CN.md)
 - [变量与模板](./variables-and-templates.zh-CN.md)
+- [对话压缩](./compaction.zh-CN.md)
 - [界面布局](./ui-layout.zh-CN.md)
 - [设置](./settings.zh-CN.md)
 - [常用快捷键](./shortcut-keys.zh-CN.md)

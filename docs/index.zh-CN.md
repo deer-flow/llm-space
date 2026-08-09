@@ -13,6 +13,7 @@
 | [快速开始](./get-started.zh-CN.md)               | 从安装、模型配置到运行第一个 Thread。                                        |
 | [核心概念](./core-concepts.zh-CN.md)             | 解释 Thread、Model、Model Provider、Tools、Messages、Tool Calls 和文件格式。 |
 | [变量与模板](./variables-and-templates.zh-CN.md) | 用 `{{变量}}` 复用内容，用模板添加逻辑：`@include`、条件判断和循环。         |
+| [对话压缩](./compaction.zh-CN.md)                | 预览并渐进式压缩较早轮次，同时原样保留最近的工作内容。                       |
 | [界面布局](./ui-layout.zh-CN.md)                 | 说明主界面各区域的用途。                                                     |
 | [设置](./settings.zh-CN.md)                      | 介绍 Settings 入口，以及 General、Models、MCP、Search、Skills 页面。         |
 | [Plugin 开发指南](./plugins.zh-CN.md)            | 介绍 Plugin 的目录、metadata、Settings、Extensions、运行模型和开发示例。     |

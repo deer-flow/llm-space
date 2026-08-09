@@ -109,6 +109,7 @@ The user guide lives in this repository:
 - [Quick start](./docs/get-started.md)
 - [User manual](./docs/index.md)
 - [Core concepts](./docs/core-concepts.md)
+- [Conversation compaction](./docs/compaction.md)
 - [Plugin development guide](./docs/plugins.md)
 - [Complete Atlas Plugin example](./examples/atlas-plugin/README.md) — two
   Skills, MCP servers, model providers, Plugin Tools, Commands, and Thread

@@ -146,6 +146,8 @@ Assistant message content is mainly text, and may also include:
 - `toolCalls`: records of tool calls requested by the model.
 - `usage`: token usage returned by the model provider.
 
+When a Thread becomes long, [Conversation Compaction](./compaction.md) can replace older turns with a structured checkpoint while keeping recent turns unchanged. Compaction is previewed first and applied to a new Thread file, so the source conversation remains available.
+
 # Tool Calls
 
 A Tool Call is a tool invocation recorded on an Assistant message. It means the model decided to call a tool and supplied arguments.

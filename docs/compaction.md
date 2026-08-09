@@ -1,3 +1,7 @@
+English | [中文](./compaction.zh-CN.md)
+
+---
+
 # Conversation compaction
 
 Conversation compaction replaces older turns with a structured checkpoint while

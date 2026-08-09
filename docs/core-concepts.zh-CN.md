@@ -146,6 +146,8 @@ Messages 是 Thread 的对话历史。LLM Space 当前主要使用两种消息�
 - `toolCalls`：模型请求调用工具的记录。
 - `usage`：模型提供方返回的 token 使用量。
 
+当 Thread 变得很长时，可以使用[对话压缩](./compaction.zh-CN.md)将较早轮次替换为结构化检查点，同时原样保留最近轮次。压缩会先生成预览，并应用到新的 Thread 文件，因此原始对话仍然可用。
+
 # Tool Calls
 
 Tool Call 是助手消息里记录的一次工具调用。它表示模型决定调用某个工具，并给出了参数。
