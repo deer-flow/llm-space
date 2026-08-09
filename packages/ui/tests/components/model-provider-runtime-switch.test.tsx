@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/only-throw-error, @typescript-eslint/require-await, @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/only-throw-error, @typescript-eslint/unbound-method */
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { ModelConfig, ModelProviderGroup } from "@llm-space/core";

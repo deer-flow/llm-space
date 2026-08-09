@@ -14,7 +14,6 @@ import { createRoot, type Root } from "react-dom/client";
 
 import type { CommandHandlers } from "@/commands";
 import type { RuntimeId } from "@/shared/runtime";
-/* eslint-disable @typescript-eslint/require-await -- interface fakes deliberately resolve synchronously */
 import {
   installReactTestDom,
   TestElement,
