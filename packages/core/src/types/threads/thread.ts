@@ -343,11 +343,21 @@ export const ThreadEvaluation = Type.Union([
 ]);
 export type ThreadEvaluation = Static<typeof ThreadEvaluation>;
 
+/** Durable, non-conversation preferences owned by one thread. */
+export const ThreadMeta = Type.Object({
+  /** Optional focus supplied to the model when manually compacting context. */
+  compactionInstructions: Type.Optional(Type.String()),
+});
+export type ThreadMeta = Static<typeof ThreadMeta>;
+
 /**
  * The definition of a thread.
  */
 export const Thread = Type.Object({
   ...THREAD_FIELDS,
+
+  /** Durable thread-level preferences that are not sent during normal runs. */
+  meta: Type.Optional(ThreadMeta),
 
   /**
    * Recent completed runs for debugging and replay. Entries are bounded by the

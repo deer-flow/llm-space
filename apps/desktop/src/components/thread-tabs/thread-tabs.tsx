@@ -80,6 +80,7 @@ interface ThreadTabsProps {
   moveToTrash: (path: string, runtimeId: RuntimeId) => void;
   share: (path: string, runtimeId: RuntimeId) => void;
   copyFile: (path: string, runtimeId: RuntimeId) => void;
+  openThread: (path: string, runtimeId: RuntimeId) => void;
   reorder: (from: number, to: number) => void;
   /** Create a new thread at the workspace root (auto-named, opened, selected). */
   onNewFile?: () => void;
@@ -116,6 +117,7 @@ export function ThreadTabs({
   moveToTrash,
   share,
   copyFile,
+  openThread,
   reorder,
   onNewFile,
   onMove,
@@ -259,6 +261,7 @@ export function ThreadTabs({
           mutationRevision={mutationRevision}
           refreshNonce={tab.refreshNonce ?? 0}
           onMove={onMove}
+          onOpen={openThread}
           onClose={close}
           consumeDiscardedPane={consumeDiscardedPane}
           onThreadStateChange={onThreadStateChange}
@@ -278,6 +281,7 @@ export function ThreadTabs({
       ),
     [
       close,
+      openThread,
       consumeDiscardedPane,
       lifecycleHost,
       mutationRevision,

@@ -532,6 +532,7 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
           moveToTrash={() => undefined}
           share={(path, runtimeId) => shared.push({ path, runtimeId })}
           copyFile={() => undefined}
+          openThread={() => undefined}
           reorder={() => undefined}
           lifecycleHost={{
             acquireMutation: () => () => undefined,

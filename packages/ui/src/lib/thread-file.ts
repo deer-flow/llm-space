@@ -57,6 +57,35 @@ export function threadPathForTitle(currentPath: string, title: string): string {
 }
 
 /**
+ * Pick the next sibling path for a compacted clone. Re-compacting
+ * `task-compact-2.json` continues the original sequence as
+ * `task-compact-3.json` instead of nesting another suffix.
+ */
+export function nextCompactedThreadPath(
+  currentPath: string,
+  existingNames: Set<string>
+): string {
+  const currentStem = stripThreadExtension(basename(currentPath));
+  const baseStem = currentStem.replace(/-compact-\d+$/, "");
+  const prefix = `${baseStem}-compact-`;
+  let highestNumber = 0;
+  for (const name of existingNames) {
+    if (!name.startsWith(prefix) || !name.endsWith(THREAD_FILE_EXTENSION)) {
+      continue;
+    }
+    const rawNumber = name.slice(prefix.length, -THREAD_FILE_EXTENSION.length);
+    if (!/^\d+$/.test(rawNumber)) continue;
+    highestNumber = Math.max(highestNumber, Number(rawNumber));
+  }
+  const currentNumber = Number((/-compact-(\d+)$/.exec(currentStem))?.[1] ?? 0);
+  const number = Math.max(highestNumber, currentNumber) + 1;
+  return joinPath(
+    parentOf(currentPath),
+    `${baseStem}-compact-${number}${THREAD_FILE_EXTENSION}`
+  );
+}
+
+/**
  * A collision-free `.json` file name for `stem` within a directory whose
  * existing names are `existing`: `stem.json`, then `stem-1.json`,
  * `stem-2.json`, … (mirrors the tree's `untitled` / `untitled-1` scheme, but

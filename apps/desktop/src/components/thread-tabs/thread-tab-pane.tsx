@@ -2,7 +2,12 @@
 
 import type { Thread } from "@llm-space/core";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
-import { parentOf, threadPathForTitle } from "@llm-space/ui/lib/thread-file";
+import {
+  nextCompactedThreadPath,
+  normalizeThreadForPath,
+  parentOf,
+  threadPathForTitle,
+} from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +38,8 @@ interface ThreadTabPaneProps {
    */
   refreshNonce?: number;
   onMove?: (from: string, to: string, runtimeId: RuntimeId) => void;
+  /** Open a newly created sibling thread and make its tab active. */
+  onOpen: (path: string, runtimeId: RuntimeId) => void;
   /** Close this pane's tab, e.g. after its thread fails to load. */
   onClose: (tabId: string) => void;
   /** Return true once when an overwritten pane must drop pending writes. */
@@ -56,6 +63,7 @@ function _ThreadTabPane({
   mutationRevision,
   refreshNonce = 0,
   onMove,
+  onOpen,
   onClose,
   consumeDiscardedPane,
   onThreadStateChange,
@@ -320,6 +328,43 @@ function _ThreadTabPane({
     [flushPending, fs, lifecycleHost, onMove, qc, runtimeId]
   );
 
+  const handleApplyCompaction = useCallback(
+    async (compactedThread: Thread): Promise<void> => {
+      const sourcePath = pathRef.current;
+      const parent = parentOf(sourcePath);
+      const existingNames = new Set(
+        (await fs.ls(parent)).map((node) => node.name)
+      );
+      const destination = nextCompactedThreadPath(sourcePath, existingNames);
+      const created = await runFileMutationWithGuard({
+        acquireMutation: lifecycleHost.acquireMutation,
+        paths: [destination],
+        runtimeId,
+        action: "creating a compacted thread",
+        blockedResult: false,
+        mutate: async () => {
+          const clone = {
+            ...normalizeThreadForPath(compactedThread, destination),
+            runtimeId,
+          };
+          await fs.write(destination, clone);
+          qc.setQueryData(["thread", runtimeId, destination], clone);
+          void qc.invalidateQueries({
+            queryKey: ["fs", runtimeId, "ls", parent],
+          });
+          return true;
+        },
+        reconcile: (didCreate) => {
+          if (didCreate) onOpen(destination, runtimeId);
+        },
+      });
+      if (!created) {
+        throw new Error("The compacted thread could not be created.");
+      }
+    },
+    [fs, lifecycleHost, onOpen, qc, runtimeId]
+  );
+
   const mutationReserved = useMemo(() => {
     void mutationRevision;
     return lifecycleHost.isMutationReserved(paneId, runtimeId, path);
@@ -353,6 +398,7 @@ function _ThreadTabPane({
         onChange={handleChange}
         onStreamingStart={handleStreamingStart}
         onStreamingEnd={handleStreamingEnd}
+        onApplyCompaction={handleApplyCompaction}
         onRenameTitle={handleRenameTitle}
       />
     </div>

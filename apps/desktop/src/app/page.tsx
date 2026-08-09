@@ -1066,6 +1066,7 @@ function PageWorkspace({
               moveToTrash={handleMoveToTrash}
               share={handleShareThread}
               copyFile={handleCopyFile}
+              openThread={tabs.open}
               reorder={reorderVisibleTabs}
               onNewFile={handleNewFile}
               onMove={reconcileFileMove}

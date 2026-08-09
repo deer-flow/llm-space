@@ -3,6 +3,16 @@ import { expect, test } from "bun:test";
 import type { Thread } from "./thread";
 import { ThreadZodSchema } from "./thread-zod";
 
+test("round-trips thread compaction instructions", () => {
+  const thread: Thread = {
+    meta: {
+      compactionInstructions: "Preserve API decisions and exact file paths.",
+    },
+  };
+
+  expect(ThreadZodSchema.parse(thread)).toEqual(thread);
+});
+
 test("round-trips persisted Plugin Tool identity", () => {
   const thread: Thread = {
     context: {

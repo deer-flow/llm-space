@@ -1,11 +1,17 @@
 "use client";
 
 import type { AgentTransport, Thread } from "@llm-space/core";
+import { isMetaUserMessage } from "@llm-space/core/generator";
+import { planCompaction } from "@llm-space/core/thread";
 import {
   ChevronDownIcon,
+  EllipsisIcon,
+  FileArchiveIcon,
   HistoryIcon,
   PlayIcon,
   Redo2Icon,
+  Share2Icon,
+  SparklesIcon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -25,7 +31,10 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import { useHostServices } from "@llm-space/ui/host";
+import {
+  createShareThreadAction,
+  useHostServices,
+} from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -70,7 +79,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "./stores";
-import { ThreadShareButton } from "./thread-share-button";
+import { ThreadCompactionDialog } from "./thread-compaction-dialog";
 import { ToolListView } from "./tool/tool-list-view";
 import { useToolExecutor } from "./tool/use-tool-executor";
 import { useShortcuts } from "./use-shortcuts";
@@ -107,6 +116,8 @@ export interface ThreadPlaygroundProps {
   storeKey?: string | number;
 
   onChange?: (thread: Thread) => void;
+  /** Persist and open a compacted clone instead of replacing this thread. */
+  onApplyCompaction?: (thread: Thread) => Promise<void>;
   onRenameTitle?: (title: string) => Promise<boolean>;
   validateTitle?: TitleValidator;
   onStreamingStart?: (runId: string) => boolean | void;
@@ -151,6 +162,7 @@ function _ThreadPlaygroundStore({
   initialValue,
   transport,
   runtimeId,
+  onApplyCompaction,
   onChange,
   onStreamingStart,
   onStreamingEnd,
@@ -199,7 +211,11 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent runtimeId={ownerRuntimeId} {...props} />
+      <ThreadPlaygroundContent
+        runtimeId={ownerRuntimeId}
+        onApplyCompaction={onApplyCompaction}
+        {...props}
+      />
     </ThreadStoreContext.Provider>
   );
 }
@@ -214,6 +230,7 @@ function ThreadPlaygroundContent({
   headerDetails,
   headerActions,
   runtimeId,
+  onApplyCompaction,
   onRenameTitle,
   validateTitle,
   readonly: readonlyFromProps = false,
@@ -231,6 +248,15 @@ function ThreadPlaygroundContent({
   const hasModel = Boolean(savedModel ?? fallbackModel);
   const undoable = useThreadStore((s) => canUndo(s.changeHistory));
   const redoable = useThreadStore((s) => canRedo(s.changeHistory));
+  const messages = useThreadStore((s) => s.thread.context?.messages ?? []);
+  const hasMetaUserPrompt = useThreadStore((s) =>
+    isMetaUserMessage(s.thread.context)
+  );
+  const canCompact = useMemo(
+    () =>
+      planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
+    [hasMetaUserPrompt, messages]
+  );
   const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
     useRunMode();
   const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
@@ -242,7 +268,7 @@ function ThreadPlaygroundContent({
   useEffect(() => {
     syncTitle(title);
   }, [syncTitle, title]);
-  const { presentational } = useHostServices();
+  const { presentational, generator } = useHostServices();
   const readonly = useMemo(() => {
     return readonlyFromProps || presentational || status !== "idle";
   }, [readonlyFromProps, presentational, status]);
@@ -268,6 +294,8 @@ function ThreadPlaygroundContent({
   }, [abort]);
   const runHistoryPanelRef = usePanelRef();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [compactDialogOpen, setCompactDialogOpen] = useState(false);
+  const [generateProjectOpen, setGenerateProjectOpen] = useState(false);
   const toggleHistory = useCallback(() => {
     const panel = runHistoryPanelRef.current;
     if (!panel) {
@@ -340,29 +368,70 @@ function ThreadPlaygroundContent({
                   <Redo2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <Tooltip content="View run history">
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label={
-                    historyOpen ? "Hide run history" : "View run history"
-                  }
-                  aria-expanded={historyOpen}
-                  disabled={status !== "idle"}
-                  onClick={toggleHistory}
-                >
-                  <HistoryIcon className="size-4" />
-                </Button>
-              </Tooltip>
-              <Tooltip content="Share thread">
-                <ThreadShareButton
-                  path={path}
-                  runtimeId={runtimeId}
-                  disabled={status !== "idle"}
-                  onShare={(input) => actions.shareThread(input)}
-                />
-              </Tooltip>
-              <GenerateProjectButton disabled={status !== "idle"} />
+              <DropdownMenu>
+                <Tooltip content="More actions">
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-lg"
+                      aria-label="More actions"
+                    >
+                      <EllipsisIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuItem
+                    disabled={status !== "idle"}
+                    onSelect={toggleHistory}
+                  >
+                    <HistoryIcon />
+                    {historyOpen ? "Hide Run History" : "View Run History"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={status !== "idle" || !canCompact}
+                    onSelect={() => setCompactDialogOpen(true)}
+                  >
+                    <FileArchiveIcon />
+                    Compact Conversation
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={status !== "idle" || !hasModel || !generator}
+                    onSelect={() => setGenerateProjectOpen(true)}
+                  >
+                    <SparklesIcon />
+                    <span className="flex-1">Generate Project</span>
+                    <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
+                      Beta
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={status !== "idle"}
+                    onSelect={() =>
+                      actions.shareThread(
+                        createShareThreadAction(path, runtimeId)
+                      )
+                    }
+                  >
+                    <Share2Icon />
+                    Share Thread
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <GenerateProjectButton
+                disabled={status !== "idle"}
+                open={generateProjectOpen}
+                onOpenChange={setGenerateProjectOpen}
+                showTrigger={false}
+              />
+              <ThreadCompactionDialog
+                disabled={status !== "idle"}
+                open={compactDialogOpen}
+                onOpenChange={setCompactDialogOpen}
+                onApplyCompaction={onApplyCompaction}
+                showTrigger={false}
+              />
             </div>
             <div className="flex items-center gap-1 px-3">
               <ButtonGroup

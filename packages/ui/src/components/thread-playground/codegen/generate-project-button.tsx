@@ -105,8 +105,14 @@ type WizardStep = "framework" | "target" | "run";
  */
 export function GenerateProjectButton({
   disabled = false,
+  open: controlledOpen,
+  onOpenChange,
+  showTrigger = true,
 }: {
   disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
 }) {
   const {
     generator,
@@ -134,7 +140,17 @@ export function GenerateProjectButton({
     [files, store]
   );
 
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setDialogOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (controlledOpen === undefined) {
+        setInternalOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, onOpenChange]
+  );
   const [step, setStep] = useState<WizardStep>("framework");
   const [framework, setFramework] = useState<string>(GENERATOR_ID);
 
@@ -355,8 +371,8 @@ export function GenerateProjectButton({
   // Abort an in-progress run and close the wizard.
   const cancelRun = useCallback(() => {
     abortRef.current?.abort();
-    setOpen(false);
-  }, []);
+    setDialogOpen(false);
+  }, [setDialogOpen]);
 
   const browseParent = useCallback(async () => {
     if (!generator) {
@@ -386,8 +402,8 @@ export function GenerateProjectButton({
   const skipEnvFile = useCallback(() => {
     void openGeneratedProject();
     setEnvConfirmOpen(false);
-    setOpen(false);
-  }, [openGeneratedProject]);
+    setDialogOpen(false);
+  }, [openGeneratedProject, setDialogOpen]);
 
   // Opt-in: write a real `.env` into the generated project, resolving the
   // model + search keys to their actual values (following `$ENV` references).
@@ -465,7 +481,7 @@ export function GenerateProjectButton({
     } finally {
       setWritingEnv(false);
       setEnvConfirmOpen(false);
-      setOpen(false);
+      setDialogOpen(false);
     }
   }, [
     generator,
@@ -477,6 +493,7 @@ export function GenerateProjectButton({
     lastSearch,
     lastMcpServers,
     openGeneratedProject,
+    setDialogOpen,
   ]);
 
   if (presentational || !generator || !runtimeId) {
@@ -487,26 +504,28 @@ export function GenerateProjectButton({
 
   return (
     <>
-      <Tooltip
-        content={
-          <span className="flex items-center gap-1.5">
-            Generate a runnable agent for this thread
-            <BetaBadge />
-          </span>
-        }
-      >
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          aria-label="Generate a runnable agent (Beta)"
-          disabled={disabled || running || !model}
-          onClick={() => setOpen(true)}
+      {showTrigger ? (
+        <Tooltip
+          content={
+            <span className="flex items-center gap-1.5">
+              Generate a runnable agent for this thread
+              <BetaBadge />
+            </span>
+          }
         >
-          <SparklesIcon className="size-4" />
-        </Button>
-      </Tooltip>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            aria-label="Generate a runnable agent (Beta)"
+            disabled={disabled || running || !model}
+            onClick={() => setDialogOpen(true)}
+          >
+            <SparklesIcon className="size-4" />
+          </Button>
+        </Tooltip>
+      ) : null}
 
-      <Dialog open={open} onOpenChange={busy ? undefined : setOpen}>
+      <Dialog open={open} onOpenChange={busy ? undefined : setDialogOpen}>
         <DialogContent className="flex h-[42rem] max-h-[calc(100vh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 border-b px-6 py-4 text-left sm:text-left">
             <span className="border-primary/20 bg-primary/10 text-primary row-span-2 flex size-8 items-center justify-center self-center rounded-xl border">
@@ -588,7 +607,7 @@ export function GenerateProjectButton({
           <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl">
             {step === "framework" ? (
               <>
-                <Button variant="ghost" onClick={() => setOpen(false)}>
+                <Button variant="ghost" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
                 <Button onClick={() => setStep("target")}>
@@ -654,7 +673,7 @@ export function GenerateProjectButton({
                   variant="default"
                   disabled={running}
                   onClick={() =>
-                    result ? setEnvConfirmOpen(true) : setOpen(false)
+                    result ? setEnvConfirmOpen(true) : setDialogOpen(false)
                   }
                 >
                   {running ? <Spinner className="size-3" /> : null}
@@ -672,7 +691,7 @@ export function GenerateProjectButton({
           // Dismiss ("No" / escape / outside) finishes without writing .env.
           if (!next && !writingEnv) {
             setEnvConfirmOpen(false);
-            setOpen(false);
+            setDialogOpen(false);
           }
         }}
         title="Create a .env file for you?"
