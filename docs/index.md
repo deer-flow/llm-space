@@ -16,6 +16,8 @@ This is the English user manual for LLM Space. Start with the quick start guide,
 | [Core Concepts](./core-concepts.md)                     | Explains Thread, Model, Model Provider, Tools, Messages, Tool Calls, and file formats.                |
 | [Variables and Templates](./variables-and-templates.md) | Reuse content with `{{variables}}` and add logic with templates: `@include`, conditionals, and loops. |
 | [Conversation Compaction](./compaction.md)              | Preview and progressively compact older turns while keeping recent work unchanged.                   |
+| [Sharing Threads](./sharing.md)                         | Publish a read-only Thread through a secret GitHub Gist and the web viewer.                           |
+| [Generating Projects](./generating-projects.md)         | Export a Thread as an editable, runnable LangGraph/Python agent project.                              |
 | [UI Layout](./ui-layout.md)                             | Explains the major areas of the main interface.                                                       |
 | [Settings](./settings.md)                               | Introduces the Settings entry point and the General, Models, MCP, Search, and Skills pages.           |
 | [Plugin Development Guide](./plugins.md)                | Build local Plugins with Skills, MCP servers, models, Tools, commands, and Thread Storages.           |

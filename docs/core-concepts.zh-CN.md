@@ -22,6 +22,8 @@ Thread 是 LLM Space 的基本工作单元。一个 Thread 通常包含：
 
 在界面里，新建、打开、复制、移动和删除 Thread，本质上是在管理工作区里的 Thread 文件。
 
+你还可以通过[分享 Thread](./sharing.zh-CN.md)发布只读副本，或者使用[生成项目](./generating-projects.zh-CN.md)将 Thread 转换成可编辑的 Agent 代码项目。
+
 # 评测 Rubric
 
 Run History 支持选择两个持久化运行并比较它们保存的证据。你可以继续使用简单的总体结论和备注，也可以选择当前 Thread 中可复用的 Rubric。

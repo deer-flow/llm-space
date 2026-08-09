@@ -131,6 +131,8 @@ After finishing this quick start, continue with:
 - [Core Concepts](./core-concepts.md)
 - [Variables and Templates](./variables-and-templates.md)
 - [Conversation Compaction](./compaction.md)
+- [Sharing Threads](./sharing.md)
+- [Generating Projects](./generating-projects.md)
 - [UI Layout](./ui-layout.md)
 - [Settings](./settings.md)
 - [Shortcut Keys](./shortcut-keys.md)

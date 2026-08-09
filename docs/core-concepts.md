@@ -22,6 +22,8 @@ A Thread is the basic unit of work in LLM Space. A Thread usually contains:
 
 In the UI, creating, opening, copying, moving, and deleting Threads is essentially managing Thread files in the workspace.
 
+You can also publish a read-only copy with [Sharing Threads](./sharing.md), or turn the Thread into an editable agent codebase with [Generating Projects](./generating-projects.md).
+
 # Evaluation Rubrics
 
 Run History lets you select two durable runs and compare their saved evidence. You can keep the simple overall verdict and note workflow, or select a reusable rubric owned by the current Thread.
