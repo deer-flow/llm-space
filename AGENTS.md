@@ -19,13 +19,27 @@ A workbench for prompt and agent development — build, trace, debug, evaluate, 
 | Local packaging / update test          | `mise run pack` · `pack:perf` · `pack:adhoc` · `pack:signed` · `pack:feed` + `feed:serve` | env combinations over `build:canary` (skip signing / CEF Performance edition / ad-hoc sign / local update feed on :8321); defined in `mise.toml` |
 | Cut a release                          | `mise run release` / `mise run release:canary`                              | → `bun scripts/release.ts`; see "Releases & auto-update"                                                               |
 | Test                                   | `mise run test`                                                             | runs the complete Bun test suite from the repository root                                                                  |
+| Check changed files                    | `mise run check:changed`                                                    | lints and typechecks only tracked changes and untracked source files                                                       |
 | Lint                                   | `mise run lint` / `mise run lint:fix`                                       | `lint` = `eslint .` (read-only), `lint:fix` = `eslint --fix .`; flat config at repo root                               |
-| Typecheck                              | `mise run typecheck`                                                        | `tsc --noEmit` over four projects: root, `packages/ui`, `apps/desktop`, `web`. `packages/ui`/`web` are React/DOM code, so they need their own DOM tsconfigs (the root config is Bun-flavored and excludes `packages/ui`); add a project here when you add a workspace. |
+| Typecheck                              | `mise run typecheck`                                                        | runs `tsc --noEmit` for root, runtime, UI, desktop, web, server, and the Atlas Plugin example; add a project here when you add a workspace. |
 | Add a dependency                       | `bun add <pkg>`                                                             | run inside the target package (`apps/desktop` or `packages/core`)                                                      |
 | Add a shadcn/ui component              | `bunx --bun shadcn@latest add <component>`                                  | run inside `packages/ui` (the shared design system now lives there, not `apps/desktop`)                                |
 | Run a script from root                 | `bun --filter <pkg> <script>`                                               | e.g. `bun --filter @llm-space/desktop start`                                                                           |
 
 Bun's built-in test runner discovers the repository's `*.test.ts` files through `mise run test`. CI (`.github/workflows/ci.yml`) runs tests + lint + typecheck + a production `vite build` + workflow-YAML validation on PRs and pushes to main. The last two exist because both failure modes are invisible until a release tag is pushed, and then take the release down with them: a renderer bundle that outgrows the runner's V8 heap (`build:view` sets `--max-old-space-size=4096`; the default ~2 GB stopped being enough at 14701 modules) and a malformed workflow file. Keep the renderer bundle in mind — if `vite build` starts OOMing again, raise the ceiling in `build:view` or cut the bundle down, and don't discover it at release time.
+
+For ordinary coding-agent work, run `mise run check:changed` instead of the
+repository-wide `mise run lint` and `mise run typecheck` tasks. The changed-file
+check uses Git tracked changes plus untracked source files, runs ESLint only on
+those files, and reports TypeScript diagnostics only for those files. Keep the
+full lint and typecheck tasks for CI parity, release preparation, or an explicit
+user request. The underlying commands are `bun run check:changed`,
+`bun run lint:changed`, `bun run lint:changed:fix`, and
+`bun run typecheck:changed` when `mise` is not available.
+
+Package tests live in `packages/<package>/tests/` beside `src/`, and their
+internal paths mirror `src/` (for example, `src/thread/history.ts` maps to
+`tests/thread/history.test.ts`). Do not colocate test files under `src/`.
 
 GUI commits (VS Code, Fork) failing with `bun: command not found`: husky hooks need bun on PATH — add `export PATH="$HOME/.local/share/mise/shims:$PATH"` to `~/.config/husky/init.sh` (husky's documented fix for version managers).
 
@@ -137,7 +151,7 @@ particular:
   generated Python renderer, including recursive-include and missing-file
   behavior.
 - Add generator regression tests in
-  `packages/core/src/generator/langgraph/templates.test.ts`, then execute the
+  `packages/core/tests/generator/langgraph/templates.test.ts`, then execute the
   generated Python at least once for syntax and behavior; TypeScript
   string/snapshot assertions alone are not sufficient.
 - Before releasing a prompt-runtime change, generate or inspect a General Agent

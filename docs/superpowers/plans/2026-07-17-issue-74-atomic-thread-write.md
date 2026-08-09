@@ -23,7 +23,7 @@
 
 **Files:**
 
-- Modify: `packages/core/src/server/storage/local/file-system.test.ts`
+- Modify: `packages/core/tests/server/storage/local/file-system.test.ts`
 
 **Interfaces:**
 
@@ -142,7 +142,7 @@ test("preserves single-file image packing and unpacking", async () => {
 
 - [x] **Step 3: Run the focused tests and record RED**
 
-Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/src/server/storage/local/file-system.test.ts`
+Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/tests/server/storage/local/file-system.test.ts`
 
 Expected: the new-file, replacement, and image compatibility cases pass against current behavior, while `leaves the existing destination intact when a temporary write cannot start` fails because the old implementation writes directly to the already-openable destination instead of creating a sibling.
 
@@ -153,7 +153,7 @@ Expected: the new-file, replacement, and image compatibility cases pass against 
 **Files:**
 
 - Modify: `packages/core/src/server/storage/local/file-system.ts`
-- Test: `packages/core/src/server/storage/local/file-system.test.ts`
+- Test: `packages/core/tests/server/storage/local/file-system.test.ts`
 
 **Interfaces:**
 
@@ -211,15 +211,15 @@ try {
 
 - [x] **Step 3: Run focused tests and record GREEN**
 
-Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/src/server/storage/local/file-system.test.ts`
+Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/tests/server/storage/local/file-system.test.ts`
 
 Expected: all LocalFileSystem tests pass, including the failure tests, and the temporary sibling directory listing contains only the original destination entry.
 
 - [x] **Step 4: Run formatting and inspect the diff**
 
-Run: `PATH="$HOME/.bun/bin:$PATH" bunx prettier --write packages/core/src/server/storage/local/file-system.ts packages/core/src/server/storage/local/file-system.test.ts docs/superpowers/plans/2026-07-17-issue-74-atomic-thread-write.md`
+Run: `PATH="$HOME/.bun/bin:$PATH" bunx prettier --write packages/core/src/server/storage/local/file-system.ts packages/core/tests/server/storage/local/file-system.test.ts docs/superpowers/plans/2026-07-17-issue-74-atomic-thread-write.md`
 
-Run: `git diff --check && git diff -- packages/core/src/server/storage/local/file-system.ts packages/core/src/server/storage/local/file-system.test.ts`
+Run: `git diff --check && git diff -- packages/core/src/server/storage/local/file-system.ts packages/core/tests/server/storage/local/file-system.test.ts`
 
 Expected: no whitespace errors; the production diff changes only the write path and required import.
 
@@ -238,7 +238,7 @@ Expected: no whitespace errors; the production diff changes only the write path 
 
 - [x] **Step 1: Run focused and full verification**
 
-Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/src/server/storage/local/file-system.test.ts`
+Run: `PATH="$HOME/.bun/bin:$PATH" bun test packages/core/tests/server/storage/local/file-system.test.ts`
 
 Run: `PATH="$HOME/.bun/bin:$PATH" bun test`
 
@@ -259,7 +259,7 @@ Confirm each acceptance criterion maps to a focused test and that cleanup errors
 ```bash
 git add docs/superpowers/plans/2026-07-17-issue-74-atomic-thread-write.md \
   packages/core/src/server/storage/local/file-system.ts \
-  packages/core/src/server/storage/local/file-system.test.ts
+  packages/core/tests/server/storage/local/file-system.test.ts
 git commit -m "fix(storage): write thread files atomically (#74)"
 ```
 

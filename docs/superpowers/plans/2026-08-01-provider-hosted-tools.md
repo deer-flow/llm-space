@@ -31,24 +31,24 @@
 
 **Files:**
 - Create: `packages/core/src/types/shared/json-value.ts`
-- Create: `packages/core/src/types/shared/json-value.test.ts`
+- Create: `packages/core/tests/types/shared/json-value.test.ts`
 - Modify: `packages/core/src/types/shared/index.ts`
 - Modify: `packages/core/src/types/tools/index.ts`
-- Modify: `packages/core/src/types/tools/index.test.ts`
+- Modify: `packages/core/tests/types/tools/index.test.ts`
 - Create: `packages/core/src/types/messages/provider-hosted-tool.ts`
 - Modify: `packages/core/src/types/messages/index.ts`
 - Modify: `packages/core/src/types/messages/contents.ts`
 - Modify: `packages/core/src/types/messages/messages.ts`
 - Modify: `packages/core/src/types/threads/thread.ts`
 - Modify: `packages/core/src/types/threads/thread-zod.ts`
-- Modify: `packages/core/src/types/threads/thread.test.ts`
-- Modify: `packages/core/src/types/threads/thread-zod.test.ts`
+- Modify: `packages/core/tests/types/threads/thread.test.ts`
+- Modify: `packages/core/tests/types/threads/thread-zod.test.ts`
 
 - [ ] **Step 1: Write the failing schema and migration tests**
 
 Add a canonical tool fixture with nested, provider-specific JSON and assert that it is accepted, preserved, uniquely keyed, and never executable:
 
-In `packages/core/src/types/tools/index.test.ts`, add
+In `packages/core/tests/types/tools/index.test.ts`, add
 `import { Compile } from "typebox/compile";`, and add `getToolKey` and `Tool` to
 the existing value import from `./index` before inserting the fixture:
 
@@ -70,7 +70,7 @@ expect(getToolKey(tool)).toBe("provider-hosted:web_search");
 ```
 
 Add these compatibility tests to
-`packages/core/src/types/threads/thread-zod.test.ts`:
+`packages/core/tests/types/threads/thread-zod.test.ts`:
 
 ```ts
 test("normalizes legacy provider-hosted fields before validation", () => {
@@ -217,7 +217,7 @@ test("normalizes legacy tool and activity fields recursively", () => {
 Run:
 
 ```bash
-bun test packages/core/src/types/shared/json-value.test.ts packages/core/src/types/tools/index.test.ts packages/core/src/types/threads/thread.test.ts packages/core/src/types/threads/thread-zod.test.ts
+bun test packages/core/tests/types/shared/json-value.test.ts packages/core/tests/types/tools/index.test.ts packages/core/tests/types/threads/thread.test.ts packages/core/tests/types/threads/thread-zod.test.ts
 ```
 
 Expected: non-zero exit because the canonical provider-hosted schemas and recursive compatibility normalization do not exist yet.
@@ -687,7 +687,7 @@ function _normalizeLegacyProviderHostedData(value: unknown): unknown {
 Run:
 
 ```bash
-bun test packages/core/src/types/shared/json-value.test.ts packages/core/src/types/tools/index.test.ts packages/core/src/types/threads/thread.test.ts packages/core/src/types/threads/thread-zod.test.ts
+bun test packages/core/tests/types/shared/json-value.test.ts packages/core/tests/types/tools/index.test.ts packages/core/tests/types/threads/thread.test.ts packages/core/tests/types/threads/thread-zod.test.ts
 ```
 
 Expected: exit 0; nested JSON round-trips, invalid non-JSON values fail validation, current data remains canonical, and legacy keys survive only in migration fixtures.
@@ -704,15 +704,15 @@ git commit -m "feat: add provider-hosted tool domain contract"
 **Files:**
 - Modify: `packages/core/src/types/agent.ts`
 - Modify: `packages/core/src/client/converters.ts`
-- Modify: `packages/core/src/client/converters.test.ts`
+- Modify: `packages/core/tests/client/converters.test.ts`
 - Modify: `packages/core/src/client/reducer.ts`
-- Create: `packages/core/src/client/reducer.test.ts`
+- Create: `packages/core/tests/client/reducer.test.ts`
 - Modify: `packages/core/src/server/agent/stream.ts`
-- Create: `packages/core/src/server/agent/stream.test.ts`
-- Create: `packages/core/src/server/agent/pi-ai-native-tools.test.ts`
+- Create: `packages/core/tests/server/agent/stream.test.ts`
+- Create: `packages/core/tests/server/agent/pi-ai-native-tools.test.ts`
 - Modify: `packages/runtime/src/streaming/stream-thread.ts`
 - Create: `packages/runtime/src/models/providers/deepseek.ts`
-- Create: `packages/runtime/src/models/providers/deepseek.test.ts`
+- Create: `packages/runtime/tests/models/providers/deepseek.test.ts`
 - Modify: `packages/runtime/src/models/providers/builtin-providers.ts`
 - Modify: `package.json`
 - Modify: `bun.lock`
@@ -720,7 +720,7 @@ git commit -m "feat: add provider-hosted tool domain contract"
 
 - [ ] **Step 1: Add the converter separation RED test**
 
-In `packages/core/src/client/converters.test.ts`, insert this test inside
+In `packages/core/tests/client/converters.test.ts`, insert this test inside
 the existing `describe("convertToPiContext", ...)` block:
 
 ```ts
@@ -759,7 +759,7 @@ test("separates provider-hosted configs from client tools", () => {
 Run:
 
 ```bash
-bun test packages/core/src/client/converters.test.ts -t "separates provider-hosted configs from client tools"
+bun test packages/core/tests/client/converters.test.ts -t "separates provider-hosted configs from client tools"
 ```
 
 Expected: FAIL because `convertToPiContext()` still sends every tool through
@@ -820,7 +820,7 @@ test("preserves response replay metadata on assistant messages", () => {
 Run:
 
 ```bash
-bun test packages/core/src/client/converters.test.ts -t "preserves response replay metadata on assistant messages"
+bun test packages/core/tests/client/converters.test.ts -t "preserves response replay metadata on assistant messages"
 ```
 
 Expected: FAIL because the app-domain activity, annotations, and terminal
@@ -828,7 +828,7 @@ output are not mapped back to the pi assistant message.
 
 - [ ] **Step 3: Create the reducer RED test**
 
-Create `packages/core/src/client/reducer.test.ts` with this exact content:
+Create `packages/core/tests/client/reducer.test.ts` with this exact content:
 
 ```ts
 import { describe, expect, test } from "bun:test";
@@ -906,7 +906,7 @@ describe("reduceMessages final Responses metadata", () => {
 Run:
 
 ```bash
-bun test packages/core/src/client/reducer.test.ts
+bun test packages/core/tests/client/reducer.test.ts
 ```
 
 Expected: FAIL because `message_end` does not yet copy the pi Responses
@@ -914,7 +914,7 @@ metadata into the persisted assistant message.
 
 - [ ] **Step 4: Add the runtime payload RED test**
 
-In `packages/core/src/server/agent/stream.test.ts`, use the file's existing
+In `packages/core/tests/server/agent/stream.test.ts`, use the file's existing
 `_completedStream()` helper and insert this test inside the existing
 `describe("streamAgent Responses native tool forwarding", ...)` block:
 
@@ -982,7 +982,7 @@ test("forwards native tools without gating on the model API", async () => {
 Run:
 
 ```bash
-bun test packages/core/src/server/agent/stream.test.ts -t "forwards native tools without gating on the model API"
+bun test packages/core/tests/server/agent/stream.test.ts -t "forwards native tools without gating on the model API"
 ```
 
 Expected: FAIL because the runtime does not yet append the opaque object to
@@ -990,7 +990,7 @@ the fully built provider payload.
 
 - [ ] **Step 5: Create the direct pi Responses contract fixture**
 
-Create `packages/core/src/server/agent/pi-ai-native-tools.test.ts` with the
+Create `packages/core/tests/server/agent/pi-ai-native-tools.test.ts` with the
 imports, models, output fixture, cleanup, SSE builder, and request reader below:
 
 ```ts
@@ -1275,7 +1275,7 @@ describe("pi-ai Responses native tools bridge", () => {
 Run:
 
 ```bash
-bun test packages/core/src/server/agent/pi-ai-native-tools.test.ts -t "sends raw native tools and replays terminal output exactly once"
+bun test packages/core/tests/server/agent/pi-ai-native-tools.test.ts -t "sends raw native tools and replays terminal output exactly once"
 ```
 
 Expected: FAIL at typecheck or runtime because pi-ai 0.83.0 lacks the raw
@@ -1322,7 +1322,7 @@ test("preserves Codex native output items when the terminal event is sparse", as
 Run:
 
 ```bash
-bun test packages/core/src/server/agent/pi-ai-native-tools.test.ts -t "preserves Codex native output items when the terminal event is sparse"
+bun test packages/core/tests/server/agent/pi-ai-native-tools.test.ts -t "preserves Codex native output items when the terminal event is sparse"
 ```
 
 Expected: FAIL because the terminal response contains only the final message
@@ -1330,7 +1330,7 @@ and pi-ai does not merge it with the indexed streamed output items.
 
 - [ ] **Step 8: Add the DeepSeek routing RED test**
 
-Create `packages/runtime/src/models/providers/deepseek.test.ts` with this exact
+Create `packages/runtime/tests/models/providers/deepseek.test.ts` with this exact
 content:
 
 ```ts
@@ -1372,7 +1372,7 @@ describe("DeepSeek mixed API provider", () => {
 Run:
 
 ```bash
-bun test packages/runtime/src/models/providers/deepseek.test.ts
+bun test packages/runtime/tests/models/providers/deepseek.test.ts
 ```
 
 Expected: FAIL because the local mixed-API provider does not exist and the
@@ -1851,7 +1851,7 @@ Run:
 
 ```bash
 bun install
-bun test packages/core/src/client/converters.test.ts packages/core/src/client/reducer.test.ts packages/core/src/server/agent/stream.test.ts packages/core/src/server/agent/pi-ai-native-tools.test.ts packages/runtime/src/models/providers/deepseek.test.ts
+bun test packages/core/tests/client/converters.test.ts packages/core/tests/client/reducer.test.ts packages/core/tests/server/agent/stream.test.ts packages/core/tests/server/agent/pi-ai-native-tools.test.ts packages/runtime/tests/models/providers/deepseek.test.ts
 ```
 
 Expected: `bun install` reports the pi-ai patch applied and exits 0; all focused tests pass, raw fields remain unchanged, hosted tools are absent from local execution, and response output replays in provider order.
@@ -1867,16 +1867,16 @@ git commit -m "feat: bridge provider-hosted tools to responses adapters"
 
 **Files:**
 - Create: `packages/ui/src/components/thread-playground/tool/provider-hosted-tool-config.ts`
-- Create: `packages/ui/src/components/thread-playground/tool/provider-hosted-tool-config.test.ts`
+- Create: `packages/ui/tests/components/thread-playground/tool/provider-hosted-tool-config.test.ts`
 - Create: `packages/ui/src/components/thread-playground/tool/provider-hosted-tool-editor-dialog.tsx`
 - Modify: `packages/ui/src/components/thread-playground/tool/tool-list-view.tsx`
 - Modify: `packages/ui/src/components/thread-playground/tool/tool-list-item.tsx`
 - Create: `packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-utils.ts`
-- Create: `packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts`
+- Create: `packages/ui/tests/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts`
 - Create: `packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-list.tsx`
 - Create: `packages/ui/src/components/thread-playground/message/citation-list.tsx`
 - Create: `packages/ui/src/components/thread-playground/message/text-citation-utils.ts`
-- Create: `packages/ui/src/components/thread-playground/message/text-citation-utils.test.ts`
+- Create: `packages/ui/tests/components/thread-playground/message/text-citation-utils.test.ts`
 - Create: `packages/ui/src/components/thread-playground/message/use-text-citation-extension.ts`
 - Modify: `packages/ui/src/components/thread-playground/message/message-list-item.tsx`
 - Modify: `packages/ui/src/components/thread-playground/message/message-list-item-header.tsx`
@@ -1887,7 +1887,7 @@ git commit -m "feat: bridge provider-hosted tools to responses adapters"
 - [ ] **Step 1: Create the parser RED tests**
 
 Create
-`packages/ui/src/components/thread-playground/tool/provider-hosted-tool-config.test.ts`
+`packages/ui/tests/components/thread-playground/tool/provider-hosted-tool-config.test.ts`
 with this exact content:
 
 ```ts
@@ -1935,7 +1935,7 @@ describe("parseProviderHostedToolConfig", () => {
 Run:
 
 ```bash
-bun test packages/ui/src/components/thread-playground/tool/provider-hosted-tool-config.test.ts
+bun test packages/ui/tests/components/thread-playground/tool/provider-hosted-tool-config.test.ts
 ```
 
 Expected: FAIL because the parser module does not exist.
@@ -2084,7 +2084,7 @@ with no text or client tool call is treated as empty.
 - [ ] **Step 4: Create the activity presentation RED tests**
 
 Create
-`packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts`
+`packages/ui/tests/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts`
 with this exact content:
 
 ```ts
@@ -2176,7 +2176,7 @@ describe("provider-hosted tool activity presentation", () => {
 Run:
 
 ```bash
-bun test packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts
+bun test packages/ui/tests/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts
 ```
 
 Expected: FAIL because safe-source collection and generic hosted-activity
@@ -2185,7 +2185,7 @@ summarization do not exist.
 - [ ] **Step 5: Create the citation-range RED tests**
 
 Create
-`packages/ui/src/components/thread-playground/message/text-citation-utils.test.ts`
+`packages/ui/tests/components/thread-playground/message/text-citation-utils.test.ts`
 with this exact content:
 
 ```ts
@@ -2295,7 +2295,7 @@ describe("normalizeCitationRanges", () => {
 Run:
 
 ```bash
-bun test packages/ui/src/components/thread-playground/message/text-citation-utils.test.ts
+bun test packages/ui/tests/components/thread-playground/message/text-citation-utils.test.ts
 ```
 
 Expected: FAIL because citation ranges are not yet normalized or filtered.
@@ -3247,7 +3247,7 @@ Provider-hosted activities stay read-only: they do not enter
 Run:
 
 ```bash
-bun test packages/ui/src/components/thread-playground/tool/provider-hosted-tool-config.test.ts packages/ui/src/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts packages/ui/src/components/thread-playground/message/text-citation-utils.test.ts packages/ui/tests/components/thread-playground/stores/thread-store.test.ts
+bun test packages/ui/tests/components/thread-playground/tool/provider-hosted-tool-config.test.ts packages/ui/tests/components/thread-playground/message/provider-hosted-tool-activity-utils.test.ts packages/ui/tests/components/thread-playground/message/text-citation-utils.test.ts packages/ui/tests/components/thread-playground/stores/thread-store.test.ts
 ```
 
 Expected: exit 0; opaque fields round-trip, identity operations are stable,
@@ -3265,19 +3265,19 @@ git commit -m "feat: configure and render provider-hosted tools"
 ### Task 4: Close persistence, history, transport, and export gaps
 
 **Files:**
-- Modify: `packages/core/src/server/storage/local/file-system.test.ts`
+- Modify: `packages/core/tests/server/storage/local/file-system.test.ts`
 - Modify: `packages/core/src/thread/run-history-utils.ts`
-- Create: `packages/core/src/thread/run-history-utils.test.ts`
+- Create: `packages/core/tests/thread/run-history-utils.test.ts`
 - Modify: `packages/core/src/generator/langgraph/context-export.ts`
-- Modify: `packages/core/src/generator/langgraph/context-export.test.ts`
+- Modify: `packages/core/tests/generator/langgraph/context-export.test.ts`
 - Modify: `packages/core/src/generator/langgraph/index.ts`
-- Create: `packages/core/src/generator/langgraph/index.test.ts`
+- Create: `packages/core/tests/generator/langgraph/index.test.ts`
 - Modify: `apps/desktop/src/bun/rpc/stream-thread-request.test.ts`
 - Modify: `apps/desktop/src/client/rpc-transport.test.ts`
 
 - [ ] **Step 1: Add the storage round-trip characterization test**
 
-In `packages/core/src/server/storage/local/file-system.test.ts`, append this
+In `packages/core/tests/server/storage/local/file-system.test.ts`, append this
 test inside `describe("LocalFileSystem.write", ...)`:
 
 ```ts
@@ -3367,7 +3367,7 @@ test("preserves provider-hosted tool configuration and response metadata", async
 Run:
 
 ```bash
-bun test packages/core/src/server/storage/local/file-system.test.ts -t "preserves provider-hosted tool configuration and response metadata"
+bun test packages/core/tests/server/storage/local/file-system.test.ts -t "preserves provider-hosted tool configuration and response metadata"
 ```
 
 Expected: PASS. Task 1 already extends the persisted thread schema; this GREEN
@@ -3376,7 +3376,7 @@ does not require a storage implementation change.
 
 - [ ] **Step 2: Create the run-history RED test**
 
-Create `packages/core/src/thread/run-history-utils.test.ts` with this exact
+Create `packages/core/tests/thread/run-history-utils.test.ts` with this exact
 content:
 
 ```ts
@@ -3416,14 +3416,14 @@ describe("provider-hosted activity run summaries", () => {
 Run:
 
 ```bash
-bun test packages/core/src/thread/run-history-utils.test.ts
+bun test packages/core/tests/thread/run-history-utils.test.ts
 ```
 
 Expected: FAIL because run summaries consider only text and client tool calls.
 
 - [ ] **Step 3: Add the context-export exclusion RED test**
 
-In `packages/core/src/generator/langgraph/context-export.test.ts`, replace the
+In `packages/core/tests/generator/langgraph/context-export.test.ts`, replace the
 existing `buildContextExports` test with this exact block:
 
 ```ts
@@ -3489,7 +3489,7 @@ describe("buildContextExports", () => {
 Run:
 
 ```bash
-bun test packages/core/src/generator/langgraph/context-export.test.ts -t "exports rendered prompt, per-tool JSON, messages, and variables"
+bun test packages/core/tests/generator/langgraph/context-export.test.ts -t "exports rendered prompt, per-tool JSON, messages, and variables"
 ```
 
 Expected: FAIL before returning any files. The current filter admits the
@@ -3532,7 +3532,7 @@ const tools = (context.tools ?? []).filter(
 Run:
 
 ```bash
-bun test packages/core/src/generator/langgraph/context-export.test.ts -t "exports rendered prompt, per-tool JSON, messages, and variables"
+bun test packages/core/tests/generator/langgraph/context-export.test.ts -t "exports rendered prompt, per-tool JSON, messages, and variables"
 ```
 
 Expected: PASS; function and MCP references remain, while built-in and
@@ -3540,7 +3540,7 @@ provider-hosted tools produce no JSON reference.
 
 - [ ] **Step 5: Create the pre-write LangGraph guard RED test**
 
-Create `packages/core/src/generator/langgraph/index.test.ts` with this exact
+Create `packages/core/tests/generator/langgraph/index.test.ts` with this exact
 content:
 
 ```ts
@@ -3637,7 +3637,7 @@ describe("langgraphGenerator", () => {
 Run:
 
 ```bash
-bun test packages/core/src/generator/langgraph/index.test.ts
+bun test packages/core/tests/generator/langgraph/index.test.ts
 ```
 
 Expected: FAIL because export begins workflow/file work instead of rejecting
@@ -3754,7 +3754,7 @@ has no equivalent execution/output contract.
 Run:
 
 ```bash
-bun test packages/core/src/server/storage/local/file-system.test.ts packages/core/src/thread/run-history-utils.test.ts packages/core/src/generator/langgraph/context-export.test.ts packages/core/src/generator/langgraph/index.test.ts apps/desktop/src/bun/rpc/stream-thread-request.test.ts apps/desktop/src/client/rpc-transport.test.ts
+bun test packages/core/tests/server/storage/local/file-system.test.ts packages/core/tests/thread/run-history-utils.test.ts packages/core/tests/generator/langgraph/context-export.test.ts packages/core/tests/generator/langgraph/index.test.ts apps/desktop/src/bun/rpc/stream-thread-request.test.ts apps/desktop/src/client/rpc-transport.test.ts
 ```
 
 Expected: exit 0; storage is lossless, run summaries remain meaningful, RPC fixtures satisfy the wire contract, and LangGraph export writes zero files before reporting the unsupported feature.
@@ -3806,7 +3806,7 @@ When changing the catalog version, first remove the old `patchedDependencies` en
 
 ```bash
 bun install
-bun test packages/core/src/server/agent/pi-ai-native-tools.test.ts packages/core/src/server/agent/stream.test.ts packages/core/src/client/converters.test.ts packages/core/src/client/reducer.test.ts
+bun test packages/core/tests/server/agent/pi-ai-native-tools.test.ts packages/core/tests/server/agent/stream.test.ts packages/core/tests/client/converters.test.ts packages/core/tests/client/reducer.test.ts
 ```
 
 Expected decision:
