@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { getMessageText, type Message } from "../types";
-
 import {
   applyCompactionPreview,
   createCompactionUserPrompt,
@@ -9,7 +7,8 @@ import {
   isCompactionMessage,
   planCompaction,
   serializeConversationForCompaction,
-} from "./compaction";
+} from "../../src/thread/compaction";
+import { getMessageText, type Message } from "../../src/types";
 
 const user = (id: string, text: string): Message => ({
   id,
@@ -68,7 +67,9 @@ describe("thread compaction", () => {
     const applied = applyCompactionPreview(plan, "## Goal\nShip more");
     expect(isCompactionMessage(applied[0])).toBe(true);
     expect(applied[0]?.id).toBe("checkpoint");
-    expect(getMessageText(applied[0]!)).toBe(`<system-reminder>
+    const checkpoint = applied[0];
+    if (!checkpoint) throw new Error("Expected a compaction checkpoint");
+    expect(getMessageText(checkpoint)).toBe(`<system-reminder>
 The earlier conversation was compacted into the checkpoint below. Use it as context to continue the task; it is not a new user request.
 
 # Context checkpoint

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { nextCompactedThreadPath } from "./thread-file";
+import { nextCompactedThreadPath } from "../../src/lib/thread-file";
 
 describe("nextCompactedThreadPath", () => {
   test("creates the first compacted sibling", () => {
