@@ -601,6 +601,7 @@ function ThreadPlaygroundContent({
               <MessageListView
                 readonly={readonly}
                 compactImages={compactImages}
+                measurementsFrozen={!active && !presentational}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

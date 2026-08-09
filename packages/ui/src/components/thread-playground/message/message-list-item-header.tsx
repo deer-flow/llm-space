@@ -1,4 +1,3 @@
-import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import { getMessageText, type Message } from "@llm-space/core";
 import { summarizeToolCalls } from "@llm-space/core/thread";
 import {
@@ -21,6 +20,7 @@ import { Button } from "@llm-space/ui/ui/button";
 import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";
+import type { MessageDragHandleProps } from "./message-drag-handle-props";
 import { MessageStatsSummary } from "./message-stats-summary";
 
 function _MessageListItemHeader({
@@ -34,7 +34,7 @@ function _MessageListItemHeader({
   message: Message;
   readonly?: boolean;
   collapsed?: boolean;
-  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  dragHandleProps?: MessageDragHandleProps;
 }) {
   const { run, removeMessage, toggleMessageRole, toggleMessageCollapsed } =
     useThreadStoreActions();
@@ -61,7 +61,8 @@ function _MessageListItemHeader({
   // still shows (disabled) for an assistant message whose tool results aren't
   // ready yet, since that can become runnable.
   const showRun =
-    message.role === "user" || (message.role === "assistant" && !!message.toolCalls?.length);
+    message.role === "user" ||
+    (message.role === "assistant" && !!message.toolCalls?.length);
   const runTooltip = runnable ? "Run from this message" : "No runnable content";
   const runAriaLabel = runnable
     ? "Run from this message"
@@ -117,7 +118,9 @@ function _MessageListItemHeader({
     >
       <Tooltip content="Drag to reorder">
         <div
-          {...dragHandleProps}
+          ref={dragHandleProps?.setActivatorNodeRef}
+          {...dragHandleProps?.attributes}
+          {...dragHandleProps?.listeners}
           aria-label={`${message.role === "user" ? "User" : "Assistant"} message drag handle`}
           className={cn(
             // A small grab affordance near the top edge, centered (out of

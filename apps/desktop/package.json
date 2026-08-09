@@ -25,7 +25,6 @@
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
     "@formkit/auto-animate": "^0.9.0",
-    "@hello-pangea/dnd": "^18.0.1",
     "@llm-space/core": "workspace:*",
     "@llm-space/runtime": "workspace:*",
     "@llm-space/ui": "workspace:*",

@@ -1,11 +1,24 @@
 import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  type DropResult,
-  type DroppableProvided,
-} from "@hello-pangea/dnd";
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { AssistantMessage, Message, ThreadContext } from "@llm-space/core";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,7 +38,13 @@ import {
   type ImageDisplayContextValue,
 } from "./image-display-context";
 import { MessageListItem } from "./message-list-item";
+import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
+import { findCenteredVirtualItemIndex } from "./virtual-item-center";
+
+const MESSAGE_ESTIMATED_HEIGHT = 240;
+const MESSAGE_OVERSCAN = 3;
+const DND_MODIFIERS = [restrictToVerticalAxis];
 
 export function MessageListView({
   className,
@@ -33,6 +52,7 @@ export function MessageListView({
   messages: messagesFromProps,
   readonly: readonlyFromProps = false,
   compactImages = false,
+  measurementsFrozen = false,
 }: {
   className?: string;
   context?: ThreadContext;
@@ -40,28 +60,81 @@ export function MessageListView({
   readonly?: boolean;
   /** Render image attachments as `[Image #N]` placeholders. */
   compactImages?: boolean;
+  /** Keep measured heights while an ancestor is hidden. */
+  measurementsFrozen?: boolean;
 }) {
   const isSnapshotView = messagesFromProps !== undefined;
-  const status = useThreadStore((s) => s.status);
-  const collapsedMessageIds = useThreadStore((s) => s.collapsedMessageIds);
-  const autoFocusMessageId = useThreadStore((s) => s.autoFocusMessageId);
-  const runValidationIssue = useThreadStore((s) => s.runValidationIssue);
-  const storeMessages = useThreadStore((s) => s.thread.context?.messages);
+  const status = useThreadStore((state) => state.status);
+  const collapsedMessageIds = useThreadStore(
+    (state) => state.collapsedMessageIds
+  );
+  const autoFocusMessageId = useThreadStore(
+    (state) => state.autoFocusMessageId
+  );
+  const runValidationIssue = useThreadStore(
+    (state) => state.runValidationIssue
+  );
+  const storeMessages = useThreadStore(
+    (state) => state.thread.context?.messages
+  );
   const { appendMessage, moveMessage, resolveRunValidationIssue } =
     useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
+    null
+  );
+  const contentRef = useRef<HTMLDivElement>(null);
   const messages = useMemo(
     () => messagesFromProps ?? storeMessages ?? [],
     [messagesFromProps, storeMessages]
   );
-  const readonly = useMemo(() => {
-    return readonlyFromProps || dragging || isSnapshotView;
-  }, [dragging, isSnapshotView, readonlyFromProps]);
+  const readonly = readonlyFromProps || isSnapshotView;
+  const messageIds = useMemo(
+    () => messages.map((message) => message.id),
+    [messages]
+  );
+  const collapsedMessageIdSet = useMemo(
+    () => new Set(collapsedMessageIds),
+    [collapsedMessageIds]
+  );
+  const getMessageKey = useCallback(
+    (index: number) => messages[index]?.id ?? index,
+    [messages]
+  );
+  const getScrollElement = useCallback(
+    () =>
+      contentRef.current?.closest<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]'
+      ) ?? null,
+    []
+  );
+  // TanStack Virtual exposes a mutable imperative controller by design.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    estimateSize: () => MESSAGE_ESTIMATED_HEIGHT,
+    getItemKey: getMessageKey,
+    getScrollElement,
+    overscan: MESSAGE_OVERSCAN,
+    paddingStart: 12,
+    useCachedMeasurements: measurementsFrozen || dragging,
+    onChange: (instance) => {
+      const viewportHeight = instance.scrollRect?.height ?? 0;
+      if (viewportHeight <= 0) {
+        return;
+      }
+      const index = findCenteredVirtualItemIndex(
+        instance.getVirtualItems(),
+        instance.scrollOffset ?? 0,
+        viewportHeight
+      );
+      setActiveMessageIndex((current) => (current === index ? current : index));
+    },
+  });
   const addMessageSuggested =
     runValidationIssue?.resolution?.type === "appendUserMessage";
 
-  // Number every image attachment sequentially across the thread so the compact
-  // placeholder can label it `[Image #N]`.
   const imageDisplay = useMemo<ImageDisplayContextValue>(() => {
     const numbers = new Map<string, number>();
     let count = 0;
@@ -80,78 +153,172 @@ export function MessageListView({
     };
   }, [messages, compactImages]);
 
-  const handleDragStart = useCallback(() => {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  const activeMessage = useMemo(
+    () => messages.find((message) => message.id === activeMessageId) ?? null,
+    [activeMessageId, messages]
+  );
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveMessageId(String(event.active.id));
     setDragging(true);
   }, []);
+  const handleDragCancel = useCallback(() => {
+    setActiveMessageId(null);
+    setDragging(false);
+  }, []);
   const handleDragEnd = useCallback(
-    (result: DropResult) => {
+    (event: DragEndEvent) => {
+      setActiveMessageId(null);
       setDragging(false);
-      const { source, destination } = result;
-      if (!destination || source.index === destination.index) return;
-      moveMessage(source.index, destination.index);
+      const move = resolveMessageMove(
+        messageIds,
+        String(event.active.id),
+        event.over ? String(event.over.id) : null
+      );
+      if (move) moveMessage(move.sourceIndex, move.destinationIndex);
     },
-    [moveMessage]
+    [messageIds, moveMessage]
   );
-
-  const contentRef = useRef<HTMLDivElement>(null);
   const scrollToBottom = useCallback(() => {
-    const viewport = contentRef.current?.closest<HTMLElement>(
-      '[data-slot="scroll-area-viewport"]'
-    );
+    const viewport = getScrollElement();
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight;
     }
-  }, []);
+  }, [getScrollElement]);
+  const jumpToMessage = useCallback(
+    (index: number) => {
+      setActiveMessageIndex(index);
+      virtualizer.scrollToIndex(index, {
+        align: "center",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    },
+    [virtualizer]
+  );
 
-  // Jump to the latest messages when a run starts so the streaming reply is
-  // in view. Fires on the idle → running transition (status only flips here).
+  useEffect(() => {
+    if (!measurementsFrozen) {
+      virtualizer.measure();
+    }
+  }, [measurementsFrozen, virtualizer]);
   useEffect(() => {
     if (status === "running") {
       scrollToBottom();
     }
   }, [status, scrollToBottom]);
+  useEffect(() => {
+    if (!autoFocusMessageId) {
+      return;
+    }
+    const index = messages.findIndex(
+      (message) => message.id === autoFocusMessageId
+    );
+    if (index >= 0) {
+      virtualizer.scrollToIndex(index, { align: "auto" });
+    }
+  }, [autoFocusMessageId, messages, virtualizer]);
+  useEffect(() => {
+    if (!runValidationIssue?.messageId) {
+      return;
+    }
+    const index = messages.findIndex(
+      (message) => message.id === runValidationIssue.messageId
+    );
+    if (index >= 0) {
+      virtualizer.scrollToIndex(index, { align: "auto" });
+    }
+  }, [messages, runValidationIssue, virtualizer]);
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const firstVirtualItem = virtualItems[0];
   const showNavigator = messages.length > 1;
 
   return (
     <div className={cn("relative size-full", className)}>
       <ScrollArea type="auto" className="size-full">
         <ImageDisplayProvider value={imageDisplay}>
-          <div ref={contentRef} className="flex flex-col p-3 pt-0.5">
-            {isSnapshotView ? (
-              <StaticMessageList
-                context={contextFromProps}
-                messages={messages}
-                readonly={readonly}
-              />
-            ) : (
-              <DragDropContext
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
+          <div ref={contentRef} className="p-3 pt-0.5">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={DND_MODIFIERS}
+              onDragStart={handleDragStart}
+              onDragCancel={handleDragCancel}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={messageIds}
+                strategy={verticalListSortingStrategy}
               >
-                <Droppable droppableId="message-list">
-                  {(droppableProvided) => (
-                    <DroppableMessageList
-                      droppableProvided={droppableProvided}
-                      messages={messages}
-                      readonly={readonly}
-                      autoFocusMessageId={autoFocusMessageId}
-                      collapsedMessageIds={collapsedMessageIds}
-                      runValidationIssue={runValidationIssue}
+                <div
+                  className="relative w-full"
+                  style={{ height: virtualizer.getTotalSize() }}
+                >
+                  <div
+                    className="absolute top-0 left-0 w-full"
+                    style={{
+                      transform: `translateY(${firstVirtualItem?.start ?? 0}px)`,
+                    }}
+                  >
+                    {virtualItems.map((virtualItem) => {
+                      const message = messages[virtualItem.index];
+                      if (!message) {
+                        return null;
+                      }
+                      return (
+                        <div
+                          key={virtualItem.key}
+                          ref={virtualizer.measureElement}
+                          className="w-full"
+                          data-index={virtualItem.index}
+                        >
+                          <SortableMessageRow
+                            context={contextFromProps}
+                            message={message}
+                            readonly={readonly}
+                            autoFocus={message.id === autoFocusMessageId}
+                            collapsed={collapsedMessageIdSet.has(message.id)}
+                            runValidationIssue={
+                              message.id === runValidationIssue?.messageId
+                                ? runValidationIssue
+                                : null
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </SortableContext>
+              <DragOverlay>
+                {activeMessage ? (
+                  <div className="pb-3.5 opacity-95">
+                    <MessageListItem
+                      context={contextFromProps}
+                      message={activeMessage}
+                      readonly
+                      collapsed={collapsedMessageIdSet.has(activeMessage.id)}
                     />
-                  )}
-                </Droppable>
-              </DragDropContext>
-            )}
-            {!isSnapshotView && (
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+            {!isSnapshotView ? (
               <StreamingMessageListItem streaming={status === "running"} />
-            )}
+            ) : null}
             <div className="relative rounded-lg">
               <Button
-                // No top margin: the preceding message / streaming item (or, in the
-                // empty state, the list's own top padding) already provides the gap.
                 className={cn(
-                  "text-muted-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_2%)]! hover:text-accent-foreground w-full justify-start rounded-lg py-5",
+                  "text-muted-foreground hover:text-accent-foreground w-full justify-start rounded-lg py-5 hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_2%)]!",
                   dragging && "invisible",
                   readonly && "hidden"
                 )}
@@ -159,7 +326,9 @@ export function MessageListView({
                 variant="secondary"
                 size="lg"
                 onClick={
-                  addMessageSuggested ? resolveRunValidationIssue : appendMessage
+                  addMessageSuggested
+                    ? resolveRunValidationIssue
+                    : appendMessage
                 }
               >
                 <PlusIcon className="size-4" />
@@ -185,137 +354,74 @@ export function MessageListView({
         </ImageDisplayProvider>
       </ScrollArea>
       {showNavigator ? (
-        <MessageNavigator contentRef={contentRef} messages={messages} />
+        <MessageNavigator
+          activeIndex={activeMessageIndex}
+          messages={messages}
+          onJump={jumpToMessage}
+        />
       ) : null}
     </div>
   );
 }
 
-function StaticMessageList({
+const _SortableMessageRow = function SortableMessageRow({
   context,
-  messages,
-  readonly,
-}: {
-  context?: ThreadContext;
-  messages: Message[];
-  readonly: boolean;
-}) {
-  return (
-    <div className="flex flex-col pt-3">
-      {messages.map((message) => (
-        <MessageListItem
-          key={message.id}
-          className="mb-3.5"
-          context={context}
-          message={message}
-          readonly={readonly}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DroppableMessageList({
-  droppableProvided,
-  messages,
-  readonly,
-  autoFocusMessageId,
-  collapsedMessageIds,
-  runValidationIssue,
-}: {
-  droppableProvided: DroppableProvided;
-  messages: Message[];
-  readonly: boolean;
-  autoFocusMessageId: string | null;
-  collapsedMessageIds: string[];
-  runValidationIssue: RunValidationIssue | null;
-}) {
-  return (
-    <div
-      className="flex flex-col pt-3"
-      ref={droppableProvided.innerRef}
-      {...droppableProvided.droppableProps}
-    >
-      {messages.map((message, index) => (
-        <DraggableMessageRow
-          key={message.id}
-          message={message}
-          index={index}
-          readonly={readonly}
-          autoFocus={message.id === autoFocusMessageId}
-          collapsed={collapsedMessageIds.includes(message.id)}
-          runValidationIssue={
-            message.id === runValidationIssue?.messageId
-              ? runValidationIssue
-              : null
-          }
-        />
-      ))}
-      {droppableProvided.placeholder}
-    </div>
-  );
-}
-
-// One draggable row. The `memo` boundary sits *above* the `<Draggable>` (not
-// inside its render prop) so that editing one message doesn't re-render every
-// row: @hello-pangea/dnd hands the render prop a fresh `draggableProvided` (with
-// a new `dragHandleProps` object) on every parent render, which would defeat a
-// memo placed on MessageListItem alone. With only stable data props here, the
-// rows whose message/flags are unchanged bail — their `Draggable` and
-// MessageListItem never re-render. Drags still work: the dragging/displaced rows
-// re-render via the dnd store subscription inside `Draggable`, not via props.
-const _DraggableMessageRow = function DraggableMessageRow({
   message,
-  index,
   readonly,
   autoFocus,
   collapsed,
   runValidationIssue,
 }: {
+  context?: ThreadContext;
   message: Message;
-  index: number;
   readonly: boolean;
   autoFocus: boolean;
   collapsed: boolean;
   runValidationIssue: RunValidationIssue | null;
 }) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: message.id, disabled: readonly });
+  const dragHandleProps = useMemo(
+    () => ({ attributes, listeners: listeners ?? {}, setActivatorNodeRef }),
+    [attributes, listeners, setActivatorNodeRef]
+  );
   return (
-    <Draggable draggableId={message.id} index={index} isDragDisabled={readonly}>
-      {(draggableProvided) => {
-        const { style, ...draggableProps } = draggableProvided.draggableProps;
-        return (
-          <div
-            ref={draggableProvided.innerRef}
-            {...draggableProps}
-            // Spacing lives on the draggable as a margin (not a flex `gap` on the
-            // list) because @hello-pangea/dnd measures item margins to size the
-            // placeholder and compute drag displacement — a `gap` is invisible to
-            // it and offsets every item mid-drag.
-            className="mb-3.5"
-            style={style}
-          >
-            <MessageListItem
-              message={message}
-              readonly={readonly}
-              autoFocus={autoFocus}
-              collapsed={collapsed}
-              runValidationIssue={runValidationIssue}
-              dragHandleProps={draggableProvided.dragHandleProps}
-            />
-          </div>
-        );
+    <div
+      ref={setNodeRef}
+      className="pb-3.5"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        visibility: isDragging ? "hidden" : undefined,
       }}
-    </Draggable>
+    >
+      <MessageListItem
+        context={context}
+        message={message}
+        readonly={readonly}
+        autoFocus={autoFocus}
+        collapsed={collapsed}
+        runValidationIssue={runValidationIssue}
+        dragHandleProps={dragHandleProps}
+      />
+    </div>
   );
 };
-const DraggableMessageRow = memo(_DraggableMessageRow);
+const SortableMessageRow = memo(_SortableMessageRow);
 
 function StreamingMessageListItem({ streaming }: { streaming: boolean }) {
   let streamingMessage: AssistantMessage | null = useThreadStore(
-    (s) => s.streamingMessage
+    (state) => state.streamingMessage
   );
   if (!streamingMessage && streaming) {
-    streamingMessage ??= {
+    streamingMessage = {
       id: "streaming",
       role: "assistant",
       content: [],
