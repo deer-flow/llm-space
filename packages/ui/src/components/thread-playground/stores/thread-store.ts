@@ -24,6 +24,8 @@ import {
   type SkillInfo,
   type Thread,
   type ThreadContext,
+  type ThreadRunReference,
+  type ThreadSnapshot,
   type ThreadVariable,
   type ThreadVariableVariants,
   type ThreadVariables,
@@ -61,6 +63,8 @@ import {
   type EvaluationRubricRecord,
   type EvaluationRubricSnapshot,
   type EvaluationRunScores,
+  isRunSnapshot,
+  type RunHistoryEntry,
   type RunSnapshot,
 } from "@llm-space/core/thread";
 import { createContext, useContext } from "react";
@@ -122,7 +126,7 @@ export interface ThreadState {
   autoFocusMessageId: string | null;
   changeHistory: ChangeHistory;
   /** Thread snapshot + completion time after each run; most recent last. */
-  runHistory: RunSnapshot[];
+  runHistory: RunHistoryEntry[];
   /** Manual verdicts comparing durable run snapshots. */
   evaluations: EvaluationRecord[];
   /** Reusable manual evaluation rubrics owned by this thread. */
@@ -133,7 +137,8 @@ export interface ThreadState {
   undo(): void;
   redo(): void;
   restoreThread(thread: Thread): void;
-  removeRun(run: RunSnapshot): void;
+  loadRunSnapshot(run: RunHistoryEntry): Promise<RunSnapshot>;
+  removeRun(run: RunHistoryEntry): void;
   saveEvaluation(input: {
     leftRunId: string;
     rightRunId: string;
@@ -254,13 +259,18 @@ export function createThreadStore(
     fileExists?: (path: string) => Promise<boolean>;
     /** Monotonic clock used for client-observed model timing. */
     now?: () => number;
+    /** Archive a completed run outside the main thread document. */
+    archiveRunSnapshot?: (run: RunSnapshot) => Promise<ThreadRunReference>;
+    /** Load a complete run snapshot from an opaque persisted reference. */
+    readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
   } = {}
 ): ThreadStore {
   const normalizedInputThread = ensureThreadVariableState(
     normalizeThread(initialThread)
   );
   const initialRunHistory = normalizeRunHistory(
-    normalizedInputThread.runHistory
+    normalizedInputThread.runHistory,
+    normalizedInputThread.runHistoryIndex
   );
   const initialEvaluations = normalizeEvaluations(
     normalizedInputThread.evaluations,
@@ -280,6 +290,17 @@ export function createThreadStore(
       // --- internal helpers ---------------------------------------------------
 
       let stopActiveRun: (() => void) | null = null;
+      const loadedRuns = new Map<string, RunSnapshot>();
+
+      const cacheLoadedRun = (run: RunSnapshot) => {
+        loadedRuns.delete(run.id);
+        loadedRuns.set(run.id, run);
+        const oldest = loadedRuns.keys().next().value;
+        if (loadedRuns.size > 2 && typeof oldest === "string") {
+          loadedRuns.delete(oldest);
+        }
+        return run;
+      };
 
       const patchThread = (partial: Partial<Thread>) => {
         const next = { ...get().thread, ...partial };
@@ -1115,7 +1136,9 @@ export function createThreadStore(
           }
           if (!isPreparingRun()) return;
           const abortController = new AbortController();
-          const isActiveRun = () => get().activeRunId === runId;
+          let finalizing = false;
+          const isActiveRun = () =>
+            !finalizing && get().activeRunId === runId;
           set({
             status: "running",
             abortController,
@@ -1166,62 +1189,91 @@ export function createThreadStore(
               }
             }, PREVIEW_THROTTLE_MS);
 
-          const finalizeActiveRun = () => {
+          let finalizePromise: Promise<void> | null = null;
+          const finalizeActiveRun = (): Promise<void> => {
+            if (finalizePromise) {
+              return finalizePromise;
+            }
             if (!isActiveRun()) {
-              return;
+              return Promise.resolve();
             }
             // Drop any pending frame before the terminal clear so a late flush
             // can't resurrect a stale streamingMessage after we reset to null.
+            finalizing = true;
             cancelPreview();
-            set({
-              streamingMessage: null,
-              status: "idle",
-              abortController: null,
-              activeRunId: null,
-              executingToolCallIds: [],
-            });
-            stopActiveRun = null;
-
-            // Fold the whole run (truncation + generated messages) into one
-            // undo step, and record a run snapshot. No-op for undo if the
-            // thread is unchanged.
-            const finalThread = get().thread;
-            if (sawEvent && !failed) {
-              const threadWithSnapshot = withPromptVariableSnapshot(
-                finalThread,
-                promptSnapshot
-              );
-              const runUsage = aggregateMessageUsage(
-                (threadWithSnapshot.context?.messages ?? []).slice(
-                  runStartMessageCount
-                )
-              );
-              const runHistory = recordRun(
-                get().runHistory,
-                threadWithSnapshot,
-                Date.now(),
-                { usage: runUsage }
-              );
-              const evaluations = normalizeEvaluations(
-                get().evaluations,
-                runHistory
-              );
-              const thread = withRunMetadata(threadWithSnapshot, {
-                runHistory,
-                evaluations,
-                evaluationRubrics: get().evaluationRubrics,
-              });
+            finalizePromise = (async () => {
+              // Fold the whole run (truncation + generated messages) into one
+              // undo step, and record a run snapshot. No-op for undo if the
+              // thread is unchanged.
+              const finalThread = get().thread;
+              if (sawEvent && !failed) {
+                const threadWithSnapshot = withPromptVariableSnapshot(
+                  finalThread,
+                  promptSnapshot
+                );
+                const runUsage = aggregateMessageUsage(
+                  (threadWithSnapshot.context?.messages ?? []).slice(
+                    runStartMessageCount
+                  )
+                );
+                let runHistory = recordRun(
+                  get().runHistory,
+                  threadWithSnapshot,
+                  Date.now(),
+                  { usage: runUsage }
+                );
+                const newestRun = runHistory[runHistory.length - 1];
+                if (
+                  newestRun &&
+                  isRunSnapshot(newestRun) &&
+                  options.archiveRunSnapshot
+                ) {
+                  try {
+                    const reference =
+                      await options.archiveRunSnapshot(newestRun);
+                    runHistory = [...runHistory.slice(0, -1), reference];
+                  } catch (error) {
+                    toast.error("Failed to archive run snapshot", {
+                      description:
+                        error instanceof Error
+                          ? error.message
+                          : "The snapshot will be archived on the next save.",
+                    });
+                  }
+                }
+                const evaluations = normalizeEvaluations(
+                  get().evaluations,
+                  runHistory
+                );
+                const thread = withRunMetadata(threadWithSnapshot, {
+                  runHistory,
+                  evaluations,
+                  evaluationRubrics: get().evaluationRubrics,
+                });
+                set({
+                  thread,
+                  changeHistory: recordSnapshot(get().changeHistory, thread),
+                  runHistory,
+                  evaluations,
+                });
+              } else {
+                set({
+                  changeHistory: recordSnapshot(
+                    get().changeHistory,
+                    finalThread
+                  ),
+                });
+              }
               set({
-                thread,
-                changeHistory: recordSnapshot(get().changeHistory, thread),
-                runHistory,
-                evaluations,
+                streamingMessage: null,
+                status: "idle",
+                abortController: null,
+                activeRunId: null,
+                executingToolCallIds: [],
               });
-            } else {
-              set({
-                changeHistory: recordSnapshot(get().changeHistory, finalThread),
-              });
-            }
+              stopActiveRun = null;
+            })();
+            return finalizePromise;
           };
 
           stopActiveRun = () => {
@@ -1237,7 +1289,7 @@ export function createThreadStore(
               commit(streamingMessage);
               streamingMessage = null;
             }
-            finalizeActiveRun();
+            void finalizeActiveRun();
           };
 
           // Stream a single model turn into `messages`. Returns whether it
@@ -1405,7 +1457,7 @@ export function createThreadStore(
               }
             }
           } finally {
-            finalizeActiveRun();
+            await finalizeActiveRun();
           }
         },
         undo() {
@@ -1475,7 +1527,26 @@ export function createThreadStore(
             changeHistory: recordSnapshot(get().changeHistory, next),
           });
         },
-        removeRun(run: RunSnapshot) {
+        async loadRunSnapshot(run: RunHistoryEntry) {
+          if (isRunSnapshot(run)) {
+            return run;
+          }
+          const cached = loadedRuns.get(run.id);
+          if (cached) {
+            return cacheLoadedRun(cached);
+          }
+          if (!options.readRunSnapshot) {
+            throw new Error("Run snapshot storage is unavailable.");
+          }
+          const thread = await options.readRunSnapshot(run.snapshotRef);
+          return cacheLoadedRun({
+            id: run.id,
+            timestamp: run.timestamp,
+            thread,
+            ...(run.usage ? { usage: run.usage } : {}),
+          });
+        },
+        removeRun(run: RunHistoryEntry) {
           if (get().status !== "idle") {
             return;
           }
@@ -1484,6 +1555,7 @@ export function createThreadStore(
           if (runHistory.length === current.length) {
             return;
           }
+          loadedRuns.delete(run.id);
           const evaluations = normalizeEvaluations(
             get().evaluations,
             runHistory
@@ -1680,6 +1752,7 @@ const selectActions = (s: ThreadState) => ({
   undo: s.undo,
   redo: s.redo,
   restoreThread: s.restoreThread,
+  loadRunSnapshot: s.loadRunSnapshot,
   removeRun: s.removeRun,
   saveEvaluation: s.saveEvaluation,
   removeEvaluation: s.removeEvaluation,

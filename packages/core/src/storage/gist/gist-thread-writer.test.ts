@@ -87,6 +87,42 @@ describe("GistThreadWriter.write (create)", () => {
     expect((calls[0]!.body as { public: boolean }).public).toBe(true);
   });
 
+  test("does not publish local inline or referenced run history", async () => {
+    const { fetch, calls } = _stubFetch({
+      "POST https://api.github.com/gists": () =>
+        _json({ id: GIST_ID, history: [{ version: NEW_VERSION }] }),
+    });
+    const writer = new GistThreadWriter({ fetch, getToken: () => "tok" });
+    await writer.write({
+      title: "Private history",
+      runHistory: [{ id: "inline", timestamp: 1, thread: {} }],
+      runHistoryVersion: 2,
+      runHistoryIndex: [
+        {
+          id: "referenced",
+          timestamp: 2,
+          snapshotRef: `${"a".repeat(64)}.json`,
+          preview: {
+            summary: "Private",
+            modelLabel: "No model",
+            messageCountLabel: "0 messages",
+          },
+        },
+      ],
+    });
+
+    const call = calls[0];
+    if (!call) throw new Error("Expected gist request");
+    const files = (call.body as { files: Record<string, { content: string }> })
+      .files;
+    const file = Object.values(files)[0];
+    if (!file) throw new Error("Expected gist file");
+    const published = JSON.parse(file.content) as Thread;
+    expect(published.runHistory).toEqual([]);
+    expect(published.runHistoryVersion).toBeUndefined();
+    expect(published.runHistoryIndex).toEqual([]);
+  });
+
   test("falls back to thread.json when the title has no slug", async () => {
     const { fetch, calls } = _stubFetch({
       "POST https://api.github.com/gists": () =>

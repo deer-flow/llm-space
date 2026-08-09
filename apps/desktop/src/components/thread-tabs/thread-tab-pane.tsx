@@ -218,6 +218,16 @@ function _ThreadTabPane({
     },
     [flushPending, lifecycleHost, paneId]
   );
+  const archiveRunSnapshot = useCallback(
+    (run: Parameters<typeof fs.archiveRun>[1]) =>
+      fs.archiveRun(pathRef.current, run),
+    [fs]
+  );
+  const readRunSnapshot = useCallback(
+    (snapshotRef: string) =>
+      fs.readRunSnapshot(pathRef.current, snapshotRef),
+    [fs]
+  );
 
   // Flush pending edits on a normal close. An editor displaced by an overwrite
   // instead drops them so stale destination content cannot replace the moved file.
@@ -399,6 +409,8 @@ function _ThreadTabPane({
         onStreamingStart={handleStreamingStart}
         onStreamingEnd={handleStreamingEnd}
         onApplyCompaction={handleApplyCompaction}
+        archiveRunSnapshot={archiveRunSnapshot}
+        readRunSnapshot={readRunSnapshot}
         onRenameTitle={handleRenameTitle}
       />
     </div>

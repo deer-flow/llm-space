@@ -212,6 +212,10 @@ export function createMainWindowRPC({
           await getRuntime(runtimeId).fsWrite(path, thread);
           return null;
         },
+        fsArchiveRun: ({ runtimeId, path, run }) =>
+          getRuntime(runtimeId).fsArchiveRun(path, run),
+        fsReadRunSnapshot: ({ runtimeId, path, snapshotRef }) =>
+          getRuntime(runtimeId).fsReadRunSnapshot(path, snapshotRef),
         pluginsList: () => Promise.resolve(pluginManager.listPlugins()),
         pluginsRefresh: () => pluginManager.refreshPlugins(),
         pluginsReload: async ({ pluginId }) => {

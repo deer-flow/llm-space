@@ -212,6 +212,17 @@ export class LocalRuntimeClient implements RuntimeClient {
     await this._deps.localFs.write(path, thread);
   }
 
+  fsArchiveRun(
+    path: string,
+    run: Parameters<RuntimeClient["fsArchiveRun"]>[1]
+  ) {
+    return this._deps.localFs.archiveRun(path, run);
+  }
+
+  fsReadRunSnapshot(path: string, snapshotRef: string) {
+    return this._deps.localFs.readRunSnapshot(path, snapshotRef);
+  }
+
   fsRealpath(path: string) {
     return Promise.resolve(this._deps.localFs.realpath(path));
   }

@@ -255,6 +255,80 @@ describe("RemoteRuntimeClient", () => {
     ]);
   });
 
+  test("uses remote run snapshot archive and lazy-read operations", async () => {
+    const requests: { method: string; params?: unknown }[] = [];
+    await _withFetch(
+      async (request) => {
+        const body = (await request.json()) as {
+          method: string;
+          params?: unknown;
+        };
+        requests.push(body);
+        return Response.json({
+          id: "1",
+          ok: true,
+          result:
+            body.method === "fs.archiveRun"
+              ? {
+                  id: "run-1",
+                  timestamp: 1,
+                  snapshotRef: `${"a".repeat(64)}.json`,
+                  preview: {
+                    summary: "Archived",
+                    modelLabel: "No model",
+                    messageCountLabel: "0 messages",
+                  },
+                }
+              : { title: "Loaded snapshot" },
+        });
+      },
+      async () => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl: "http://remote.test",
+          token: "secret",
+        });
+        expect(
+          await client.fsArchiveRun("thread.json", {
+            id: "run-1",
+            timestamp: 1,
+            thread: { title: "Snapshot" },
+          })
+        ).toMatchObject({ id: "run-1", preview: { summary: "Archived" } });
+        expect(
+          await client.fsReadRunSnapshot(
+            "thread.json",
+            `${"a".repeat(64)}.json`
+          )
+        ).toEqual({ title: "Loaded snapshot" });
+      }
+    );
+
+    expect(
+      requests.map(({ method, params }) => ({ method, params }))
+    ).toEqual([
+      {
+        method: "fs.archiveRun",
+        params: {
+          path: "thread.json",
+          run: {
+            id: "run-1",
+            timestamp: 1,
+            thread: { title: "Snapshot" },
+          },
+        },
+      },
+      {
+        method: "fs.readRunSnapshot",
+        params: {
+          path: "thread.json",
+          snapshotRef: `${"a".repeat(64)}.json`,
+        },
+      },
+    ]);
+  });
+
   test("parses SSE stream events", async () => {
     const events: AgentEvent[] = [];
     let requestBody: unknown;

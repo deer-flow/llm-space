@@ -147,7 +147,8 @@ particular:
 
 State is **persisted to disk** under the llm-space root (`~/.llm-space` by default; override with `LLM_SPACE_HOME`):
 
-- `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices.
+- `workspace/` — thread files as JSON, served through `LocalFileSystem` behind the `fs*` RPC requests. On a fresh install `bun/workspace/seed.ts` creates the empty directory so the welcome screen can offer blank-thread and example-start choices. **Nothing derived ever goes in here**: it holds user content and nothing else.
+- `history/` — run snapshots, externalized out of the thread file so it stays small, and kept out of `workspace/` so the user never sees derived data next to their own. One folder per thread, named `sha256(<workspace-relative path>)`, holding an `index.json` marker (`{ version, resource, orphanedAt? }`) plus one JSON file per run, named by the opaque `snapshotRef` recorded in the thread's `runHistoryIndex`. `RunHistoryStore` (`packages/core/src/server/storage/local/run-history-store.ts`) owns the folder; because the key is the thread's path, `LocalFileSystem` re-keys it on `cp`/`mv` (including whole directory subtrees) and prunes entries a thread no longer references. Deleting a thread deliberately **keeps** its history, so a file restored from the trash keeps its runs; the marker is what makes that safe: `LocalFileSystem.maintainRunHistory()` (run once at desktop startup) uses it to stamp orphans and reclaim them after 30 days.
 - `settings/` — `models.json` (configured providers, owned by `ModelManager`), `window.json` (frame/zoom/maximized), and `reminders.json` (`featureRemindersSeen` ids + GitHub-star reminder state, owned by `bun/reminders/`).
 
 ### Releases & auto-update

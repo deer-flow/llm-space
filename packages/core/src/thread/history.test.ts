@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { Thread } from "../types";
 
 import {
-  MAX_RUN_HISTORY,
+  isRunSnapshot,
   normalizeEvaluationRubrics,
   normalizeEvaluations,
   normalizeRunHistory,
@@ -176,22 +176,20 @@ describe("evaluation rubrics", () => {
 });
 
 describe("run history persistence", () => {
-  test("backfills stable ids and retains only the newest runs", () => {
-    const raw = Array.from({ length: MAX_RUN_HISTORY + 2 }, (_, index) => ({
+  test("backfills stable ids without discarding old runs", () => {
+    const raw = Array.from({ length: 22 }, (_, index) => ({
       thread: { title: `Run ${index}` },
       timestamp: index + 0.9,
     }));
     const normalized = normalizeRunHistory(raw);
 
-    expect(normalized).toHaveLength(MAX_RUN_HISTORY);
-    expect(normalized[0]?.id).toBe("run-2-2");
-    expect(normalized.at(-1)?.id).toBe(
-      `run-${MAX_RUN_HISTORY + 1}-${MAX_RUN_HISTORY + 1}`
-    );
+    expect(normalized).toHaveLength(22);
+    expect(normalized[0]?.id).toBe("run-0-0");
+    expect(normalized.at(-1)?.id).toBe("run-21-21");
   });
 
-  test("does not append beyond the run cap", () => {
-    const runs = Array.from({ length: MAX_RUN_HISTORY }, (_, index) => ({
+  test("appends new runs without a count cap", () => {
+    const runs = Array.from({ length: 25 }, (_, index) => ({
       id: `run-${index}`,
       thread: {},
       timestamp: index,
@@ -200,9 +198,61 @@ describe("run history persistence", () => {
       id: "run-latest",
     });
 
-    expect(next).toHaveLength(MAX_RUN_HISTORY);
-    expect(next[0]?.id).toBe("run-1");
+    expect(next).toHaveLength(26);
+    expect(next[0]?.id).toBe("run-0");
     expect(next.at(-1)?.id).toBe("run-latest");
+  });
+
+  test("merges legacy snapshots with the versioned index and keeps the last duplicate", () => {
+    const normalized = normalizeRunHistory(
+      [{ id: "same", thread: { title: "Legacy" }, timestamp: 1 }],
+      [
+        {
+          id: "same",
+          timestamp: 2,
+          snapshotRef: `${"a".repeat(64)}.json`,
+          preview: {
+            summary: "Referenced",
+            modelLabel: "No model",
+            messageCountLabel: "0 messages",
+          },
+        },
+      ]
+    );
+
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0]).toMatchObject({
+      id: "same",
+      timestamp: 2,
+      preview: { summary: "Referenced" },
+    });
+  });
+
+  test("writes loaded and referenced runs to separate persistence fields", () => {
+    const loaded = RUNS[0];
+    if (!loaded) throw new Error("Expected loaded run fixture");
+    const referenced = {
+      id: "referenced",
+      timestamp: 2,
+      snapshotRef: `${"b".repeat(64)}.json`,
+      preview: {
+        summary: "Referenced",
+        modelLabel: "No model",
+        messageCountLabel: "0 messages",
+      },
+    };
+    const thread = withRunMetadata(
+      { title: "Thread" },
+      {
+        runHistory: [loaded, referenced],
+        evaluations: [],
+        evaluationRubrics: [],
+      }
+    );
+
+    expect(thread.runHistory).toEqual([loaded]);
+    expect(thread.runHistoryVersion).toBe(2);
+    expect(thread.runHistoryIndex).toEqual([referenced]);
   });
 });
 
@@ -315,7 +365,12 @@ describe("structured evaluation persistence", () => {
       { id: "unique", thread: {}, timestamp: 2 },
       { id: "duplicate", thread: { title: "New" }, timestamp: 3 },
     ]);
-    expect(runs.map((run) => [run.id, run.thread.title])).toEqual([
+    expect(
+      runs.map((run) => [
+        run.id,
+        isRunSnapshot(run) ? run.thread.title : undefined,
+      ])
+    ).toEqual([
       ["unique", undefined],
       ["duplicate", "New"],
     ]);

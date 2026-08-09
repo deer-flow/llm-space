@@ -105,6 +105,8 @@ function _looksNative(data: object): boolean {
     "model",
     "context",
     "runHistory",
+    "runHistoryVersion",
+    "runHistoryIndex",
     "evaluations",
     "evaluationRubrics",
     "modelName",

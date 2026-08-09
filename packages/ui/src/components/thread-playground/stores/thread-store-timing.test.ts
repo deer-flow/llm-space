@@ -8,7 +8,7 @@ const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
 
 beforeAll(() => {
   globalThis.requestAnimationFrame = (callback) =>
-    setTimeout(() => callback(performance.now()), 0);
+    setTimeout(() => callback(performance.now()), 0) as unknown as number;
   globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle);
 });
 
@@ -80,8 +80,115 @@ describe("assistant message timing", () => {
       firstTokenMs: 800,
       durationMs: 1500,
     });
-    expect(store.getState().runHistory[0]?.thread.context?.messages?.at(-1)).toEqual(
-      assistant
+    const savedRun = store.getState().runHistory[0];
+    if (!savedRun?.thread) throw new Error("Expected inline run snapshot");
+    expect(savedRun.thread.context?.messages?.at(-1)).toEqual(assistant);
+  });
+
+  test("archives a completed run before publishing idle state", async () => {
+    const transport: AgentTransport = async function* () {
+      yield _event({ type: "message_start", message: { role: "assistant" } });
+      yield _event({
+        type: "message_update",
+        assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+      });
+      yield _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "text_delta",
+          contentIndex: 0,
+          delta: "Archived",
+        },
+      });
+      yield _event({ type: "message_end", message: { role: "assistant" } });
+    };
+    const observedStatuses: string[] = [];
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-archive",
+              role: "user",
+              content: [{ type: "text", text: "Archive this" }],
+            },
+          ],
+        },
+      },
+      {
+        transport,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        archiveRunSnapshot: async (run) => {
+          observedStatuses.push(store.getState().status);
+          return {
+            id: run.id,
+            timestamp: run.timestamp,
+            usage: run.usage,
+            snapshotRef: `${"a".repeat(64)}.json`,
+            preview: {
+              summary: "Archived",
+              modelLabel: "test/test",
+              messageCountLabel: "2 messages",
+            },
+          };
+        },
+      }
     );
+
+    await store.getState().run();
+
+    expect(observedStatuses).toEqual(["running"]);
+    expect(store.getState().status).toBe("idle");
+    expect(store.getState().runHistory[0]).toMatchObject({
+      snapshotRef: `${"a".repeat(64)}.json`,
+    });
+    expect(store.getState().thread.runHistory).toBeUndefined();
+    expect(store.getState().thread.runHistoryVersion).toBe(2);
+  });
+
+  test("keeps the complete inline snapshot when archival fails", async () => {
+    const transport: AgentTransport = async function* () {
+      yield _event({ type: "message_start", message: { role: "assistant" } });
+      yield _event({
+        type: "message_update",
+        assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+      });
+      yield _event({
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "text_delta",
+          contentIndex: 0,
+          delta: "Fallback",
+        },
+      });
+      yield _event({ type: "message_end", message: { role: "assistant" } });
+    };
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-fallback",
+              role: "user",
+              content: [{ type: "text", text: "Keep this" }],
+            },
+          ],
+        },
+      },
+      {
+        transport,
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        archiveRunSnapshot: () => Promise.reject(new Error("Disk unavailable")),
+      }
+    );
+
+    await store.getState().run();
+
+    const run = store.getState().runHistory[0];
+    expect(run?.thread?.context?.messages).toHaveLength(2);
+    expect(store.getState().thread.runHistory?.[0]?.thread).toEqual(
+      run?.thread
+    );
+    expect(store.getState().status).toBe("idle");
   });
 });

@@ -1,6 +1,12 @@
 "use client";
 
-import type { AgentTransport, Thread } from "@llm-space/core";
+import type {
+  AgentTransport,
+  Thread,
+  ThreadRunReference,
+  ThreadRunSnapshot,
+  ThreadSnapshot,
+} from "@llm-space/core";
 import { isMetaUserMessage } from "@llm-space/core/generator";
 import { planCompaction } from "@llm-space/core/thread";
 import {
@@ -122,6 +128,10 @@ export interface ThreadPlaygroundProps {
   validateTitle?: TitleValidator;
   onStreamingStart?: (runId: string) => boolean | void;
   onStreamingEnd?: (runId: string) => void;
+  archiveRunSnapshot?: (
+    run: ThreadRunSnapshot & { id: string }
+  ) => Promise<ThreadRunReference>;
+  readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
 }
 
 export function ThreadPlayground({
@@ -166,6 +176,8 @@ function _ThreadPlaygroundStore({
   onChange,
   onStreamingStart,
   onStreamingEnd,
+  archiveRunSnapshot,
+  readRunSnapshot,
   ...props
 }: ThreadPlaygroundProps) {
   const [ownerRuntimeId] = useState(() => runtimeId ?? "local");
@@ -202,6 +214,8 @@ function _ThreadPlaygroundStore({
         }),
       loadFile: promptFiles.loadFile,
       fileExists: promptFiles.fileExists,
+      archiveRunSnapshot,
+      readRunSnapshot,
     });
   });
   useThreadPlaygroundEvents(store, {

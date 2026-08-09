@@ -27,7 +27,9 @@ describe("Thread Storage deep links", () => {
   test("imports a registered storage URL into the local workspace", async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "llm-space-deep-link-"));
     roots.push(root);
-    const localFs = new LocalFileSystem(path.join(root, "workspace"));
+    const localFs = new LocalFileSystem(path.join(root, "workspace"), {
+      historyRoot: path.join(root, "history"),
+    });
     const threadStorages = new ThreadStorageRegistry();
     const resolvedIds: string[] = [];
     threadStorages.registerBuiltin({
@@ -104,7 +106,9 @@ describe("Thread Storage deep links", () => {
       },
     } as unknown as MainWindowRPC;
     const handler = createDeepLinkHandler({
-      localFs: new LocalFileSystem(path.join(root, "workspace")),
+      localFs: new LocalFileSystem(path.join(root, "workspace"), {
+        historyRoot: path.join(root, "history"),
+      }),
       threadStorages: new ThreadStorageRegistry(),
       githubAuth: {} as GitHubAuthManager,
       getRpc: () => rpc,
@@ -131,7 +135,9 @@ describe("Thread Storage deep links", () => {
       },
     } as unknown as MainWindowRPC;
     const handler = createDeepLinkHandler({
-      localFs: new LocalFileSystem(path.join(root, "workspace")),
+      localFs: new LocalFileSystem(path.join(root, "workspace"), {
+        historyRoot: path.join(root, "history"),
+      }),
       threadStorages: new ThreadStorageRegistry(),
       githubAuth: {} as GitHubAuthManager,
       getRpc: () => rpc,

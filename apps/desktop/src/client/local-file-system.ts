@@ -2,6 +2,9 @@ import type {
   FileNode,
   FileSystem,
   Thread,
+  ThreadRunReference,
+  ThreadRunSnapshot,
+  ThreadSnapshot,
   ThreadStorage,
 } from "@llm-space/core";
 import { normalizeThreadForPath } from "@llm-space/ui/lib/thread-file";
@@ -63,6 +66,28 @@ export class LocalFileSystemClient implements FileSystem, ThreadStorage {
       ...runtimeScope(this._runtimeId),
       path,
       thread: normalizeThreadForPath(thread, path),
+    });
+  }
+
+  async archiveRun(
+    path: string,
+    run: ThreadRunSnapshot & { id: string }
+  ): Promise<ThreadRunReference> {
+    return this._rpc().request.fsArchiveRun({
+      ...runtimeScope(this._runtimeId),
+      path,
+      run,
+    });
+  }
+
+  async readRunSnapshot(
+    path: string,
+    snapshotRef: string
+  ): Promise<ThreadSnapshot> {
+    return this._rpc().request.fsReadRunSnapshot({
+      ...runtimeScope(this._runtimeId),
+      path,
+      snapshotRef,
     });
   }
 

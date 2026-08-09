@@ -209,6 +209,25 @@ export const ThreadRunSnapshot = Type.Object({
 });
 export type ThreadRunSnapshot = Static<typeof ThreadRunSnapshot>;
 
+/** Lightweight display data kept in the main thread file for a stored run. */
+export const ThreadRunPreview = Type.Object({
+  summary: Type.String(),
+  modelLabel: Type.String(),
+  messageCountLabel: Type.String(),
+});
+export type ThreadRunPreview = Static<typeof ThreadRunPreview>;
+
+/** A completed run whose full snapshot is stored outside the main thread file. */
+export const ThreadRunReference = Type.Object({
+  id: Type.String(),
+  timestamp: Type.Number(),
+  usage: Type.Optional(ModelUsage),
+  thread: Type.Optional(Type.Never()),
+  snapshotRef: Type.String(),
+  preview: ThreadRunPreview,
+});
+export type ThreadRunReference = Static<typeof ThreadRunReference>;
+
 /** One ordered dimension in a reusable manual evaluation rubric. */
 export const ThreadEvaluationCriterion = Type.Object({
   id: Type.String(),
@@ -360,10 +379,16 @@ export const Thread = Type.Object({
   meta: Type.Optional(ThreadMeta),
 
   /**
-   * Recent completed runs for debugging and replay. Entries are bounded by the
-   * desktop store and store de-nested thread snapshots.
+   * Legacy inline completed runs. New workspace persistence migrates these to
+   * {@link ThreadRunReference} entries without discarding snapshots.
    */
   runHistory: Type.Optional(Type.Array(ThreadRunSnapshot)),
+
+  /** Version of the external run-history persistence format. */
+  runHistoryVersion: Type.Optional(Type.Literal(2)),
+
+  /** Lightweight index for full run snapshots stored in sidecar files. */
+  runHistoryIndex: Type.Optional(Type.Array(ThreadRunReference)),
 
   /**
    * Manual evaluations created by comparing durable run snapshots.

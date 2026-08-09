@@ -37,6 +37,26 @@ test("round-trips persisted Plugin Tool identity", () => {
   expect(ThreadZodSchema.parse(thread)).toEqual(thread);
 });
 
+test("round-trips the versioned run-history index", () => {
+  const thread: Thread = {
+    runHistoryVersion: 2,
+    runHistoryIndex: [
+      {
+        id: "run-1",
+        timestamp: 1,
+        snapshotRef: `${"a".repeat(64)}.json`,
+        preview: {
+          summary: "Result",
+          modelLabel: "test/model",
+          messageCountLabel: "2 messages",
+        },
+      },
+    ],
+  };
+
+  expect(ThreadZodSchema.parse(thread)).toEqual(thread);
+});
+
 test("validates deeply nested provider-hosted tool JSON data", () => {
   const thread: Thread = {
     context: {

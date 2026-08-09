@@ -11,10 +11,18 @@ import type {
 } from "../types";
 import { uuid } from "../utils";
 
+import {
+  isRunSnapshot,
+  type RunHistoryEntry,
+  type RunSnapshot,
+} from "./run-history-entry";
 import { emptyModelUsage, isModelUsage } from "./usage";
 
-/** Maximum number of run snapshots retained in `runHistory`. */
-export const MAX_RUN_HISTORY = 20;
+export {
+  isRunSnapshot,
+  type RunHistoryEntry,
+  type RunSnapshot,
+} from "./run-history-entry";
 
 /** Maximum number of manual evaluation records retained per thread. */
 export const MAX_EVALUATIONS = 50;
@@ -30,7 +38,6 @@ export const MAX_RUBRIC_NAME_LENGTH = 80;
 export const MAX_CRITERION_NAME_LENGTH = 80;
 export const MAX_CRITERION_DESCRIPTION_LENGTH = 240;
 
-export type RunSnapshot = ThreadRunSnapshot & { id: string };
 export type EvaluationRecord = ThreadEvaluation;
 export type EvaluationCriterion = ThreadEvaluationCriterion;
 export type EvaluationRubricRecord = ThreadEvaluationRubric;
@@ -41,6 +48,12 @@ export interface EvaluationRubricInput {
   id?: string;
   name: string;
   criteria: EvaluationCriterion[];
+}
+
+const THREAD_SNAPSHOT_KEYS = new Set(["title", "model", "context"]);
+
+function _isCleanThreadSnapshot(thread: Thread): boolean {
+  return Object.keys(thread).every((key) => THREAD_SNAPSHOT_KEYS.has(key));
 }
 
 function _asRecord(value: unknown): Record<string, unknown> | null {
@@ -86,16 +99,20 @@ function _fallbackRunId(run: ThreadRunSnapshot, index: number): string {
 }
 
 /**
- * Normalize persisted run history read from a thread file, trimming malformed
- * timestamps and enforcing the same recent-run cap used for newly recorded runs.
+ * Normalize persisted run history read from either the legacy inline field or
+ * the versioned sidecar index.
  */
 export function normalizeRunHistory(
-  runHistory: Thread["runHistory"]
-): RunSnapshot[] {
-  if (!Array.isArray(runHistory)) {
-    return [];
-  }
-  const normalized = runHistory.flatMap((run, index): RunSnapshot[] => {
+  runHistory: Thread["runHistory"] | RunHistoryEntry[],
+  runHistoryIndex: Thread["runHistoryIndex"] = undefined
+): RunHistoryEntry[] {
+  const inline = Array.isArray(runHistory) ? runHistory : [];
+  const referenced = Array.isArray(runHistoryIndex) ? runHistoryIndex : [];
+  const normalizedInline = inline.flatMap((run, index): RunHistoryEntry[] => {
+    if ("snapshotRef" in run) {
+      const normalized = _normalizeRunReference(run);
+      return normalized ? [normalized] : [];
+    }
     if (!Number.isFinite(run.timestamp)) {
       return [];
     }
@@ -112,20 +129,43 @@ export function normalizeRunHistory(
       {
         id,
         timestamp: run.timestamp,
-        thread: snapshotThread(run.thread),
+        thread: _isCleanThreadSnapshot(run.thread)
+          ? run.thread
+          : snapshotThread(run.thread),
         ...(usage ? { usage } : {}),
       },
     ];
   });
+  const normalizedReferenced = referenced.flatMap(
+    (run): RunHistoryEntry[] => {
+      const normalized = _normalizeRunReference(run);
+      return normalized ? [normalized] : [];
+    }
+  );
+  const normalized = [...normalizedInline, ...normalizedReferenced];
   const lastIndexById = new Map(
     normalized.map((run, index) => [run.id, index] as const)
   );
   const deduped = normalized.filter(
     (run, index) => lastIndexById.get(run.id) === index
   );
-  return deduped.length > MAX_RUN_HISTORY
-    ? deduped.slice(deduped.length - MAX_RUN_HISTORY)
-    : deduped;
+  return deduped;
+}
+
+function _normalizeRunReference(
+  run: Exclude<RunHistoryEntry, RunSnapshot>
+): Exclude<RunHistoryEntry, RunSnapshot> | null {
+  const id = run.id.trim();
+  const snapshotRef = run.snapshotRef.trim();
+  if (!id || !snapshotRef || !Number.isFinite(run.timestamp)) return null;
+  const usage = isModelUsage(run.usage) ? run.usage : undefined;
+  return {
+    id,
+    timestamp: run.timestamp,
+    snapshotRef,
+    preview: run.preview,
+    ...(usage ? { usage } : {}),
+  };
 }
 
 function _normalizeCriterion(
@@ -394,16 +434,23 @@ function _normalizeRunScores(
   ) {
     return null;
   }
-  return [leftRunId, rightRunId].map((runId) => {
-    const scores = scoreByRunId.get(runId)!;
-    return {
-      runId,
-      scores: rubric.criteria.map((criterion) => ({
-        criterionId: criterion.id,
-        score: scores.get(criterion.id)!,
-      })),
-    };
-  });
+  const result: EvaluationRunScores[] = [];
+  for (const runId of [leftRunId, rightRunId]) {
+    const scores = scoreByRunId.get(runId);
+    if (!scores) {
+      return null;
+    }
+    const criterionScores: EvaluationRunScores["scores"] = [];
+    for (const criterion of rubric.criteria) {
+      const score = scores.get(criterion.id);
+      if (score === undefined) {
+        return null;
+      }
+      criterionScores.push({ criterionId: criterion.id, score });
+    }
+    result.push({ runId, scores: criterionScores });
+  }
+  return result;
 }
 
 /** Check whether a value is a supported persisted evaluation verdict. */
@@ -421,11 +468,11 @@ function _isEvaluationVerdict(
 
 /**
  * Normalize persisted evaluations and drop records whose compared runs no
- * longer exist in the bounded run history.
+ * longer exist in run history.
  */
 export function normalizeEvaluations(
   evaluations: Thread["evaluations"],
-  runHistory: RunSnapshot[]
+  runHistory: RunHistoryEntry[]
 ): EvaluationRecord[] {
   if (!Array.isArray(evaluations)) {
     return [];
@@ -484,7 +531,10 @@ export function normalizeEvaluations(
   const seenPairs = new Set<string>();
   const deduped: EvaluationRecord[] = [];
   for (let index = normalized.length - 1; index >= 0; index--) {
-    const evaluation = normalized[index]!;
+    const evaluation = normalized[index];
+    if (!evaluation) {
+      continue;
+    }
     const pairKey = JSON.stringify(
       [evaluation.leftRunId, evaluation.rightRunId].sort()
     );
@@ -509,23 +559,34 @@ export function withRunMetadata(
   thread: Thread,
   {
     runHistory,
-    evaluations = normalizeEvaluations(
-      thread.evaluations,
-      normalizeRunHistory(runHistory)
-    ),
-    evaluationRubrics = normalizeEvaluationRubrics(thread.evaluationRubrics),
+    evaluations,
+    evaluationRubrics,
   }: {
-    runHistory: RunSnapshot[];
+    runHistory: RunHistoryEntry[];
     evaluations?: EvaluationRecord[];
     evaluationRubrics?: EvaluationRubricRecord[];
   }
 ): Thread {
   const normalized = normalizeRunHistory(runHistory);
-  const normalizedEvaluations = normalizeEvaluations(evaluations, normalized);
-  const normalizedRubrics = normalizeEvaluationRubrics(evaluationRubrics);
+  const normalizedEvaluations = normalizeEvaluations(
+    evaluations ?? thread.evaluations,
+    normalized
+  );
+  const normalizedRubrics = normalizeEvaluationRubrics(
+    evaluationRubrics ?? thread.evaluationRubrics
+  );
   const next: Thread = snapshotThread(thread);
-  if (normalized.length > 0) {
-    next.runHistory = normalized;
+  const inlineRuns = normalized.filter(isRunSnapshot);
+  const referencedRuns = normalized.filter(
+    (run): run is Exclude<RunHistoryEntry, RunSnapshot> =>
+      !isRunSnapshot(run)
+  );
+  if (inlineRuns.length > 0) {
+    next.runHistory = inlineRuns;
+  }
+  if (referencedRuns.length > 0) {
+    next.runHistoryVersion = 2;
+    next.runHistoryIndex = referencedRuns;
   }
   if (normalizedEvaluations.length > 0) {
     next.evaluations = normalizedEvaluations;
@@ -537,16 +598,16 @@ export function withRunMetadata(
 }
 
 /**
- * Append a snapshot of a completed run, keeping only the most recent
- * {@link MAX_RUN_HISTORY}. The thread is stored by reference and shares unchanged
- * substructure with the live thread, so this stays cheap.
+ * Append a snapshot of a completed run. The thread is stored by reference and
+ * shares unchanged substructure with the live thread until persistence archives
+ * it into a sidecar.
  */
 export function recordRun(
-  runHistory: RunSnapshot[],
+  runHistory: RunHistoryEntry[],
   thread: Thread,
   timestamp: number = Date.now(),
   options: { id?: string; usage?: ModelUsage | null } = {}
-): RunSnapshot[] {
+): RunHistoryEntry[] {
   const usage = options.usage ?? emptyModelUsage();
   const next = [
     ...normalizeRunHistory(runHistory),
@@ -557,9 +618,7 @@ export function recordRun(
       usage,
     },
   ];
-  return next.length > MAX_RUN_HISTORY
-    ? next.slice(next.length - MAX_RUN_HISTORY)
-    : next;
+  return next;
 }
 
 /** Check whether two left/right run IDs describe the same comparison pair. */
@@ -582,7 +641,7 @@ function _isSameRunPair(
  */
 export function upsertEvaluation(
   evaluations: EvaluationRecord[],
-  runHistory: RunSnapshot[],
+  runHistory: RunHistoryEntry[],
   input: {
     id?: string;
     leftRunId: string;
