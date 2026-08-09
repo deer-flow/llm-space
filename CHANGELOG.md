@@ -4,6 +4,40 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-08-09
+
+This release adds preview-first progressive conversation compaction, makes long
+Threads easier to navigate, and connects major Thread workflows to expanded
+bilingual documentation.
+
+### Added
+
+- Threads can compact older turns into a structured, progressively updated
+  checkpoint while keeping a configurable number of recent turns verbatim.
+  Compaction renders prompt variables before summarizing, supports reusable
+  per-Thread instructions, previews the result before applying, and creates a
+  numbered `-compact-N.json` clone instead of overwriting the source Thread.
+- User and Assistant messages expose navigation anchors for moving quickly
+  through long conversations.
+- A complete Atlas Plugin example demonstrates multiple Skills, MCP servers,
+  model providers, Plugin Tools, Commands, Thread Storages, and Settings fields.
+
+### Changed
+
+- Compaction, Sharing, Generate Project, and Variables dialogs provide localized
+  Help links to new or expanded English and Chinese guides.
+- Sharing, project generation, compaction, and variables documentation is linked
+  from the user manual, quick start, core concepts, and repository guides.
+- The bundled pi packages are upgraded to `0.84.1`.
+
+### Fixed
+
+- HTML previews allow their embedded scripts to run as intended.
+- Bash tools start from the owning workspace root rather than an unrelated
+  process directory.
+- Message navigation controls stay below menus and dialogs instead of covering
+  higher-priority UI.
+
 ## [4.9.0] - 2026-08-07
 
 This release adds Seedream image generation and provider connection profiles,
