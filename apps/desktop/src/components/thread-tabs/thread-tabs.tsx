@@ -249,7 +249,7 @@ export function ThreadTabs({
   );
 
   const renderPane = useCallback(
-    (tab: AppTab, active: boolean) =>
+    (tab: AppTab, active: boolean, viewMounted: boolean) =>
       tab.type === "thread" ? (
         <ThreadTabPane
           tabId={tab.id}
@@ -257,6 +257,7 @@ export function ThreadTabs({
           path={tab.path}
           runtimeId={tab.runtimeId}
           active={active}
+          viewMounted={viewMounted}
           lifecycleHost={lifecycleHost}
           mutationRevision={mutationRevision}
           refreshNonce={tab.refreshNonce ?? 0}
@@ -272,6 +273,7 @@ export function ThreadTabs({
           traceKey={tab.traceKey}
           runtimeId={tab.runtimeId}
           active={active}
+          viewMounted={viewMounted}
           lifecycleHost={lifecycleHost}
           mutationRevision={mutationRevision}
           refreshNonce={tab.refreshNonce ?? 0}

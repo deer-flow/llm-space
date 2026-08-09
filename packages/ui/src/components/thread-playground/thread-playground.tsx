@@ -114,6 +114,8 @@ export interface ThreadPlaygroundProps {
    * single handler per type), so a global run always targets the active tab.
    */
   active?: boolean;
+  /** Mount the visual workbench while keeping its owner and store alive. */
+  viewMounted?: boolean;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
@@ -138,11 +140,15 @@ export function ThreadPlayground({
   loading,
   initialValue,
   className,
+  viewMounted = true,
   ...props
 }: Omit<ThreadPlaygroundProps, "initialValue"> & {
   loading?: boolean;
   initialValue?: Thread | null;
 }) {
+  if (!viewMounted && (loading || !initialValue)) {
+    return null;
+  }
   if (loading) {
     return <ThreadPlaygroundSkeleton className={className} />;
   }
@@ -153,6 +159,7 @@ export function ThreadPlayground({
     <_ThreadPlayground
       className={className}
       initialValue={initialValue}
+      viewMounted={viewMounted}
       {...props}
     />
   );
@@ -173,6 +180,7 @@ function _ThreadPlaygroundStore({
   transport,
   runtimeId,
   onApplyCompaction,
+  viewMounted = true,
   onChange,
   onStreamingStart,
   onStreamingEnd,
@@ -225,11 +233,13 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent
-        runtimeId={ownerRuntimeId}
-        onApplyCompaction={onApplyCompaction}
-        {...props}
-      />
+      {viewMounted ? (
+        <ThreadPlaygroundContent
+          runtimeId={ownerRuntimeId}
+          onApplyCompaction={onApplyCompaction}
+          {...props}
+        />
+      ) : null}
     </ThreadStoreContext.Provider>
   );
 }
