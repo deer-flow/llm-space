@@ -28,6 +28,7 @@ import {
   BotIcon,
   BracesIcon,
   CheckIcon,
+  CircleHelpIcon,
   CopyIcon,
   ExternalLinkIcon,
   FileCode2Icon,
@@ -47,6 +48,7 @@ import { useHostServices } from "@llm-space/ui/host";
 import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { docsUrl } from "../../../lib/docs-url";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../../ui/button";
 import {
@@ -604,8 +606,16 @@ export function GenerateProjectButton({
             ) : null}
           </div>
 
-          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl">
-            {step === "framework" ? (
+          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => actions.openLink(docsUrl("generating-projects"))}
+            >
+              <CircleHelpIcon className="size-4" />
+              Help
+            </Button>
+            <div className="flex items-center justify-end gap-2">
+              {step === "framework" ? (
               <>
                 <Button variant="ghost" onClick={() => setDialogOpen(false)}>
                   Cancel
@@ -614,9 +624,9 @@ export function GenerateProjectButton({
                   Next
                 </Button>
               </>
-            ) : null}
+              ) : null}
 
-            {step === "target" ? (
+              {step === "target" ? (
               <>
                 <Button
                   variant="ghost"
@@ -633,9 +643,9 @@ export function GenerateProjectButton({
                   {preparing ? "Checking…" : "Generate"}
                 </Button>
               </>
-            ) : null}
+              ) : null}
 
-            {step === "run" && uvMissing ? (
+              {step === "run" && uvMissing ? (
               <>
                 <Button
                   variant="ghost"
@@ -651,9 +661,9 @@ export function GenerateProjectButton({
                   Install uv
                 </Button>
               </>
-            ) : null}
+              ) : null}
 
-            {step === "run" && !uvMissing ? (
+              {step === "run" && !uvMissing ? (
               <>
                 {result ? (
                   <Button
@@ -680,7 +690,8 @@ export function GenerateProjectButton({
                   {running ? "Generating…" : "Done"}
                 </Button>
               </>
-            ) : null}
+              ) : null}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

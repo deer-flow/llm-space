@@ -12,6 +12,7 @@ import {
 import {
   ArrowRightIcon,
   CheckIcon,
+  CircleHelpIcon,
   FileArchiveIcon,
   FileStackIcon,
   Layers3Icon,
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 import { Markdown } from "@llm-space/ui/components/markdown";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
+import { docsUrl } from "@llm-space/ui/lib/docs-url";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -106,7 +108,7 @@ export function ThreadCompactionDialog({
   const threadModel = useThreadStore((state) => state.thread.model);
   const runtimeId = useThreadStore((state) => state.runtimeId);
   const fallbackModel = useFirstAvailableModel();
-  const { files, skills } = useHostServices();
+  const { actions, files, skills } = useHostServices();
   const store = useThreadStoreApi();
   const { restoreThread } = useThreadStoreActions();
   const hasMetaUserPrompt = useThreadStore((state) =>
@@ -381,60 +383,69 @@ export function ThreadCompactionDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="bg-background/80 border-t px-6 py-4 backdrop-blur-xl">
-          {step === "introduction" ? (
-            <>
-              <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => setStep("configure")}>Next</Button>
-            </>
-          ) : null}
-          {step === "configure" ? (
-            <>
-              <Button variant="ghost" onClick={() => setStep("introduction")}>
-                Back
-              </Button>
-              <Button onClick={() => void startCompaction()}>
-                Start compact
-              </Button>
-            </>
-          ) : null}
-          {step === "compact" ? (
-            <>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() => setStep("configure")}
-              >
-                Back
-              </Button>
-              {text.trim() &&
-              !visibleError &&
-              !preparing &&
-              !streaming ? (
-                <Button
-                  disabled={applying}
-                  onClick={() => void applyPreview()}
-                >
-                  {applying ? <Spinner className="size-3" /> : null}
-                  {applying ? "Creating copy…" : "Apply compaction"}
+        <DialogFooter className="bg-background/80 border-t px-6 py-4 backdrop-blur-xl sm:justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => actions.openLink(docsUrl("compaction"))}
+          >
+            <CircleHelpIcon className="size-4" />
+            Help
+          </Button>
+          <div className="flex items-center justify-end gap-2">
+            {step === "introduction" ? (
+              <>
+                <Button variant="ghost" onClick={() => handleOpenChange(false)}>
+                  Cancel
                 </Button>
-              ) : (
+                <Button onClick={() => setStep("configure")}>Next</Button>
+              </>
+            ) : null}
+            {step === "configure" ? (
+              <>
+                <Button variant="ghost" onClick={() => setStep("introduction")}>
+                  Back
+                </Button>
+                <Button onClick={() => void startCompaction()}>
+                  Start compact
+                </Button>
+              </>
+            ) : null}
+            {step === "compact" ? (
+              <>
                 <Button
+                  variant="ghost"
                   disabled={busy}
-                  onClick={() => void startCompaction()}
+                  onClick={() => setStep("configure")}
                 >
-                  {busy ? <Spinner className="size-3" /> : null}
-                  {busy
-                    ? preparing
-                      ? "Preparing…"
-                      : "Compacting…"
-                    : "Try again"}
+                  Back
                 </Button>
-              )}
-            </>
-          ) : null}
+                {text.trim() &&
+                !visibleError &&
+                !preparing &&
+                !streaming ? (
+                  <Button
+                    disabled={applying}
+                    onClick={() => void applyPreview()}
+                  >
+                    {applying ? <Spinner className="size-3" /> : null}
+                    {applying ? "Creating copy…" : "Apply compaction"}
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={busy}
+                    onClick={() => void startCompaction()}
+                  >
+                    {busy ? <Spinner className="size-3" /> : null}
+                    {busy
+                      ? preparing
+                        ? "Preparing…"
+                        : "Compacting…"
+                      : "Try again"}
+                  </Button>
+                )}
+              </>
+            ) : null}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

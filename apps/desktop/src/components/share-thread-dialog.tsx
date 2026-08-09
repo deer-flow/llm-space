@@ -1,6 +1,7 @@
 "use client";
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { docsUrl } from "@llm-space/ui/lib/docs-url";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -14,6 +15,7 @@ import { Input } from "@llm-space/ui/ui/input";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 import {
   CheckIcon,
+  CircleHelpIcon,
   CopyIcon,
   ExternalLinkIcon,
   Link2Icon,
@@ -315,27 +317,41 @@ export function ShareThreadDialog({
             </div>
           )}
 
-          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl">
-            {status === "success" ? (
-              <Button onClick={() => handleOpenChange(false)}>Done</Button>
-            ) : (
-              <>
-                <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleGenerate} disabled={busy}>
-                  {busy ? <Loader2Icon className="animate-spin" /> : null}
-                  {status === "awaitingAuth"
-                    ? "Waiting for GitHub sign-in…"
-                    : status === "generating"
-                      ? "Creating link…"
-                      : status === "error"
-                        ? "Try again"
-                        : "Generate link"}
-                  {!busy ? <SendIcon className="size-3.5" /> : null}
-                </Button>
-              </>
-            )}
+          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={() =>
+                executeCommand({
+                  type: "openLink",
+                  args: { url: docsUrl("sharing") },
+                })
+              }
+            >
+              <CircleHelpIcon className="size-4" />
+              Help
+            </Button>
+            <div className="flex items-center justify-end gap-2">
+              {status === "success" ? (
+                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => handleOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleGenerate} disabled={busy}>
+                    {busy ? <Loader2Icon className="animate-spin" /> : null}
+                    {status === "awaitingAuth"
+                      ? "Waiting for GitHub sign-in…"
+                      : status === "generating"
+                        ? "Creating link…"
+                        : status === "error"
+                          ? "Try again"
+                          : "Generate link"}
+                    {!busy ? <SendIcon className="size-3.5" /> : null}
+                  </Button>
+                </>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

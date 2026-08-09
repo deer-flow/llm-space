@@ -1,11 +1,16 @@
 "use client";
 
+import { CircleHelpIcon } from "lucide-react";
 import { memo } from "react";
 
+import { useHostServices } from "@llm-space/ui/host";
+import { docsUrl } from "@llm-space/ui/lib/docs-url";
+import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
@@ -28,6 +33,8 @@ function _PromptVariablesDialog({
   initialSelection,
   onOpenChange,
 }: PromptVariablesDialogProps) {
+  const { actions } = useHostServices();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -48,6 +55,17 @@ function _PromptVariablesDialog({
           disabled={disabled}
           initialSelection={initialSelection}
         />
+        <DialogFooter className="shrink-0 border-t px-4 py-3 sm:justify-start">
+          <Button
+            variant="ghost"
+            onClick={() =>
+              actions.openLink(docsUrl("variables-and-templates"))
+            }
+          >
+            <CircleHelpIcon className="size-4" />
+            Help
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
