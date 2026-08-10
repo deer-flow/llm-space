@@ -14,6 +14,9 @@ import type {
   SearchSettings,
   SystemProxyDetection,
   Thread,
+  ThreadRunReference,
+  ThreadRunSnapshot,
+  ThreadSnapshot,
   ThreadLocator,
   ThreadStorageView,
   PluginCommandView,
@@ -294,6 +297,17 @@ export interface DesktopRPCType {
       fsWrite: {
         params: RuntimeScopedParams & { path: string; thread: Thread };
         response: null;
+      };
+      fsArchiveRun: {
+        params: RuntimeScopedParams & {
+          path: string;
+          run: ThreadRunSnapshot & { id: string };
+        };
+        response: ThreadRunReference;
+      };
+      fsReadRunSnapshot: {
+        params: RuntimeScopedParams & { path: string; snapshotRef: string };
+        response: ThreadSnapshot;
       };
       pluginsList: {
         params: Record<string, never>;

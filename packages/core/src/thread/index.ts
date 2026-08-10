@@ -6,6 +6,7 @@ export * from "./prompt-variable-display";
 export * from "./response-performance";
 export * from "./run-evaluation-utils";
 export * from "./run-history-utils";
+export * from "./run-history-entry";
 export * from "./token-usage";
 export * from "./tool-call-status";
 export * from "./usage";

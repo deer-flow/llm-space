@@ -180,6 +180,8 @@ function _hasRecognizableThreadData(value: Thread): boolean {
     "model",
     "context",
     "runHistory",
+    "runHistoryVersion",
+    "runHistoryIndex",
     "evaluations",
     "evaluationRubrics",
     "modelName",

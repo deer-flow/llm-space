@@ -20,6 +20,5 @@
     "noFallthroughCasesInSwitch": true,
     "incremental": true
   },
-  "include": ["src", "tests"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "include": ["src", "tests"]
 }

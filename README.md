@@ -60,12 +60,18 @@ LLM Space is a Bun monorepo:
 
 ```
 packages/
-  core/       # Shared logic: types, the agent loop, thread storage
+  core/       # Shared domain types, clients, storage, and generators
+  runtime/    # Local runtime, models, tools, skills, MCP, and Plugins
+  ui/         # Shared React design system and Thread Playground
 apps/
   desktop/    # The desktop app (Electrobun shell + React UI)
 examples/
   atlas-plugin/ # Complete Plugin example covering every Extension type
 ```
+
+Each package keeps tests in a `tests/` directory beside `src/`. Test paths
+mirror source paths, such as `packages/core/src/thread/history.ts` and
+`packages/core/tests/thread/history.test.ts`.
 
 ## Download
 

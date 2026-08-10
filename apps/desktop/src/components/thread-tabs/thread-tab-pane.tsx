@@ -30,6 +30,7 @@ interface ThreadTabPaneProps {
   path: string;
   runtimeId: RuntimeId;
   active: boolean;
+  viewMounted: boolean;
   lifecycleHost: PaneLifecycleHost;
   mutationRevision: number;
   /**
@@ -49,9 +50,8 @@ interface ThreadTabPaneProps {
 }
 
 /**
- * One open thread. Each pane owns its own fetch + debounced persistence and stays
- * mounted while inactive (hidden via CSS) so its store, undo history, and any
- * in-progress streaming run survive tab switches.
+ * One open thread owner. Fetch, persistence, store, and streaming stay mounted
+ * while {@link ThreadPlayground} releases views outside the pane MRU budget.
  */
 function _ThreadTabPane({
   tabId,
@@ -59,6 +59,7 @@ function _ThreadTabPane({
   path,
   runtimeId,
   active,
+  viewMounted,
   lifecycleHost,
   mutationRevision,
   refreshNonce = 0,
@@ -218,6 +219,16 @@ function _ThreadTabPane({
     },
     [flushPending, lifecycleHost, paneId]
   );
+  const archiveRunSnapshot = useCallback(
+    (run: Parameters<typeof fs.archiveRun>[1]) =>
+      fs.archiveRun(pathRef.current, run),
+    [fs]
+  );
+  const readRunSnapshot = useCallback(
+    (snapshotRef: string) =>
+      fs.readRunSnapshot(pathRef.current, snapshotRef),
+    [fs]
+  );
 
   // Flush pending edits on a normal close. An editor displaced by an overwrite
   // instead drops them so stale destination content cannot replace the moved file.
@@ -371,7 +382,7 @@ function _ThreadTabPane({
   }, [lifecycleHost, mutationRevision, paneId, path, runtimeId]);
 
   if (loadError) {
-    return (
+    return viewMounted ? (
       <div
         className={cn(
           "bg-background text-muted-foreground flex size-full items-center justify-center text-sm",
@@ -380,28 +391,29 @@ function _ThreadTabPane({
       >
         Failed to load thread.
       </div>
-    );
+    ) : null;
   }
 
   return (
-    <div className={cn("size-full", !active && "hidden")}>
-      <ThreadPlayground
-        storeKey={reloadKey}
-        className="bg-background size-full shadow-lg"
-        loading={isLoading}
-        path={path}
-        initialValue={thread}
-        readonly={mutationReserved}
-        active={active}
-        transport={rpcTransport}
-        runtimeId={runtimeId}
-        onChange={handleChange}
-        onStreamingStart={handleStreamingStart}
-        onStreamingEnd={handleStreamingEnd}
-        onApplyCompaction={handleApplyCompaction}
-        onRenameTitle={handleRenameTitle}
-      />
-    </div>
+    <ThreadPlayground
+      storeKey={reloadKey}
+      className={cn("bg-background size-full shadow-lg", !active && "hidden")}
+      loading={isLoading}
+      path={path}
+      initialValue={thread}
+      readonly={mutationReserved}
+      active={active}
+      viewMounted={viewMounted}
+      transport={rpcTransport}
+      runtimeId={runtimeId}
+      onChange={handleChange}
+      onStreamingStart={handleStreamingStart}
+      onStreamingEnd={handleStreamingEnd}
+      onApplyCompaction={handleApplyCompaction}
+      archiveRunSnapshot={archiveRunSnapshot}
+      readRunSnapshot={readRunSnapshot}
+      onRenameTitle={handleRenameTitle}
+    />
   );
 }
 

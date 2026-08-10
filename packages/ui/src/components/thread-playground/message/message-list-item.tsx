@@ -1,4 +1,3 @@
-import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import {
   getMessageText,
   isExecutableTool,
@@ -36,6 +35,7 @@ import { usePromptVariableExtensionForContext } from "../variable/use-prompt-var
 
 import { CitationList } from "./citation-list";
 import { ImageContentList } from "./image-content-view";
+import type { MessageDragHandleProps } from "./message-drag-handle-props";
 import { MessageListItemHeader } from "./message-list-item-header";
 import { ProviderHostedToolActivityList } from "./provider-hosted-tool-activity-list";
 import { ThinkingView } from "./thinking-view";
@@ -65,7 +65,7 @@ function _MessageListItem({
   collapsed?: boolean;
   /** Focus this message's editor on mount. Set only for a freshly-added message. */
   autoFocus?: boolean;
-  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  dragHandleProps?: MessageDragHandleProps;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { fidelity } = useRenderingFidelity();
@@ -76,9 +76,7 @@ function _MessageListItem({
   const assistantTextContents = useMemo(
     () =>
       message.role === "assistant"
-        ? (message.content.filter(
-            (content) => content.type === "text"
-          ))
+        ? message.content.filter((content) => content.type === "text")
         : [],
     [message]
   );
@@ -278,26 +276,26 @@ function _MessageListItem({
             (text.length > 0 ||
               message.role !== "assistant" ||
               !message.providerHostedToolActivities?.length) && (
-            <CodeEditor
-              className="max-h-[40vh] min-h-9.5 w-full bg-transparent"
-              autoFocus={autoFocus}
-              hideFocusRing
-              hideBorder
-              scrollOnFocus
-              plain={fidelity === "lite"}
-              placeholder={
-                placeholder ??
-                `Enter ${message.role === "user" ? "user" : "assistant"} message here`
-              }
-              streaming={streaming}
-              readonly={readonly}
-              value={text}
-              extraExtensions={editorExtensions}
-              onChange={handleTextContentChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-            />
-          )}
+              <CodeEditor
+                className="max-h-[40vh] min-h-9.5 w-full bg-transparent"
+                autoFocus={autoFocus}
+                hideFocusRing
+                hideBorder
+                scrollOnFocus
+                plain={fidelity === "lite"}
+                placeholder={
+                  placeholder ??
+                  `Enter ${message.role === "user" ? "user" : "assistant"} message here`
+                }
+                streaming={streaming}
+                readonly={readonly}
+                value={text}
+                extraExtensions={editorExtensions}
+                onChange={handleTextContentChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              />
+            )}
           {message.role === "assistant" && (
             <CitationList contents={assistantTextContents} />
           )}

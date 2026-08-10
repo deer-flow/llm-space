@@ -4,5 +4,7 @@ import { LocalFileSystem } from "@llm-space/core/server";
 
 /** Create the process-scoped local storage backend behind the `fs*` RPC requests. */
 export function createLocalFileSystem(homePath: string): LocalFileSystem {
-  return new LocalFileSystem(path.join(homePath, "workspace"));
+  return new LocalFileSystem(path.join(homePath, "workspace"), {
+    historyRoot: path.join(homePath, "history"),
+  });
 }

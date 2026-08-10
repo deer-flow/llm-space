@@ -138,6 +138,23 @@ export class RemoteRuntimeClient implements RuntimeClient {
     await this._rpc<null>("fs.write", { path, thread });
   }
 
+  fsArchiveRun(
+    path: string,
+    run: Parameters<RuntimeClient["fsArchiveRun"]>[1]
+  ) {
+    return this._rpc<Awaited<ReturnType<RuntimeClient["fsArchiveRun"]>>>(
+      "fs.archiveRun",
+      { path, run }
+    );
+  }
+
+  fsReadRunSnapshot(path: string, snapshotRef: string) {
+    return this._rpc<Awaited<ReturnType<RuntimeClient["fsReadRunSnapshot"]>>>(
+      "fs.readRunSnapshot",
+      { path, snapshotRef }
+    );
+  }
+
   async fsRealpath(path: string) {
     const result = await this._rpc<{ path: string }>("fs.realpath", { path });
     return result.path;

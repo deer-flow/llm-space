@@ -3,10 +3,11 @@ import {
   evaluationScoreDelta,
   findEvaluationForPair,
   preferredEvaluationRubricId,
-  runMessageCountLabel,
-  runModelLabel,
-  summarizeRun,
+  runEntryMessageCountLabel,
+  runEntryModelLabel,
+  runEntrySummary,
   type EvaluationRecord,
+  type RunHistoryEntry,
   type RunSnapshot,
 } from "@llm-space/core/thread";
 import {
@@ -29,6 +30,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
+import { toast } from "sonner";
 import { format } from "timeago.js";
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
@@ -57,6 +59,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const evaluationRubrics = useThreadStore((s) => s.evaluationRubrics);
   const {
     restoreThread,
+    loadRunSnapshot,
     removeRun,
     saveEvaluation,
     removeEvaluation,
@@ -66,8 +69,13 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   const [inspectingRunId, setInspectingRunId] = useState<string | null>(null);
+  const [inspectingRun, setInspectingRun] = useState<RunSnapshot | null>(null);
+  const [comparisonRuns, setComparisonRuns] = useState<
+    [RunSnapshot, RunSnapshot] | null
+  >(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const [runPendingRemoval, setRunPendingRemoval] =
-    useState<RunSnapshot | null>(null);
+    useState<RunHistoryEntry | null>(null);
   const [evaluationPendingRemoval, setEvaluationPendingRemoval] =
     useState<EvaluationRecord | null>(null);
   const runs = useMemo(() => runHistory.slice().reverse(), [runHistory]);
@@ -77,7 +85,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
     }
     return runs.findIndex((run) => run.id === inspectingRunId);
   }, [inspectingRunId, runs]);
-  const inspectingRun =
+  const inspectingRunEntry =
     inspectingRunIndex >= 0 ? runs[inspectingRunIndex] : null;
   const canInspectPrevious = inspectingRunIndex > 0;
   const canInspectNext =
@@ -88,23 +96,18 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const selectedRuns = useMemo(() => {
     return selectedRunIds
       .map((id) => runById.get(id))
-      .filter((run): run is RunSnapshot => Boolean(run));
+      .filter((run): run is RunHistoryEntry => Boolean(run));
   }, [runById, selectedRunIds]);
-  const comparisonRuns = useMemo(
-    () =>
-      selectedRuns.length === 2 ? [selectedRuns[0], selectedRuns[1]] : null,
-    [selectedRuns]
-  );
   const selectedEvaluation = useMemo(() => {
-    if (!comparisonRuns) {
+    if (selectedRuns.length !== 2) {
       return null;
     }
     return findEvaluationForPair(
       evaluations,
-      comparisonRuns[0].id,
-      comparisonRuns[1].id
+      selectedRuns[0].id,
+      selectedRuns[1].id
     );
-  }, [comparisonRuns, evaluations]);
+  }, [evaluations, selectedRuns]);
   const preferredRubricId = useMemo(
     () => preferredEvaluationRubricId(evaluations, evaluationRubrics),
     [evaluationRubrics, evaluations]
@@ -118,6 +121,29 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       setInspectingRunId(null);
     }
   }, [inspectingRunId, inspectingRunIndex]);
+  useEffect(() => {
+    setInspectingRun(null);
+    if (!inspectingRunEntry) return;
+    let current = true;
+    void loadRunSnapshot(inspectingRunEntry)
+      .then((run) => {
+        if (current) setInspectingRun(run);
+      })
+      .catch((error) => {
+        if (!current) return;
+        setInspectingRunId(null);
+        toast.error("Failed to load run snapshot", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      });
+    return () => {
+      current = false;
+    };
+  }, [inspectingRunEntry, loadRunSnapshot]);
+  useEffect(() => {
+    setComparisonRuns(null);
+  }, [selectedRunIds]);
 
   const toggleRunSelection = useCallback((runId: string) => {
     setSelectedRunIds((current) => {
@@ -131,26 +157,55 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
     });
   }, []);
 
+  const loadComparison = useCallback(
+    async (entries: RunHistoryEntry[]) => {
+      if (entries.length !== 2) return;
+      setComparisonLoading(true);
+      try {
+        const loaded = await Promise.all(entries.map(loadRunSnapshot));
+        setComparisonRuns([loaded[0], loaded[1]]);
+        setEvaluationOpen(true);
+      } catch (error) {
+        toast.error("Failed to load run snapshots", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      } finally {
+        setComparisonLoading(false);
+      }
+    },
+    [loadRunSnapshot]
+  );
   const openEvaluation = useCallback(
     (leftRunId: string, rightRunId: string) => {
       setSelectedRunIds([leftRunId, rightRunId]);
-      setEvaluationOpen(true);
+      const leftRun = runById.get(leftRunId);
+      const rightRun = runById.get(rightRunId);
+      if (leftRun && rightRun) {
+        void loadComparison([leftRun, rightRun]);
+      }
     },
-    []
+    [loadComparison, runById]
   );
 
   const handleCompareSelected = useCallback(() => {
-    if (comparisonRuns) {
-      setEvaluationOpen(true);
-    }
-  }, [comparisonRuns]);
+    void loadComparison(selectedRuns);
+  }, [loadComparison, selectedRuns]);
   const handleRestoreRun = useCallback(
-    (thread: RunSnapshot["thread"]) => {
-      restoreThread(thread);
+    async (run: RunHistoryEntry) => {
+      try {
+        restoreThread((await loadRunSnapshot(run)).thread);
+      } catch (error) {
+        toast.error("Failed to load run snapshot", {
+          description:
+            error instanceof Error ? error.message : "Please try again.",
+        });
+      }
     },
-    [restoreThread]
+    [loadRunSnapshot, restoreThread]
   );
-  const inspectRunFromHistory = useCallback((run: RunSnapshot) => {
+  const inspectRunFromHistory = useCallback((run: RunHistoryEntry) => {
+    setComparisonRuns(null);
     setInspectingRunId(run.id);
   }, []);
   const handleBackToHistory = useCallback(() => {
@@ -166,8 +221,12 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       setInspectingRunId(runs[inspectingRunIndex + 1].id);
     }
   }, [canInspectNext, inspectingRunIndex, runs]);
+  const handleEvaluationOpenChange = useCallback((open: boolean) => {
+    setEvaluationOpen(open);
+    if (!open) setComparisonRuns(null);
+  }, []);
 
-  if (inspectingRun) {
+  if (inspectingRunId) {
     return (
       <div className="flex size-full flex-col">
         <div className="text-muted-foreground flex h-12 shrink-0 items-center gap-1 border-b px-2 text-sm">
@@ -217,7 +276,13 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             <XIcon className="size-3" />
           </Button>
         </div>
-        <RunTraceView className="min-h-0 flex-1" run={inspectingRun} />
+        {inspectingRun ? (
+          <RunTraceView className="min-h-0 flex-1" run={inspectingRun} />
+        ) : (
+          <div className="text-muted-foreground flex min-h-0 flex-1 items-center justify-center text-xs">
+            Loading run snapshot...
+          </div>
+        )}
       </div>
     );
   }
@@ -247,7 +312,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
           </div>
           <Button
             size="sm"
-            disabled={!comparisonRuns}
+            disabled={selectedRuns.length !== 2 || comparisonLoading}
             onClick={handleCompareSelected}
           >
             <GitCompareArrowsIcon className="size-3" />
@@ -295,7 +360,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
         evaluation={selectedEvaluation}
         rubrics={evaluationRubrics}
         preferredRubricId={preferredRubricId}
-        onOpenChange={setEvaluationOpen}
+        onOpenChange={handleEvaluationOpenChange}
         onSave={saveEvaluation}
         onSaveRubric={saveEvaluationRubric}
         onRemoveRubric={removeEvaluationRubric}
@@ -351,17 +416,17 @@ function _RunHistoryItem({
   onRestore,
   onRequestRemove,
 }: {
-  run: RunSnapshot;
+  run: RunHistoryEntry;
   newest: boolean;
   selected: boolean;
   onToggleSelected: (runId: string) => void;
-  onInspectRun: (run: RunSnapshot) => void;
-  onRestore: (thread: RunSnapshot["thread"]) => void;
-  onRequestRemove: (run: RunSnapshot) => void;
+  onInspectRun: (run: RunHistoryEntry) => void;
+  onRestore: (run: RunHistoryEntry) => void;
+  onRequestRemove: (run: RunHistoryEntry) => void;
 }) {
-  const summary = summarizeRun(run.thread);
-  const modelLabel = runModelLabel(run.thread);
-  const messageCountLabel = runMessageCountLabel(run.thread);
+  const summary = runEntrySummary(run);
+  const modelLabel = runEntryModelLabel(run);
+  const messageCountLabel = runEntryMessageCountLabel(run);
   const time = format(run.timestamp);
   const handleInspect = useCallback(() => {
     onInspectRun(run);
@@ -475,7 +540,7 @@ function _RunHistoryItem({
               variant="ghost"
               size="icon-sm"
               aria-label={`Restore run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
-              onClick={() => onRestore(run.thread)}
+              onClick={() => onRestore(run)}
             >
               <RotateCcwIcon className="size-3" />
             </Button>
@@ -495,7 +560,7 @@ function _EvaluationList({
   onRequestRemove,
 }: {
   evaluations: EvaluationRecord[];
-  runById: Map<string, RunSnapshot>;
+  runById: Map<string, RunHistoryEntry>;
   onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
   onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
@@ -541,8 +606,8 @@ function _EvaluationListItem({
   onRequestRemove,
 }: {
   evaluation: EvaluationRecord;
-  leftRun: RunSnapshot;
-  rightRun: RunSnapshot;
+  leftRun: RunHistoryEntry;
+  rightRun: RunHistoryEntry;
   onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
   onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
@@ -612,8 +677,8 @@ function _EvaluationListItem({
         </div>
       </div>
       <div className="text-muted-foreground line-clamp-2 w-full font-mono text-[0.625rem]">
-        A: {summarizeRun(leftRun.thread)}
-        {"\n"}B: {summarizeRun(rightRun.thread)}
+        A: {runEntrySummary(leftRun)}
+        {"\n"}B: {runEntrySummary(rightRun)}
       </div>
       {evaluation.rubric &&
         leftAverage !== null &&

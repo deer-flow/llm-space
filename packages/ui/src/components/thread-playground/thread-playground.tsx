@@ -1,6 +1,12 @@
 "use client";
 
-import type { AgentTransport, Thread } from "@llm-space/core";
+import type {
+  AgentTransport,
+  Thread,
+  ThreadRunReference,
+  ThreadRunSnapshot,
+  ThreadSnapshot,
+} from "@llm-space/core";
 import { isMetaUserMessage } from "@llm-space/core/generator";
 import { planCompaction } from "@llm-space/core/thread";
 import {
@@ -108,6 +114,8 @@ export interface ThreadPlaygroundProps {
    * single handler per type), so a global run always targets the active tab.
    */
   active?: boolean;
+  /** Mount the visual workbench while keeping its owner and store alive. */
+  viewMounted?: boolean;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
@@ -122,17 +130,25 @@ export interface ThreadPlaygroundProps {
   validateTitle?: TitleValidator;
   onStreamingStart?: (runId: string) => boolean | void;
   onStreamingEnd?: (runId: string) => void;
+  archiveRunSnapshot?: (
+    run: ThreadRunSnapshot & { id: string }
+  ) => Promise<ThreadRunReference>;
+  readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
 }
 
 export function ThreadPlayground({
   loading,
   initialValue,
   className,
+  viewMounted = true,
   ...props
 }: Omit<ThreadPlaygroundProps, "initialValue"> & {
   loading?: boolean;
   initialValue?: Thread | null;
 }) {
+  if (!viewMounted && (loading || !initialValue)) {
+    return null;
+  }
   if (loading) {
     return <ThreadPlaygroundSkeleton className={className} />;
   }
@@ -143,6 +159,7 @@ export function ThreadPlayground({
     <_ThreadPlayground
       className={className}
       initialValue={initialValue}
+      viewMounted={viewMounted}
       {...props}
     />
   );
@@ -163,9 +180,12 @@ function _ThreadPlaygroundStore({
   transport,
   runtimeId,
   onApplyCompaction,
+  viewMounted = true,
   onChange,
   onStreamingStart,
   onStreamingEnd,
+  archiveRunSnapshot,
+  readRunSnapshot,
   ...props
 }: ThreadPlaygroundProps) {
   const [ownerRuntimeId] = useState(() => runtimeId ?? "local");
@@ -202,6 +222,8 @@ function _ThreadPlaygroundStore({
         }),
       loadFile: promptFiles.loadFile,
       fileExists: promptFiles.fileExists,
+      archiveRunSnapshot,
+      readRunSnapshot,
     });
   });
   useThreadPlaygroundEvents(store, {
@@ -211,11 +233,13 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      <ThreadPlaygroundContent
-        runtimeId={ownerRuntimeId}
-        onApplyCompaction={onApplyCompaction}
-        {...props}
-      />
+      {viewMounted ? (
+        <ThreadPlaygroundContent
+          runtimeId={ownerRuntimeId}
+          onApplyCompaction={onApplyCompaction}
+          {...props}
+        />
+      ) : null}
     </ThreadStoreContext.Provider>
   );
 }
@@ -587,6 +611,7 @@ function ThreadPlaygroundContent({
               <MessageListView
                 readonly={readonly}
                 compactImages={compactImages}
+                measurementsFrozen={!active && !presentational}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

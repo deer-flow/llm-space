@@ -21,6 +21,9 @@ import type {
   SkillsSettings,
   SystemProxyDetection,
   Thread,
+  ThreadRunReference,
+  ThreadRunSnapshot,
+  ThreadSnapshot,
 } from "@llm-space/core";
 
 import type {
@@ -152,6 +155,14 @@ export interface RuntimeClient {
   fsRm(path: string): Promise<void>;
   fsRead(path: string): Promise<Thread>;
   fsWrite(path: string, thread: Thread): Promise<void>;
+  fsArchiveRun(
+    path: string,
+    run: ThreadRunSnapshot & { id: string }
+  ): Promise<ThreadRunReference>;
+  fsReadRunSnapshot(
+    path: string,
+    snapshotRef: string
+  ): Promise<ThreadSnapshot>;
   fsRealpath(path: string): Promise<string>;
   /** Read arbitrary prompt text (`~` expands on this runtime). */
   readTextFile(path: string): Promise<string>;

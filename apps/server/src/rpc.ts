@@ -75,6 +75,18 @@ async function _dispatch(
     case "fs.write":
       await runtime.fsWrite(_stringParam(params, "path"), _threadParam(params));
       return null;
+    case "fs.archiveRun":
+      return runtime.fsArchiveRun(
+        _stringParam(params, "path"),
+        _recordParam(params, "run") as Parameters<
+          RuntimeClient["fsArchiveRun"]
+        >[1]
+      );
+    case "fs.readRunSnapshot":
+      return runtime.fsReadRunSnapshot(
+        _stringParam(params, "path"),
+        _stringParam(params, "snapshotRef")
+      );
     case "fs.realpath":
       return { path: await runtime.fsRealpath(_stringParam(params, "path")) };
     case "fs.readText":

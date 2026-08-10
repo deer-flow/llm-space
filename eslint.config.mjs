@@ -23,10 +23,6 @@ export default defineConfig([
       "**/*.generated.ts",
       "apps/desktop/electrobun.config.ts",
       "packages/ui/src/ui/**",
-      // Excluded from packages/ui's typecheck project (no test runner), so the
-      // typed-lint project service can't resolve them.
-      "packages/ui/src/**/*.test.ts",
-      "packages/ui/src/**/*.test.tsx",
       "apps/desktop/vite.config.mts",
       "apps/web/vite.config.ts",
       "apps/web/postcss.config.js",
@@ -132,6 +128,16 @@ export default defineConfig([
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/refs": "off",
       "react/react-in-jsx-scope": "off",
+    },
+  },
+
+  // Test doubles often retain async and generator signatures to match the
+  // production interface while returning fixture data synchronously.
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+      "require-yield": "off",
     },
   },
 

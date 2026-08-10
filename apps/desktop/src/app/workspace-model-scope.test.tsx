@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-empty-function, @typescript-eslint/require-await, @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-empty-function, @typescript-eslint/unbound-method */
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentTransport, Thread } from "@llm-space/core";

@@ -7,14 +7,7 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon } from "lucide-react";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { createRpcTransport, traceClient } from "@/client";
@@ -31,6 +24,7 @@ interface TraceTabPaneProps {
   traceKey: string;
   runtimeId: RuntimeId;
   active: boolean;
+  viewMounted: boolean;
   lifecycleHost: PaneLifecycleHost;
   mutationRevision: number;
   refreshNonce?: number;
@@ -48,6 +42,7 @@ function _TraceTabPane({
   traceKey,
   runtimeId,
   active,
+  viewMounted,
   lifecycleHost,
   mutationRevision,
   refreshNonce = 0,
@@ -102,14 +97,7 @@ function _TraceTabPane({
           },
         }
       ),
-    [
-      lifecycleHost,
-      persistenceOwner,
-      projectId,
-      runtimeId,
-      tabId,
-      traceKey,
-    ]
+    [lifecycleHost, persistenceOwner, projectId, runtimeId, tabId, traceKey]
   );
 
   const flushPending = useCallback(async () => {
@@ -231,35 +219,34 @@ function _TraceTabPane({
   ]);
 
   const trace = data?.trace;
-  const mutationReserved = useMemo(
-    () => {
-      void mutationRevision;
-      return lifecycleHost.isMutationReserved(tabId, runtimeId);
-    },
-    [lifecycleHost, mutationRevision, runtimeId, tabId]
-  );
+  const mutationReserved = useMemo(() => {
+    void mutationRevision;
+    return lifecycleHost.isMutationReserved(tabId, runtimeId);
+  }, [lifecycleHost, mutationRevision, runtimeId, tabId]);
 
   return (
-    <div className={cn("flex size-full flex-col", !active && "hidden")}>
-      <ThreadPlayground
-        storeKey={reloadKey}
-        className="bg-background min-h-0 flex-1 shadow-lg"
-        loading={isLoading || !data}
-        path={`trace/${projectId}/${traceKey}/workbench.json`}
-        title={trace?.title ?? traceKey}
-        headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
-        initialValue={data?.thread}
-        readonly={mutationReserved}
-        active={active}
-        transport={rpcTransport}
-        runtimeId={runtimeId}
-        onChange={handleChange}
-        onStreamingStart={handleStreamingStart}
-        onStreamingEnd={handleStreamingEnd}
-        onRenameTitle={handleRenameTitle}
-        validateTitle={_validateTraceTitle}
-      />
-    </div>
+    <ThreadPlayground
+      storeKey={reloadKey}
+      className={cn(
+        "bg-background flex size-full min-h-0 flex-1 flex-col shadow-lg",
+        !active && "hidden"
+      )}
+      loading={isLoading || !data}
+      path={`trace/${projectId}/${traceKey}/workbench.json`}
+      title={trace?.title ?? traceKey}
+      headerDetails={trace ? <TraceHeaderDetails trace={trace} /> : null}
+      initialValue={data?.thread}
+      readonly={mutationReserved}
+      active={active}
+      viewMounted={viewMounted}
+      transport={rpcTransport}
+      runtimeId={runtimeId}
+      onChange={handleChange}
+      onStreamingStart={handleStreamingStart}
+      onStreamingEnd={handleStreamingEnd}
+      onRenameTitle={handleRenameTitle}
+      validateTitle={_validateTraceTitle}
+    />
   );
 }
 

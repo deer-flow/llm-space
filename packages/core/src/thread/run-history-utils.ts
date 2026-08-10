@@ -2,9 +2,11 @@ import {
   getMessageText,
   type AssistantMessage,
   type Message,
+  type ThreadRunPreview,
   type ThreadSnapshot,
 } from "../types";
 
+import { isRunSnapshot, type RunHistoryEntry } from "./run-history-entry";
 import { getToolResultText } from "./tool-call-status";
 
 /**
@@ -51,6 +53,34 @@ export function runModelLabel(thread: ThreadSnapshot): string {
 export function runMessageCountLabel(thread: ThreadSnapshot): string {
   const messageCount = thread.context?.messages?.length ?? 0;
   return `${messageCount} message${messageCount === 1 ? "" : "s"}`;
+}
+
+/** Build the metadata displayed without loading a persisted run sidecar. */
+export function createRunPreview(thread: ThreadSnapshot): ThreadRunPreview {
+  return {
+    summary: summarizeRun(thread),
+    modelLabel: runModelLabel(thread),
+    messageCountLabel: runMessageCountLabel(thread),
+  };
+}
+
+/** Summary for either a loaded run or a lightweight persisted reference. */
+export function runEntrySummary(run: RunHistoryEntry): string {
+  return isRunSnapshot(run) ? summarizeRun(run.thread) : run.preview.summary;
+}
+
+/** Model label for either a loaded run or a persisted reference. */
+export function runEntryModelLabel(run: RunHistoryEntry): string {
+  return isRunSnapshot(run)
+    ? runModelLabel(run.thread)
+    : run.preview.modelLabel;
+}
+
+/** Message count for either a loaded run or a persisted reference. */
+export function runEntryMessageCountLabel(run: RunHistoryEntry): string {
+  return isRunSnapshot(run)
+    ? runMessageCountLabel(run.thread)
+    : run.preview.messageCountLabel;
 }
 
 /** Return the last message for a given role in a snapshot. */

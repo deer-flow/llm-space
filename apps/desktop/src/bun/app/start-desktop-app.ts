@@ -86,6 +86,13 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     onChange: (state) => getRpc().send.githubAuthChanged(state),
   });
   const localFs = createLocalFileSystem(homePath);
+  // Reclaim run history whose thread is gone for good. Best-effort and off the
+  // startup path: a slow or failing sweep must never delay the window.
+  void localFs
+    .maintainRunHistory()
+    .catch((error: unknown) =>
+      console.warn("Run history maintenance failed:", error)
+    );
   // Write-side gist connector for the "Share thread" flow. Reuses the signed-in
   // GitHub token (the `gist` scope); creates secret gists readable by URL.
   const gistWriter = new GistThreadWriter({
@@ -213,11 +220,13 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     tools: host.tools,
     traceManager,
     rmPath: async (workspacePath) => {
-      const abs = localFs.realpath(workspacePath);
-      if (abs === localFs.realpath("")) {
+      // Run history is stored outside the workspace and deliberately stays
+      // behind, so a thread restored from the trash keeps its runs.
+      const target = localFs.realpath(workspacePath);
+      if (target === localFs.realpath("")) {
         throw new Error("Cannot delete the workspace root.");
       }
-      await moveToTrash(abs);
+      await moveToTrash(target);
     },
   });
   const runtimeRouter = new RuntimeRouter(localRuntime);

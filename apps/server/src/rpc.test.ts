@@ -19,6 +19,19 @@ function createRuntime(): RuntimeClient {
     readTextFile: (path: string) => Promise.resolve(`remote:${path}`),
     textFileExists: (path: string) => Promise.resolve(path === "/remote.md"),
     fsWrite: () => Promise.resolve(),
+    fsArchiveRun: (_path, run) =>
+      Promise.resolve({
+        id: run.id,
+        timestamp: run.timestamp,
+        usage: run.usage,
+        snapshotRef: `${"a".repeat(64)}.json`,
+        preview: {
+          summary: "Archived",
+          modelLabel: "No model",
+          messageCountLabel: "0 messages",
+        },
+      }),
+    fsReadRunSnapshot: () => Promise.resolve({ title: "Archived" }),
     fsRealpath: (path) => Promise.resolve(`/tmp/${path}`),
     availableModels: () => Promise.resolve([]),
     builtinProviders: () => Promise.resolve([]),
@@ -234,6 +247,37 @@ describe("handleRuntimeRpc", () => {
         params: { path: "/remote.md" },
       })
     ).toEqual({ id: "exists", ok: true, result: true });
+  });
+
+  test("dispatches run snapshot archive and lazy reads", async () => {
+    const archived = await handleRuntimeRpc(createRuntime(), {
+      id: "archive",
+      method: "fs.archiveRun",
+      params: {
+        path: "thread.json",
+        run: { id: "run-1", timestamp: 1, thread: { title: "Snapshot" } },
+      },
+    });
+    expect(archived).toMatchObject({
+      id: "archive",
+      ok: true,
+      result: { id: "run-1", preview: { summary: "Archived" } },
+    });
+
+    expect(
+      await handleRuntimeRpc(createRuntime(), {
+        id: "read-run",
+        method: "fs.readRunSnapshot",
+        params: {
+          path: "thread.json",
+          snapshotRef: `${"a".repeat(64)}.json`,
+        },
+      })
+    ).toEqual({
+      id: "read-run",
+      ok: true,
+      result: { title: "Archived" },
+    });
   });
 
   test("validates prompt-file paths before dispatch", async () => {

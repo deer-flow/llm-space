@@ -50,6 +50,10 @@ run = "bun run dev:server"
 description = "Run all Bun tests"
 run = "bun run test"
 
+[tasks."check:changed"]
+description = "Lint and typecheck changed files"
+run = "bun run check:changed"
+
 [tasks.lint]
 description = "Check lint (read-only)"
 run = "bun run lint"
