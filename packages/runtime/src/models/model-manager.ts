@@ -370,7 +370,7 @@ export class ModelManager {
     this._saveConfig();
   }
 
-  /** Add a named connection profile, cloning the default endpoint and headers. */
+  /** Add a custom connection profile, cloning the default endpoint and headers. */
   addProfile(providerId: string): string {
     const entry = this._providerEntry(providerId);
     const profiles = this._profilesFor(entry);
@@ -398,6 +398,18 @@ export class ModelManager {
     if (!profile) {
       throw new Error(
         `Provider profile not configured: ${providerId}/${profileId}`
+      );
+    }
+    const profileIndex = profiles.findIndex(
+      (candidate) => candidate.id === profileId
+    );
+    if (
+      entry.builtin === true &&
+      profileIndex === 0 &&
+      (fields.baseUrl !== undefined || fields.headers !== undefined)
+    ) {
+      throw new Error(
+        "The official provider profile only supports an API key. Use a custom profile for base URLs or headers."
       );
     }
     if (fields.name !== undefined) {
@@ -893,7 +905,11 @@ export class ModelManager {
     return true;
   }
 
-  /** Migrate legacy provider-level connection fields into a first profile. */
+  /**
+   * Migrate legacy connection fields into profiles and keep builtin defaults
+   * pinned to their official service. Older configs could put a custom URL or
+   * headers on that default; preserve those credentials in a custom profile.
+   */
   private _normalizeProviderProfiles(): boolean {
     let changed = false;
     for (const entry of this._config.providers) {
@@ -915,6 +931,24 @@ export class ModelManager {
       if (entry.headers !== undefined) {
         first.headers = { ...entry.headers };
         delete entry.headers;
+        changed = true;
+      }
+      if (
+        entry.builtin === true &&
+        (first.baseUrl !== undefined || first.headers !== undefined)
+      ) {
+        entry.profiles.splice(1, 0, {
+          id: uuid(),
+          name: this._nextProfileName(entry.profiles),
+          ...(first.apiKey !== undefined ? { apiKey: first.apiKey } : {}),
+          ...(first.baseUrl !== undefined ? { baseUrl: first.baseUrl } : {}),
+          ...(first.headers !== undefined
+            ? { headers: { ...first.headers } }
+            : {}),
+        });
+        delete first.apiKey;
+        delete first.baseUrl;
+        delete first.headers;
         changed = true;
       }
     }
@@ -969,11 +1003,11 @@ export class ModelManager {
     const names = new Set(
       profiles.map((profile) => profile.name.toLocaleLowerCase())
     );
-    let index = profiles.length + 1;
-    while (names.has(`profile ${index}`)) {
+    let index = 1;
+    while (names.has(`custom profile ${index}`)) {
       index += 1;
     }
-    return `Profile ${index}`;
+    return `Custom profile ${index}`;
   }
 
   private get _configPath(): string {
