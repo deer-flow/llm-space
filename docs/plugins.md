@@ -111,7 +111,37 @@ A complete Plugin might look like this:
 
 Do not create empty directories merely to satisfy the layout. A Skill-only Plugin needs only `package.json` and its Skill directory.
 
-### 2.3 Extensions in Settings
+### 2.3 Persistent Plugin data
+
+A Plugin **must** store downloaded files, caches, indexes, databases, and other
+runtime-generated state outside its installation directory, under:
+
+```text
+~/.llm-space/data/plugins/<plugin-name>/
+```
+
+For a scoped Plugin, this becomes
+`~/.llm-space/data/plugins/@scope/<plugin-name>/`. Respect `LLM_SPACE_HOME`
+rather than hard-coding `~/.llm-space`:
+
+```ts
+const home = process.env.LLM_SPACE_HOME?.trim()
+  || path.join(os.homedir(), ".llm-space");
+const dataDirectory = path.join(
+  home,
+  "data",
+  "plugins",
+  ...pluginName.split("/"),
+);
+```
+
+The ZIP installer replaces the Plugin installation directory during an update.
+Therefore, any runtime data written under `LLM_SPACE_HOME/plugins/<name>/` can
+be overwritten or deleted. The external `data/plugins/<name>/` directory is not
+part of the package replacement and remains intact across install, update,
+reload, and disable operations. Do not include runtime data in the Plugin ZIP.
+
+### 2.4 Extensions in Settings
 
 Settings → Plugins groups discovered Extensions by type, with an icon, count,
 activation status, and any load diagnostic. Select an Extension to reveal its
@@ -171,19 +201,72 @@ A 512 × 512 PNG is recommended. The file must be a valid PNG, no larger than 2 
 
 ## 4. Install, refresh, and reload
 
-To install a Plugin manually:
+### 4.1 Package a Plugin ZIP
+
+The installer accepts either of these archive layouts:
+
+```text
+weather-kit-1.2.3.zip          weather-kit-1.2.3.zip
+├── package.json               └── weather-kit/
+├── tools/                         ├── package.json
+└── ...                            ├── tools/
+                                   └── ...
+```
+
+In other words, `package.json` may be at the ZIP root or inside exactly one
+top-level package directory. Its `name` determines the installation directory;
+the ZIP filename and wrapper-directory name do not.
+
+From the Plugin root, create a release archive with:
+
+```sh
+zip -r ../weather-kit-1.2.3.zip . \
+  -x "data/*" ".git/*" ".DS_Store" "__MACOSX/*"
+```
+
+Write the ZIP outside the Plugin root so it cannot include itself. Do not ship
+`data/`: installation-specific state belongs in
+`LLM_SPACE_HOME/data/plugins/<plugin-name>/`. Include all Extension source files, assets, and runtime
+dependencies needed by the Plugin. LLM Space does not run a package-manager
+install after extraction.
+
+Current archive limits are 50 MiB compressed, 200 MiB extracted, and 10,000
+entries. Unsafe absolute paths, `..` traversal, backslash paths, and archives
+with multiple package roots are rejected. Common macOS metadata is ignored.
+
+### 4.2 Install or update by dragging the ZIP
+
+1. Start LLM Space and drag one or more `.zip` files onto the main window.
+2. Wait for the **Drop plugin ZIP to install** overlay, then release the files.
+3. After installation, use the success notification's **View plugin** action,
+   or open Settings → Plugins.
+
+The success notification includes the Plugin ID and installed version. A ZIP
+whose `package.json.name` matches an installed Plugin replaces that Plugin's
+package files and reloads it. Data stored at
+`LLM_SPACE_HOME/data/plugins/<plugin-name>/` remains untouched. A different
+package name installs as a separate Plugin; changing `name` is not an upgrade
+or migration and does not migrate the old Plugin's data.
+
+### 4.3 Manual installation
+
+To install an unpacked Plugin manually:
 
 1. Copy the complete Plugin directory to the correct location under `LLM_SPACE_HOME/plugins/`.
 2. Open Settings → Plugins.
 3. Select **Refresh plugins** to discover added, removed, or renamed packages.
 4. Select the Plugin and inspect compatibility, location, Extensions, and diagnostics on the General tab.
 
+### 4.4 Refresh and reload
+
 After editing files in an already discovered Plugin, select **Reload** on that Plugin.
 
 - **Refresh plugins** rescans the installation directory. Use it for additions, removals, and renames.
 - **Reload** reloads one existing Plugin. Use it after changing its metadata, schema, configuration, or Extension files.
 
-LLM Space does not download Plugins, run `npm install`, install dependencies, update packages, or roll versions back. Any runtime dependencies must be shipped with the Plugin directory.
+LLM Space does not fetch Plugins from a registry, run `npm install`, resolve
+dependencies, compare versions, or roll versions back. Any runtime dependencies
+must be shipped inside the Plugin ZIP or directory.
 
 ## 5. Settings
 

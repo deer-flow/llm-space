@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -27,6 +28,19 @@ afterEach(async () => {
 });
 
 describe("PluginManager", () => {
+  test("uninstalls a plugin and removes its directory", async () => {
+    const home = _home();
+    const root = _plugin(home, "removable-plugin");
+    const { manager } = await _manager(home);
+
+    expect(manager.listPlugins().map((plugin) => plugin.id)).toContain(
+      "removable-plugin"
+    );
+
+    expect(await manager.uninstallPlugin("removable-plugin")).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+
   test("activates valid extensions and isolates a broken command", async () => {
     const home = _home();
     const root = _plugin(home, "mixed-plugin");

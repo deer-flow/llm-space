@@ -111,7 +111,36 @@ LLM Space 只从固定位置发现扩展：
 
 不需要为了满足结构而创建空目录。一个只提供 Skill 的 Plugin 只需 `package.json` 和相应的 Skill 目录。
 
-### 2.3 Settings 中的 Extensions
+### 2.3 Plugin 持久化数据
+
+Plugin **必须**将下载文件、缓存、索引、数据库以及其他运行时生成的数据放在
+Plugin 安装目录之外的以下位置：
+
+```text
+~/.llm-space/data/plugins/<plugin-name>/
+```
+
+Scoped Plugin 对应的路径是
+`~/.llm-space/data/plugins/@scope/<plugin-name>/`。代码必须支持
+`LLM_SPACE_HOME`，不要写死 `~/.llm-space`：
+
+```ts
+const home = process.env.LLM_SPACE_HOME?.trim()
+  || path.join(os.homedir(), ".llm-space");
+const dataDirectory = path.join(
+  home,
+  "data",
+  "plugins",
+  ...pluginName.split("/"),
+);
+```
+
+ZIP 安装器会在更新时整体替换 Plugin 安装目录。因此，任何写在
+`LLM_SPACE_HOME/plugins/<name>/` 下的运行时数据都可能被覆盖或删除；外部的
+`data/plugins/<name>/` 不参与包替换，在安装、更新、Reload 和禁用操作中会保持
+不变。不要把运行时数据打进 Plugin ZIP。
+
+### 2.4 Settings 中的 Extensions
 
 Settings → Plugins 会按类型分组展示已发现的 Extensions，并显示类型图标、数量、
 启用状态和加载诊断。选中 Extension 可以定位其来源文件或目录。建议为扩展提供简洁
@@ -176,12 +205,59 @@ icon.png
 
 ## 4. 安装、刷新与重载
 
-手动安装一个 Plugin：
+### 4.1 打包 Plugin ZIP
+
+安装器接受以下两种压缩包结构：
+
+```text
+weather-kit-1.2.3.zip          weather-kit-1.2.3.zip
+├── package.json               └── weather-kit/
+├── tools/                         ├── package.json
+└── ...                            ├── tools/
+                                   └── ...
+```
+
+也就是说，`package.json` 可以直接位于 ZIP 根目录，也可以放在唯一的一层包装目录
+中。真正决定安装目录的是 `package.json.name`，ZIP 文件名和包装目录名都不参与
+Plugin 身份判断。
+
+在 Plugin 根目录执行下面的命令即可制作发布包：
+
+```sh
+zip -r ../weather-kit-1.2.3.zip . \
+  -x "data/*" ".git/*" ".DS_Store" "__MACOSX/*"
+```
+
+ZIP 应输出到 Plugin 根目录之外，避免把压缩包自身再次打进去。不要发布 `data/`；
+当前安装实例的数据应写入 `LLM_SPACE_HOME/data/plugins/<plugin-name>/`。Plugin
+使用的所有扩展源码、资源文件和运行时依赖都必须包含在发布包中；LLM Space 解压
+后不会再运行包管理器安装依赖。
+
+当前限制为：ZIP 压缩后不超过 50 MiB，解压后不超过 200 MiB，文件条目不超过
+10,000 个。绝对路径、`..` 路径穿越、反斜杠路径以及包含多个 package 根目录的
+压缩包会被拒绝；常见的 macOS metadata 会被忽略。
+
+### 4.2 拖拽 ZIP 安装或更新
+
+1. 启动 LLM Space，将一个或多个 `.zip` 文件拖到主窗口上。
+2. 看到 **Drop plugin ZIP to install** 提示后松开文件。
+3. 安装成功后，点击通知中的 **View plugin**，或者打开 Settings → Plugins 查看。
+
+成功通知会显示 Plugin ID 和安装版本。若 ZIP 的 `package.json.name` 与已安装
+Plugin 相同，安装器会替换该 Plugin 的包文件并重新加载，但不会修改
+`LLM_SPACE_HOME/data/plugins/<plugin-name>/` 下的数据。不同的包名会安装为另一个
+Plugin；修改 `name` 不属于升级，也不会自动迁移旧 Plugin 的数据。
+
+### 4.3 手动安装
+
+手动安装一个已经解压的 Plugin：
 
 1. 将完整目录复制到 `LLM_SPACE_HOME/plugins/` 的正确层级。
 2. 打开 Settings → Plugins。
 3. 点击 **Refresh plugins**，重新扫描新增、删除或改名的 Plugin。
 4. 选中 Plugin，检查 General 页中的兼容性、位置和 Extensions。
+
+### 4.4 Refresh 与 Reload
 
 开发时修改现有 Plugin 文件后，点击该 Plugin 的 **Reload**。Reload 会重新读取 metadata、Settings schema 和所有 Extensions。
 
@@ -190,7 +266,8 @@ icon.png
 - **Refresh plugins**：重新扫描整个安装目录，用于发现新增、删除或改名的 Plugin。
 - **Reload**：重新加载当前 Plugin，用于应用已有目录中的代码或配置改动。
 
-LLM Space 当前不负责下载 Plugin、运行 `npm install`、更新依赖或回滚版本。Plugin 的运行时依赖必须随目录一起提供。
+LLM Space 不会从 registry 拉取 Plugin，不会运行 `npm install`、解析依赖、比较版本
+高低或自动回滚。Plugin 的运行时依赖必须随 ZIP 或目录一起提供。
 
 ## 5. Settings
 

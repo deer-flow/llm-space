@@ -6,6 +6,38 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.0] - 2026-08-11
+
+This release makes local Plugins installable as ZIP packages, streamlines
+Plugin, MCP server, and model-provider management, and improves desktop
+responsiveness and interaction details.
+
+### Added
+
+- Plugin ZIP packages can be installed or updated by dragging them onto the
+  desktop window. Archives are validated and extracted with size, entry-count,
+  and path-safety limits before atomically replacing the installed package.
+- Installed Plugins can be revealed, reloaded, or uninstalled directly from
+  the Plugin list, with persistent Plugin data kept outside the replaceable
+  installation directory.
+
+### Changed
+
+- Model-provider connection profiles appear as nested sidebar items, making it
+  faster to switch, add, configure, and remove individual connections.
+- Plugin and MCP server rows expose contextual management menus, including
+  connection testing and removal without first opening the detail editor.
+- The bilingual Plugin guide now documents ZIP packaging, drag-and-drop
+  installation, archive safety limits, upgrades, and persistent data storage.
+- Sidebar resizing and onboarding transitions are smoother, while closed
+  Thread workspaces release retained state more aggressively.
+
+### Fixed
+
+- Update actions remain visible above the Settings dialog.
+- Selecting text in an expandable Tool-call argument no longer toggles the
+  argument open or closed when the pointer is released.
+
 ## [4.10.0] - 2026-08-09
 
 This release adds preview-first progressive conversation compaction, makes long

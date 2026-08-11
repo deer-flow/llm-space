@@ -79,16 +79,11 @@ import {
 } from "@llm-space/ui/ui/select";
 import { Switch } from "@llm-space/ui/ui/switch";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@llm-space/ui/ui/tabs";
-import {
   Ban,
   CableIcon,
   Check,
   CheckCheck,
+  ChevronRight,
   ExternalLink,
   Loader2,
   MoreHorizontal,
@@ -96,7 +91,6 @@ import {
   Plus,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -131,6 +125,9 @@ export function ModelsPage() {
     [providers]
   );
   const [selectedId, setSelectedId] = useState<string | null>(firstProviderId);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (
@@ -138,11 +135,31 @@ export function ModelsPage() {
       !providers.some((provider) => provider.id === selectedId)
     ) {
       setSelectedId(firstProviderId);
+      setSelectedProfileId(null);
     }
   }, [firstProviderId, providers, selectedId]);
 
   const selected =
     providers.find((provider) => provider.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (
+      selectedProfileId &&
+      !selected?.profiles.some((profile) => profile.id === selectedProfileId)
+    ) {
+      setSelectedProfileId(null);
+    }
+  }, [selected, selectedProfileId]);
+
+  const selectProvider = (id: string) => {
+    setSelectedId(id);
+    setSelectedProfileId(null);
+  };
+
+  const selectProfile = (providerId: string, profileId: string) => {
+    setSelectedId(providerId);
+    setSelectedProfileId(profileId);
+  };
 
   return (
     <SettingsPage
@@ -153,10 +170,16 @@ export function ModelsPage() {
       <ProviderList
         providers={providers}
         selectedId={selectedId}
-        onSelect={setSelectedId}
-        onAdd={setSelectedId}
+        selectedProfileId={selectedProfileId}
+        onSelectProvider={selectProvider}
+        onSelectProfile={selectProfile}
+        onAdd={selectProvider}
       />
-      <ProviderEditor key={selected?.id} provider={selected} />
+      <ProviderEditor
+        key={selected?.id}
+        provider={selected}
+        selectedProfileId={selectedProfileId}
+      />
     </SettingsPage>
   );
 }
@@ -164,12 +187,16 @@ export function ModelsPage() {
 function ProviderList({
   providers,
   selectedId,
-  onSelect,
+  selectedProfileId,
+  onSelectProvider,
+  onSelectProfile,
   onAdd,
 }: {
   providers: ModelProviderGroup[];
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedProfileId: string | null;
+  onSelectProvider: (id: string) => void;
+  onSelectProfile: (providerId: string, profileId: string) => void;
   onAdd: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -216,8 +243,16 @@ function ProviderList({
               <ProviderListItem
                 key={provider.id}
                 provider={provider}
-                selected={provider.id === selectedId}
-                onSelect={() => onSelect(provider.id)}
+                selected={
+                  provider.id === selectedId && selectedProfileId === null
+                }
+                activeProfileId={
+                  provider.id === selectedId ? selectedProfileId : null
+                }
+                onSelect={() => onSelectProvider(provider.id)}
+                onSelectProfile={(profileId) =>
+                  onSelectProfile(provider.id, profileId)
+                }
               />
             ))}
           </div>
@@ -395,104 +430,254 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
 function ProviderListItem({
   provider,
   selected,
+  activeProfileId,
   onSelect,
+  onSelectProfile,
 }: {
   provider: ModelProviderGroup;
   selected: boolean;
+  activeProfileId: string | null;
   onSelect: () => void;
+  onSelectProfile: (profileId: string) => void;
 }) {
   const removeProvider = useRemoveProvider();
+  const addProviderProfile = useAddProviderProfile();
+  const removeProviderProfile = useRemoveProviderProfile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [expanded, setExpanded] = useState(provider.profiles.length > 1);
+  const [profilePendingRemoval, setProfilePendingRemoval] =
+    useState<ProviderProfile | null>(null);
+
+  useEffect(() => {
+    if (activeProfileId) setExpanded(true);
+  }, [activeProfileId]);
+
+  const handleAddProfile = async () => {
+    try {
+      const profileId = await addProviderProfile(provider.id);
+      setExpanded(true);
+      onSelectProfile(profileId);
+    } catch (error) {
+      toast.error("Failed to add connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const handleRemoveProfile = async (profile: ProviderProfile) => {
+    try {
+      await removeProviderProfile(provider.id, profile.id);
+      if (activeProfileId === profile.id) {
+        onSelect();
+      }
+    } catch (error) {
+      toast.error("Failed to remove connection profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const handleGroupClick = () => {
+    if (selected && provider.profiles.length > 1) {
+      setExpanded((value) => !value);
+      return;
+    }
+    onSelect();
+  };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Select ${provider.name} provider`}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
+    <div>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Select ${provider.name} provider`}
+        aria-expanded={
+          provider.profiles.length > 1 ? expanded : undefined
         }
-      }}
-      className={cn(
-        "group flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
-        selected ? "bg-muted font-medium" : "hover:bg-muted/50"
-      )}
-    >
-      <ProviderAvatar
-        id={provider.id}
-        name={provider.name}
-        icon={provider.icon}
-      />
-      <span className="line-clamp-1 grow">{provider.name}</span>
-
-      {!provider.readOnly ? (
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label={`${provider.name} provider actions`}
-              title={`${provider.name} provider actions`}
+        onClick={handleGroupClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleGroupClick();
+          }
+        }}
+        className={cn(
+          "group flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
+          selected ? "bg-muted font-medium" : "hover:bg-muted/50"
+        )}
+      >
+        {provider.profiles.length > 1 ? (
+          <button
+            type="button"
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${provider.name} profiles`}
+            className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded"
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpanded((value) => !value);
+            }}
+          >
+            <ChevronRight
               className={cn(
-                "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
-                menuOpen
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                "size-3.5 transition-transform",
+                expanded && "rotate-90"
               )}
+            />
+          </button>
+        ) : (
+          <ProviderAvatar
+            id={provider.id}
+            name={provider.name}
+            icon={provider.icon}
+          />
+        )}
+        <span className="line-clamp-1 grow">{provider.name}</span>
+
+        {!provider.readOnly ? (
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`${provider.name} provider actions`}
+                title={`${provider.name} provider actions`}
+                className={cn(
+                  "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
+                  menuOpen
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="size-4" />
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
               onClick={(e) => e.stopPropagation()}
             >
-              <MoreHorizontal className="size-4" />
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => setConfirmOpen(true)}
-            >
-              <Trash2 />
-              Remove {provider.name}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <span className="text-muted-foreground text-[10px] uppercase">
-          Plugin
-        </span>
-      )}
+              <DropdownMenuItem onSelect={() => void handleAddProfile()}>
+                <Plus />
+                Add connection profile
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setConfirmOpen(true)}
+              >
+                <Trash2 />
+                Remove {provider.name}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="text-muted-foreground text-[10px] uppercase">
+            Plugin
+          </span>
+        )}
+      </div>
+
+      {provider.profiles.length > 1 && expanded ? (
+        <div className="mt-0.5 flex flex-col gap-0.5 pl-7">
+          {provider.profiles.slice(1).map((profile, index) => {
+            const profileSelected = profile.id === activeProfileId;
+            return (
+              <div
+                key={profile.id}
+                className={cn(
+                  "group/profile flex items-center rounded-md text-xs transition-colors",
+                  profileSelected ? "bg-muted font-medium" : "hover:bg-muted/50"
+                )}
+              >
+                <button
+                  type="button"
+                  className="flex min-w-0 grow items-center gap-2 px-2 py-1.5 text-left"
+                  onClick={() => onSelectProfile(profile.id)}
+                >
+                  <ProviderAvatar
+                    id={provider.id}
+                    name={provider.name}
+                    icon={provider.icon}
+                  />
+                  <span className="truncate">
+                    {formatProviderProfileLabel(profile, index + 1)}
+                  </span>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`${profile.name} profile actions`}
+                      className="text-muted-foreground hover:text-foreground mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded opacity-0 hover:bg-accent group-hover/profile:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setProfilePendingRemoval(profile)}
+                    >
+                      <Trash2 />
+                      Remove {profile.name}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {!provider.readOnly ? (
-        <ConfirmDialog
-          open={confirmOpen}
-          onOpenChange={setConfirmOpen}
-          title={`Remove ${provider.name}?`}
-          description={`This removes ${provider.name} from your configured providers. You can add it back later.`}
-          confirmLabel="Remove"
-          dimBackground={false}
-          onConfirm={() => {
-            setConfirmOpen(false);
-            void removeProvider(provider.id);
-          }}
-        />
+        <>
+          <ConfirmDialog
+            open={confirmOpen}
+            onOpenChange={setConfirmOpen}
+            title={`Remove ${provider.name}?`}
+            description={`This removes ${provider.name} from your configured providers. You can add it back later.`}
+            confirmLabel="Remove"
+            dimBackground={false}
+            onConfirm={() => {
+              setConfirmOpen(false);
+              void removeProvider(provider.id);
+            }}
+          />
+          <ConfirmDialog
+            open={profilePendingRemoval !== null}
+            onOpenChange={(open) => {
+              if (!open) setProfilePendingRemoval(null);
+            }}
+            title={`Remove ${profilePendingRemoval?.name ?? "profile"}?`}
+            description="This removes the connection profile and its credentials. This action cannot be undone."
+            confirmLabel="Remove"
+            dimBackground={false}
+            onConfirm={() => {
+              if (profilePendingRemoval) {
+                void handleRemoveProfile(profilePendingRemoval);
+              }
+              setProfilePendingRemoval(null);
+            }}
+          />
+        </>
       ) : null}
     </div>
   );
 }
 
-function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
+function ProviderEditor({
+  provider,
+  selectedProfileId,
+}: {
+  provider: ModelProviderGroup | null;
+  selectedProfileId: string | null;
+}) {
   const updateProvider = useUpdateProvider();
-  const addProviderProfile = useAddProviderProfile();
-  const removeProviderProfile = useRemoveProviderProfile();
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
   const [iconDraft, setIconDraft] = useState(provider?.icon ?? "");
-  const [selectedProfileId, setSelectedProfileId] = useState(
-    provider?.profiles[0]?.id ?? ""
-  );
-  const [removeProfileId, setRemoveProfileId] = useState<string | null>(null);
   const [modelView, setModelView] = useState<"all" | "enabled" | "disabled">(
     "all"
   );
@@ -612,34 +797,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
   const selectedProfile =
     provider.profiles.find((profile) => profile.id === selectedProfileId) ??
     provider.profiles[0];
-  const profilePendingRemoval = provider.profiles.find(
-    (profile) => profile.id === removeProfileId
-  );
-
-  const handleAddProfile = async () => {
-    try {
-      setSelectedProfileId(await addProviderProfile(provider.id));
-    } catch (error) {
-      toast.error("Failed to add connection profile", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    }
-  };
-
-  const handleRemoveProfile = async (profile: ProviderProfile) => {
-    try {
-      await removeProviderProfile(provider.id, profile.id);
-      if (selectedProfile.id === profile.id) {
-        setSelectedProfileId(provider.profiles[0].id);
-      }
-    } catch (error) {
-      toast.error("Failed to remove connection profile", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    }
-  };
 
   // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
   // providers are recognized by their models' API; custom providers follow the
@@ -742,75 +899,29 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
             </div>
           )}
 
-          <Tabs
-            value={selectedProfile.id}
-            onValueChange={setSelectedProfileId}
-            className="gap-3"
-          >
-            <div className="flex flex-col gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <TabsList variant="line" className="h-8! min-w-0 grow flex-row! justify-start overflow-x-auto">
-                  {provider.profiles.map((profile, index) => (
-                    <div
-                      key={profile.id}
-                      className="flex shrink-0 items-center"
-                    >
-                      <TabsTrigger value={profile.id} className="w-auto!">
-                        {formatProviderProfileLabel(profile, index)}
-                      </TabsTrigger>
-                      {index > 0 ? (
-                        <Tooltip content={`Remove ${profile.name}`}>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label={`Remove ${profile.name} connection profile`}
-                            onClick={() => setRemoveProfileId(profile.id)}
-                          >
-                            <X data-icon="inline-start" />
-                          </Button>
-                        </Tooltip>
-                      ) : null}
-                    </div>
-                  ))}
-                </TabsList>
-                <Tooltip content="Add connection profile">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label="Add connection profile"
-                    onClick={() => void handleAddProfile()}
-                  >
-                    <Plus data-icon="inline-start" />
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
-
-            {provider.profiles.map((profile, index) => (
-              <TabsContent key={profile.id} value={profile.id}>
-                <Card size="sm" className="bg-muted/30">
-                  <CardHeader className="border-b">
-                    <CardTitle>
-                      {formatProviderProfileLabel(profile, index)}
-                    </CardTitle>
-                    <CardDescription>
-                      API key, base URL, and headers for this connection.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <_ProviderProfileEditor
-                      provider={provider}
-                      profile={profile}
-                      isBuiltin={isBuiltin}
-                      usesAnthropicApi={usesAnthropicApi}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
+          <Card size="sm" className="bg-muted/30">
+            <CardHeader className="border-b">
+              <CardTitle>
+                {formatProviderProfileLabel(
+                  selectedProfile,
+                  provider.profiles.findIndex(
+                    (profile) => profile.id === selectedProfile.id
+                  )
+                )}
+              </CardTitle>
+              <CardDescription>
+                API key, base URL, and headers for this connection.
+              </CardDescription>
+            </CardHeader>
+            <CardContent key={selectedProfile.id}>
+              <_ProviderProfileEditor
+                provider={provider}
+                profile={selectedProfile}
+                isBuiltin={isBuiltin}
+                usesAnthropicApi={usesAnthropicApi}
+              />
+            </CardContent>
+          </Card>
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -923,21 +1034,6 @@ function ProviderEditor({ provider }: { provider: ModelProviderGroup | null }) {
         profileId={selectedProfile.id}
         providerApi={isBuiltin ? undefined : apiValue}
         model={editingModel}
-      />
-      <ConfirmDialog
-        open={profilePendingRemoval !== undefined}
-        onOpenChange={(open) => {
-          if (!open) setRemoveProfileId(null);
-        }}
-        title={`Remove ${profilePendingRemoval?.name ?? "profile"}?`}
-        description={`This permanently removes the connection profile "${profilePendingRemoval?.name ?? "profile"}" from ${provider.name}.`}
-        confirmLabel="Remove"
-        dimBackground={false}
-        onConfirm={() => {
-          const profile = profilePendingRemoval;
-          setRemoveProfileId(null);
-          if (profile) void handleRemoveProfile(profile);
-        }}
       />
     </div>
   );

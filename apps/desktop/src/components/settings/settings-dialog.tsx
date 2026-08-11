@@ -96,7 +96,9 @@ const PAGES = [
     value: "plugins",
     label: "Plugins",
     icon: Puzzle,
-    Page: () => <PluginsPage />,
+    Page: ({ selectedPluginId }: { selectedPluginId?: string }) => (
+      <PluginsPage preferredPluginId={selectedPluginId} />
+    ),
   },
   {
     group: "Connections",
@@ -152,6 +154,7 @@ export function SettingsDialog({
   open,
   onOpenChange,
   tab,
+  selectedPluginId,
   onTabChange,
   canConnectRemote,
   canDisconnectRemote,
@@ -163,6 +166,7 @@ export function SettingsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tab: SettingsTab;
+  selectedPluginId?: string;
   onTabChange: (tab: SettingsTab) => void;
   canConnectRemote?: () => boolean;
   canDisconnectRemote?: (runtimeId: RuntimeId) => boolean;
@@ -256,6 +260,7 @@ export function SettingsDialog({
               <TabsContent key={value} value={value} className="size-full">
                 <Page
                   runtimeId={runtimeId}
+                  selectedPluginId={selectedPluginId}
                   canConnect={canConnectRemote}
                   canDisconnect={canDisconnectRemote}
                   acquireConnect={acquireConnectRemote}

@@ -34,7 +34,11 @@ import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
 import { createFileSystemClient } from "@/client";
-import type { PluginActiveTab } from "@/client/plugins";
+import {
+  installPluginFile,
+  isPluginZipFile,
+  type PluginActiveTab,
+} from "@/client/plugins";
 import { getDefaultRuntime, listRuntimes } from "@/client/remote-servers";
 import { CommandProvider, useCommands, useRegisterCommands } from "@/commands";
 import { AccountStatus } from "@/components/account-status";
@@ -202,6 +206,16 @@ const COMMAND_PALETTE_BLACKLIST = [
 /** Whether a drag carries OS files (vs. the tree's internal node-reorder drag). */
 function hasFiles(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes("Files");
+}
+
+type DropKind = "plugins" | "threads" | "mixed";
+
+function droppedFileKind(dataTransfer: DataTransfer): DropKind {
+  const files = [...dataTransfer.files];
+  const hasPlugin = files.some(isPluginZipFile);
+  const hasThread = files.some((file) => !isPluginZipFile(file));
+  if (hasPlugin && hasThread) return "mixed";
+  return hasPlugin ? "plugins" : "threads";
 }
 
 // Persisted width (in px) of the sidebar file-tree panel, so it survives
@@ -507,6 +521,7 @@ function PageWorkspace({
     [refreshModels]
   );
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const [settingsPluginId, setSettingsPluginId] = useState<string>();
   // One event per open transition, no matter which command opened Settings.
   useEffect(() => {
     if (settingsOpen) track({ event: "settings_opened", properties: {} });
@@ -609,6 +624,7 @@ function PageWorkspace({
   const pendingImportRuntimeIdRef = useRef<RuntimeId>("local");
   const dragDepthRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [dropKind, setDropKind] = useState<DropKind>("threads");
   const { open: openTab } = tabs;
   const handleImportFiles = useCallback(
     async (
@@ -654,6 +670,35 @@ function PageWorkspace({
       );
     },
     [models, executeCommand, openTab, workspaceRuntimeIdRef]
+  );
+  const handleDroppedFiles = useCallback(
+    async (files: FileList) => {
+      const pluginFiles = [...files].filter(isPluginZipFile);
+      const threadFiles = [...files].filter((file) => !isPluginZipFile(file));
+
+      for (const file of pluginFiles) {
+        try {
+          const result = await installPluginFile(file);
+          toast.success(`Installed ${result.pluginId} v${result.version}`, {
+            description: "The existing plugin was replaced and reloaded.",
+            action: {
+              label: "View plugin",
+              onClick: () => {
+                setSettingsPluginId(result.pluginId);
+                setSettingsTab("plugins");
+                setSettingsOpen(true);
+              },
+            },
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : String(error));
+        }
+      }
+      if (threadFiles.length > 0) {
+        await handleImportFiles(threadFiles, "", workspaceRuntimeIdRef.current);
+      }
+    },
+    [handleImportFiles, workspaceRuntimeIdRef]
   );
   const getActiveThreadForStorage =
     useCallback(async (): Promise<Thread | null> => {
@@ -961,11 +1006,13 @@ function PageWorkspace({
         if (!hasFiles(e)) return;
         e.preventDefault();
         dragDepthRef.current += 1;
+        setDropKind(droppedFileKind(e.dataTransfer));
         setIsDraggingFiles(true);
       }}
       onDragOver={(e) => {
         if (!hasFiles(e)) return;
         e.preventDefault();
+        setDropKind(droppedFileKind(e.dataTransfer));
         e.dataTransfer.dropEffect = "copy";
       }}
       onDragLeave={(e) => {
@@ -981,11 +1028,7 @@ function PageWorkspace({
         e.preventDefault();
         dragDepthRef.current = 0;
         setIsDraggingFiles(false);
-        void handleImportFiles(
-          e.dataTransfer.files,
-          "",
-          workspaceRuntimeIdRef.current
-        );
+        void handleDroppedFiles(e.dataTransfer.files);
       }}
     >
       <SharedImportProvider />
@@ -1118,6 +1161,7 @@ function PageWorkspace({
       <LazyMount open={settingsOpen}>
         <SettingsDialog
           tab={settingsTab}
+          selectedPluginId={settingsPluginId}
           open={settingsOpen}
           onOpenChange={handleSettingsOpenChange}
           onTabChange={setSettingsTab}
@@ -1173,8 +1217,12 @@ function PageWorkspace({
         />
       </LazyMount>
       {isDraggingFiles && (
-        <div className="border-primary bg-primary/10 text-primary pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium backdrop-blur-sm">
-          Drop files to import as threads
+        <div className="border-primary bg-primary/10 text-primary pointer-events-none fixed inset-3 z-[100] flex items-center justify-center rounded-lg border-2 border-dashed text-sm font-medium backdrop-blur-sm">
+          {dropKind === "plugins"
+            ? "Drop plugin ZIP to install"
+            : dropKind === "mixed"
+              ? "Drop ZIPs to install and files to import"
+              : "Drop files to import as threads"}
         </div>
       )}
     </div>

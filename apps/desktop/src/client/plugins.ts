@@ -19,6 +19,8 @@ function _rpc() {
   return electrobun.rpc;
 }
 
+const MAX_PLUGIN_ZIP_BYTES = 50 * 1024 * 1024;
+
 /** The mounted pane snapshot captured when a Plugin Command starts. */
 export interface PluginActiveTab {
   tabId: string;
@@ -35,8 +37,43 @@ export const listPlugins = (): Promise<PluginView[]> =>
 export const refreshPlugins = (): Promise<PluginView[]> =>
   _rpc().request.pluginsRefresh({});
 
+export const installPluginZip = (
+  fileName: string,
+  dataBase64: string
+): Promise<{
+  pluginId: string;
+  version: string;
+  path: string;
+  plugins: PluginView[];
+}> =>
+  _rpc().request.pluginsInstallZip({ fileName, dataBase64 });
+
+export function isPluginZipFile(file: Pick<File, "name">): boolean {
+  return file.name.toLowerCase().endsWith(".zip");
+}
+
+export async function installPluginFile(
+  file: File
+): Promise<{
+  pluginId: string;
+  version: string;
+  path: string;
+  plugins: PluginView[];
+}> {
+  if (!isPluginZipFile(file)) {
+    throw new Error("Only .zip plugin packages can be installed.");
+  }
+  if (file.size > MAX_PLUGIN_ZIP_BYTES) {
+    throw new Error("The plugin ZIP exceeds the 50 MB size limit.");
+  }
+  return installPluginZip(file.name, await _readFileAsBase64(file));
+}
+
 export const reloadPlugin = (pluginId: string): Promise<PluginView[]> =>
   _rpc().request.pluginsReload({ pluginId });
+
+export const uninstallPlugin = (pluginId: string): Promise<PluginView[]> =>
+  _rpc().request.pluginsUninstall({ pluginId });
 
 export const setPluginEnabled = (
   pluginId: string,
@@ -102,3 +139,24 @@ export const writeThreadStorage = (
   resourceId?: string
 ): Promise<ThreadLocator> =>
   _rpc().request.threadStorageWrite({ storageId, thread, resourceId });
+
+function _readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Read failed."));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error(`Could not read ${file.name}.`));
+        return;
+      }
+      const separator = result.indexOf(",");
+      if (separator < 0) {
+        reject(new Error(`Could not read ${file.name}.`));
+        return;
+      }
+      resolve(result.slice(separator + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}

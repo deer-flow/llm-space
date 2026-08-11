@@ -3,7 +3,11 @@ import { describe, expect, test } from "bun:test";
 import type { ToolCallInput } from "@llm-space/core";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ToolCallInputView } from "../../../../src/components/thread-playground/message/tool-call-input-view";
+import {
+  hasTextSelectionWithin,
+  isPointerDrag,
+  ToolCallInputView,
+} from "../../../../src/components/thread-playground/message/tool-call-input-view";
 import {
   HostServicesProvider,
   type HostServices,
@@ -79,5 +83,40 @@ describe("ToolCallInputView", () => {
 
     expect(markup).toContain('title="Reveal in file manager"');
     expect(markup).toContain("~/Desktop/project");
+  });
+});
+
+describe("hasTextSelectionWithin", () => {
+  test("distinguishes a text selection in the argument row from a click", () => {
+    const target = {} as Node;
+    expect(
+      hasTextSelectionWithin(target, {
+        isCollapsed: false,
+        rangeCount: 1,
+        getRangeAt: () => ({ intersectsNode: (node: Node) => node === target }),
+      })
+    ).toBe(true);
+  });
+
+  test("allows an ordinary collapsed selection to toggle the row", () => {
+    expect(
+      hasTextSelectionWithin({} as Node, {
+        isCollapsed: true,
+        rangeCount: 0,
+        getRangeAt: () => {
+          throw new Error("Collapsed selections have no ranges");
+        },
+      })
+    ).toBe(false);
+  });
+});
+
+describe("isPointerDrag", () => {
+  test("separates a selection drag from normal click jitter", () => {
+    const start = { x: 10, y: 10 };
+
+    expect(isPointerDrag(start, { clientX: 11, clientY: 11 })).toBe(false);
+    expect(isPointerDrag(start, { clientX: 13, clientY: 10 })).toBe(true);
+    expect(isPointerDrag(start, { clientX: 40, clientY: 10 })).toBe(true);
   });
 });

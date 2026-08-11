@@ -1,6 +1,9 @@
 import { userDirectoryExists } from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
-import type { PluginManager } from "@llm-space/runtime/plugins";
+import {
+  installPluginZip,
+  type PluginManager,
+} from "@llm-space/runtime/plugins";
 import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 
 import type { Command } from "../../shared/commands";
@@ -218,10 +221,23 @@ export function createMainWindowRPC({
           getRuntime(runtimeId).fsReadRunSnapshot(path, snapshotRef),
         pluginsList: () => Promise.resolve(pluginManager.listPlugins()),
         pluginsRefresh: () => pluginManager.refreshPlugins(),
+        pluginsInstallZip: async ({ fileName, dataBase64 }) => {
+          if (!fileName.toLowerCase().endsWith(".zip")) {
+            throw new Error("Only .zip plugin packages can be installed.");
+          }
+          const result = await installPluginZip({
+            homePath,
+            archive: Buffer.from(dataBase64, "base64"),
+          });
+          const plugins = await pluginManager.refreshPlugins();
+          return { ...result, plugins };
+        },
         pluginsReload: async ({ pluginId }) => {
           await pluginManager.reloadPlugin(pluginId);
           return pluginManager.listPlugins();
         },
+        pluginsUninstall: ({ pluginId }) =>
+          pluginManager.uninstallPlugin(pluginId),
         pluginsSetEnabled: ({ pluginId, enabled }) =>
           pluginManager.setEnabled(pluginId, enabled),
         pluginsSetSettings: ({ pluginId, settings }) =>

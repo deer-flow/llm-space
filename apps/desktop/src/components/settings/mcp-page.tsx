@@ -21,6 +21,13 @@ import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
 import { Input } from "@llm-space/ui/ui/input";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import {
@@ -43,6 +50,7 @@ import {
   EyeOff,
   FileText,
   Loader2,
+  MoreHorizontal,
   Network,
   Plus,
   RefreshCw,
@@ -203,7 +211,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [testingServerId, setTestingServerId] = useState<string | null>(null);
   const [cancellingTest, setCancellingTest] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removeServerId, setRemoveServerId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const formRef = useRef(form);
   const preserveFormAfterCreateRef = useRef(false);
@@ -213,6 +221,10 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const selectedServer = useMemo(
     () => servers.find((server) => server.id === selectedId) ?? null,
     [selectedId, servers]
+  );
+  const serverPendingRemoval = useMemo(
+    () => servers.find((server) => server.id === removeServerId) ?? null,
+    [removeServerId, servers]
   );
   const normalizedName = normalizeMcpName(form.name);
   const testing = selectedServer?.id === testingServerId;
@@ -343,11 +355,11 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     return () => window.clearTimeout(timeout);
   }, [creating, dirty, form, formError, save, saving, selectedId]);
 
-  const testServer = async () => {
-    if (!selectedServer) {
+  const testServer = async (targetServer: McpServerView | null) => {
+    if (!targetServer) {
       return;
     }
-    const server = selectedServer;
+    const server = targetServer;
     setFormError(null);
     cancelRequestedRef.current = false;
     setTestingServerId(server.id);
@@ -421,14 +433,19 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   };
 
   const confirmRemove = async () => {
-    if (!selectedServer) {
+    if (!serverPendingRemoval) {
       return;
     }
-    setRemoveOpen(false);
+    const removedId = serverPendingRemoval.id;
+    setRemoveServerId(null);
     try {
-      const next = await removeMcpServer(selectedServer.id, runtimeId);
+      const next = await removeMcpServer(removedId, runtimeId);
       setServers(next);
-      setSelectedId(next[0]?.id ?? null);
+      setSelectedId((current) =>
+        current !== removedId && next.some((server) => server.id === current)
+          ? current
+          : (next[0]?.id ?? null)
+      );
       toast.success("MCP server removed");
     } catch (error) {
       toast.error("Failed to remove MCP server", {
@@ -488,33 +505,24 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
             <ScrollArea className="min-h-0 grow">
               <div className="flex flex-col gap-1 pr-2">
                 {userServers.map((server) => (
-                  <button
+                  <McpServerListItem
                     key={server.id}
-                    type="button"
+                    server={server}
+                    selected={selectedId === server.id}
                     disabled={saving || dirty || testingServerId !== null}
-                    className={cn(
-                      "hover:bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
-                      selectedId === server.id && "bg-accent"
-                    )}
-                    onClick={() => {
+                    onSelect={() => {
                       setCreating(false);
                       setFormError(null);
                       setSelectedId(server.id);
                     }}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <StatusDot server={server} />
-                      <span className="truncate text-sm font-medium">
-                        {server.name}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground truncate pl-4 font-mono text-xs">
-                      {server.transport}
-                    </span>
-                    <span className="text-muted-foreground truncate pl-4 text-xs">
-                      {_sidebarReadiness(server)}
-                    </span>
-                  </button>
+                    onTest={() => {
+                      setCreating(false);
+                      setFormError(null);
+                      setSelectedId(server.id);
+                      void testServer(server);
+                    }}
+                    onRemove={() => setRemoveServerId(server.id)}
+                  />
                 ))}
                 {creating ? (
                   <button
@@ -586,11 +594,10 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                   setForm(nextForm);
                   setDirty(true);
                 }}
-                onTest={() => void testServer()}
+                onTest={() => void testServer(selectedServer)}
                 onCancelTest={() => void cancelTest()}
                 onDisconnect={() => void disconnectServer()}
                 onCancel={cancelCreate}
-                onRemove={() => setRemoveOpen(true)}
               />
             ) : (
               <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
@@ -601,12 +608,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         </div>
       )}
       <ConfirmDialog
-        open={removeOpen}
-        onOpenChange={setRemoveOpen}
+        open={serverPendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveServerId(null);
+        }}
         title="Remove MCP Server"
         description={
-          selectedServer
-            ? `Remove ${selectedServer.name} from local MCP settings?`
+          serverPendingRemoval
+            ? `Remove ${serverPendingRemoval.name} from local MCP settings?`
             : undefined
         }
         confirmLabel="Remove"
@@ -614,6 +623,96 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         onConfirm={() => void confirmRemove()}
       />
     </SettingsPage>
+  );
+}
+
+function McpServerListItem({
+  server,
+  selected,
+  disabled,
+  onSelect,
+  onTest,
+  onRemove,
+}: {
+  server: McpServerView;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onTest: () => void;
+  onRemove: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={`Select MCP server ${server.name}`}
+      aria-disabled={disabled}
+      className={cn(
+        "group relative flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors",
+        disabled
+          ? "pointer-events-none opacity-50"
+          : "cursor-pointer hover:bg-accent",
+        selected && "bg-accent"
+      )}
+      onClick={() => {
+        if (!disabled) onSelect();
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || disabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <span className="flex min-w-0 items-center gap-2 pr-6">
+        <StatusDot server={server} />
+        <span className="truncate text-sm font-medium">{server.name}</span>
+      </span>
+      <span className="text-muted-foreground truncate pr-6 pl-4 font-mono text-xs">
+        {server.transport}
+      </span>
+      <span className="text-muted-foreground truncate pr-6 pl-4 text-xs">
+        {_sidebarReadiness(server)}
+      </span>
+
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={`${server.name} MCP server actions`}
+            title={`${server.name} MCP server actions`}
+            className={cn(
+              "text-muted-foreground hover:bg-accent hover:text-foreground absolute top-2 right-2 inline-flex size-5 items-center justify-center rounded",
+              menuOpen
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            )}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <MoreHorizontal className="size-4" />
+          </span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <DropdownMenuItem onSelect={onTest}>
+            <RefreshCw />
+            {server.connected ? "Retest" : "Connect & Test"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={onRemove}>
+            <Trash2 />
+            Remove
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -683,7 +782,6 @@ function ServerEditor({
   onCancelTest,
   onDisconnect,
   onCancel,
-  onRemove,
 }: {
   form: ServerForm;
   normalizedName: string;
@@ -702,7 +800,6 @@ function ServerEditor({
   onCancelTest: () => void;
   onDisconnect: () => void;
   onCancel: () => void;
-  onRemove: () => void;
 }) {
   const patch = (partial: Partial<ServerForm>) =>
     onFormChange({ ...form, ...partial });
@@ -799,18 +896,6 @@ function ServerEditor({
                   )}
                   Disconnect
                 </Button>
-              ) : null}
-              {!readOnly ? (
-                <Tooltip content="Remove MCP server">
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Remove MCP server"
-                    onClick={onRemove}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </Tooltip>
               ) : null}
             </>
           ) : null}

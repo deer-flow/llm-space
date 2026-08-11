@@ -317,7 +317,20 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: PluginView[];
       };
+      pluginsInstallZip: {
+        params: { fileName: string; dataBase64: string };
+        response: {
+          pluginId: string;
+          version: string;
+          path: string;
+          plugins: PluginView[];
+        };
+      };
       pluginsReload: {
+        params: { pluginId: string };
+        response: PluginView[];
+      };
+      pluginsUninstall: {
         params: { pluginId: string };
         response: PluginView[];
       };

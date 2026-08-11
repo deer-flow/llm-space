@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -205,6 +206,34 @@ export class PluginManager {
     if (record.enabled && record.compatible) await this._activate(record);
     await this._rebuildContributions();
     this._options.onChanged?.();
+  }
+
+  async uninstallPlugin(pluginId: string): Promise<PluginView[]> {
+    const record = this._records.get(pluginId);
+    const failure = this._failures.find((item) => item.id === pluginId);
+    const rootPath = record?.rootPath ?? failure?.path;
+    if (!rootPath) throw new Error(`Unknown plugin: ${pluginId}`);
+
+    if (record) await this._deactivate(record);
+    try {
+      await rm(rootPath, { recursive: true });
+    } catch (error) {
+      if (record) {
+        try {
+          await this.reloadPlugin(pluginId);
+        } catch {
+          // Preserve the original filesystem error. A later refresh can retry
+          // activation if restoring the Plugin runner also failed.
+        }
+      }
+      throw error;
+    }
+
+    this._records.delete(pluginId);
+    this._removeFailure(pluginId);
+    await this._rebuildContributions();
+    this._options.onChanged?.();
+    return this.listPlugins();
   }
 
   async shutdown(): Promise<void> {

@@ -6,6 +6,7 @@ import type {
   PluginExtensionKind,
   PluginView,
 } from "@llm-space/core";
+import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Link } from "@llm-space/ui/components/link";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
@@ -15,6 +16,13 @@ import {
   AccordionTrigger,
 } from "@llm-space/ui/ui/accordion";
 import { Button } from "@llm-space/ui/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@llm-space/ui/ui/dropdown-menu";
 import {
   Empty,
   EmptyDescription,
@@ -47,6 +55,7 @@ import {
   FolderOpen,
   Globe2,
   MessageSquare,
+  MoreHorizontal,
   Package,
   Puzzle,
   RefreshCw,
@@ -56,6 +65,7 @@ import {
   Settings2,
   Sparkles,
   Terminal,
+  Trash2,
   Workflow,
   Wrench,
   Zap,
@@ -71,6 +81,7 @@ import {
   reloadPlugin,
   setPluginEnabled,
   setPluginSettings,
+  uninstallPlugin,
 } from "@/client/plugins";
 import { electrobun } from "@/lib/electrobun";
 
@@ -79,6 +90,10 @@ import { SettingsPage } from "./settings-page";
 
 const PLUGIN_DOCUMENTATION_URL =
   "https://github.com/deer-flow/llm-space/blob/main/docs/plugins.md";
+const REVEAL_LABEL =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
+    ? "Reveal in Explorer"
+    : "Reveal in Finder";
 
 const PLUGIN_WALL_ICONS: readonly LucideIcon[] = [
   Wrench,
@@ -134,7 +149,11 @@ const EXTENSION_KIND_ORDER: readonly PluginExtensionKind[] = [
   "settings",
 ];
 
-export function PluginsPage() {
+export function PluginsPage({
+  preferredPluginId,
+}: {
+  preferredPluginId?: string;
+}) {
   const [plugins, setPlugins] = useState<PluginView[]>([]);
   const [pluginsPath, setPluginsPath] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -173,10 +192,17 @@ export function PluginsPage() {
   );
 
   useEffect(() => {
+    if (
+      preferredPluginId &&
+      plugins.some((plugin) => plugin.id === preferredPluginId)
+    ) {
+      if (selectedId !== preferredPluginId) setSelectedId(preferredPluginId);
+      return;
+    }
     if (!selectedId || !plugins.some((plugin) => plugin.id === selectedId)) {
       setSelectedId(firstPluginId);
     }
-  }, [firstPluginId, plugins, selectedId]);
+  }, [firstPluginId, plugins, preferredPluginId, selectedId]);
 
   const selected = plugins.find((plugin) => plugin.id === selectedId) ?? null;
 
@@ -267,6 +293,7 @@ export function PluginsPage() {
             selectedId={selectedId}
             refreshing={refreshing}
             onSelect={setSelectedId}
+            onChanged={setPlugins}
             onRefresh={() => void refresh()}
           />
           <PluginEditor
@@ -285,12 +312,14 @@ function PluginList({
   selectedId,
   refreshing,
   onSelect,
+  onChanged,
   onRefresh,
 }: {
   plugins: PluginView[];
   selectedId: string | null;
   refreshing: boolean;
   onSelect: (id: string) => void;
+  onChanged: (plugins: PluginView[]) => void;
   onRefresh: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -341,6 +370,7 @@ function PluginList({
                 plugin={plugin}
                 selected={plugin.id === selectedId}
                 onSelect={() => onSelect(plugin.id)}
+                onChanged={onChanged}
               />
             ))}
           </div>
@@ -363,19 +393,60 @@ function PluginListItem({
   plugin,
   selected,
   onSelect,
+  onChanged,
 }: {
   plugin: PluginView;
   selected: boolean;
   onSelect: () => void;
+  onChanged: (plugins: PluginView[]) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [uninstalling, setUninstalling] = useState(false);
+
+  const handleReload = async () => {
+    setReloading(true);
+    try {
+      onChanged(await reloadPlugin(plugin.id));
+      toast.success(`Reloaded ${plugin.displayName}`);
+    } catch (error) {
+      _showError(error);
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  const handleUninstall = async () => {
+    setConfirmOpen(false);
+    setUninstalling(true);
+    try {
+      onChanged(await uninstallPlugin(plugin.id));
+      toast.success(`Uninstalled ${plugin.displayName}`);
+    } catch (error) {
+      _showError(error);
+    } finally {
+      setUninstalling(false);
+    }
+  };
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Select plugin ${plugin.displayName}`}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
+        "group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
         selected ? "bg-muted font-medium" : "hover:bg-muted/50"
       )}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
     >
       <PluginIcon plugin={plugin} className="size-6" />
       <span className="min-w-0 grow">
@@ -384,20 +455,81 @@ function PluginListItem({
           {plugin.id}
         </span>
       </span>
-      <span
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          plugin.status === "active"
-            ? "bg-emerald-500"
-            : plugin.status === "disabled"
-              ? "bg-muted-foreground/40"
-              : plugin.status === "degraded"
-                ? "bg-amber-500"
-                : "bg-destructive"
-        )}
-        title={plugin.status}
+      <span className="relative flex size-5 shrink-0 items-center justify-center">
+        <span
+          className={cn(
+            "size-1.5 rounded-full transition-opacity group-hover:opacity-0 group-focus-within:opacity-0",
+            plugin.status === "active"
+              ? "bg-emerald-500"
+              : plugin.status === "disabled"
+                ? "bg-muted-foreground/40"
+                : plugin.status === "degraded"
+                  ? "bg-amber-500"
+                  : "bg-destructive",
+            menuOpen && "opacity-0"
+          )}
+          title={plugin.status}
+        />
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={`${plugin.displayName} plugin actions`}
+              title={`${plugin.displayName} plugin actions`}
+              className={cn(
+                "text-muted-foreground hover:bg-accent hover:text-foreground absolute inset-0 inline-flex items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+                menuOpen && "opacity-100"
+              )}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <MoreHorizontal className="size-4" />
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <DropdownMenuItem onSelect={() => _reveal(plugin.path)}>
+              <FolderOpen />
+              {REVEAL_LABEL}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={plugin.version === "unknown" || reloading}
+              onSelect={() => void handleReload()}
+            >
+              <RefreshCw className={reloading ? "animate-spin" : undefined} />
+              Reload
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={uninstalling}
+              onSelect={() => setConfirmOpen(true)}
+            >
+              <Trash2 />
+              Uninstall
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Uninstall ${plugin.displayName}?`}
+        description={
+          <>
+            This permanently deletes the Plugin folder at{" "}
+            <span className="font-mono">{plugin.path}</span>.
+          </>
+        }
+        confirmLabel="Uninstall"
+        dimBackground={false}
+        onConfirm={() => void handleUninstall()}
       />
-    </button>
+    </div>
   );
 }
 

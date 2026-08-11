@@ -1,5 +1,6 @@
 export * from "./plugin-command-registry";
 export * from "./plugin-discovery";
+export * from "./plugin-installer";
 export * from "./plugin-logger";
 export * from "./plugin-manager";
 export * from "./plugin-settings-store";
