@@ -834,7 +834,7 @@ function ProviderEditor({
   return (
     <div className="flex min-w-0 grow flex-col">
       <ScrollArea className="min-h-0 grow">
-        <div className="flex flex-col gap-6 pr-4 pl-6">
+        <div className="flex flex-col gap-6 pr-4 pb-px pl-6">
           <div className="flex items-center gap-2">
             {isBuiltin && provider.websiteLink ? (
               <Tooltip content={`Learn more about ${provider.name}`}>
