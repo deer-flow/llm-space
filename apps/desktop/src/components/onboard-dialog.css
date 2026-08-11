@@ -1,0 +1,99 @@
+@keyframes onboard-background-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes onboard-copy-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboard-action-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.onboard-background-enter {
+  animation: onboard-background-enter 3500ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  transform-origin: 64% 42%;
+  will-change: opacity, transform;
+}
+
+.onboard-copy-enter {
+  animation: onboard-copy-enter 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+.onboard-copy-enter-1 {
+  animation-delay: 250ms;
+}
+
+.onboard-copy-enter-2 {
+  animation-delay: 370ms;
+}
+
+.onboard-copy-enter-3 {
+  animation-delay: 490ms;
+}
+
+.onboard-copy-enter-4 {
+  animation-delay: 630ms;
+}
+
+.onboard-action-enter {
+  animation: onboard-action-enter 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center bottom;
+  will-change: opacity, transform;
+}
+
+.onboard-action-enter-1 {
+  animation-delay: 850ms;
+}
+
+.onboard-action-enter-2 {
+  animation-delay: 960ms;
+}
+
+.onboard-action-enter-3 {
+  animation-delay: 1070ms;
+}
+
+.onboard-action-enter-4 {
+  animation-delay: 1180ms;
+}
+
+.onboard-close-enter {
+  animation: onboard-copy-enter 400ms ease-out 900ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboard-background-enter,
+  .onboard-copy-enter,
+  .onboard-action-enter,
+  .onboard-close-enter {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}

@@ -459,6 +459,38 @@ function PageWorkspace({
   const sidebarPanelRef = usePanelRef();
   const defaultSidebarSize = useRef(readSidebarSize());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarOpenRef = useRef(true);
+  const sidebarSizeWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const handleSidebarResize = useCallback(
+    (size: { inPixels: number }) => {
+      const open = size.inPixels > 0;
+      if (sidebarOpenRef.current !== open) {
+        sidebarOpenRef.current = open;
+        setSidebarOpen(open);
+      }
+
+      // localStorage writes are synchronous. Coalesce the pointer-move stream
+      // into one trailing write so resizing stays on the browser's layout path.
+      if (!open) return;
+      if (sidebarSizeWriteTimerRef.current !== null) {
+        clearTimeout(sidebarSizeWriteTimerRef.current);
+      }
+      sidebarSizeWriteTimerRef.current = setTimeout(() => {
+        sidebarSizeWriteTimerRef.current = null;
+        writeSidebarSize(size.inPixels);
+      }, 120);
+    },
+    []
+  );
+  useEffect(() => {
+    return () => {
+      if (sidebarSizeWriteTimerRef.current !== null) {
+        clearTimeout(sidebarSizeWriteTimerRef.current);
+      }
+    };
+  }, []);
   const toggleSidebar = useCallback(() => {
     const panel = sidebarPanelRef.current;
     if (!panel) return;
@@ -985,12 +1017,7 @@ function PageWorkspace({
             collapsedSize={0}
             defaultSize={defaultSidebarSize.current}
             minSize={200}
-            onResize={(size) => {
-              setSidebarOpen(size.inPixels > 0);
-              // Persist the dragged width, but never the collapsed (0) state so
-              // reopening restores the last real width.
-              if (size.inPixels > 0) writeSidebarSize(size.inPixels);
-            }}
+            onResize={handleSidebarResize}
           >
             <FileSystemTreeView
               runtimeId={workspaceRuntimeId}
