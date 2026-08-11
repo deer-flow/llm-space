@@ -36,6 +36,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@llm-space/ui/ui/card";
@@ -77,6 +78,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@llm-space/ui/ui/select";
+import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 import {
   Ban,
@@ -179,6 +181,9 @@ export function ModelsPage() {
         key={selected?.id}
         provider={selected}
         selectedProfileId={selectedProfileId}
+        onSelectProfile={(profileId) => {
+          if (selected) selectProfile(selected.id, profileId);
+        }}
       />
     </SettingsPage>
   );
@@ -509,6 +514,12 @@ function ProviderListItem({
           selected ? "bg-muted font-medium" : "hover:bg-muted/50"
         )}
       >
+        <ProviderAvatar
+          id={provider.id}
+          name={provider.name}
+          icon={provider.icon}
+        />
+        <span className="min-w-0 truncate">{provider.name}</span>
         {provider.profiles.length > 1 ? (
           <button
             type="button"
@@ -526,14 +537,7 @@ function ProviderListItem({
               )}
             />
           </button>
-        ) : (
-          <ProviderAvatar
-            id={provider.id}
-            name={provider.name}
-            icon={provider.icon}
-          />
-        )}
-        <span className="line-clamp-1 grow">{provider.name}</span>
+        ) : null}
 
         {!provider.readOnly ? (
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -544,7 +548,7 @@ function ProviderListItem({
                 aria-label={`${provider.name} provider actions`}
                 title={`${provider.name} provider actions`}
                 className={cn(
-                  "text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded",
+                  "text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded",
                   menuOpen
                     ? "opacity-100"
                     : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
@@ -573,7 +577,7 @@ function ProviderListItem({
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <span className="text-muted-foreground text-[10px] uppercase">
+          <span className="text-muted-foreground ml-auto text-[10px] uppercase">
             Plugin
           </span>
         )}
@@ -596,10 +600,9 @@ function ProviderListItem({
                   className="flex min-w-0 grow items-center gap-2 px-2 py-1.5 text-left"
                   onClick={() => onSelectProfile(profile.id)}
                 >
-                  <ProviderAvatar
-                    id={provider.id}
-                    name={provider.name}
-                    icon={provider.icon}
+                  <CableIcon
+                    aria-hidden="true"
+                    className="text-muted-foreground size-4 shrink-0"
                   />
                   <span className="truncate">
                     {formatProviderProfileLabel(profile, index + 1)}
@@ -670,11 +673,14 @@ function ProviderListItem({
 function ProviderEditor({
   provider,
   selectedProfileId,
+  onSelectProfile,
 }: {
   provider: ModelProviderGroup | null;
   selectedProfileId: string | null;
+  onSelectProfile: (profileId: string) => void;
 }) {
   const updateProvider = useUpdateProvider();
+  const addProviderProfile = useAddProviderProfile();
   const setModelEnabled = useSetModelEnabled();
   const setAllModelsEnabled = useSetAllModelsEnabled();
   const [iconDraft, setIconDraft] = useState(provider?.icon ?? "");
@@ -686,6 +692,7 @@ function ProviderEditor({
   );
   const [modelListRef] = useAutoAnimation<HTMLDivElement>();
   const [editorOpen, setEditorOpen] = useState(false);
+  const [profileCreating, setProfileCreating] = useState(false);
   // The custom model being edited, or `null` for a fresh create.
   const [editingModel, setEditingModel] = useState<CustomModel | null>(null);
 
@@ -751,6 +758,22 @@ function ProviderEditor({
     }
   };
 
+  const handleAddCustomProfile = async () => {
+    if (!provider || profileCreating) return;
+    setProfileCreating(true);
+    try {
+      const profileId = await addProviderProfile(provider.id);
+      onSelectProfile(profileId);
+    } catch (error) {
+      toast.error("Failed to add custom profile", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setProfileCreating(false);
+    }
+  };
+
   if (!provider) {
     return (
       <div className="text-muted-foreground flex min-w-0 grow items-center justify-center text-sm">
@@ -787,16 +810,20 @@ function ProviderEditor({
   const enabledModels = provider.models.filter(
     (model) => !disabledModels.has(model.id)
   ).length;
-
+  const isBuiltin = provider.builtin === true;
+  const selectedProfile =
+    provider.profiles.find((profile) => profile.id === selectedProfileId) ??
+    provider.profiles[0];
+  const selectedProfileIndex = provider.profiles.findIndex(
+    (profile) => profile.id === selectedProfile.id
+  );
+  const isOfficialProfile = isBuiltin && selectedProfileIndex === 0;
+  const canManageModels = selectedProfileIndex === 0;
   const visibleModels = provider.models.filter((model) => {
     if (modelView === "enabled") return !disabledModels.has(model.id);
     if (modelView === "disabled") return disabledModels.has(model.id);
     return true;
   });
-  const isBuiltin = provider.builtin === true;
-  const selectedProfile =
-    provider.profiles.find((profile) => profile.id === selectedProfileId) ??
-    provider.profiles[0];
 
   // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
   // providers are recognized by their models' API; custom providers follow the
@@ -899,131 +926,156 @@ function ProviderEditor({
             </div>
           )}
 
-          <Card size="sm" className="bg-muted/30">
+          <Card size="sm">
             <CardHeader className="border-b">
               <CardTitle>
-                {formatProviderProfileLabel(
-                  selectedProfile,
-                  provider.profiles.findIndex(
-                    (profile) => profile.id === selectedProfile.id
-                  )
-                )}
+                {isOfficialProfile
+                  ? "Official service"
+                  : formatProviderProfileLabel(
+                      selectedProfile,
+                      selectedProfileIndex
+                    )}
               </CardTitle>
               <CardDescription>
-                API key, base URL, and headers for this connection.
+                {isOfficialProfile
+                  ? `Connect directly to ${provider.name}. The official endpoint is used automatically.`
+                  : "Custom profile for gateways, proxies, and compatible API endpoints."}
               </CardDescription>
             </CardHeader>
             <CardContent key={selectedProfile.id}>
               <_ProviderProfileEditor
                 provider={provider}
                 profile={selectedProfile}
-                isBuiltin={isBuiltin}
+                isOfficial={isOfficialProfile}
                 usesAnthropicApi={usesAnthropicApi}
               />
             </CardContent>
+            {isOfficialProfile ? (
+              <CardFooter className="justify-between gap-4 border-t">
+                <p className="text-muted-foreground text-xs">
+                  Need a custom URL or request headers?
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={profileCreating}
+                  onClick={() => void handleAddCustomProfile()}
+                >
+                  {profileCreating ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <Plus data-icon="inline-start" />
+                  )}
+                  Add custom profile
+                </Button>
+              </CardFooter>
+            ) : null}
           </Card>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {provider.id === "ark" ? "Chat models" : "Models"}
-              </span>
-              <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                {enabledModels === totalModels
-                  ? totalModels
-                  : `${enabledModels}/${totalModels}`}
-              </span>
-              <div className="ml-auto flex items-center gap-1">
-                <Tooltip content="Add custom model">
-                  <button
-                    type="button"
-                    aria-label="Add custom model"
-                    onClick={openCreateModel}
-                    className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
-                  >
-                    <Plus className="size-4" />
-                  </button>
-                </Tooltip>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+          {canManageModels ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {provider.id === "ark" ? "Chat models" : "Models"}
+                </span>
+                <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+                  {enabledModels === totalModels
+                    ? totalModels
+                    : `${enabledModels}/${totalModels}`}
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  <Tooltip content="Add custom model">
                     <button
                       type="button"
-                      aria-label={`Model list actions for ${provider.name}`}
+                      aria-label="Add custom model"
+                      onClick={openCreateModel}
                       className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                     >
-                      <MoreHorizontal className="size-4" />
+                      <Plus className="size-4" />
                     </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void setAllModelsEnabled(provider.id, false)
-                      }
-                    >
-                      <Ban />
-                      Disable All
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void setAllModelsEnabled(provider.id, true)
-                      }
-                    >
-                      <CheckCheck />
-                      Enable All
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {(
-                      [
-                        ["enabled", "Show Enabled Only"],
-                        ["disabled", "Show Disabled Only"],
-                        ["all", "Show All"],
-                      ] as const
-                    ).map(([value, label]) => (
-                      <DropdownMenuItem
-                        key={value}
-                        onSelect={() => setModelView(value)}
+                  </Tooltip>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Model list actions for ${provider.name}`}
+                        className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                       >
-                        <Check
-                          className={cn(
-                            "size-3.5",
-                            modelView !== value && "invisible"
-                          )}
-                        />
-                        {label}
+                        <MoreHorizontal className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void setAllModelsEnabled(provider.id, false)
+                        }
+                      >
+                        <Ban />
+                        Disable All
                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void setAllModelsEnabled(provider.id, true)
+                        }
+                      >
+                        <CheckCheck />
+                        Enable All
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {(
+                        [
+                          ["enabled", "Show Enabled Only"],
+                          ["disabled", "Show Disabled Only"],
+                          ["all", "Show All"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <DropdownMenuItem
+                          key={value}
+                          onSelect={() => setModelView(value)}
+                        >
+                          <Check
+                            className={cn(
+                              "size-3.5",
+                              modelView !== value && "invisible"
+                            )}
+                          />
+                          {label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <div ref={modelListRef} className="flex flex-col gap-1.5">
+                {visibleModels.length === 0 ? (
+                  <div className="text-muted-foreground px-1 py-2 text-xs">
+                    No models to show.
+                  </div>
+                ) : (
+                  visibleModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      providerId={provider.id}
+                      providerName={provider.name}
+                      profileId={selectedProfile.id}
+                      model={model}
+                      enabled={!disabledModels.has(model.id)}
+                      isCustom={customModels.has(model.id)}
+                      onToggle={(next) =>
+                        void setModelEnabled(provider.id, model.id, next)
+                      }
+                      onEdit={() => openEditModel(model)}
+                    />
+                  ))
+                )}
               </div>
             </div>
-            <div ref={modelListRef} className="flex flex-col gap-1.5">
-              {visibleModels.length === 0 ? (
-                <div className="text-muted-foreground px-1 py-2 text-xs">
-                  No models to show.
-                </div>
-              ) : (
-                visibleModels.map((model) => (
-                  <ModelListItem
-                    key={model.id}
-                    providerId={provider.id}
-                    providerName={provider.name}
-                    profileId={selectedProfile.id}
-                    model={model}
-                    enabled={!disabledModels.has(model.id)}
-                    isCustom={customModels.has(model.id)}
-                    onToggle={(next) =>
-                      void setModelEnabled(provider.id, model.id, next)
-                    }
-                    onEdit={() => openEditModel(model)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+          ) : null}
 
-          {provider.id === "ark" && (
+          {provider.id === "ark" && canManageModels ? (
             <_ArkImageGenerationEditor provider={provider} />
-          )}
+          ) : null}
         </div>
       </ScrollArea>
 
@@ -1042,18 +1094,15 @@ function ProviderEditor({
 function _ProviderProfileEditor({
   provider,
   profile,
-  isBuiltin,
+  isOfficial,
   usesAnthropicApi,
 }: {
   provider: ModelProviderGroup;
   profile: ProviderProfile;
-  isBuiltin: boolean;
+  isOfficial: boolean;
   usesAnthropicApi: boolean;
 }) {
   const updateProviderProfile = useUpdateProviderProfile();
-  const [baseUrlEnabled, setBaseUrlEnabled] = useState(
-    Boolean(profile.baseUrl)
-  );
   const baseUrlPlaceholder = usesAnthropicApi
     ? "https://api.example.com"
     : "https://api.example.com/v1";
@@ -1093,24 +1142,19 @@ function _ProviderProfileEditor({
     }
   };
 
-  const handleBaseUrlToggle = (enabled: boolean) => {
-    setBaseUrlEnabled(enabled);
-    if (!enabled) {
-      void update({ baseUrl: null });
-    }
-  };
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Profile name</span>
-        <Input
-          defaultValue={profile.name}
-          placeholder="Profile name"
-          aria-label={`${provider.name} profile name`}
-          onBlur={handleNameBlur}
-        />
-      </div>
+      {!isOfficial ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Profile name</span>
+          <Input
+            defaultValue={profile.name}
+            placeholder="Profile name"
+            aria-label={`${provider.name} profile name`}
+            onBlur={handleNameBlur}
+          />
+        </div>
+      ) : null}
 
       {provider.id !== "openai-codex" ? (
         <ApiKeyField
@@ -1127,45 +1171,22 @@ function _ProviderProfileEditor({
                   'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
                 }
               </div>
-              <div className="list-item">
-                Leave it blank to use the official {provider.name} environment
-                variable
-              </div>
+              {isOfficial ? (
+                <div className="list-item">
+                  Leave it blank to use the official {provider.name}{" "}
+                  environment variable
+                </div>
+              ) : null}
             </div>
           }
         />
+      ) : isOfficial ? (
+        <p className="text-muted-foreground text-xs">
+          OpenAI Codex uses your signed-in account. No API key is required.
+        </p>
       ) : null}
 
-      {isBuiltin ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Custom base URL</span>
-            <Switch
-              aria-label={
-                baseUrlEnabled
-                  ? `Disable custom base URL for ${profile.name}`
-                  : `Enable custom base URL for ${profile.name}`
-              }
-              checked={baseUrlEnabled}
-              onCheckedChange={handleBaseUrlToggle}
-            />
-          </div>
-          {baseUrlEnabled ? (
-            <>
-              <Input
-                defaultValue={profile.baseUrl ?? ""}
-                placeholder={baseUrlPlaceholder}
-                aria-label={`${profile.name} custom base URL`}
-                onBlur={handleBaseUrlBlur}
-              />
-              <div className="text-muted-foreground text-xs">
-                Leave empty to use the default endpoint.
-                {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
-              </div>
-            </>
-          ) : null}
-        </div>
-      ) : (
+      {!isOfficial ? (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Base URL</span>
           <Input
@@ -1175,19 +1196,20 @@ function _ProviderProfileEditor({
             aria-label={`${profile.name} base URL`}
             onBlur={handleBaseUrlBlur}
           />
-          {usesAnthropicApi ? (
-            <div className="text-muted-foreground text-xs">
-              {ANTHROPIC_BASE_URL_HINT}
-            </div>
-          ) : null}
+          <div className="text-muted-foreground text-xs">
+            Required for custom profiles.
+            {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
+          </div>
         </div>
-      )}
+      ) : null}
 
-      <_ProviderHeadersEditor
-        providerId={provider.id}
-        providerName={provider.name}
-        profile={profile}
-      />
+      {!isOfficial ? (
+        <_ProviderHeadersEditor
+          providerId={provider.id}
+          providerName={provider.name}
+          profile={profile}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1644,7 +1666,7 @@ function ModelListItem({
               )}
             </button>
           </Tooltip>
-          {isCustom && (
+          {isCustom ? (
             <>
               <button
                 type="button"
@@ -1663,7 +1685,7 @@ function ModelListItem({
                 <Trash2 className="size-3.5" />
               </button>
             </>
-          )}
+          ) : null}
         </div>
         <Switch
           size="sm"
@@ -1674,7 +1696,7 @@ function ModelListItem({
           }
         />
       </ItemActions>
-      {isCustom && (
+      {isCustom ? (
         <ConfirmDialog
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
@@ -1687,7 +1709,7 @@ function ModelListItem({
             void removeCustomModel(providerId, model.id);
           }}
         />
-      )}
+      ) : null}
     </Item>
   );
 }

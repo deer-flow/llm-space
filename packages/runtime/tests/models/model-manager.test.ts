@@ -219,22 +219,61 @@ describe("ModelManager provider profiles", () => {
     );
   });
 
-  test("adds a named profile with copied endpoint settings but no API key", () => {
+  test("keeps the builtin default official and adds a blank custom profile", () => {
     const manager = new ModelManager({ settingsDir: _emptySettingsDir() });
     manager.addBuiltInProvider({ id: "minimax", apiKey: "secret" });
     const defaultProfile = manager.getProfiles("minimax")[0];
-    manager.updateProfile("minimax", defaultProfile.id, {
-      baseUrl: "https://gateway.example/v1",
-      headers: { "X-Tenant": "one" },
-    });
 
     const addedId = manager.addProfile("minimax");
     expect(manager.getProfiles("minimax")[1]).toEqual({
       id: addedId,
-      name: "Profile 2",
-      baseUrl: "https://gateway.example/v1",
-      headers: { "X-Tenant": "one" },
+      name: "Custom profile 1",
     });
+    expect(manager.getProfiles("minimax")[0]).toEqual(defaultProfile);
+    expect(() =>
+      manager.updateProfile("minimax", defaultProfile.id, {
+        baseUrl: "https://gateway.example/v1",
+      })
+    ).toThrow("official provider profile only supports an API key");
+  });
+
+  test("moves a builtin default's custom connection into a custom profile", () => {
+    const settingsDir = _emptySettingsDir();
+    writeFileSync(
+      path.join(settingsDir, "models.json"),
+      JSON.stringify({
+        providers: [
+          {
+            id: "minimax",
+            builtin: true,
+            profiles: [
+              {
+                id: "legacy-default",
+                name: "Default",
+                apiKey: "$GATEWAY_KEY",
+                baseUrl: "https://gateway.example/v1",
+                headers: { "X-Tenant": "one" },
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    const manager = new ModelManager({ settingsDir });
+    const profiles = manager.getProfiles("minimax");
+    expect(typeof profiles[1]?.id).toBe("string");
+    expect(profiles).toMatchObject([
+      { id: "legacy-default", name: "Default" },
+      {
+        name: "Custom profile 1",
+        apiKey: "$GATEWAY_KEY",
+        baseUrl: "https://gateway.example/v1",
+        headers: { "X-Tenant": "one" },
+      },
+    ]);
+    expect(manager.getBaseUrl("minimax")).toBeUndefined();
+    expect(manager.getHeaders("minimax")).toBeUndefined();
   });
 
   test("enforces unique names and protects the first profile", () => {
