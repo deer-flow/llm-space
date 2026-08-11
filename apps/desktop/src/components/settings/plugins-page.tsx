@@ -212,13 +212,15 @@ export function PluginsPage({
       description={
         <span>
           Extend LLM Space with skills, MCP servers, model providers, commands,
-          and custom thread storage. Read the{" "}
-          <Link
-            href={PLUGIN_DOCUMENTATION_URL}
-            className="text-foreground underline underline-offset-2"
+          and thread storage. Plugins are installed in the{" "}
+          <button
+            type="button"
+            className="text-foreground underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!pluginsPath}
+            onClick={() => pluginsPath && _reveal(pluginsPath)}
           >
-            plugin development guide
-          </Link>
+            plugins directory
+          </button>
           .
         </span>
       }
@@ -458,7 +460,7 @@ function PluginListItem({
       <span className="relative flex size-5 shrink-0 items-center justify-center">
         <span
           className={cn(
-            "size-1.5 rounded-full transition-opacity group-hover:opacity-0 group-focus-within:opacity-0",
+            "size-1.5 rounded-full transition-opacity group-focus-within:opacity-0 group-hover:opacity-0",
             plugin.status === "active"
               ? "bg-emerald-500"
               : plugin.status === "disabled"
