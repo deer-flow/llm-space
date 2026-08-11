@@ -37,6 +37,7 @@ function ThemedToaster() {
   const { resolvedTheme } = useTheme();
   return (
     <Toaster
+      className="toaster group pointer-events-auto! z-[100]!"
       theme={resolvedTheme}
       position="top-center"
       offset={28}

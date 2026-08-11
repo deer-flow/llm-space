@@ -46,7 +46,7 @@ export function UpdateDialog({
 }: UpdateDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 p-0 sm:max-w-[400px]">
+      <DialogContent className="z-[80] gap-0 p-0 sm:max-w-[400px]">
         {status ? (
           <UpdateDialogBody
             status={status}

@@ -41,7 +41,10 @@ export function UpdateIndicator() {
           </Button>
         </PopoverTrigger>
       </Tooltip>
-      <PopoverContent align="end" className="flex w-64 flex-col gap-2">
+      <PopoverContent
+        align="end"
+        className="z-[70] flex w-64 flex-col gap-2"
+      >
         <span className="text-sm font-medium">Update ready</span>
         <span className="text-muted-foreground text-xs">
           v{readyVersion} has been downloaded. Restart to install.

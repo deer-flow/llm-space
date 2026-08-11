@@ -52,8 +52,10 @@ function _UpdateReadyCard({
   onRestart: () => void;
   onDismiss: () => void;
 }) {
+  const restartButtonRef = _useNativeClick(onRestart);
+  const dismissButtonRef = _useNativeClick(onDismiss);
   return (
-    <div className="flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
+    <div className="pointer-events-auto flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/18 text-emerald-200">
         <CheckIcon className="size-4" />
       </div>
@@ -64,13 +66,13 @@ function _UpdateReadyCard({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button size="sm" onClick={onRestart}>
+        <Button ref={restartButtonRef} size="sm">
           Restart
         </Button>
         <button
+          ref={dismissButtonRef}
           type="button"
           aria-label="Dismiss"
-          onClick={onDismiss}
           className="flex size-6 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -92,8 +94,9 @@ function _UpdateDownloadingCard({
   version: string;
   onDismiss: () => void;
 }) {
+  const dismissButtonRef = _useNativeClick(onDismiss);
   return (
-    <div className="w-[356px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
+    <div className="pointer-events-auto w-[356px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
       <div className="flex items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
           <Loader2Icon className="size-4 animate-spin" />
@@ -105,9 +108,9 @@ function _UpdateDownloadingCard({
           </div>
         </div>
         <button
+          ref={dismissButtonRef}
           type="button"
           aria-label="Dismiss"
-          onClick={onDismiss}
           className="flex size-6 shrink-0 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -121,6 +124,22 @@ function _UpdateDownloadingCard({
       </div>
     </div>
   );
+}
+
+/**
+ * Radix modal dialogs suppress React's delegated click handler for elements
+ * outside their dismissable layer. Update cards intentionally sit above those
+ * dialogs, so bind their actions directly to the button DOM nodes.
+ */
+function _useNativeClick(onClick: () => void) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const button = ref.current;
+    if (!button) return;
+    button.addEventListener("click", onClick);
+    return () => button.removeEventListener("click", onClick);
+  }, [onClick]);
+  return ref;
 }
 
 const UpdateStatusContext = createContext<UpdateStatusValue | null>(null);
