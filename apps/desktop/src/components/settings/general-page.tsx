@@ -45,6 +45,12 @@ import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { APP_LANGUAGES, type AppLanguage } from "@/shared/language";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
+import {
+  MAX_THREAD_VIEW_CACHE_SIZE,
+  MIN_THREAD_VIEW_CACHE_SIZE,
+  useThreadViewCacheSize,
+} from "../thread-tabs/thread-view-cache-size";
+
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
 
@@ -303,6 +309,8 @@ export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
+  const [threadViewCacheSize, setCachedThreadViews] =
+    useThreadViewCacheSize();
   const [updateMode, setUpdateMode] = useUpdateMode();
   const {
     primaryColor,
@@ -408,7 +416,41 @@ export function GeneralPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="rich">{t.general.renderingFull}</SelectItem>
+                <SelectItem value="on-demand">On Demand</SelectItem>
                 <SelectItem value="lite">{t.general.renderingFast}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Cached thread views"
+                hint="Maximum recently used thread views kept mounted. Background sessions keep running after a view is released."
+              />
+            }
+          >
+            <Select
+              value={String(threadViewCacheSize)}
+              onValueChange={(value) => setCachedThreadViews(Number(value))}
+            >
+              <SelectTrigger className="w-32" aria-label="Cached thread views">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(
+                  {
+                    length:
+                      MAX_THREAD_VIEW_CACHE_SIZE -
+                      MIN_THREAD_VIEW_CACHE_SIZE +
+                      1,
+                  },
+                  (_, index) => MIN_THREAD_VIEW_CACHE_SIZE + index
+                ).map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </SettingsRow>

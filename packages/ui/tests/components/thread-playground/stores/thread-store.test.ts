@@ -105,15 +105,15 @@ describe("inline run validation", () => {
     const messages = store.getState().thread.context?.messages ?? [];
     expect(store.getState().runValidationIssue).toBeNull();
     expect(messages.at(-1)?.role).toBe("user");
-    expect(store.getState().autoFocusMessageId).toBe(
+    expect(store.getState().pendingAutoFocusMessageId).toBe(
       messages.at(-1)?.id ?? null
     );
-    const autoFocusMessageId = store.getState().autoFocusMessageId;
-    if (!autoFocusMessageId) {
-      throw new Error("Expected an auto-focus message");
-    }
-    store.getState().consumeAutoFocusMessage(autoFocusMessageId);
-    expect(store.getState().autoFocusMessageId).toBeNull();
+    store.getState().consumePendingAutoFocusMessage("another-message");
+    expect(store.getState().pendingAutoFocusMessageId).toBe(
+      messages.at(-1)?.id ?? null
+    );
+    store.getState().consumePendingAutoFocusMessage(messages.at(-1)?.id ?? "");
+    expect(store.getState().pendingAutoFocusMessageId).toBeNull();
   });
 
   test("clears feedback when the blocking role becomes runnable", async () => {

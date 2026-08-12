@@ -41,7 +41,7 @@ export function ExamplesMenu<T extends ExampleItem>({
   const { dialogs } = usePlaygroundLabels();
   const labels = dialogs.examples;
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm">
           {labels.title}

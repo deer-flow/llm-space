@@ -48,12 +48,14 @@ export function closeTabIfAllowed({
   tabs,
   targetId,
   onBlocked,
+  commitViews,
   close,
 }: {
   tracker: RuntimeRunTracker;
   tabs: AppTab[];
   targetId: string;
   onBlocked: () => void;
+  commitViews: (tabs: AppTab[]) => void;
   close: (id: string) => void;
 }): boolean {
   const target = tabs.find((tab) => tab.id === targetId);
@@ -62,7 +64,10 @@ export function closeTabIfAllowed({
     tracker,
     tabs: [target],
     onBlocked,
-    action: () => close(target.id),
+    action: () => {
+      commitViews([target]);
+      close(target.id);
+    },
   });
 }
 
@@ -72,6 +77,7 @@ export function closeOtherTabsIfAllowed({
   keepId,
   runtimeId,
   onBlocked,
+  commitViews,
   closeOthers,
 }: {
   tracker: RuntimeRunTracker;
@@ -79,6 +85,7 @@ export function closeOtherTabsIfAllowed({
   keepId: string;
   runtimeId: RuntimeId;
   onBlocked: () => void;
+  commitViews: (tabs: AppTab[]) => void;
   closeOthers: (id: string, runtimeId: RuntimeId) => void;
 }): boolean {
   const removed = tabs.filter(
@@ -88,7 +95,10 @@ export function closeOtherTabsIfAllowed({
     tracker,
     tabs: removed,
     onBlocked,
-    action: () => closeOthers(keepId, runtimeId),
+    action: () => {
+      commitViews(removed);
+      closeOthers(keepId, runtimeId);
+    },
   });
 }
 
@@ -97,19 +107,25 @@ export function closeAllTabsIfAllowed({
   tabs,
   runtimeId,
   onBlocked,
+  commitViews,
   closeAll,
 }: {
   tracker: RuntimeRunTracker;
   tabs: AppTab[];
   runtimeId: RuntimeId;
   onBlocked: () => void;
+  commitViews: (tabs: AppTab[]) => void;
   closeAll: (runtimeId: RuntimeId) => void;
 }): boolean {
+  const removed = tabs.filter((tab) => tab.runtimeId === runtimeId);
   return _runIfIdle({
     tracker,
-    tabs: tabs.filter((tab) => tab.runtimeId === runtimeId),
+    tabs: removed,
     onBlocked,
-    action: () => closeAll(runtimeId),
+    action: () => {
+      commitViews(removed);
+      closeAll(runtimeId);
+    },
   });
 }
 

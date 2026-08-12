@@ -44,6 +44,7 @@ describe("pane mutation production actions", () => {
         tabs: TABS,
         targetId: TABS[0].id,
         onBlocked,
+        commitViews: () => undefined,
         close: () => {
           mutations += 1;
         },
@@ -56,6 +57,7 @@ describe("pane mutation production actions", () => {
         keepId: TABS[0].id,
         runtimeId: "local",
         onBlocked,
+        commitViews: () => undefined,
         closeOthers: () => {
           mutations += 1;
         },
@@ -67,6 +69,7 @@ describe("pane mutation production actions", () => {
         tabs: TABS,
         runtimeId: "local",
         onBlocked,
+        commitViews: () => undefined,
         closeAll: () => {
           mutations += 1;
         },
@@ -84,6 +87,62 @@ describe("pane mutation production actions", () => {
       })
     ).toBeNull();
     expect({ blocked, mutations }).toEqual({ blocked: 4, mutations: 0 });
+  });
+
+  test("commits the exact closing views before removing their tabs", () => {
+    const tracker = new RuntimeRunTracker();
+    const events: string[] = [];
+    const commitViews = (tabs: AppTab[]) => {
+      events.push(`commit:${tabs.map((tab) => tab.id).join(",")}`);
+    };
+
+    expect(
+      closeTabIfAllowed({
+        tracker,
+        tabs: TABS,
+        targetId: TABS[0].id,
+        onBlocked: () => undefined,
+        commitViews,
+        close: (id) => events.push(`close:${id}`),
+      })
+    ).toBe(true);
+    expect(events).toEqual([
+      `commit:${TABS[0].id}`,
+      `close:${TABS[0].id}`,
+    ]);
+
+    events.length = 0;
+    expect(
+      closeOtherTabsIfAllowed({
+        tracker,
+        tabs: TABS,
+        keepId: TABS[0].id,
+        runtimeId: "local",
+        onBlocked: () => undefined,
+        commitViews,
+        closeOthers: (id) => events.push(`closeOthers:${id}`),
+      })
+    ).toBe(true);
+    expect(events).toEqual([
+      `commit:${TABS[1].id}`,
+      `closeOthers:${TABS[0].id}`,
+    ]);
+
+    events.length = 0;
+    expect(
+      closeAllTabsIfAllowed({
+        tracker,
+        tabs: TABS,
+        runtimeId: "local",
+        onBlocked: () => undefined,
+        commitViews,
+        closeAll: (runtimeId) => events.push(`closeAll:${runtimeId}`),
+      })
+    ).toBe(true);
+    expect(events).toEqual([
+      `commit:${TABS.map((tab) => tab.id).join(",")}`,
+      "closeAll:local",
+    ]);
   });
 
   test("delete and overwrite path guards include open descendants", () => {
