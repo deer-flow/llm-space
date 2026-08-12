@@ -6,14 +6,13 @@ import { EditorState } from "@codemirror/state";
 import {
   collectStaticDecorations,
   type EditorEnhancement,
-} from "../../code-editor/editor-enhancement";
-
+} from "../../../../src/components/code-editor/editor-enhancement";
 import {
   createPromptSyntaxEditingEnhancement,
   PROMPT_TEMPLATE_TAG_HIGHLIGHT,
   PROMPT_VARIABLE_HIGHLIGHT,
-} from "./prompt-syntax-enhancements";
-import { createPromptCompletionSource } from "./prompt-variable-extension";
+} from "../../../../src/components/thread-playground/variable/prompt-syntax-enhancements";
+import { createPromptCompletionSource } from "../../../../src/components/thread-playground/variable/prompt-variable-extension";
 
 const originalDocument = globalThis.document;
 

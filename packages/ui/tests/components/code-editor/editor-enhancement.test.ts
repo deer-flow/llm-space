@@ -7,8 +7,8 @@ import {
   createRangeHighlightEnhancement,
   createRegexHighlightEnhancement,
   type CodeMirrorOnlyEnhancement,
-} from "./editor-enhancement";
-import { compileCodeMirrorEnhancements } from "./editor-enhancement-codemirror";
+} from "../../../src/components/code-editor/editor-enhancement";
+import { compileCodeMirrorEnhancements } from "../../../src/components/code-editor/editor-enhancement-codemirror";
 
 const VARIABLE = createRegexHighlightEnhancement({
   id: "prompt-variable-highlight",

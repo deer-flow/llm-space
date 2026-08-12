@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRegexHighlightEnhancement } from "./editor-enhancement";
-import { createHighlightSegments } from "./static-highlight";
+import { createRegexHighlightEnhancement } from "../../../src/components/code-editor/editor-enhancement";
+import { createHighlightSegments } from "../../../src/components/code-editor/static-highlight";
 
 const PROMPT_VARIABLE_HIGHLIGHT = createRegexHighlightEnhancement({
   id: "prompt-variable-highlight",

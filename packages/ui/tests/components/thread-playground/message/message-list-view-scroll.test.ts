@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import * as messageListViewModule from "./message-list-view";
+import * as messageListViewModule from "../../../../src/components/thread-playground/message/message-list-view";
 
 interface ScrollAnchorMeasurement {
   id: string;
