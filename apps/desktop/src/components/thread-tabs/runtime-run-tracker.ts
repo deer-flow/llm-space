@@ -54,6 +54,7 @@ function _pathsOverlap(left: string, right: string): boolean {
 /** Tracks panes whose run or terminal persistence still owns its runtime. */
 export class RuntimeRunTracker {
   private _globalMutation = false;
+  private readonly _closingPanes = new Set<string>();
   private readonly _mutatingPanes = new Set<string>();
   private readonly _mutatingPaths = new Map<RuntimeId, Map<object, string[]>>();
   private readonly _mutatingRuntimes = new Set<RuntimeId>();
@@ -78,7 +79,12 @@ export class RuntimeRunTracker {
     runId: string,
     path?: string
   ): boolean {
-    if (this.isMutationReserved(paneId, runtimeId, path)) return false;
+    if (
+      this._closingPanes.has(paneId) ||
+      this.isMutationReserved(paneId, runtimeId, path)
+    ) {
+      return false;
+    }
     let leases = this._runningPanes.get(paneId);
     if (!leases) {
       leases = new Map();
@@ -168,7 +174,9 @@ export class RuntimeRunTracker {
       this._mutatingRuntimes.size > 0 ||
       ids.some(
         (paneId) =>
-          this.isPaneBusy(paneId) || this._mutatingPanes.has(paneId)
+          this.isPaneBusy(paneId) ||
+          this._mutatingPanes.has(paneId) ||
+          this._closingPanes.has(paneId)
       )
     ) {
       return null;
@@ -180,6 +188,36 @@ export class RuntimeRunTracker {
       if (!active) return;
       active = false;
       ids.forEach((paneId) => this._mutatingPanes.delete(paneId));
+      this._notifyMutationChange();
+    };
+  }
+
+  /**
+   * Blocks new runs and competing mutations while a close synchronously commits
+   * editor drafts. Unlike a destructive mutation reservation, this must not
+   * suppress the closing pane's own Store-to-persistence notification.
+   */
+  reservePanesForClose(paneIds: Iterable<string>): (() => void) | null {
+    const ids = [...new Set(paneIds)];
+    if (
+      this._globalMutation ||
+      this._mutatingRuntimes.size > 0 ||
+      ids.some(
+        (paneId) =>
+          this.isPaneBusy(paneId) ||
+          this._mutatingPanes.has(paneId) ||
+          this._closingPanes.has(paneId)
+      )
+    ) {
+      return null;
+    }
+    ids.forEach((paneId) => this._closingPanes.add(paneId));
+    this._notifyMutationChange();
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      ids.forEach((paneId) => this._closingPanes.delete(paneId));
       this._notifyMutationChange();
     };
   }
@@ -204,7 +242,9 @@ export class RuntimeRunTracker {
       this._mutatingRuntimes.has(runtimeId) ||
       ids.some(
         (paneId) =>
-          this.isPaneBusy(paneId) || this._mutatingPanes.has(paneId)
+          this.isPaneBusy(paneId) ||
+          this._mutatingPanes.has(paneId) ||
+          this._closingPanes.has(paneId)
       ) ||
       normalizedPaths.some((path) =>
         existingPaths.some((reserved) => _pathsOverlap(path, reserved))
@@ -250,6 +290,7 @@ export class RuntimeRunTracker {
       this._mutatingRuntimes.has(runtimeId) ||
       this._mutatingPaths.has(runtimeId) ||
       this._mutatingPanes.size > 0 ||
+      this._closingPanes.size > 0 ||
       this.hasRunning(runtimeId) ||
       this._persistingPanes
         .values()
@@ -276,6 +317,7 @@ export class RuntimeRunTracker {
       this._mutatingRuntimes.size > 0 ||
       this._mutatingPaths.size > 0 ||
       this._mutatingPanes.size > 0 ||
+      this._closingPanes.size > 0 ||
       this.hasAnyRunning() ||
       [...this._persistingPanes.values()].some((leases) => leases.size > 0)
     ) {

@@ -30,7 +30,7 @@ function _runIfIdle({
     onBlocked();
     return false;
   }
-  const release = tracker.reservePanes(tabs.map(paneIdForTab));
+  const release = tracker.reservePanesForClose(tabs.map(paneIdForTab));
   if (!release) {
     onBlocked();
     return false;
