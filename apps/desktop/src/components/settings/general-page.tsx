@@ -43,6 +43,12 @@ import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
+import {
+  MAX_THREAD_VIEW_CACHE_SIZE,
+  MIN_THREAD_VIEW_CACHE_SIZE,
+  useThreadViewCacheSize,
+} from "../thread-tabs/thread-view-cache-size";
+
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
 
@@ -295,6 +301,8 @@ export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
+  const [threadViewCacheSize, setCachedThreadViews] =
+    useThreadViewCacheSize();
   const [updateMode, setUpdateMode] = useUpdateMode();
   const {
     primaryColor,
@@ -379,7 +387,7 @@ export function GeneralPage() {
             label={
               <RowLabel
                 title="Rendering"
-                hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
+                hint="Full keeps every message editor mounted. On Demand shows lightweight syntax highlighting and activates an editor after focus; editing at a specific position may require a second click. Fast uses plain text for the lowest overhead."
               />
             }
           >
@@ -392,7 +400,41 @@ export function GeneralPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="rich">Full</SelectItem>
+                <SelectItem value="on-demand">On Demand</SelectItem>
                 <SelectItem value="lite">Fast</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Cached thread views"
+                hint="Maximum recently used thread views kept mounted. Background sessions keep running after a view is released."
+              />
+            }
+          >
+            <Select
+              value={String(threadViewCacheSize)}
+              onValueChange={(value) => setCachedThreadViews(Number(value))}
+            >
+              <SelectTrigger className="w-32" aria-label="Cached thread views">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(
+                  {
+                    length:
+                      MAX_THREAD_VIEW_CACHE_SIZE -
+                      MIN_THREAD_VIEW_CACHE_SIZE +
+                      1,
+                  },
+                  (_, index) => MIN_THREAD_VIEW_CACHE_SIZE + index
+                ).map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </SettingsRow>

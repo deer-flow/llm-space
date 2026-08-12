@@ -6,15 +6,13 @@ import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 
-
-
 import metaPrompt from "../examples/meta-prompt.md?raw";
 import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
-import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
+import { usePromptSyntaxEnhancements } from "../variable/use-prompt-syntax-enhancements";
 
 interface SystemPromptEditorProps {
   className?: string;
@@ -35,7 +33,9 @@ function _SystemPromptEditor({
   const seedHost = useHostServices();
   const { presentational } = seedHost;
   const { updateSystemPrompt } = useThreadStoreActions();
-  const variableExtension = usePromptVariableExtension(SYSTEM_PROMPT_PLACE_KEY);
+  const promptSyntaxEnhancements = usePromptSyntaxEnhancements(
+    SYSTEM_PROMPT_PLACE_KEY
+  );
   const handleChange = useCallback(
     (value: string) => {
       updateSystemPrompt(value);
@@ -139,7 +139,7 @@ function _SystemPromptEditor({
         language="markdown"
         readonly={readonly || streaming}
         placeholder="Enter system prompt here"
-        extraExtensions={variableExtension}
+        enhancements={promptSyntaxEnhancements}
         onChange={handleChange}
       />
     </div>

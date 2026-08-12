@@ -31,6 +31,11 @@ import {
 import { usePanelRef } from "react-resizable-panels";
 
 import {
+  EditorCommitScope,
+  type EditorCommitScopeHandle,
+} from "@llm-space/ui/components/code-editor/editor-commit-scope";
+import { OnDemandEditorScope } from "@llm-space/ui/components/code-editor/on-demand-code-editor";
+import {
   resolveModelConfig,
   useDefaultModel,
   useFirstAvailableModel,
@@ -62,7 +67,10 @@ import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
 import { GenerateProjectButton } from "./codegen/generate-project-button";
-import { MessageListView } from "./message/message-list-view";
+import {
+  MessageListView,
+  type ThreadScrollSnapshot,
+} from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
@@ -93,6 +101,8 @@ import { useThreadPlaygroundEvents } from "./use-thread-playground-events";
 import { listEnabledPromptVariableSkills } from "./variable/prompt-variable-skills";
 import { PromptVariablesListView } from "./variable/prompt-variables-list-view";
 
+export type { ThreadScrollSnapshot } from "./message/message-list-view";
+
 export interface ThreadPlaygroundProps {
   className?: string;
   path: string;
@@ -112,10 +122,14 @@ export interface ThreadPlaygroundProps {
    * Whether this playground belongs to the active tab. Only the active one
    * registers the `runThread` command handler (the command registry keeps a
    * single handler per type), so a global run always targets the active tab.
-   */
+  */
   active?: boolean;
   /** Mount the visual workbench while keeping its owner and store alive. */
   viewMounted?: boolean;
+  /** View-local scroll position restored after an LRU remount. */
+  initialScrollSnapshot?: ThreadScrollSnapshot | null;
+  /** Records the latest active-to-inactive scroll snapshot. */
+  onScrollSnapshotChange?: (snapshot: ThreadScrollSnapshot) => void;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
@@ -135,6 +149,40 @@ export interface ThreadPlaygroundProps {
   ) => Promise<ThreadRunReference>;
   readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
 }
+
+export interface ThreadPlaygroundSessionProps {
+  initialValue: Thread;
+  /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
+  transport?: AgentTransport;
+  /** Runtime that owns this session and every run it starts. */
+  runtimeId?: string;
+  /** Recreate the store without tying its lifetime to the disposable View. */
+  storeKey?: string | number;
+  children?: ReactNode;
+  onChange?: (thread: Thread) => void;
+  onStreamingStart?: (runId: string) => boolean | void;
+  onStreamingEnd?: (runId: string) => void;
+  archiveRunSnapshot?: (
+    run: ThreadRunSnapshot & { id: string }
+  ) => Promise<ThreadRunReference>;
+  readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
+}
+
+export type ThreadPlaygroundViewProps = Omit<
+  ThreadPlaygroundProps,
+  | "initialValue"
+  | "transport"
+  | "storeKey"
+  | "onChange"
+  | "onStreamingStart"
+  | "onStreamingEnd"
+  | "archiveRunSnapshot"
+  | "readRunSnapshot"
+  | "viewMounted"
+> & {
+  /** Registers the imperative draft-commit boundary for this disposable View. */
+  onEditorCommitScopeReady?: (handle: EditorCommitScopeHandle | null) => void;
+};
 
 export function ThreadPlayground({
   loading,
@@ -156,38 +204,52 @@ export function ThreadPlayground({
     throw new Error("initialValue is required when not loading");
   }
   return (
-    <_ThreadPlayground
-      className={className}
+    <ThreadPlaygroundSession
       initialValue={initialValue}
-      viewMounted={viewMounted}
-      {...props}
-    />
+      transport={props.transport}
+      runtimeId={props.runtimeId}
+      storeKey={props.storeKey}
+      onChange={props.onChange}
+      onStreamingStart={props.onStreamingStart}
+      onStreamingEnd={props.onStreamingEnd}
+      archiveRunSnapshot={props.archiveRunSnapshot}
+      readRunSnapshot={props.readRunSnapshot}
+    >
+      {viewMounted ? (
+        <ThreadPlaygroundView
+          {...props}
+          className={className}
+          runtimeId={props.runtimeId ?? "local"}
+        />
+      ) : null}
+    </ThreadPlaygroundSession>
   );
 }
 
-function _ThreadPlayground({ storeKey, ...props }: ThreadPlaygroundProps) {
+export function ThreadPlaygroundSession({
+  storeKey,
+  ...props
+}: ThreadPlaygroundSessionProps) {
   const providers = useModels();
   const profileSelections = useProviderProfileSelections(providers);
   return (
     <ProviderProfileSelectionProvider value={profileSelections}>
-      <_ThreadPlaygroundStore key={storeKey} {...props} />
+      <_ThreadPlaygroundSessionStore key={storeKey} {...props} />
     </ProviderProfileSelectionProvider>
   );
 }
 
-function _ThreadPlaygroundStore({
+function _ThreadPlaygroundSessionStore({
   initialValue,
   transport,
   runtimeId,
-  onApplyCompaction,
-  viewMounted = true,
+  children,
   onChange,
   onStreamingStart,
   onStreamingEnd,
   archiveRunSnapshot,
   readRunSnapshot,
-  ...props
-}: ThreadPlaygroundProps) {
+}: ThreadPlaygroundSessionProps) {
   const [ownerRuntimeId] = useState(() => runtimeId ?? "local");
   // Keep live refs to the provider list and default model so the store can
   // resolve a thread's model (its own, else the default/first available) at
@@ -234,14 +296,21 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      {viewMounted ? (
-        <ThreadPlaygroundContent
-          runtimeId={ownerRuntimeId}
-          onApplyCompaction={onApplyCompaction}
-          {...props}
-        />
-      ) : null}
+      {children}
     </ThreadStoreContext.Provider>
+  );
+}
+
+export function ThreadPlaygroundView({
+  onEditorCommitScopeReady,
+  ...props
+}: ThreadPlaygroundViewProps) {
+  return (
+    <EditorCommitScope onReady={onEditorCommitScopeReady}>
+      <OnDemandEditorScope active={props.active ?? false}>
+        <ThreadPlaygroundContent {...props} />
+      </OnDemandEditorScope>
+    </EditorCommitScope>
   );
 }
 
@@ -261,6 +330,8 @@ function ThreadPlaygroundContent({
   readonly: readonlyFromProps = false,
   active = false,
   compactImages = false,
+  initialScrollSnapshot,
+  onScrollSnapshotChange,
 }: Omit<
   ThreadPlaygroundProps,
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
@@ -613,6 +684,9 @@ function ThreadPlaygroundContent({
                 readonly={readonly}
                 compactImages={compactImages}
                 measurementsFrozen={!active && !presentational}
+                active={active}
+                initialScrollSnapshot={initialScrollSnapshot}
+                onScrollSnapshotChange={onScrollSnapshotChange}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

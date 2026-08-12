@@ -1,7 +1,13 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
-import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
+import type { EditorCommitScopeHandle } from "@llm-space/ui/components/code-editor/editor-commit-scope";
+import {
+  ThreadPlayground,
+  ThreadPlaygroundSession,
+  ThreadPlaygroundView,
+  type ThreadScrollSnapshot,
+} from "@llm-space/ui/components/thread-playground";
 import {
   nextCompactedThreadPath,
   normalizeThreadForPath,
@@ -47,6 +53,11 @@ interface ThreadTabPaneProps {
   consumeDiscardedPane?: (paneId: string) => boolean;
   /** Publish the pane's latest in-memory thread for host integrations. */
   onThreadStateChange?: (tabId: string, thread: Thread | null) => void;
+  /** Register the commit boundary owned by this pane's disposable View. */
+  onViewCommitScopeReady?: (
+    paneId: string,
+    handle: EditorCommitScopeHandle | null
+  ) => void;
 }
 
 /**
@@ -68,6 +79,7 @@ function _ThreadTabPane({
   onClose,
   consumeDiscardedPane,
   onThreadStateChange,
+  onViewCommitScopeReady,
 }: ThreadTabPaneProps) {
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
@@ -380,6 +392,19 @@ function _ThreadTabPane({
     void mutationRevision;
     return lifecycleHost.isMutationReserved(paneId, runtimeId, path);
   }, [lifecycleHost, mutationRevision, paneId, path, runtimeId]);
+  const handleViewCommitScopeReady = useCallback(
+    (handle: EditorCommitScopeHandle | null) => {
+      onViewCommitScopeReady?.(paneId, handle);
+    },
+    [onViewCommitScopeReady, paneId]
+  );
+  const scrollSnapshotRef = useRef<ThreadScrollSnapshot | null>(null);
+  const handleScrollSnapshotChange = useCallback(
+    (snapshot: ThreadScrollSnapshot) => {
+      scrollSnapshotRef.current = snapshot;
+    },
+    []
+  );
 
   if (loadError) {
     return viewMounted ? (
@@ -394,26 +419,50 @@ function _ThreadTabPane({
     ) : null;
   }
 
+  if (!thread) {
+    return viewMounted ? (
+      <div className={cn("size-full", !active && "hidden")}>
+        <ThreadPlayground
+          className="bg-background size-full shadow-lg"
+          loading={isLoading}
+          path={path}
+        />
+      </div>
+    ) : null;
+  }
+
   return (
-    <ThreadPlayground
+    <ThreadPlaygroundSession
       storeKey={reloadKey}
-      className={cn("bg-background size-full shadow-lg", !active && "hidden")}
-      loading={isLoading}
-      path={path}
       initialValue={thread}
-      readonly={mutationReserved}
-      active={active}
-      viewMounted={viewMounted}
       transport={rpcTransport}
       runtimeId={runtimeId}
       onChange={handleChange}
       onStreamingStart={handleStreamingStart}
       onStreamingEnd={handleStreamingEnd}
-      onApplyCompaction={handleApplyCompaction}
       archiveRunSnapshot={archiveRunSnapshot}
       readRunSnapshot={readRunSnapshot}
-      onRenameTitle={handleRenameTitle}
-    />
+    >
+      {viewMounted ? (
+        <div
+          className={cn("size-full", !active && "hidden")}
+          data-thread-view-pane-id={paneId}
+        >
+          <ThreadPlaygroundView
+            className="bg-background size-full shadow-lg"
+            path={path}
+            readonly={mutationReserved}
+            active={active}
+            initialScrollSnapshot={scrollSnapshotRef.current}
+            onScrollSnapshotChange={handleScrollSnapshotChange}
+            runtimeId={runtimeId}
+            onApplyCompaction={handleApplyCompaction}
+            onRenameTitle={handleRenameTitle}
+            onEditorCommitScopeReady={handleViewCommitScopeReady}
+          />
+        </div>
+      ) : null}
+    </ThreadPlaygroundSession>
   );
 }
 

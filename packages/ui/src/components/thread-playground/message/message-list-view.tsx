@@ -25,6 +25,7 @@ import {
   type Ref,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -105,6 +106,87 @@ function _estimateMessageHeight(message: Message, collapsed: boolean) {
   return Math.max(88, height);
 }
 
+export interface ThreadScrollSnapshot {
+  messageId: string | null;
+  offset: number;
+  scrollTop: number;
+}
+
+export interface ScrollAnchorMeasurement {
+  id: string;
+  top: number;
+  bottom: number;
+}
+
+export function captureThreadScrollSnapshotFromMeasurements(
+  scrollTop: number,
+  viewportTop: number,
+  anchors: readonly ScrollAnchorMeasurement[]
+): ThreadScrollSnapshot {
+  const anchor = anchors.find(({ bottom }) => bottom > viewportTop);
+  return {
+    messageId: anchor?.id ?? null,
+    offset: anchor ? anchor.top - viewportTop : 0,
+    scrollTop,
+  };
+}
+
+export function resolveThreadScrollTop(
+  snapshot: ThreadScrollSnapshot,
+  currentScrollTop: number,
+  viewportTop: number,
+  anchors: readonly ScrollAnchorMeasurement[]
+): number {
+  const anchor = anchors.find(({ id }) => id === snapshot.messageId);
+  return anchor
+    ? currentScrollTop + anchor.top - viewportTop - snapshot.offset
+    : snapshot.scrollTop;
+}
+
+function _getScrollViewport(content: HTMLElement | null): HTMLElement | null {
+  return (
+    content?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]') ??
+    null
+  );
+}
+
+function _measureMessageAnchors(content: HTMLElement): ScrollAnchorMeasurement[] {
+  return Array.from(
+    content.querySelectorAll<HTMLElement>("[data-message-id]")
+  ).map((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      id: element.dataset.messageId ?? "",
+      top: rect.top,
+      bottom: rect.bottom,
+    };
+  });
+}
+
+function _captureThreadScrollSnapshot(
+  viewport: HTMLElement,
+  content: HTMLElement
+): ThreadScrollSnapshot {
+  return captureThreadScrollSnapshotFromMeasurements(
+    viewport.scrollTop,
+    viewport.getBoundingClientRect().top,
+    _measureMessageAnchors(content)
+  );
+}
+
+function _restoreThreadScrollSnapshot(
+  snapshot: ThreadScrollSnapshot,
+  viewport: HTMLElement,
+  content: HTMLElement
+): void {
+  viewport.scrollTop = resolveThreadScrollTop(
+    snapshot,
+    viewport.scrollTop,
+    viewport.getBoundingClientRect().top,
+    _measureMessageAnchors(content)
+  );
+}
+
 export function MessageListView({
   className,
   context: contextFromProps,
@@ -112,6 +194,9 @@ export function MessageListView({
   readonly: readonlyFromProps = false,
   compactImages = false,
   measurementsFrozen = false,
+  active = false,
+  initialScrollSnapshot = null,
+  onScrollSnapshotChange,
 }: {
   className?: string;
   context?: ThreadContext;
@@ -121,6 +206,12 @@ export function MessageListView({
   compactImages?: boolean;
   /** Keep measured heights while an ancestor is hidden. */
   measurementsFrozen?: boolean;
+  /** Whether this live Thread View is currently visible. */
+  active?: boolean;
+  /** One-shot View-local position restored after an LRU remount. */
+  initialScrollSnapshot?: ThreadScrollSnapshot | null;
+  /** Captures position when the View leaves the active state. */
+  onScrollSnapshotChange?: (snapshot: ThreadScrollSnapshot) => void;
 }) {
   const isSnapshotView = messagesFromProps !== undefined;
   const status = useThreadStore((state) => state.status);
@@ -130,8 +221,8 @@ export function MessageListView({
   const collapsedMessageIds = useThreadStore(
     (state) => state.collapsedMessageIds
   );
-  const autoFocusMessageId = useThreadStore(
-    (state) => state.autoFocusMessageId
+  const pendingAutoFocusMessageId = useThreadStore(
+    (state) => state.pendingAutoFocusMessageId
   );
   const runValidationIssue = useThreadStore(
     (state) => state.runValidationIssue
@@ -139,12 +230,8 @@ export function MessageListView({
   const storeMessages = useThreadStore(
     (state) => state.thread.context?.messages
   );
-  const {
-    appendMessage,
-    consumeAutoFocusMessage,
-    moveMessage,
-    resolveRunValidationIssue,
-  } = useThreadStoreActions();
+  const { appendMessage, moveMessage, resolveRunValidationIssue } =
+    useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
@@ -176,8 +263,8 @@ export function MessageListView({
     () => messages.map((message) => message.id),
     [messages]
   );
-  const autoFocusMessageIndex = autoFocusMessageId
-    ? messages.findIndex((message) => message.id === autoFocusMessageId)
+  const pendingAutoFocusMessageIndex = pendingAutoFocusMessageId
+    ? messages.findIndex((message) => message.id === pendingAutoFocusMessageId)
     : -1;
   const validationMessageId = runValidationIssue?.messageId ?? null;
   const validationMessageIndex = validationMessageId
@@ -312,6 +399,13 @@ export function MessageListView({
     },
     [messageIds, moveMessage]
   );
+  const restoredScrollRef = useRef(false);
+  const scrollToBottom = useCallback(() => {
+    const viewport = getScrollElement();
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+  }, [getScrollElement]);
   const scrollToMessageIndex = useCallback(
     (
       index: number,
@@ -418,15 +512,13 @@ export function MessageListView({
     return followMessageViewportBottom(viewport, content);
   }, [getScrollElement, status]);
   useEffect(() => {
-    if (!autoFocusMessageId || autoFocusMessageIndex < 0) {
+    if (!pendingAutoFocusMessageId || pendingAutoFocusMessageIndex < 0) {
       return;
     }
-    scrollToMessageIndex(autoFocusMessageIndex, "auto");
-    consumeAutoFocusMessage(autoFocusMessageId);
+    scrollToMessageIndex(pendingAutoFocusMessageIndex, "auto");
   }, [
-    autoFocusMessageId,
-    autoFocusMessageIndex,
-    consumeAutoFocusMessage,
+    pendingAutoFocusMessageId,
+    pendingAutoFocusMessageIndex,
     scrollToMessageIndex,
   ]);
   useEffect(() => {
@@ -435,6 +527,44 @@ export function MessageListView({
     }
     scrollToMessageIndex(validationMessageIndex, "auto");
   }, [validationMessageId, validationMessageIndex, scrollToMessageIndex]);
+
+  // The active View is always retained. Capture once as it transitions to
+  // inactive, before its ancestor becomes `display: none`; no scroll listener
+  // or Store update is needed while the user scrolls.
+  useLayoutEffect(() => {
+    if (!active || isSnapshotView || !onScrollSnapshotChange) return;
+    const content = contentRef.current;
+    return () => {
+      const viewport = _getScrollViewport(content);
+      if (content && viewport) {
+        onScrollSnapshotChange(
+          _captureThreadScrollSnapshot(viewport, content)
+        );
+      }
+    };
+  }, [active, isSnapshotView, onScrollSnapshotChange]);
+
+  // A retained hidden View keeps its DOM scrollTop. This only does work for a
+  // View recreated after LRU eviction. A newly appended/inserted message owns
+  // focus and scrolling, so its one-shot autofocus takes precedence.
+  useLayoutEffect(() => {
+    if (restoredScrollRef.current || !active || isSnapshotView) return;
+    if (pendingAutoFocusMessageId) {
+      restoredScrollRef.current = true;
+      return;
+    }
+    const content = contentRef.current;
+    const viewport = _getScrollViewport(content);
+    if (initialScrollSnapshot && content && viewport) {
+      _restoreThreadScrollSnapshot(initialScrollSnapshot, viewport, content);
+    }
+    restoredScrollRef.current = true;
+  }, [
+    active,
+    initialScrollSnapshot,
+    isSnapshotView,
+    pendingAutoFocusMessageId,
+  ]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const showNavigator = displayMessages.length > 1;
@@ -485,7 +615,7 @@ export function MessageListView({
                           row={row}
                           context={contextFromProps}
                           readonly={readonly}
-                          autoFocusMessageId={autoFocusMessageId}
+                          autoFocusMessageId={pendingAutoFocusMessageId}
                           collapsed={collapsedMessageIdSet.has(row.message.id)}
                           runValidationIssue={runValidationIssue}
                         />
@@ -501,7 +631,7 @@ export function MessageListView({
                         row={row}
                         context={contextFromProps}
                         readonly={readonly}
-                        autoFocusMessageId={autoFocusMessageId}
+                        autoFocusMessageId={pendingAutoFocusMessageId}
                         collapsed={collapsedMessageIdSet.has(row.message.id)}
                         runValidationIssue={runValidationIssue}
                       />

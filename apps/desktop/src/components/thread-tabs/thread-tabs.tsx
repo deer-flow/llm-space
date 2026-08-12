@@ -1,6 +1,7 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
+import type { EditorCommitScopeHandle } from "@llm-space/ui/components/code-editor/editor-commit-scope";
 import { useTheme } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -34,8 +35,10 @@ import type { PaneLifecycleHost } from "./pane-lifecycle-host";
 import { RuntimePaneHost } from "./runtime-pane-host";
 import { ShareThreadMenuItem } from "./share-thread-menu-item";
 import { ThreadTabPane } from "./thread-tab-pane";
+import { useThreadViewCacheSize } from "./thread-view-cache-size";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
+import { useThreadViewLru } from "./use-thread-view-lru";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -94,6 +97,13 @@ interface ThreadTabsProps {
   onToggleSidebar?: () => void;
   lifecycleHost: PaneLifecycleHost;
   mutationRevision: number;
+  /** Commit editor-local drafts before a Thread View is evicted. */
+  commitThreadView: (paneId: string) => void;
+  /** Publish each disposable Thread View's current commit boundary. */
+  onViewCommitScopeReady: (
+    paneId: string,
+    handle: EditorCommitScopeHandle | null
+  ) => void;
   onThreadStateChange?: (tabId: string, thread: Thread | null) => void;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
@@ -125,6 +135,8 @@ export function ThreadTabs({
   onToggleSidebar,
   lifecycleHost,
   mutationRevision,
+  commitThreadView,
+  onViewCommitScopeReady,
   onThreadStateChange,
   toolbarSlot,
 }: ThreadTabsProps) {
@@ -222,6 +234,13 @@ export function ThreadTabs({
   // over the strip can't leak into a later gesture and close the wrong tab.
   // preventDefault also disables middle-click autoscroll on Windows/Linux.
   const middlePressedTabIdRef = useRef<string | null>(null);
+  const [threadViewCacheSize] = useThreadViewCacheSize();
+  const retainedThreadViews = useThreadViewLru({
+    tabs: paneTabs,
+    activeId,
+    capacity: threadViewCacheSize,
+    commitPane: commitThreadView,
+  });
   const handleMouseDownCapture = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (event.button !== 1) return;
@@ -257,7 +276,7 @@ export function ThreadTabs({
           path={tab.path}
           runtimeId={tab.runtimeId}
           active={active}
-          viewMounted={viewMounted}
+          viewMounted={retainedThreadViews.has(tab.paneId)}
           lifecycleHost={lifecycleHost}
           mutationRevision={mutationRevision}
           refreshNonce={tab.refreshNonce ?? 0}
@@ -266,6 +285,7 @@ export function ThreadTabs({
           onClose={close}
           consumeDiscardedPane={consumeDiscardedPane}
           onThreadStateChange={onThreadStateChange}
+          onViewCommitScopeReady={onViewCommitScopeReady}
         />
       ) : (
         <TraceTabPane
@@ -290,6 +310,8 @@ export function ThreadTabs({
       onMove,
       onThreadStateChange,
       onTraceTitleChange,
+      onViewCommitScopeReady,
+      retainedThreadViews,
     ]
   );
 

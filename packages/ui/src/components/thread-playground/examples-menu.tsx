@@ -32,7 +32,7 @@ export function ExamplesMenu<T extends ExampleItem>({
   align?: "start" | "end";
 }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm">
           Examples
