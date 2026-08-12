@@ -19,6 +19,8 @@ export async function getModelProviderGroups(
     imageGeneration:
       provider.id === "ark"
         ? modelManager.getArkImageGenerationConfig()
+        : provider.id === "minimax"
+          ? modelManager.getMiniMaxImageGenerationConfig()
         : undefined,
     websiteLink: modelManager.getWebsiteLink(provider.id),
     icon: modelManager.getProviderIcon(provider.id),

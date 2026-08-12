@@ -1,11 +1,11 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
-  ArkImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
   FileNode,
+  ImageGenerationConfig,
   McpCallToolResponse,
   McpServerDraft,
   McpServerToolsResponse,
@@ -114,7 +114,7 @@ export interface RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
-    imageGeneration?: ArkImageGenerationConfig;
+    imageGeneration?: ImageGenerationConfig;
   }): Promise<ModelProviderGroup[]>;
   setModelEnabled(input: {
     providerId: string;

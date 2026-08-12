@@ -5,5 +5,6 @@ export {
 export {
   createMediaBuiltInTools,
   generateImageTool,
+  generateMiniMaxImageTool,
   type MediaBuiltInToolsDependencies,
 } from "./media";

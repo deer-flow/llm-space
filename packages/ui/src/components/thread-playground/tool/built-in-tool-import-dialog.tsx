@@ -78,7 +78,10 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
 
 const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search", "weather_report"]);
 
-const MEDIA_TOOL_NAMES = new Set(["generate_image"]);
+const MEDIA_TOOL_NAMES = new Set([
+  "generate_image",
+  "generate_minimax_image",
+]);
 
 function _BuiltInToolImportDialog({
   existingToolNames,
