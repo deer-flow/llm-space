@@ -1,13 +1,19 @@
 /**
  * Update-flow status pushed from the bun process to the renderer over the
  * `updateStatusChanged` RPC message. `manual` marks flows started from the
- * "Check for Updates…" menu item; those surface feedback (checking /
- * up-to-date / errors) that automatic background checks keep silent.
+ * "Check for Updates…" menu item; those additionally surface checking,
+ * up-to-date, and error feedback. Downloads surface progress in either mode.
  */
 export type UpdateStatus =
   | { state: "checking" }
   | { state: "up-to-date"; version: string }
-  | { state: "downloading"; version: string }
+  | {
+      state: "downloading";
+      version: string;
+      progress?: number;
+      bytesDownloaded?: number;
+      totalBytes?: number;
+    }
   | { state: "ready"; version: string }
   | { state: "error"; message: string };
 

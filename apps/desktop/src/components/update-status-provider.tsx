@@ -85,16 +85,23 @@ function _UpdateReadyCard({
 /**
  * The passive "downloading" progress card for the bottom-right corner. A
  * download can take a while and needs no interaction, so it stays out of the way
- * (never a modal) with an indeterminate bar until the "ready" card replaces it.
+ * (never a modal) with byte-accurate progress when Electrobun provides it, or
+ * an indeterminate bar while patch downloads expose no total size.
  */
 function _UpdateDownloadingCard({
-  version,
+  status,
   onDismiss,
 }: {
-  version: string;
+  status: Extract<UpdateStatus, { state: "downloading" }>;
   onDismiss: () => void;
 }) {
   const dismissButtonRef = _useNativeClick(onDismiss);
+  const { version, progress, bytesDownloaded, totalBytes } = status;
+  const progressLabel = _formatDownloadProgress(
+    progress,
+    bytesDownloaded,
+    totalBytes
+  );
   return (
     <div className="pointer-events-auto w-[356px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
       <div className="flex items-center gap-3">
@@ -104,7 +111,7 @@ function _UpdateDownloadingCard({
         <div className="min-w-0 grow">
           <div className="text-sm font-medium">Downloading update</div>
           <div className="truncate text-xs text-white/65">
-            v{version} — this continues in the background.
+            v{version} — {progressLabel}
           </div>
         </div>
         <button
@@ -117,13 +124,40 @@ function _UpdateDownloadingCard({
         </button>
       </div>
       <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full w-2/5 rounded-full bg-white/70"
-          style={{ animation: "update-progress 1.2s ease-in-out infinite" }}
-        />
+        {progress === undefined ? (
+          <div
+            className="h-full w-2/5 rounded-full bg-white/70"
+            style={{ animation: "update-progress 1.2s ease-in-out infinite" }}
+          />
+        ) : (
+          <div
+            className="h-full rounded-full bg-white/70 transition-[width] duration-300"
+            style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+          />
+        )}
       </div>
     </div>
   );
+}
+
+function _formatDownloadProgress(
+  progress?: number,
+  bytesDownloaded?: number,
+  totalBytes?: number
+): string {
+  const percent = progress === undefined ? null : `${Math.round(progress)}%`;
+  if (bytesDownloaded === undefined) {
+    return percent ?? "this continues in the background.";
+  }
+
+  const downloaded = _formatBytes(bytesDownloaded);
+  const size = totalBytes === undefined ? downloaded : `${downloaded} / ${_formatBytes(totalBytes)}`;
+  return percent ? `${percent} · ${size}` : size;
+}
+
+function _formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /**
@@ -210,24 +244,22 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
           return;
         }
         // Long, non-interactive → hand off to the non-blocking corner and close
-        // the check dialog. Background downloads stay fully silent.
+        // the check dialog. Both automatic and manual downloads surface progress.
         case "downloading": {
           setDialogOpen(false);
-          if (manual) {
-            toast.custom(
-              (id) => (
-                <_UpdateDownloadingCard
-                  version={status.version}
-                  onDismiss={() => toast.dismiss(id)}
-                />
-              ),
-              {
-                id: DOWNLOADING_TOAST_ID,
-                position: UPDATE_TOAST_POSITION,
-                duration: Infinity,
-              }
-            );
-          }
+          toast.custom(
+            (id) => (
+              <_UpdateDownloadingCard
+                status={status}
+                onDismiss={() => toast.dismiss(id)}
+              />
+            ),
+            {
+              id: DOWNLOADING_TOAST_ID,
+              position: UPDATE_TOAST_POSITION,
+              duration: Infinity,
+            }
+          );
           return;
         }
         // Downloaded → replace the progress card with the actionable ready card

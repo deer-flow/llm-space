@@ -65,6 +65,7 @@ interface View {
   icon: LucideIcon;
   spin?: boolean;
   progress?: boolean;
+  progressValue?: number;
   title: string;
   description: string;
   actions: ReactNode | null;
@@ -91,7 +92,13 @@ function UpdateDialogBody({
           {view.description}
         </DialogDescription>
       </DialogHeader>
-      {view.progress ? <IndeterminateBar tone={view.tone} /> : null}
+      {view.progress ? (
+        view.progressValue === undefined ? (
+          <IndeterminateBar tone={view.tone} />
+        ) : (
+          <DeterminateBar tone={view.tone} value={view.progressValue} />
+        )
+      ) : null}
       {view.actions ? (
         <DialogFooter className="mt-6 w-full sm:justify-center">
           {view.actions}
@@ -126,8 +133,12 @@ function viewFor(
         icon: Loader2Icon,
         spin: true,
         progress: true,
+        progressValue: status.progress,
         title: "Downloading update",
-        description: `Getting version ${status.version} ready to install…`,
+        description:
+          status.progress === undefined
+            ? `Getting version ${status.version} ready to install…`
+            : `Getting version ${status.version} ready to install… ${Math.round(status.progress)}%`,
         actions: (
           <Button size="sm" variant="outline" onClick={onClose}>
             Continue in background
@@ -244,6 +255,20 @@ function IndeterminateBar({ tone }: { tone: Tone }) {
       <div
         className={cn("absolute inset-y-0 w-2/5 rounded-full", t.bar)}
         style={{ animation: "update-progress 1.2s ease-in-out infinite" }}
+      />
+    </div>
+  );
+}
+
+function DeterminateBar({ tone, value }: { tone: Tone; value: number }) {
+  return (
+    <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className={cn(
+          "h-full rounded-full transition-[width] duration-300",
+          tone === "danger" ? "bg-destructive" : "bg-primary"
+        )}
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
   );

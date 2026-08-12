@@ -1,4 +1,4 @@
-import { Updater } from "electrobun/bun";
+import { Updater, type UpdateStatusEntry } from "electrobun/bun";
 
 import type { UpdateMode, UpdateStatus } from "../../shared/updates";
 import { setUpdateReadyInMenu } from "../app/menu";
@@ -56,7 +56,22 @@ export class UpdaterService {
         return;
       }
       this._sendStatus({ state: "downloading", version: info.version });
-      await Updater.downloadUpdate();
+      Updater.onStatusChange((entry: UpdateStatusEntry) => {
+        if (entry.status !== "download-progress") return;
+        const { progress, bytesDownloaded, totalBytes } = entry.details ?? {};
+        this._sendStatus({
+          state: "downloading",
+          version: info.version,
+          progress,
+          bytesDownloaded,
+          totalBytes,
+        });
+      });
+      try {
+        await Updater.downloadUpdate();
+      } finally {
+        Updater.onStatusChange(null);
+      }
       if (!Updater.updateInfo()?.updateReady) {
         const message =
           Updater.updateInfo()?.error || "download did not complete";
