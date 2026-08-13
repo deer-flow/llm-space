@@ -108,6 +108,20 @@ The user guide lives in this repository:
 - [User manual](./docs/index.md)
 - [Core concepts](./docs/core-concepts.md)
 
+## 📚 Developer Learning Course
+
+New to the codebase? We provide a **complete, structured learning wiki** designed to take junior developers and contributors from zero to fully understanding how to develop on LLM Space.
+
+**[Open the learning wiki →](./llm-space-learning-wiki/index.html)**
+
+The self-contained HTML wiki includes:
+- **7 chapters, 31 lessons** covering foundations (JS/TS/React/async), architecture tour, core domain logic, agent runtime, desktop app, remote runtime, and UI engineering
+- Tiered content for beginners: prerequisite markers, lesson durations, and external concept explanations
+- Interactive SPA with search, progress tracking (local storage), glossary, and source markdown viewer
+- No build required — just open `llm-space-learning-wiki/index.html` directly in your browser
+
+Source markdown files and the generation script are in the [`llm-space-learning-wiki/`](./llm-space-learning-wiki/) folder.
+
 ## Contributing
 
 For now, we only merge pull requests from the [DeerFlow](https://github.com/bytedance/deer-flow) core team members.

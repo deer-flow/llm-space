@@ -108,6 +108,20 @@ mise run build:canary
 - [用户手册](./docs/index.zh-CN.md)
 - [核心概念](./docs/core-concepts.zh-CN.md)
 
+## 📚 开发者学习课程
+
+刚接触代码库？我们提供了一份**完整、结构化的学习 wiki**，帮助初级开发者和贡献者从零开始，完全掌握如何在 LLM Space 上进行开发。
+
+**[打开学习 wiki →](./llm-space-learning-wiki/index.html)**
+
+这个自包含的 HTML wiki 包含：
+- **7 个章节、31 节课**，涵盖基础知识（JS/TS/React/异步）、架构导览、核心领域逻辑、Agent 运行时、桌面应用、远程运行时、UI 工程
+- 面向初学者的分级内容：前置知识标记、课程时长、外部概念补充解释
+- 交互式单页应用：搜索、学习进度记录（本地存储）、术语表、源码 Markdown 查看器
+- 无需构建 —— 直接在浏览器中打开 `llm-space-learning-wiki/index.html` 即可使用
+
+源 Markdown 文件和生成脚本位于 [`llm-space-learning-wiki/`](./llm-space-learning-wiki/) 文件夹中。
+
 ## 参与贡献
 
 目前我们只合并来自 [DeerFlow](https://github.com/bytedance/deer-flow) 核心团队成员的 Pull Request。
