@@ -1,0 +1,44 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "type": "page",
+      "htmlSrc": "pages/index.html",
+      "title": "LLM Space 4 完全开发课程",
+      "deviceType": "desktop",
+      "order": 0,
+      "version": 1,
+      "createdAt": 1786079489,
+      "canvasData": {
+        "group": 0,
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 13632,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-3527ef08",
+          "measuredAt": 1786080260360
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "designLibrary": {
+      "name": "Volcengine Copy-1",
+      "id": "22N1LGOZ9CUTNS",
+      "version": "1",
+      "scope": "custom-global",
+      "path": null,
+      "versionSource": null
+    },
+    "themeMode": "light"
+  }
+}
