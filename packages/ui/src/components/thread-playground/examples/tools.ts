@@ -631,9 +631,8 @@ const GENERATE_IMAGE_TOOL: FunctionTool = _functionTool({
       },
       output_directory: {
         type: "string",
-        minLength: 1,
         description:
-          "Optional absolute directory for the generated image file; a leading ~/ is expanded to the current user's home directory. Omit it to use the system temporary directory.",
+          "Optional absolute directory for the generated image file; a leading ~/ is expanded to the current user's home directory. Invalid or unwritable directories fall back to the system temporary directory.",
       },
     },
     additionalProperties: false,
