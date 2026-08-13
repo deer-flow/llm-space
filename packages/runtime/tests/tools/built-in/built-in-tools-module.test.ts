@@ -102,6 +102,7 @@ describe("built-in tools module", () => {
       "bash",
       "present_files",
       "generate_image",
+      "generate_minimax_image",
       "todo_write",
       "sleep",
       "ask_user_question",
