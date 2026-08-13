@@ -629,6 +629,12 @@ const GENERATE_IMAGE_TOOL: FunctionTool = _functionTool({
         description:
           'Aspect ratio of the generated image (e.g. "1:1", "16:9", "9:16")',
       },
+      output_directory: {
+        type: "string",
+        minLength: 1,
+        description:
+          "Optional absolute directory for the generated image file; a leading ~/ is expanded to the current user's home directory. Omit it to use the system temporary directory.",
+      },
     },
     additionalProperties: false,
   },
