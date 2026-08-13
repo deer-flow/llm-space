@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm, truncate, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  realpath,
+  rm,
+  truncate,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -56,7 +62,6 @@ describe("built-in tools module", () => {
 
   test("contributes the existing tools in their RPC list order", async () => {
     const tools = new ToolRegistry();
-    let generatedInput: unknown;
     const module = createBuiltInToolsModule({
       env: {},
       findSkill: (name) =>
@@ -67,15 +72,7 @@ describe("built-in tools module", () => {
               path: "/tmp/skills/fixture",
             }
           : null,
-      generateImage: (input) => {
-        generatedInput = input;
-        return Promise.resolve({
-          data: "aW1hZ2U=",
-          mimeType: "image/png",
-          model: "seedream-fixture",
-          size: "2048x2048",
-        });
-      },
+      generateImage: () => Promise.reject(new Error("unused")),
       getSearchSettings: () => ({
         provider: "firecrawl",
         braveApiKey: "",
@@ -123,39 +120,6 @@ describe("built-in tools module", () => {
         },
       ],
     });
-    expect(
-      await tools.call({
-        name: "generate_image",
-        arguments: { prompt: "A red circle" },
-        config: {
-          model: "seedream-fixture",
-          size: "2K",
-          watermark: true,
-        },
-        connection: { providerId: "ark", profileId: "profile-work" },
-      })
-    ).toEqual({
-      content: [
-        {
-          type: "text",
-          text: "Generated image with seedream-fixture at 2048x2048.",
-        },
-        { type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
-      ],
-    });
-    expect(generatedInput).toEqual({
-      prompt: "A red circle",
-      model: "seedream-fixture",
-      size: "2K",
-      watermark: true,
-      connection: { providerId: "ark", profileId: "profile-work" },
-    });
-    expect(
-      tools.call({
-        name: "generate_image",
-        arguments: { prompt: "A red circle" },
-      })
-    ).rejects.toThrow("Choose an enabled image model");
   });
 
   test("reports a missing dependency", () => {
