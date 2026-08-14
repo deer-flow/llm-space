@@ -1,6 +1,6 @@
 {
   "name": "@llm-space/desktop",
-  "version": "4.12.0",
+  "version": "4.12.1",
   "scripts": {
     "start": "vite build && LLM_SPACE_DEEP_LINK_SCHEME=llm-space-dev electrobun dev",
     "dev:watch": "LLM_SPACE_DEEP_LINK_SCHEME=llm-space-dev electrobun dev --watch",
