@@ -264,6 +264,28 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { fullScreen: boolean };
       };
+      localStorageGet: {
+        params: Record<string, never>;
+        response: {
+          initialized: boolean;
+          values: Record<string, string>;
+        };
+      };
+      localStorageInitialize: {
+        params: { values: Record<string, string> };
+        response: {
+          initialized: boolean;
+          values: Record<string, string>;
+        };
+      };
+      localStorageSet: {
+        params: { key: string; value: string };
+        response: null;
+      };
+      localStorageRemove: {
+        params: { key: string };
+        response: null;
+      };
       // Resolve a directory under the llm-space root, creating it (recursively)
       // if missing, and return its absolute path. The renderer can't touch the
       // filesystem or read the root itself.

@@ -12,7 +12,17 @@
       (function () {
         try {
           var root = document.documentElement;
-          var theme = localStorage.getItem("llm-space-theme") || "dark";
+          var params = new URLSearchParams(location.search);
+          var initialTheme = params.get("llm-space-theme");
+          var theme =
+            initialTheme === "light" ||
+            initialTheme === "dark" ||
+            initialTheme === "system"
+              ? initialTheme
+              : localStorage.getItem("llm-space-theme") || "dark";
+          if (initialTheme === theme) {
+            localStorage.setItem("llm-space-theme", theme);
+          }
           var dark =
             theme === "dark" ||
             (theme === "system" &&
@@ -20,12 +30,26 @@
           root.classList.toggle("dark", dark);
 
           // "Lite" fidelity disables all transitions/animations (see globals.css).
-          root.classList.toggle(
-            "lite",
-            localStorage.getItem("llm-space-rendering-fidelity") === "lite"
+          var initialFidelity = params.get(
+            "llm-space-rendering-fidelity"
           );
+          var fidelity =
+            initialFidelity === "rich" || initialFidelity === "lite"
+              ? initialFidelity
+              : localStorage.getItem("llm-space-rendering-fidelity");
+          if (initialFidelity === fidelity) {
+            localStorage.setItem("llm-space-rendering-fidelity", fidelity);
+          }
+          root.classList.toggle("lite", fidelity === "lite");
 
-          var primary = localStorage.getItem("llm-space-primary");
+          var initialPrimary = params.get("llm-space-primary");
+          var primary =
+            initialPrimary && /^#[0-9a-fA-F]{6}$/.test(initialPrimary)
+              ? initialPrimary
+              : localStorage.getItem("llm-space-primary");
+          if (initialPrimary === primary) {
+            localStorage.setItem("llm-space-primary", primary);
+          }
           if (primary && /^#[0-9a-fA-F]{6}$/.test(primary)) {
             var n = parseInt(primary.slice(1), 16);
             var lin = function (c) {

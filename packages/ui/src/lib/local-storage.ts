@@ -23,8 +23,41 @@ export const LOCAL_STORAGE_KEYS = {
   fileTreeExpanded: "llm-space:fs-tree:expanded",
 } as const;
 
-export type LocalStorageKey =
+type RegisteredLocalStorageKey =
   (typeof LOCAL_STORAGE_KEYS)[keyof typeof LOCAL_STORAGE_KEYS];
+
+/** File-tree expansion state is namespaced once per runtime. */
+export type LocalStorageKey =
+  | RegisteredLocalStorageKey
+  | `${typeof LOCAL_STORAGE_KEYS.fileTreeExpanded}:${string}`;
+
+export type LocalStorageValues = Record<string, string>;
+
+export interface LocalStoragePersistence {
+  setItem(key: LocalStorageKey, value: string): void;
+  removeItem(key: LocalStorageKey): void;
+}
+
+let persistence: LocalStoragePersistence | null = null;
+
+/**
+ * Attach an optional host persistence mirror. Browser-only consumers leave this
+ * unset and continue to use native localStorage alone.
+ */
+export function configureLocalStoragePersistence(
+  next: LocalStoragePersistence | null
+): void {
+  persistence = next;
+}
+
+export function isManagedLocalStorageKey(
+  key: string
+): key is LocalStorageKey {
+  return (
+    (Object.values(LOCAL_STORAGE_KEYS) as string[]).includes(key) ||
+    key.startsWith(`${LOCAL_STORAGE_KEYS.fileTreeExpanded}:`)
+  );
+}
 
 function _getLocalStorage(): Storage | null {
   if (typeof window === "undefined") {
@@ -55,6 +88,7 @@ export function writeLocalStorage(
       return false;
     }
     storage.setItem(key, value);
+    persistence?.setItem(key, value);
     return true;
   } catch {
     return false;
@@ -68,6 +102,43 @@ export function removeLocalStorage(key: LocalStorageKey): boolean {
       return false;
     }
     storage.removeItem(key);
+    persistence?.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Snapshot only keys owned by this API, excluding unrelated origin storage. */
+export function readLocalStorageValues(): LocalStorageValues {
+  const storage = _getLocalStorage();
+  if (!storage) return {};
+  const values: LocalStorageValues = {};
+  try {
+    for (let index = 0; index < storage.length; index++) {
+      const key = storage.key(index);
+      if (!key || !isManagedLocalStorageKey(key)) continue;
+      const value = storage.getItem(key);
+      if (value !== null) values[key] = value;
+    }
+  } catch {
+    return {};
+  }
+  return values;
+}
+
+/** Replace the browser copy without notifying the configured host mirror. */
+export function hydrateLocalStorage(values: LocalStorageValues): boolean {
+  const storage = _getLocalStorage();
+  if (!storage) return false;
+  try {
+    const existingKeys = Object.keys(readLocalStorageValues());
+    for (const key of existingKeys) {
+      if (!(key in values)) storage.removeItem(key);
+    }
+    for (const [key, value] of Object.entries(values)) {
+      if (isManagedLocalStorageKey(key)) storage.setItem(key, value);
+    }
     return true;
   } catch {
     return false;

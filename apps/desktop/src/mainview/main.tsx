@@ -3,30 +3,66 @@
 // the toolbar is tree-shaken out of shipped bundles.
 
 import {
+  configureLocalStoragePersistence,
+  hydrateLocalStorage,
   LOCAL_STORAGE_KEYS,
+  readLocalStorageValues,
   readLocalStorage,
 } from "@llm-space/ui/lib/local-storage";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { scan } from "react-scan";
 
-import "@/lib/electrobun";
-
-import { App } from "../app";
+import { electrobun } from "@/lib/electrobun";
 
 // Opt-in via the Experimental settings; the toggle only takes effect on the
 // next reload since react-scan must patch the reconciler before React renders.
 // Gated on `import.meta.env.DEV` (statically false in production), so the whole
 // block — and the `react-scan` import — is tree-shaken out of shipped bundles.
-if (
-  import.meta.env.DEV &&
-  readLocalStorage(LOCAL_STORAGE_KEYS.experimentalReactScan) === "true"
-) {
-  scan({ enabled: true });
+async function startRenderer(): Promise<void> {
+  const rpc = electrobun.rpc;
+  if (rpc) {
+    try {
+      let snapshot = await rpc.request.localStorageGet({});
+      if (!snapshot.initialized) {
+        snapshot = await rpc.request.localStorageInitialize({
+          values: readLocalStorageValues(),
+        });
+      }
+      hydrateLocalStorage(snapshot.values);
+
+      let persistenceQueue: Promise<unknown> = Promise.resolve();
+      const persist = (operation: () => Promise<unknown>) => {
+        persistenceQueue = persistenceQueue
+          .then(operation)
+          .catch((error: unknown) =>
+            console.error("Failed to persist localStorage:", error)
+          );
+      };
+      configureLocalStoragePersistence({
+        setItem: (key, value) =>
+          persist(() => rpc.request.localStorageSet({ key, value })),
+        removeItem: (key) =>
+          persist(() => rpc.request.localStorageRemove({ key })),
+      });
+    } catch (error) {
+      console.error("Failed to hydrate localStorage:", error);
+    }
+  }
+
+  if (
+    import.meta.env.DEV &&
+    readLocalStorage(LOCAL_STORAGE_KEYS.experimentalReactScan) === "true"
+  ) {
+    scan({ enabled: true });
+  }
+
+  const { App } = await import("../app");
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+void startRenderer();

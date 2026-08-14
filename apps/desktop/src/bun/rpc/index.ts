@@ -18,6 +18,7 @@ import {
   runUv,
   writeProjectFile,
 } from "../fs";
+import type { LocalStorageManager } from "../local-storage";
 import type { PluginCommandExecutionController } from "../plugins/plugin-command-execution-controller";
 import {
   dismissGithubStarReminder,
@@ -55,6 +56,7 @@ export interface MainWindowRPCDependencies {
   /** Publishes a thread as a secret gist for the `shareThread` request. */
   gistWriter: GistThreadWriter;
   homePath: string;
+  localStorageManager: LocalStorageManager;
   runtimeRouter: RuntimeRouter;
   remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
@@ -73,6 +75,7 @@ export function createMainWindowRPC({
   getMainWindow,
   gistWriter,
   homePath,
+  localStorageManager,
   runtimeRouter,
   remoteServerManager,
   skillsManager,
@@ -188,6 +191,21 @@ export function createMainWindowRPC({
         isFullScreen: () => {
           const mainWindow = getMainWindow();
           return { fullScreen: mainWindow.isFullScreen() };
+        },
+        localStorageGet: () => Promise.resolve(localStorageManager.snapshot()),
+        localStorageInitialize: ({ values }) => {
+          _assertLocalStorageValues(values);
+          return Promise.resolve(localStorageManager.initialize(values));
+        },
+        localStorageSet: ({ key, value }) => {
+          _assertLocalStorageKey(key);
+          localStorageManager.setItem(key, value);
+          return Promise.resolve(null);
+        },
+        localStorageRemove: ({ key }) => {
+          _assertLocalStorageKey(key);
+          localStorageManager.removeItem(key);
+          return Promise.resolve(null);
         },
         ensureRootDir: ({ relativePath }) => {
           const dir = ensureRootDir(homePath, relativePath);
@@ -545,4 +563,14 @@ export function createMainWindowRPC({
     },
   });
   return rpc;
+}
+
+function _assertLocalStorageKey(key: string): void {
+  if (!key.startsWith("llm-space")) {
+    throw new Error(`Unmanaged localStorage key: ${key}`);
+  }
+}
+
+function _assertLocalStorageValues(values: Record<string, string>): void {
+  for (const key of Object.keys(values)) _assertLocalStorageKey(key);
 }

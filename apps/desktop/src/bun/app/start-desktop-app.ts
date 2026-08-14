@@ -24,6 +24,7 @@ import { activateWindowForDeepLink } from "../deep-link/activate-window";
 import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
+import { LocalStorageManager } from "../local-storage";
 import { McpManager } from "../mcp";
 import { createConfiguredArkImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
@@ -58,6 +59,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const homePath = getLlmSpaceHomePath();
   const workspacePath = path.join(homePath, "workspace");
   const analytics = new Analytics();
+  const localStorageManager = new LocalStorageManager();
   // Apply the configured proxy to `process.env` before anything spawns a
   // subprocess (MCP) or makes a request, so egress is routed from the start.
   const networkSettings = new NetworkSettingsManager();
@@ -284,6 +286,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       getMainWindow,
       gistWriter,
       homePath,
+      localStorageManager,
       runtimeRouter,
       remoteServerManager,
       skillsManager,
@@ -294,7 +297,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     remoteServerManager.setStatusListener((payload) =>
       getRpc().send.remoteServerStatusChanged(payload)
     );
-    mainWindow = await createMainWindow({ rpc, executeCommand });
+    mainWindow = await createMainWindow({
+      rpc,
+      executeCommand,
+      localStorageValues: localStorageManager.snapshot().values,
+    });
 
     // The window + rpc are ready — wire the importer and flush any deep links
     // buffered at process entry during a cold-start launch (see deep-link/launch).
