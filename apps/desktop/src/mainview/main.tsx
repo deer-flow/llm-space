@@ -15,6 +15,8 @@ import { scan } from "react-scan";
 
 import { electrobun } from "@/lib/electrobun";
 
+import { applyAppearancePreferences } from "./apply-appearance-preferences";
+
 // Opt-in via the Experimental settings; the toggle only takes effect on the
 // next reload since react-scan must patch the reconciler before React renders.
 // Gated on `import.meta.env.DEV` (statically false in production), so the whole
@@ -30,6 +32,7 @@ async function startRenderer(): Promise<void> {
         });
       }
       hydrateLocalStorage(snapshot.values);
+      applyAppearancePreferences(snapshot.values);
 
       let persistenceQueue: Promise<unknown> = Promise.resolve();
       const persist = (operation: () => Promise<unknown>) => {

@@ -4,6 +4,14 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.1] - 2026-08-14
+
+### Fixed
+
+- The Performance edition once again loads its packaged renderer at startup.
+  Appearance preferences are hydrated from disk before React mounts without
+  adding an unsupported query string to Electrobun's `views://` URL.
+
 ## [4.12.0] - 2026-08-14
 
 This release makes generated media durable, improves update visibility and

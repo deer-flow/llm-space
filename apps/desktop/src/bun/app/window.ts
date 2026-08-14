@@ -11,6 +11,7 @@ import { BrowserWindow, Updater } from "electrobun/bun";
 import type { Command } from "../../shared/commands";
 import type { MainWindowRPC } from "../rpc";
 
+import { withAppearancePreferences } from "./main-view-url";
 import { registerMenuActions } from "./menu";
 import { attachWindowStates } from "./window-state";
 
@@ -26,33 +27,17 @@ async function getMainViewUrl(
     try {
       await fetch(DEV_SERVER_URL, { method: "HEAD" });
       console.info(`HMR enabled: Using Vite dev server at ${DEV_SERVER_URL}`);
-      return _withAppearancePreferences(DEV_SERVER_URL, localStorageValues);
+      return withAppearancePreferences(DEV_SERVER_URL, localStorageValues);
     } catch {
       console.info(
         "Vite dev server not running. Run 'bun run dev:hmr' for HMR support."
       );
     }
   }
-  return _withAppearancePreferences(
+  return withAppearancePreferences(
     "views://mainview/index.html",
     localStorageValues
   );
-}
-
-function _withAppearancePreferences(
-  url: string,
-  values: Record<string, string>
-): string {
-  const themedUrl = new URL(url);
-  for (const key of [
-    "llm-space-theme",
-    "llm-space-primary",
-    "llm-space-rendering-fidelity",
-  ]) {
-    const value = values[key];
-    if (value !== undefined) themedUrl.searchParams.set(key, value);
-  }
-  return themedUrl.toString();
 }
 
 export async function createMainWindow({
