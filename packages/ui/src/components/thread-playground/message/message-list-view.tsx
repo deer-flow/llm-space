@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { AssistantMessage, Message, ThreadContext } from "@llm-space/core";
+import type { Message, ThreadContext } from "@llm-space/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PlusIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +33,7 @@ import {
   useThreadStoreActions,
 } from "../stores";
 
+import { resolveDisplayMessages } from "./display-messages";
 import {
   ImageDisplayProvider,
   type ImageDisplayContextValue,
@@ -65,6 +66,9 @@ export function MessageListView({
 }) {
   const isSnapshotView = messagesFromProps !== undefined;
   const status = useThreadStore((state) => state.status);
+  const streamingMessageId = useThreadStore(
+    (state) => state.streamingMessage?.id ?? null
+  );
   const collapsedMessageIds = useThreadStore(
     (state) => state.collapsedMessageIds
   );
@@ -84,12 +88,28 @@ export function MessageListView({
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
     null
   );
+  const activeMessageIndexRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messages = useMemo(
     () => messagesFromProps ?? storeMessages ?? [],
     [messagesFromProps, storeMessages]
   );
   const readonly = readonlyFromProps || isSnapshotView;
+  const displayRows = useMemo(
+    () =>
+      isSnapshotView
+        ? messages.map((message) => ({ message, streaming: false }))
+        : resolveDisplayMessages(
+            messages,
+            streamingMessageId,
+            status === "running"
+          ),
+    [isSnapshotView, messages, status, streamingMessageId]
+  );
+  const displayMessages = useMemo(
+    () => displayRows.map((row) => row.message),
+    [displayRows]
+  );
   const messageIds = useMemo(
     () => messages.map((message) => message.id),
     [messages]
@@ -99,8 +119,8 @@ export function MessageListView({
     [collapsedMessageIds]
   );
   const getMessageKey = useCallback(
-    (index: number) => messages[index]?.id ?? index,
-    [messages]
+    (index: number) => displayMessages[index]?.id ?? index,
+    [displayMessages]
   );
   const getScrollElement = useCallback(
     () =>
@@ -112,7 +132,7 @@ export function MessageListView({
   // TanStack Virtual exposes a mutable imperative controller by design.
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: displayRows.length,
     estimateSize: () => MESSAGE_ESTIMATED_HEIGHT,
     getItemKey: getMessageKey,
     getScrollElement,
@@ -129,7 +149,10 @@ export function MessageListView({
         instance.scrollOffset ?? 0,
         viewportHeight
       );
-      setActiveMessageIndex((current) => (current === index ? current : index));
+      if (activeMessageIndexRef.current !== index) {
+        activeMessageIndexRef.current = index;
+        setActiveMessageIndex(index);
+      }
     },
   });
   const addMessageSuggested =
@@ -194,6 +217,7 @@ export function MessageListView({
   }, [getScrollElement]);
   const jumpToMessage = useCallback(
     (index: number) => {
+      activeMessageIndexRef.current = index;
       setActiveMessageIndex(index);
       virtualizer.scrollToIndex(index, {
         align: "center",
@@ -240,7 +264,7 @@ export function MessageListView({
 
   const virtualItems = virtualizer.getVirtualItems();
   const firstVirtualItem = virtualItems[0];
-  const showNavigator = messages.length > 1;
+  const showNavigator = displayMessages.length > 1;
 
   return (
     <div className={cn("relative size-full", className)}>
@@ -270,8 +294,8 @@ export function MessageListView({
                     }}
                   >
                     {virtualItems.map((virtualItem) => {
-                      const message = messages[virtualItem.index];
-                      if (!message) {
+                      const row = displayRows[virtualItem.index];
+                      if (!row) {
                         return null;
                       }
                       return (
@@ -281,18 +305,26 @@ export function MessageListView({
                           className="w-full"
                           data-index={virtualItem.index}
                         >
-                          <SortableMessageRow
-                            context={contextFromProps}
-                            message={message}
-                            readonly={readonly}
-                            autoFocus={message.id === autoFocusMessageId}
-                            collapsed={collapsedMessageIdSet.has(message.id)}
-                            runValidationIssue={
-                              message.id === runValidationIssue?.messageId
-                                ? runValidationIssue
-                                : null
-                            }
-                          />
+                          {row.streaming ? (
+                            <StreamingMessageRow message={row.message} />
+                          ) : (
+                            <SortableMessageRow
+                              context={contextFromProps}
+                              message={row.message}
+                              readonly={readonly}
+                              autoFocus={
+                                row.message.id === autoFocusMessageId
+                              }
+                              collapsed={collapsedMessageIdSet.has(
+                                row.message.id
+                              )}
+                              runValidationIssue={
+                                row.message.id === runValidationIssue?.messageId
+                                  ? runValidationIssue
+                                  : null
+                              }
+                            />
+                          )}
                         </div>
                       );
                     })}
@@ -312,9 +344,6 @@ export function MessageListView({
                 ) : null}
               </DragOverlay>
             </DndContext>
-            {!isSnapshotView ? (
-              <StreamingMessageListItem streaming={status === "running"} />
-            ) : null}
             <div className="relative rounded-lg">
               <Button
                 className={cn(
@@ -356,7 +385,7 @@ export function MessageListView({
       {showNavigator ? (
         <MessageNavigator
           activeIndex={activeMessageIndex}
-          messages={messages}
+          messages={displayMessages}
           onJump={jumpToMessage}
         />
       ) : null}
@@ -416,26 +445,13 @@ const _SortableMessageRow = function SortableMessageRow({
 };
 const SortableMessageRow = memo(_SortableMessageRow);
 
-function StreamingMessageListItem({ streaming }: { streaming: boolean }) {
-  let streamingMessage: AssistantMessage | null = useThreadStore(
-    (state) => state.streamingMessage
+function StreamingMessageRow({ message }: { message: Message }) {
+  const liveMessage = useThreadStore((state) =>
+    state.streamingMessage?.id === message.id ? state.streamingMessage : null
   );
-  if (!streamingMessage && streaming) {
-    streamingMessage = {
-      id: "streaming",
-      role: "assistant",
-      content: [],
-    };
-  }
-  if (!streamingMessage) {
-    return null;
-  }
   return (
-    <MessageListItem
-      className="mb-3.5"
-      message={streamingMessage}
-      readonly
-      streaming
-    />
+    <div className="pb-3.5">
+      <MessageListItem message={liveMessage ?? message} readonly streaming />
+    </div>
   );
 }

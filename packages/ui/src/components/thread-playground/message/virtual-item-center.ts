@@ -4,7 +4,7 @@ export interface VirtualItemBounds {
   end: number;
 }
 
-/** Find the rendered virtual item closest to the viewport's visual center. */
+/** Find the rendered virtual item containing, or nearest to, viewport center. */
 export function findCenteredVirtualItemIndex(
   items: readonly VirtualItemBounds[],
   scrollOffset: number,
@@ -15,7 +15,12 @@ export function findCenteredVirtualItemIndex(
   let index: number | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
   for (const item of items) {
-    const distance = Math.abs((item.start + item.end) / 2 - viewportCenter);
+    const distance =
+      viewportCenter < item.start
+        ? item.start - viewportCenter
+        : viewportCenter > item.end
+          ? viewportCenter - item.end
+          : 0;
     if (distance < closestDistance) {
       index = item.index;
       closestDistance = distance;
