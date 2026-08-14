@@ -1,10 +1,34 @@
 # Changelog
 
-English | [简体中文](./CHANGELOG.zh-CN.md)
-
 All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [4.12.0] - 2026-08-14
+
+This release makes generated media durable, improves update visibility and
+model-provider management, and stabilizes long streaming conversations.
+
+### Added
+
+- Generated images and other media are persisted to an output directory so
+  results remain available after the generating Tool call finishes.
+- The update dialog reports download progress while a new desktop build is
+  being fetched.
+
+### Changed
+
+- Model-provider connection profiles use a clearer nested management layout
+  with more consistent editing controls.
+- Renderer preferences, including the selected theme, are persisted through a
+  single disk-backed local-storage service in `settings/local-storage.json`.
+
+### Fixed
+
+- Long Assistant messages no longer cause the conversation to jump when
+  streaming ends, and the message ruler selects the item containing the
+  viewport center instead of a nearby shorter message.
+- Provider editor spacing and Plugin directory actions are more consistent.
 
 ## [4.11.0] - 2026-08-11
 
