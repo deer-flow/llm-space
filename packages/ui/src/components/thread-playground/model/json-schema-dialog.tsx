@@ -73,11 +73,11 @@ export function JsonSchemaDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[75vh]! w-full flex-col gap-4 sm:max-w-4xl"
+        className="flex h-[75vh]! max-h-[calc(100dvh-2rem)] w-full flex-col gap-4 overflow-hidden sm:max-w-4xl"
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>Edit response schema</DialogTitle>
           <DialogDescription>
             The model constrains its response to this JSON Schema. Support and
@@ -87,7 +87,7 @@ export function JsonSchemaDialog({
 
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <CodeEditor
-            className="min-h-80 flex-1 font-mono text-sm"
+            className="min-h-0 flex-1 font-mono text-sm"
             language="json"
             value={text}
             autoFocus
@@ -95,7 +95,7 @@ export function JsonSchemaDialog({
           />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

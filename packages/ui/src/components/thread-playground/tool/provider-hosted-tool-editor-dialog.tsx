@@ -89,11 +89,11 @@ export function ProviderHostedToolEditorDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[65vh]! w-full flex-col gap-4 sm:max-w-3xl"
+        className="flex h-[65vh]! max-h-[calc(100dvh-2rem)] w-full flex-col gap-4 overflow-hidden sm:max-w-3xl"
         onInteractOutside={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {tool
               ? "Edit provider-hosted tool"
@@ -111,14 +111,14 @@ export function ProviderHostedToolEditorDialog({
           <div className="text-sm font-medium">Configuration</div>
           <CodeEditor
             ref={editorRef}
-            className="min-h-64 flex-1 font-mono text-sm"
+            className="min-h-0 flex-1 font-mono text-sm"
             language="json"
             value={text}
             autoFocus
             onChange={setText}
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
