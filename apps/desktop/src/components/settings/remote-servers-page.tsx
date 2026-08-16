@@ -671,8 +671,11 @@ function SshHostKeyDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onReject()}>
-      <DialogContent className="sm:max-w-xl" showCloseButton={false}>
-        <DialogHeader>
+      <DialogContent
+        className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-xl"
+        showCloseButton={false}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {changed ? "SSH host key changed" : "Trust this SSH host?"}
           </DialogTitle>
@@ -682,40 +685,42 @@ function SshHostKeyDialog({
               : "LLM Space has not connected to this SSH host before. Confirm the fingerprint before continuing."}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-2 rounded-lg border p-3 text-sm">
-          <Info label="Host" value={request.host} />
-          <Info label="Target" value={request.target} />
-          {request.resolvedHost ? (
-            <Info label="Resolved" value={_endpoint(request)} />
-          ) : null}
-          {request.user ? <Info label="User" value={request.user} /> : null}
-          <Info label="Key type" value={request.keyType} />
-          <Info label="Fingerprint" value={request.fingerprint} />
-          {request.knownHostsFile ? (
-            <Info label="known_hosts" value={request.knownHostsFile} />
-          ) : null}
-          {request.knownHostsLine ? (
-            <Info
-              label="Offending line"
-              value={String(request.knownHostsLine)}
-            />
+        <div className="flex min-h-0 shrink flex-col gap-4 overflow-y-auto">
+          <div className="grid gap-2 rounded-lg border p-3 text-sm">
+            <Info label="Host" value={request.host} />
+            <Info label="Target" value={request.target} />
+            {request.resolvedHost ? (
+              <Info label="Resolved" value={_endpoint(request)} />
+            ) : null}
+            {request.user ? <Info label="User" value={request.user} /> : null}
+            <Info label="Key type" value={request.keyType} />
+            <Info label="Fingerprint" value={request.fingerprint} />
+            {request.knownHostsFile ? (
+              <Info label="known_hosts" value={request.knownHostsFile} />
+            ) : null}
+            {request.knownHostsLine ? (
+              <Info
+                label="Offending line"
+                value={String(request.knownHostsLine)}
+              />
+            ) : null}
+          </div>
+          {changed ? (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={verified}
+                onChange={(event) => setVerified(event.target.checked)}
+              />
+              <span>
+                I verified this host identity with the administrator or server
+                console.
+              </span>
+            </label>
           ) : null}
         </div>
-        {changed ? (
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              className="mt-1"
-              type="checkbox"
-              checked={verified}
-              onChange={(event) => setVerified(event.target.checked)}
-            />
-            <span>
-              I verified this host identity with the administrator or server
-              console.
-            </span>
-          </label>
-        ) : null}
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" disabled={busy} onClick={onReject}>
             Cancel
           </Button>
