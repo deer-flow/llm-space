@@ -136,11 +136,11 @@ export function ToolEditorDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[75vh]! w-full flex-col gap-4 sm:max-w-4xl"
+        className="flex h-[75vh]! max-h-[calc(100dvh-2rem)] w-full flex-col gap-4 overflow-hidden sm:max-w-4xl"
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {originalName ? "Edit tool" : "Add function tool"}
           </DialogTitle>
@@ -166,7 +166,7 @@ export function ToolEditorDialog({
             </div>
           </div>
           <CodeEditor
-            className="min-h-80 flex-1 font-mono text-sm"
+            className="min-h-0 flex-1 font-mono text-sm"
             language="json"
             value={text}
             autoFocus
@@ -175,7 +175,7 @@ export function ToolEditorDialog({
           />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
