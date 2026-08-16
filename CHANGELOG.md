@@ -4,6 +4,15 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.3] - 2026-08-17
+
+### Fixed
+
+- Dialog actions remain visible in short windows while editors, forms, and
+  detailed content scroll or resize within the available viewport.
+- Onboarding, sharing, feature reminders, and SSH host-key confirmation adapt
+  to reduced window heights without clipping their primary controls.
+
 ## [4.12.2] - 2026-08-16
 
 ### Fixed
