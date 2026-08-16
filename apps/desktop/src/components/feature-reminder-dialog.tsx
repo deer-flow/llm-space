@@ -83,10 +83,10 @@ export function FeatureReminderDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="w-full max-w-[520px]! gap-0 overflow-hidden p-0"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[520px]! flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
-        <div className="relative">
+        <div className="relative min-h-0 shrink overflow-hidden">
           <img
             src={reminder.imageUrl}
             alt={reminder.title}
@@ -103,7 +103,7 @@ export function FeatureReminderDialog() {
             </Button>
           </DialogClose>
         </div>
-        <div className="flex flex-col gap-2 p-6">
+        <div className="flex shrink-0 flex-col gap-2 p-6">
           {reminder.eyebrow && (
             <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               {reminder.eyebrow}
