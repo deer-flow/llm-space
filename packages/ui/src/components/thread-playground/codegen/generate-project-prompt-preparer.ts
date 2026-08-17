@@ -60,6 +60,7 @@ async function _prepareGenerateProjectPromptContext({
     loadSkills: () => Promise.resolve(skillList),
     loadFile: promptFiles.loadFile,
     fileExists: promptFiles.fileExists,
+    resolvePath: (path) => files.resolvePath(path),
   });
   const systemPromptTemplate = await _expandIncludes(
     context.systemPrompt ?? "",

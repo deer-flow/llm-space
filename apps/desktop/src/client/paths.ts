@@ -62,6 +62,12 @@ export async function directoryExists(path: string): Promise<boolean> {
   return exists;
 }
 
+/** Expand a user-authored path and return its absolute form. */
+export async function resolveUserPath(path: string): Promise<string> {
+  const response = await _rpc().request.fsResolveUserPath({ path });
+  return response.path;
+}
+
 /** Open the native file picker; resolves to the chosen path or `null`. */
 export async function pickFile(): Promise<string | null> {
   const { path } = await _rpc().request.fsPickFile({});

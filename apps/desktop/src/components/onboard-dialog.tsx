@@ -235,7 +235,7 @@ export function OnboardDialog({
               </div>
             </div>
             <_OnboardSetupPanel
-              className="onboard-action-enter onboard-action-enter-4 w-[22rem] shrink-0"
+              className="onboard-panel-enter w-[22rem] shrink-0"
               configured={models.length > 0}
               readyProviderName={readyProviderName}
               detectedProviders={detectedProviders}

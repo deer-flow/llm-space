@@ -449,6 +449,12 @@ export interface DesktopRPCType {
         params: { path: string };
         response: { exists: boolean };
       };
+      // Expand a user-authored path (including a leading `~`) and return its
+      // absolute form without requiring it to exist.
+      fsResolveUserPath: {
+        params: { path: string };
+        response: { path: string };
+      };
       // Open the native file picker (for a "file content" prompt variable).
       // `path` is null when the user cancels.
       fsPickFile: {

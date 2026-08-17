@@ -7,6 +7,7 @@ import path from "node:path";
 import { expandHomePath } from "../../src/server/paths";
 import {
   readUserTextFile,
+  resolveUserPath,
   userDirectoryExists,
   userTextFileExists,
 } from "../../src/server/read-text";
@@ -15,6 +16,15 @@ const tmp = mkdtempSync(path.join(os.tmpdir(), "llm-space-readtext-"));
 
 afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
+});
+
+describe("resolveUserPath", () => {
+  test("returns an absolute path after trimming and expanding home", () => {
+    expect(resolveUserPath(" ~/Desktop/llm-space-project ")).toBe(
+      path.join(os.homedir(), "Desktop/llm-space-project")
+    );
+    expect(path.isAbsolute(resolveUserPath("relative/project"))).toBe(true);
+  });
 });
 
 describe("expandHomePath", () => {

@@ -25,6 +25,7 @@ import {
   pickDirectory,
   pickFile,
   readTextFile,
+  resolveUserPath,
   textFileExists,
 } from "@/client/paths";
 import { listPluginTools } from "@/client/plugins";
@@ -154,6 +155,7 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
       },
       paths: { ensureRootDir },
       files: {
+        resolvePath: resolveUserPath,
         readText: (path, options) =>
           readTextFile(path, options.runtimeId as RuntimeId),
         exists: (path, options) =>

@@ -410,7 +410,9 @@ export function applyTemplatePy(
         `        ${_pyStr(name)}: current_date(${_pyStr(def.format)}),`
       );
     } else if (def.type === "workingDirectory") {
-      entries.push(`        ${_pyStr(name)}: ${_pyStr(def.value)},`);
+      entries.push(
+        `        ${_pyStr(name)}: ${_pyStr(renderedValues[name] ?? def.value)},`
+      );
     } else if (def.type === "skills") {
       usesVariablesModule = true;
       // Match the thread renderer: an empty selection means every enabled

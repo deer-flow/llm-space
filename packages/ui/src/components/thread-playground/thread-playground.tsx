@@ -222,6 +222,7 @@ function _ThreadPlaygroundStore({
         }),
       loadFile: promptFiles.loadFile,
       fileExists: promptFiles.fileExists,
+      resolvePath: (path) => files.resolvePath(path),
       archiveRunSnapshot,
       readRunSnapshot,
     });
