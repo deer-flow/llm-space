@@ -54,7 +54,7 @@ function _MessageNavigator({
     >
       <div
         ref={viewportRef}
-        className="hover:bg-background/70 focus-within:bg-background/70 pointer-events-auto max-h-[45vh] w-7 overflow-y-auto rounded-full transition-colors"
+        className="bg-background/50 hover:bg-background/70! focus-within:bg-background/70! pointer-events-auto max-h-[45vh] w-7 overflow-x-hidden overflow-y-scroll rounded-full [scrollbar-width:none] transition-colors [&::-webkit-scrollbar]:hidden"
       >
         <div
           className="relative w-full"
