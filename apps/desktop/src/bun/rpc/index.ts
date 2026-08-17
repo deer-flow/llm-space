@@ -54,6 +54,8 @@ export interface MainWindowRPCDependencies {
   executeCommand: (command: Command) => void;
   /** Cancel the in-flight deep-link shared-thread import (Cancel button). */
   onCancelSharedImport: () => void;
+  /** Release buffered launch URLs once the renderer listener is attached. */
+  onDeepLinkReady: () => void;
   githubAuth: GitHubAuthManager;
   getMainWindow: () => BrowserWindow;
   /** Publishes a thread as a secret gist for the `shareThread` request. */
@@ -74,6 +76,7 @@ export function createMainWindowRPC({
   analytics,
   executeCommand,
   onCancelSharedImport,
+  onDeepLinkReady,
   githubAuth,
   getMainWindow,
   gistWriter,
@@ -564,6 +567,7 @@ export function createMainWindowRPC({
           analytics.capture(event, properties),
         executeCommand: (command) => executeCommand(command),
         cancelSharedImport: () => onCancelSharedImport(),
+        deepLinkReady: () => onDeepLinkReady(),
       },
     },
   });

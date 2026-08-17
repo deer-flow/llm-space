@@ -6,8 +6,8 @@ import { hydrateShellEnv } from "./env/hydrate";
 async function _bootstrapDesktopApp(): Promise<void> {
   hydrateShellEnv();
 
-  // Attach the listener immediately after hydration so cold-start deep links
-  // are buffered before the longer bootstrap imports evaluate.
+  // Start the launcher inbox + Electrobun listener immediately after hydration
+  // so cold- and warm-start deep links survive the longer bootstrap imports.
   await import("./deep-link/launch");
 
   const { seedWorkspace } = await import("./workspace/seed");

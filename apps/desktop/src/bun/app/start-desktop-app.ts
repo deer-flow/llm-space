@@ -76,6 +76,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   let mainWindow: BrowserWindow | null = null;
   let rpc: MainWindowRPC | null = null;
   let deepLink: DeepLinkHandler | null = null;
+  let rendererAcceptsDeepLinks = false;
+  let deepLinkHandlerInstalled = false;
+  const deepLinkScheme = resolveDeepLinkScheme(
+    process.env.LLM_SPACE_DEEP_LINK_SCHEME
+  );
   const getRpc = (): MainWindowRPC => {
     if (!rpc) throw new Error("Main window RPC is not ready.");
     return rpc;
@@ -83,6 +88,21 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const getMainWindow = (): BrowserWindow => {
     if (!mainWindow) throw new Error("Main window is not ready.");
     return mainWindow;
+  };
+  const installDeepLinkHandler = (): void => {
+    if (
+      deepLinkHandlerInstalled ||
+      !rendererAcceptsDeepLinks ||
+      !mainWindow ||
+      !deepLink
+    ) {
+      return;
+    }
+    deepLinkHandlerInstalled = true;
+    setDeepLinkHandler((url) => {
+      activateWindowForDeepLink(getMainWindow(), url, deepLinkScheme);
+      void deepLink?.handle(url);
+    });
   };
   const githubAuth = new GitHubAuthManager({
     onChange: (state) => getRpc().send.githubAuthChanged(state),
@@ -282,6 +302,10 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       analytics,
       executeCommand: (command) => executeCommand(command, getMainWindow()),
       onCancelSharedImport: () => deepLink?.cancel(),
+      onDeepLinkReady: () => {
+        rendererAcceptsDeepLinks = true;
+        installDeepLinkHandler();
+      },
       githubAuth,
       getMainWindow,
       gistWriter,
@@ -311,13 +335,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       threadStorages: pluginManager.threadStorages,
       getRpc,
     });
-    const deepLinkScheme = resolveDeepLinkScheme(
-      process.env.LLM_SPACE_DEEP_LINK_SCHEME
-    );
-    setDeepLinkHandler((url) => {
-      activateWindowForDeepLink(getMainWindow(), url, deepLinkScheme);
-      void deepLink?.handle(url);
-    });
+    installDeepLinkHandler();
 
     analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
     void updater.start();

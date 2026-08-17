@@ -799,6 +799,9 @@ export interface DesktopRPCType {
       // Cancel the in-flight deep-link shared-thread import (aborts the read; no
       // file is written). Sent when the user clicks Cancel on the import modal.
       cancelSharedImport: Record<string, never>;
+      // Sent only after the renderer has attached its shared-import listener.
+      // Cold-start URLs stay buffered in bun until this handshake completes.
+      deepLinkReady: Record<string, never>;
     };
   }>;
   webview: RPCSchema<{

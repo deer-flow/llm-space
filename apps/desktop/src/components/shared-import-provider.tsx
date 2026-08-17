@@ -56,6 +56,7 @@ export function SharedImportProvider() {
     };
 
     rpc.addMessageListener("sharedImportStatusChanged", handle);
+    rpc.send.deepLinkReady({});
     return () => rpc.removeMessageListener("sharedImportStatusChanged", handle);
   }, [executeCommand]);
 
