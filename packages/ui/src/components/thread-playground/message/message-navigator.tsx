@@ -125,6 +125,14 @@ function _MessageAnchor({
         : hoverDistance === 2
           ? "scale-x-[0.5]"
           : "scale-x-[0.4]";
+  const opacityClass =
+    hoverDistance === 0
+      ? "opacity-100"
+      : hoverDistance === 1
+        ? "opacity-50 dark:opacity-75"
+        : hoverDistance === 2
+          ? "opacity-30 dark:opacity-60"
+          : "opacity-15 dark:opacity-45";
 
   return (
     <HoverCard openDelay={250} closeDelay={100}>
@@ -145,8 +153,8 @@ function _MessageAnchor({
               "group-hover/anchor:bg-foreground group-focus-visible/anchor:bg-foreground h-0.5 w-5 origin-left transform-gpu rounded-full transition-[scale,background-color,opacity] group-hover/anchor:opacity-100 group-focus-visible/anchor:opacity-100 motion-reduce:transition-none",
               scaleClass,
               active
-                ? "bg-accent-foreground opacity-100"
-                : "bg-muted-foreground opacity-70"
+                ? "bg-foreground opacity-100"
+                : cn("bg-foreground", opacityClass)
             )}
           />
         </button>
