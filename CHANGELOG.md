@@ -4,6 +4,30 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.13.0] - 2026-08-17
+
+This release makes long Threads scroll more smoothly, resolves working
+directories to stable absolute paths, and refines navigation and onboarding
+feedback.
+
+### Changed
+
+- Working-directory prompt variables expand user-authored paths and persist
+  non-empty values as absolute paths across desktop runs, prompt previews,
+  compaction, code generation, and generated LangGraph projects.
+- Web-search Tool results show a compact four-result preview that can expand
+  on demand without introducing a nested vertical scroll area.
+- Message navigation anchors provide clearer focus and hover proximity, while
+  the onboarding setup panel enters with a more cohesive transition.
+
+### Fixed
+
+- Conversations with a small number of large messages avoid unnecessary
+  virtualization, while long conversations use adaptive and cached height
+  estimates, wider pre-rendering, and compositor-backed positioning. This
+  prevents upward-scroll traps, scrollbar jumps, and blank frames during fast
+  trackpad or Magic Mouse scrolling.
+
 ## [4.12.3] - 2026-08-17
 
 ### Fixed
