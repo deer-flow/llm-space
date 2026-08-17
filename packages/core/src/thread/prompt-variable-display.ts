@@ -67,10 +67,20 @@ export function resolvePromptVariableValueSync(
 export async function resolvePromptVariableValue(
   name: string,
   context: ThreadContext | undefined,
-  loadSkills: () => Promise<PromptSkill[]>
+  loadSkills: () => Promise<PromptSkill[]>,
+  resolvePath?: (path: string) => Promise<string>
 ): Promise<VariableResolution> {
   const fast = resolvePromptVariableValueSync(name, context);
   if (fast.status !== "needsSkills") {
+    if (
+      fast.status === "ok" &&
+      normalizePromptVariableState(context).variables[name]?.type ===
+        "workingDirectory" &&
+      resolvePath &&
+      fast.value.trim().length > 0
+    ) {
+      return { status: "ok", value: await resolvePath(fast.value) };
+    }
     return fast;
   }
   try {
@@ -93,7 +103,8 @@ export function resolvePromptVariableValueForPlace(
   name: string,
   context: ThreadContext | undefined,
   placeKey: string | undefined,
-  loadSkills: () => Promise<PromptSkill[]>
+  loadSkills: () => Promise<PromptSkill[]>,
+  resolvePath?: (path: string) => Promise<string>
 ): Promise<VariableResolution> {
   if (!VARIABLE_NAME_RE.test(name)) {
     return Promise.resolve({ status: "invalid", name });
@@ -103,9 +114,17 @@ export function resolvePromptVariableValueForPlace(
       ? undefined
       : context?.snapshot?.variables?.[placeKey]?.[name];
   if (frozen !== undefined) {
+    if (
+      normalizePromptVariableState(context).variables[name]?.type ===
+        "workingDirectory" &&
+      resolvePath &&
+      frozen.trim().length > 0
+    ) {
+      return resolvePath(frozen).then((value) => ({ status: "ok", value }));
+    }
     return Promise.resolve({ status: "ok", value: frozen });
   }
-  return resolvePromptVariableValue(name, context, loadSkills);
+  return resolvePromptVariableValue(name, context, loadSkills, resolvePath);
 }
 
 export function listPromptVariableCompletions(

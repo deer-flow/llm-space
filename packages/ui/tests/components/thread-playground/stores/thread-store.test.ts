@@ -34,6 +34,47 @@ const INVALID_THREAD: Thread = {
   model: { id: "model", provider: "fake" },
 };
 
+describe("working-directory normalization", () => {
+  test("stores an absolute path and invalidates legacy frozen values", async () => {
+    const store = createThreadStore(
+      {
+        context: {
+          variables: {
+            current_working_directory: {
+              type: "workingDirectory",
+              value: "~/Desktop/llm-space-project",
+            },
+          },
+          snapshot: {
+            variables: {
+              systemPrompt: {
+                current_working_directory: "~/Desktop/llm-space-project",
+              },
+            },
+          },
+        },
+      },
+      {
+        resolvePath: (value) =>
+          Promise.resolve(value.replace("~", "/Users/tester")),
+      }
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      store.getState().thread.context?.variables?.current_working_directory
+    ).toEqual({
+      type: "workingDirectory",
+      value: "/Users/tester/Desktop/llm-space-project",
+    });
+    expect(
+      store.getState().thread.context?.snapshot?.variables?.systemPrompt
+        ?.current_working_directory
+    ).toBeUndefined();
+  });
+});
+
 describe("inline run validation", () => {
   test("scopes feedback to the blocking message", async () => {
     let transportCalls = 0;

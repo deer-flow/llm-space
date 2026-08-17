@@ -4,6 +4,11 @@ import path from "node:path";
 
 import { expandHomePath } from "./paths";
 
+/** Resolve a user-authored path to the absolute form used by prompt variables. */
+export function resolveUserPath(inputPath: string): string {
+  return path.resolve(expandHomePath(inputPath.trim()));
+}
+
 /**
  * Read an arbitrary UTF-8 text file for the prompt `@include` macro. A leading
  * `~` expands to the user's home directory. Any failure — missing file, a
@@ -19,7 +24,7 @@ export async function readUserTextFile(inputPath: string): Promise<string> {
     if (typeof inputPath !== "string" || inputPath.trim().length === 0) {
       return "";
     }
-    const resolved = path.resolve(expandHomePath(inputPath));
+    const resolved = resolveUserPath(inputPath);
     return await readFile(resolved, "utf8");
   } catch {
     return "";
@@ -36,7 +41,7 @@ export async function userTextFileExists(inputPath: string): Promise<boolean> {
     if (typeof inputPath !== "string" || inputPath.trim().length === 0) {
       return false;
     }
-    const resolved = path.resolve(expandHomePath(inputPath));
+    const resolved = resolveUserPath(inputPath);
     const info = await stat(resolved);
     if (!info.isFile()) {
       return false;
@@ -58,7 +63,7 @@ export async function userDirectoryExists(inputPath: string): Promise<boolean> {
     if (typeof inputPath !== "string" || inputPath.trim().length === 0) {
       return false;
     }
-    const resolved = path.resolve(expandHomePath(inputPath));
+    const resolved = resolveUserPath(inputPath);
     return (await stat(resolved)).isDirectory();
   } catch {
     return false;

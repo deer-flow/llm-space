@@ -1,4 +1,7 @@
-import { userDirectoryExists } from "@llm-space/core/server";
+import {
+  resolveUserPath,
+  userDirectoryExists,
+} from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
 import {
   installPluginZip,
@@ -304,6 +307,8 @@ export function createMainWindowRPC({
         fsDirectoryExists: async ({ path }) => ({
           exists: await userDirectoryExists(path),
         }),
+        fsResolveUserPath: ({ path }) =>
+          Promise.resolve({ path: resolveUserPath(path) }),
         // Native file picker for a "file content" prompt variable.
         fsPickFile: async () => {
           const selected = await Utils.openFileDialog({

@@ -233,6 +233,7 @@ export function ThreadCompactionDialog({
           listEnabledPromptVariableSkills(skills, { runtimeId }),
         loadFile: promptFiles.loadFile,
         fileExists: promptFiles.fileExists,
+        resolvePath: (path) => files.resolvePath(path),
       });
       if (preparationVersionRef.current !== version) return;
 

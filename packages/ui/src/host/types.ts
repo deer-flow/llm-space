@@ -100,6 +100,8 @@ export interface PathsHost {
 
 /** Arbitrary text-file reads + native file picking for prompt variables. */
 export interface FilesHost {
+  /** Expand a user-authored path and return its absolute form. */
+  resolvePath(path: string): Promise<string>;
   /** Read a file's UTF-8 contents (`~` expands to home); `""` when missing. */
   readText(path: string, options: RuntimeOwnedHostOptions): Promise<string>;
   /** Whether a path points to a readable regular file (`~` expands to home). */

@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import {
   agentPy,
@@ -11,6 +14,13 @@ import {
 } from "../../../src/generator/langgraph/templates";
 import type { GeneratorMcpServer } from "../../../src/generator/types";
 
+const pythonTmp = mkdtempSync(
+  path.join(os.tmpdir(), "llm-space-working-directory-python-")
+);
+
+afterAll(() => {
+  rmSync(pythonTmp, { recursive: true, force: true });
+});
 
 describe("makefile", () => {
   test("runs the LangGraph development server through uv", () => {
@@ -178,10 +188,58 @@ describe("meta prompt templates", () => {
         },
       },
       [],
-      {}
+      {
+        current_working_directory:
+          "/Users/tester/Desktop/llm-space-project",
+      }
     );
     expect(py).toContain(
-      '"current_working_directory": "~/Desktop/llm-space-project"'
+      '"current_working_directory": "/Users/tester/Desktop/llm-space-project"'
+    );
+  });
+
+  test("generated Python renders the absolute working directory", async () => {
+    const promptingDir = path.join(pythonTmp, "src", "prompting");
+    mkdirSync(promptingDir, { recursive: true });
+    await Bun.write(
+      path.join(promptingDir, "apply_template.py"),
+      applyTemplatePy(
+        {
+          variables: {
+            current_working_directory: {
+              type: "workingDirectory",
+              value: "~/Desktop/llm-space-project",
+            },
+          },
+        },
+        [],
+        {
+          current_working_directory:
+            "/Users/tester/Desktop/llm-space-project",
+        }
+      )
+    );
+    await Bun.write(
+      path.join(promptingDir, "system_prompt.md"),
+      "Workspace: {{current_working_directory}}"
+    );
+    const child = Bun.spawn(
+      [
+        "python3",
+        "-c",
+        "from src.prompting.apply_template import get_system_prompt; print(get_system_prompt())",
+      ],
+      { cwd: pythonTmp, stdout: "pipe", stderr: "pipe" }
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe(
+      "Workspace: /Users/tester/Desktop/llm-space-project"
     );
   });
 

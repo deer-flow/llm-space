@@ -257,6 +257,8 @@ export function createThreadStore(
     loadFile?: (path: string) => Promise<string>;
     /** Test readable-file existence for template `exists(path)` conditions. */
     fileExists?: (path: string) => Promise<boolean>;
+    /** Resolve working-directory values to absolute paths. */
+    resolvePath?: (path: string) => Promise<string>;
     /** Monotonic clock used for client-observed model timing. */
     now?: () => number;
     /** Archive a completed run outside the main thread document. */
@@ -285,7 +287,7 @@ export function createThreadStore(
     evaluationRubrics: initialEvaluationRubrics,
   });
 
-  return createStore<ThreadState>()(
+  const store = createStore<ThreadState>()(
     subscribeWithSelector((set, get) => {
       // --- internal helpers ---------------------------------------------------
 
@@ -595,6 +597,7 @@ export function createThreadStore(
               loadSkills: options.loadSkills ?? _noSkills,
               loadFile: options.loadFile ?? _noFile,
               fileExists: options.fileExists ?? _noFileExists,
+              resolvePath: options.resolvePath,
             })
           : {};
         const invocationContext = { thread: owningThread, variables };
@@ -1120,6 +1123,7 @@ export function createThreadStore(
               loadSkills: options.loadSkills ?? _noSkills,
               loadFile: options.loadFile ?? _noFile,
               fileExists: options.fileExists ?? _noFileExists,
+              resolvePath: options.resolvePath,
             });
             preparedContext = rendered.context;
             promptSnapshot = rendered.snapshot;
@@ -1314,6 +1318,7 @@ export function createThreadStore(
                       loadSkills: options.loadSkills ?? _noSkills,
                       loadFile: options.loadFile ?? _noFile,
                       fileExists: options.fileExists ?? _noFileExists,
+                      resolvePath: options.resolvePath,
                     })
                   ).context;
               preparedContext = null;
@@ -1711,6 +1716,55 @@ export function createThreadStore(
       };
     })
   );
+
+  if (options.resolvePath) {
+    const initialVariables = normalizedInitialThread.context?.variables ?? {};
+    const workingDirectories = Object.entries(initialVariables).filter(
+      (entry): entry is [string, Extract<ThreadVariable, { type: "workingDirectory" }>] =>
+        entry[1].type === "workingDirectory" && entry[1].value.trim().length > 0
+    );
+    void Promise.all(
+      workingDirectories.map(async ([name, variable]) => [
+        name,
+        variable.value,
+        await options.resolvePath!(variable.value).catch(() => variable.value),
+      ] as const)
+    ).then((resolved) => {
+      const current = store.getState();
+      const variables = current.thread.context?.variables;
+      if (!variables) return;
+      let changed = false;
+      const changedNames: string[] = [];
+      const nextVariables = { ...variables };
+      for (const [name, original, absolute] of resolved) {
+        const variable = variables[name];
+        if (
+          variable?.type === "workingDirectory" &&
+          variable.value === original &&
+          absolute !== original
+        ) {
+          nextVariables[name] = { ...variable, value: absolute };
+          changedNames.push(name);
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      const thread = {
+        ...current.thread,
+        context: {
+          ...current.thread.context,
+          variables: nextVariables,
+          snapshot: removePromptVariableSnapshotNames(
+            current.thread.context?.snapshot,
+            changedNames
+          ),
+        },
+      };
+      store.setState({ thread, changeHistory: createInitialHistory(thread) });
+    });
+  }
+
+  return store;
 }
 
 function _isNonEmptyAssistantDelta(event: AgentEvent): boolean {

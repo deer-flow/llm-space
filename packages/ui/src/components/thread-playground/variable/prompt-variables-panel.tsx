@@ -856,6 +856,7 @@ function WorkingDirectoryVariableDetail({
   onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
 }) {
   const { builtinTools, files } = useHostServices();
+  const [draftPath, setDraftPath] = useState(variable.value);
   const [directoryExists, setDirectoryExists] = useState<boolean | null>(null);
   const directoryCheckIdRef = useRef(0);
 
@@ -884,32 +885,38 @@ function WorkingDirectoryVariableDetail({
   );
 
   useEffect(() => {
+    setDraftPath(variable.value);
+  }, [variable.value]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
-      void checkPath(variable.value);
+      void checkPath(draftPath);
     }, 200);
 
     return () => window.clearTimeout(timeout);
-  }, [checkPath, variable.value]);
+  }, [checkPath, draftPath]);
 
   const commitPath = useCallback(
-    (rawValue: string) => {
-      const value = _normalizeDirectoryPath(rawValue);
+    async (rawValue: string) => {
+      const normalized = _normalizeDirectoryPath(rawValue);
+      const value = normalized ? await files.resolvePath(normalized) : "";
+      setDraftPath(value);
       if (value !== variable.value) {
         onUpdate(name, { ...variable, value });
       } else {
         void checkPath(value);
       }
     },
-    [checkPath, name, onUpdate, variable]
+    [checkPath, files, name, onUpdate, variable]
   );
 
   const handlePathChange = useCallback(
     (value: string) => {
       ++directoryCheckIdRef.current;
       setDirectoryExists(null);
-      onUpdate(name, { ...variable, value });
+      setDraftPath(value);
     },
-    [name, onUpdate, variable]
+    []
   );
 
   const browse = useCallback(async () => {
@@ -955,11 +962,11 @@ function WorkingDirectoryVariableDetail({
         <div className="flex items-center gap-2">
           <Input
             className="h-7 font-mono text-xs"
-            value={variable.value}
+            value={draftPath}
             disabled={disabled}
             placeholder="~/Desktop/llm-space-project"
             onChange={(event) => handlePathChange(event.currentTarget.value)}
-            onBlur={(event) => commitPath(event.currentTarget.value)}
+            onBlur={(event) => void commitPath(event.currentTarget.value)}
           />
           <Button
             size="sm"
