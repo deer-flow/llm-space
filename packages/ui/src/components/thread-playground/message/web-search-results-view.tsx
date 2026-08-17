@@ -1,6 +1,6 @@
 import { type ToolCallInput } from "@llm-space/core";
 import { GlobeIcon } from "lucide-react";
-import { memo } from "react";
+import { memo, useState } from "react";
 
 import { Link } from "@llm-space/ui/components/link";
 
@@ -9,6 +9,29 @@ interface WebSearchResult {
   url: string;
   snippet?: string;
   content?: string;
+}
+
+const DEFAULT_VISIBLE_RESULTS = 4;
+const RESULT_DESCRIPTION_LIMIT = 400;
+const PARSED_RESULTS_CACHE_LIMIT = 100;
+const PARSED_RESULTS_CACHE = new Map<string, WebSearchResult[]>();
+
+function _rememberParsedResults(value: string, results: WebSearchResult[]) {
+  PARSED_RESULTS_CACHE.delete(value);
+  PARSED_RESULTS_CACHE.set(value, results);
+  if (PARSED_RESULTS_CACHE.size > PARSED_RESULTS_CACHE_LIMIT) {
+    const oldestValue = PARSED_RESULTS_CACHE.keys().next().value;
+    if (oldestValue !== undefined) {
+      PARSED_RESULTS_CACHE.delete(oldestValue);
+    }
+  }
+}
+
+function _truncateDescription(value: string | undefined) {
+  if (!value || value.length <= RESULT_DESCRIPTION_LIMIT) {
+    return value;
+  }
+  return `${value.slice(0, RESULT_DESCRIPTION_LIMIT).trimEnd()}…`;
 }
 
 /**
@@ -23,6 +46,11 @@ export function parseWebSearchOutput(
 ): WebSearchResult[] | null {
   if (input.name !== "web_search" || value.trim() === "") {
     return null;
+  }
+  const cachedResults = PARSED_RESULTS_CACHE.get(value);
+  if (cachedResults) {
+    _rememberParsedResults(value, cachedResults);
+    return cachedResults;
   }
   let parsed: unknown;
   try {
@@ -46,10 +74,17 @@ export function parseWebSearchOutput(
     results.push({
       title: r.title,
       url: r.url,
-      snippet: typeof r.snippet === "string" ? r.snippet : undefined,
-      content: typeof r.content === "string" ? r.content : undefined,
+      snippet:
+        typeof r.snippet === "string"
+          ? _truncateDescription(r.snippet)
+          : undefined,
+      content:
+        typeof r.content === "string"
+          ? _truncateDescription(r.content)
+          : undefined,
     });
   }
+  _rememberParsedResults(value, results);
   return results;
 }
 
@@ -66,15 +101,33 @@ function _prettyUrl(url: string): string {
 }
 
 /**
- * A read-only, Google-style rendering of `web_search` results. Height is capped
- * to match the code editor it replaces, scrolling internally past that.
+ * A read-only, Google-style rendering of `web_search` results. Keep the default
+ * DOM small and let the owning message viewport handle vertical scrolling so
+ * trackpad momentum does not switch between nested scroll containers.
  */
 function _WebSearchResultsView({ results }: { results: WebSearchResult[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const canExpand = results.length > DEFAULT_VISIBLE_RESULTS;
+  const visibleResults = expanded
+    ? results
+    : results.slice(0, DEFAULT_VISIBLE_RESULTS);
+
   return (
-    <div className="flex max-h-96 w-full flex-col gap-4 overflow-y-auto rounded-lg bg-(--textarea) px-3 py-2.5 select-auto">
-      {results.map((result, index) => (
+    <div className="flex w-full flex-col gap-4 rounded-lg bg-(--textarea) px-3 py-2.5 select-auto">
+      {visibleResults.map((result, index) => (
         <WebSearchResultRow key={index} result={result} />
       ))}
+      {canExpand ? (
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-4 hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded
+            ? "Show fewer results"
+            : `Show ${results.length - DEFAULT_VISIBLE_RESULTS} more results`}
+        </button>
+      ) : null}
     </div>
   );
 }
