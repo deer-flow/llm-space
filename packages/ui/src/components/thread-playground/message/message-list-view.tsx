@@ -55,7 +55,7 @@ import { MessageNavigator } from "./message-navigator";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
 
 const MESSAGE_VIRTUALIZATION_THRESHOLD = 20;
-const MESSAGE_OVERSCAN = 4;
+const MESSAGE_OVERSCAN = 5;
 const MESSAGE_HEIGHT_CACHE_LIMIT = 1_000;
 const MESSAGE_HEIGHT_CACHE = new Map<string, number>();
 const DND_MODIFIERS = [restrictToVerticalAxis];
@@ -329,13 +329,7 @@ export function MessageListView({
     (index: number) => {
       activeMessageIndexRef.current = index;
       setActiveMessageIndex(index);
-      scrollToMessageIndex(
-        index,
-        "center",
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth"
-      );
+      scrollToMessageIndex(index, "center");
     },
     [scrollToMessageIndex]
   );
