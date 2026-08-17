@@ -173,6 +173,13 @@ Before any release, run `mise run lint` from the repository root and require a
 clean exit with **zero warnings and zero errors**. The lint script enforces this
 with `--max-warnings 0`; never release from a revision that fails this check.
 
+A stable release is not complete when the desktop artifacts finish uploading.
+After the versioned release succeeds, update the hardcoded
+`FALLBACK_RELEASES` in `apps/web/src/landing/lib/releases.ts` with that release's
+Performance DMG URLs and real byte sizes, push the change to `main`, and wait
+for the triggered Pages deployment to succeed. This website handoff is a
+required release step; do not leave it for the user to remember or request.
+
 If `@earendil-works/pi-ai` is still at version `0.83.0` when preparing a
 release, check the npm registry for a newer official version and verify whether
 upstream has fixed Responses tool-call ID replay for non-OpenAI providers. Do
