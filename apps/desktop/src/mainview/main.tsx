@@ -23,6 +23,7 @@ import { applyAppearancePreferences } from "./apply-appearance-preferences";
 // block — and the `react-scan` import — is tree-shaken out of shipped bundles.
 async function startRenderer(): Promise<void> {
   const rpc = electrobun.rpc;
+  let totalMemoryBytes: number | null = null;
   if (rpc) {
     try {
       let snapshot = await rpc.request.localStorageGet({});
@@ -51,6 +52,12 @@ async function startRenderer(): Promise<void> {
     } catch (error) {
       console.error("Failed to hydrate localStorage:", error);
     }
+    try {
+      const systemInfo = await rpc.request.systemInfo({});
+      totalMemoryBytes = systemInfo.totalMemoryBytes;
+    } catch (error) {
+      console.error("Failed to read system information:", error);
+    }
   }
 
   if (
@@ -63,7 +70,7 @@ async function startRenderer(): Promise<void> {
   const { App } = await import("../app");
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <App />
+      <App totalMemoryBytes={totalMemoryBytes} />
     </StrictMode>
   );
 }

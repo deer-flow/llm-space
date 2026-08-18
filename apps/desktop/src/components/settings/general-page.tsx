@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  useMessageVirtualization,
+  type MessageVirtualizationMode,
+} from "@llm-space/ui/components/message-virtualization-provider";
+import {
   isModelAvailable,
   useDefaultModel,
   useModels,
@@ -16,6 +20,7 @@ import {
 } from "@llm-space/ui/components/theme-provider";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
 import {
   Select,
   SelectContent,
@@ -40,16 +45,17 @@ import { getAnalyticsSettings, setAnalyticsSettings } from "@/client/analytics";
 import { getWorkspacePath } from "@/client/paths";
 import { useCommands } from "@/commands";
 import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { APP_LANGUAGES, type AppLanguage } from "@/shared/language";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
 import {
-  MAX_THREAD_VIEW_CACHE_SIZE,
-  MIN_THREAD_VIEW_CACHE_SIZE,
-  useThreadViewCacheSize,
-} from "../thread-tabs/thread-view-cache-size";
+  MAX_VIEW_CACHE_SIZE,
+  MIN_VIEW_CACHE_SIZE,
+  useViewCacheSize,
+} from "../thread-tabs/view-cache-size";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
@@ -93,6 +99,37 @@ function SettingsSection({
         {children}
       </div>
     </section>
+  );
+}
+
+function VirtualizationThresholdInput({
+  value,
+  onCommit,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const next = Number(draft);
+    onCommit(next);
+    setDraft(String(Number.isSafeInteger(next) && next > 0 ? next : 20));
+  };
+  return (
+    <Input
+      className="w-20"
+      type="number"
+      min={1}
+      aria-label={t.general.virtualizationThresholdAria}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
   );
 }
 
@@ -309,8 +346,16 @@ export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
-  const [threadViewCacheSize, setCachedThreadViews] =
-    useThreadViewCacheSize();
+  const {
+    autoThreshold,
+    customThreshold,
+    fullBaseThreshold,
+    mode: virtualizationMode,
+    renderingMultiplier,
+    setCustomThreshold,
+    setMode: setVirtualizationMode,
+  } = useMessageVirtualization();
+  const [viewCacheSize, setViewCacheSize] = useViewCacheSize();
   const [updateMode, setUpdateMode] = useUpdateMode();
   const {
     primaryColor,
@@ -399,6 +444,9 @@ export function GeneralPage() {
             </div>
           </SettingsRow>
 
+        </SettingsSection>
+
+        <SettingsSection title={t.general.performance}>
           <SettingsRow
             label={
               <RowLabel
@@ -416,7 +464,9 @@ export function GeneralPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="rich">{t.general.renderingFull}</SelectItem>
-                <SelectItem value="on-demand">On Demand</SelectItem>
+                <SelectItem value="on-demand">
+                  {t.general.renderingOnDemand}
+                </SelectItem>
                 <SelectItem value="lite">{t.general.renderingFast}</SelectItem>
               </SelectContent>
             </Select>
@@ -425,27 +475,78 @@ export function GeneralPage() {
           <SettingsRow
             label={
               <RowLabel
-                title="Cached thread views"
-                hint="Maximum recently used thread views kept mounted. Background sessions keep running after a view is released."
+                title={t.general.virtualization}
+                hint={
+                  virtualizationMode === "auto"
+                    ? formatMessage(t.general.virtualizationAutoHint, {
+                        threshold: autoThreshold,
+                        baseline: fullBaseThreshold,
+                        multiplier: renderingMultiplier,
+                      })
+                    : t.general.virtualizationHint
+                }
+              />
+            }
+          >
+            <div className="flex items-center gap-2">
+              {virtualizationMode === "custom" ? (
+                <VirtualizationThresholdInput
+                  value={customThreshold}
+                  onCommit={setCustomThreshold}
+                />
+              ) : null}
+              <Select
+                value={virtualizationMode}
+                onValueChange={(value) =>
+                  setVirtualizationMode(value as MessageVirtualizationMode)
+                }
+              >
+                <SelectTrigger
+                  className="w-32"
+                  aria-label={t.general.virtualization}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">
+                    {t.general.virtualizationOff}
+                  </SelectItem>
+                  <SelectItem value="auto">
+                    {t.general.virtualizationAuto}
+                  </SelectItem>
+                  <SelectItem value="custom">
+                    {t.general.virtualizationCustom}
+                  </SelectItem>
+                  <SelectItem value="on">
+                    {t.general.virtualizationOn}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SettingsRow>
+
+          <SettingsRow
+            label={
+              <RowLabel
+                title={t.general.viewCache}
+                hint={t.general.viewCacheHint}
               />
             }
           >
             <Select
-              value={String(threadViewCacheSize)}
-              onValueChange={(value) => setCachedThreadViews(Number(value))}
+              value={String(viewCacheSize)}
+              onValueChange={(value) => setViewCacheSize(Number(value))}
             >
-              <SelectTrigger className="w-32" aria-label="Cached thread views">
+              <SelectTrigger
+                className="w-32"
+                aria-label={t.general.viewCache}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Array.from(
-                  {
-                    length:
-                      MAX_THREAD_VIEW_CACHE_SIZE -
-                      MIN_THREAD_VIEW_CACHE_SIZE +
-                      1,
-                  },
-                  (_, index) => MIN_THREAD_VIEW_CACHE_SIZE + index
+                  { length: MAX_VIEW_CACHE_SIZE - MIN_VIEW_CACHE_SIZE + 1 },
+                  (_, index) => MIN_VIEW_CACHE_SIZE + index
                 ).map((value) => (
                   <SelectItem key={value} value={String(value)}>
                     {value}

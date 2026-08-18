@@ -2,28 +2,37 @@
 
 ## Summary
 
-Long threads and multiple open thread tabs currently keep every
-`ThreadPlayground` React tree mounted. Each tree owns both the running thread
-state and its visible editors, so hiding an inactive pane preserves a run but
-also preserves thousands of DOM nodes, CodeMirror instances, observers, drag
-sensors, and focusable controls. Global overlay work then scales with all of
-that retained UI.
+Long threads and multiple open runtime tabs create two related costs: the number
+of retained `ThreadPlayground` React trees, and the number and weight of message
+rows inside each tree. Main now bounds recent Thread and Trace pane Views and
+virtualizes message lists above a fixed size, while this feature branch started
+with a configurable Thread-only View cache and On Demand message rendering.
+The fused design replaces those overlapping policies with one Thread-and-Trace
+lifecycle owner and independent controls for View retention and message-list
+virtualization.
 
-This change separates a thread's durable in-process session from its disposable
-view, retains only the most recently used thread views, adds an on-demand
-syntax-highlighted message renderer, and makes two ordinary dropdown menus
-non-modal. It preserves background runs, pending persistence, undo history, and
-the existing rule that a running tab cannot be closed.
+This change separates a runtime tab's durable in-process session from its
+disposable view, retains only the most recently used Thread and Trace views,
+adds an on-demand syntax-highlighted message renderer, makes message-list
+virtualization configurable, and makes two ordinary dropdown menus non-modal.
+It preserves background runs, pending persistence, undo history, scroll
+location at message granularity, and the existing rule that a running tab
+cannot be closed.
 
 ## Goals
 
-- Keep a thread run alive and receiving events when its React view is evicted.
+- Keep a Thread or Trace run alive and receiving events when its React view is
+  evicted.
 - Remount an evicted view from the same in-memory store with complete current
   messages, run status, and undo/redo history.
-- Bound mounted thread views with an LRU capacity that defaults to three and is
-  configurable under General settings.
+- Bound mounted Thread and Trace views with one LRU capacity that defaults to
+  three and is configurable under General settings.
 - Add an `On Demand` rendering mode that keeps static syntax highlighting while
   mounting CodeMirror only for the active editor.
+- Make message-list virtualization independent from message rendering, with
+  Off, Auto, Custom, and On policies.
+- Restore an evicted view to the end of the message nearest the viewport bottom
+  without persisting a mutable message index or pixel offset.
 - Keep prompt-variable and template-tag highlighting visually consistent
   between the static preview and CodeMirror without teaching the generic
   editor about prompt syntax.
@@ -33,11 +42,12 @@ the existing rule that a running tab cannot be closed.
 
 ## Non-goals
 
-- Trace tabs do not participate in the thread-view LRU and retain their current
-  lifecycle.
 - The LRU does not limit open tabs or background sessions.
 - LRU recency is not persisted across application restarts.
-- This change does not virtualize the active message list.
+- Scroll restoration is message-granular. It does not restore an offset inside
+  a long message.
+- Auto virtualization does not poll memory or change its device threshold on a
+  timer or ordinary tab switch.
 - Dialogs such as Settings, Variables, New Thread, and confirmations remain
   modal.
 - On Demand does not map a click in static highlighted DOM to the equivalent
@@ -51,31 +61,35 @@ the existing rule that a running tab cannot be closed.
 ## Terminology
 
 - **Tab:** the persistent open-tab record and chrome entry.
-- **Session:** the headless in-process owner of a thread store, run, persistence,
-  and thread data. It exists from tab open until tab close or application exit.
+- **Session:** the headless in-process owner of a Thread or Trace store, run,
+  persistence, and thread data. It exists from tab open until tab close or
+  application exit.
 - **View:** the mounted `ThreadPlayground` React UI bound to a Session.
 - **Cached view:** an inactive View retained by the LRU for fast switching.
 - **Evicted view:** an open Tab whose Session exists but whose View is unmounted.
 
 ## Current Constraints
 
-`ThreadTabPane` currently owns file loading, debounced persistence, transport,
-run lifecycle callbacks, and the `ThreadPlayground`. `ThreadPlayground` creates
-its Zustand store inside the view. Consequently, unmounting the pane also
-destroys the store and the React subscription that forwards streaming changes
-to persistence.
+The feature branch already splits the Thread Session from its disposable View,
+while the current `RuntimePaneHost` from main independently retains a bounded
+set of recent Thread and Trace panes. The two policies overlap: Thread tabs are
+filtered once by a thread-only LRU and again by the generic runtime-pane host.
+The fused implementation must keep one generic LRU in `RuntimePaneHost`, feed
+it the configured capacity, and remove the nested thread-only selection.
 
-Inactive panes are currently rendered and hidden with CSS. This preserves their
-stores but also preserves their full DOM. The implementation cannot simply
-filter `RuntimePaneHost` without first moving store ownership and event handling
-out of the disposable view.
+The message list from main already virtualizes when its display-row count is
+greater than 20. That fixed policy improves large Threads but can produce
+temporary blank space during very fast scrolling and adds unnecessary
+virtualizer work to modest Threads whose selected renderer is already cheap.
+The fixed condition therefore becomes an explicit policy without coupling it
+to the message-rendering selector.
 
 ## Architecture
 
-### Thread Session Registry
+### Session and View Boundary
 
-The desktop thread-tab layer will own a registry keyed by stable `paneId`. Each
-open thread tab has exactly one Session entry. A Session contains:
+Every open Thread or Trace pane keeps one mounted Session shell keyed by its
+stable pane identity. A Session contains:
 
 - the `ThreadStore` created for that thread;
 - load state and the latest loaded thread;
@@ -86,28 +100,24 @@ open thread tab has exactly one Session entry. A Session contains:
 - lifecycle hooks for run start, run settlement, and host integrations;
 - a synchronous view-commit callback while a View is mounted.
 
-A lightweight headless session host remains mounted for every open thread tab.
-It performs the work currently tied to `ThreadTabPane`: loading, store creation,
-thread-store event subscription, persistence, refresh, rename/compaction wiring,
-and cleanup. It publishes the Session through a registry/context that a View can
-consume without recreating the store.
+A lightweight headless session host remains mounted for every open runtime tab.
+It owns loading, store creation, store event subscription, persistence,
+refresh, rename/compaction wiring, and cleanup. `viewMounted` gates only the
+disposable `ThreadPlayground` View. Remounting consumes the existing Store and
+does not reread or recreate the Session.
 
 Provider/model/runtime callbacks used by `createThreadStore` remain live through
 refs owned by the session host. Provider-profile state needed to resolve a run
 also stays on the Session side rather than disappearing with an evicted View.
 
-### Thread View Host
+### Runtime View Host
 
-The visible pane host is split into:
-
-- the existing Trace pane path, which is unchanged and always follows the
-  current behavior; and
-- a Thread View host that renders only pane IDs selected by the LRU.
-
-`ThreadTabView` receives a Session, provides its existing `ThreadStore` through
-`ThreadStoreContext`, and renders `ThreadPlaygroundContent`. Mounting a View does
-not reread the file and does not create a store. Unmounting a View does not
-abort the store or remove its subscriptions.
+`RuntimePaneHost` is the sole owner of view recency for both Thread and Trace
+tabs. It passes `viewMounted` into the corresponding Session shell. A Thread
+View receives its existing Store through `ThreadStoreContext`; a Trace View
+uses the equivalent persistent `ThreadPlayground` Session boundary. Unmounting
+either View does not abort its Store, remove its stream subscription, or stop
+persistence.
 
 Loading and fatal-load errors are Session state. An active loading Session shows
 the existing skeleton. A fatal load error retains the current toast-and-close
@@ -117,20 +127,19 @@ behavior.
 
 The cache capacity is an integer from 1 through 10 and defaults to 3.
 
-- Only `type: "thread"` tabs count toward the capacity.
-- The active Thread View is always included.
-- Activating a Thread marks it most recently used.
-- A newly opened active Thread is most recently used.
-- When capacity is exceeded, the least recently active inactive Thread View is
-  evicted.
+- Thread and Trace tabs share the same capacity.
+- The active runtime View is always included.
+- Activating a Thread or Trace marks it most recently used.
+- A newly opened active runtime tab is most recently used.
+- When capacity is exceeded, the least recently active inactive Thread or Trace
+  View is evicted.
 - Changing capacity applies immediately. Reducing it evicts excess inactive
   Views after committing their drafts.
-- Closing a Tab removes its View and Session from the LRU/registry.
+- Closing a Tab removes its View and Session from the LRU state.
 - Renaming or moving a Thread preserves `paneId`, so the same Session and LRU
   identity survive the path rewrite.
-- Trace tabs neither consume capacity nor alter Thread recency.
-- On restart, only the active Thread View is initially mounted. The cache fills
-  as the user activates other Thread tabs during that process lifetime.
+- On restart, only the active runtime View is initially mounted. The cache
+  fills as the user activates other runtime tabs during that process lifetime.
 
 The LRU is implemented as pure selection/update functions with deterministic
 unit tests. React components receive the selected pane-ID set rather than
@@ -142,11 +151,12 @@ An editor can hold a draft that has not yet reached the Thread Store. Eviction
 must not rely on a browser blur event because React may remove the focused DOM
 before blur is delivered.
 
-Each mounted View registers a synchronous `commitView()` with its Session. The
-callback commits every active CodeEditor/textarea draft to the existing Store.
-The LRU host calls it before removing a pane ID from the mounted-view set. Normal
-Tab close and application cleanup retain the existing serialized persistence
-flush behavior after Store-level drafts have been committed.
+Each mounted Thread or Trace View registers a synchronous `commitView()` with
+its Session. The callback commits every active CodeEditor/textarea draft to the
+existing Store. The LRU host calls it before removing a pane ID from the
+mounted-view set. Normal Tab close and application cleanup retain the existing
+serialized persistence flush behavior after Store-level drafts have been
+committed.
 
 Eviction never invokes `abort()`. A running Session may have no mounted View;
 its async loop, event reduction, status changes, tool results, and persistence
@@ -158,20 +168,11 @@ process-wide terminal lifecycle.
 
 ## Settings
 
-### Cached Thread Views
+General keeps Language, Theme, and Primary color under `Appearance`. A new
+`Performance` group contains `Message rendering`, `Virtualization`, and `View
+cache` in that order.
 
-Add a persisted UI preference using the shared local-storage registry.
-
-- Label: `Cached thread views`
-- Location: General, immediately below `Rendering`
-- Control: numeric select with values 1 through 10
-- Default: 3
-- Hint: `Maximum recently used thread views kept mounted. Background sessions keep running after a view is released.`
-
-Invalid, missing, or out-of-range stored values resolve to 3. Changing the value
-updates the active LRU immediately.
-
-### Rendering
+### Message rendering
 
 Extend `RenderingFidelity` with a third persisted value for On Demand. Existing
 `rich` and `lite` values remain valid, and missing/unknown values continue to
@@ -194,6 +195,108 @@ The Rendering row hint will say:
 
 The anti-FOUC `.lite` class continues to apply only to Fast. On Demand retains
 normal motion and is not treated as Lite in CSS.
+
+### Virtualization
+
+Add an independent persisted message-list policy:
+
+- `Off`: never virtualize the message list.
+- `Auto`: virtualize when the display-row count exceeds a threshold derived
+  from the system's total physical-memory tier and the selected Message
+  rendering mode.
+- `Custom`: virtualize when the display-row count exceeds a user-entered
+  positive integer; the input defaults to 20 and does not use rendering
+  multipliers.
+- `On`: always use the virtualizer, including for short lists.
+
+Auto treats the memory-tier value as the conservative Full-rendering baseline
+and calculates:
+
+```ts
+clamp(fullBaseThreshold * renderingMultiplier, 10, 200)
+```
+
+The rendering multipliers are Full `x1`, On Demand `x1.5`, and Fast `x2`.
+Benchmark calibration selected Full baselines of 10 through 8 GiB, 15 through
+16 GiB, 25 through 32 GiB, and 30 above 32 GiB. Ten and 200 are hard Auto
+bounds regardless of tier or multiplier. The multipliers estimate retained
+editor-resource savings; they do not claim that complete-DOM scroll cost scales
+linearly.
+
+The system total-memory tier is evaluated when the app starts in Auto and each
+time the user explicitly enters Auto from another mode. Changing Message
+rendering while Auto is selected reuses the current memory-tier baseline and
+recalculates only the multiplier. No timer, normal tab switch, background
+message, or available-memory sample changes Auto during ordinary use.
+
+The Auto row shows its current effective threshold and the inputs that produced
+it. Invalid virtualization modes resolve to Auto. Invalid Custom thresholds
+resolve to 20.
+
+### View cache
+
+Add a persisted UI preference using the shared local-storage registry.
+
+- Label: `View cache`
+- Control: numeric select with values 1 through 10
+- Default: 3
+- Hint: `Maximum recently used Thread and Trace views kept mounted. Background sessions keep running after a view is released.`
+
+Invalid, missing, or out-of-range stored values resolve to 3. Changing the value
+updates the active LRU immediately after committing drafts in Views selected
+for eviction.
+
+## Scroll Restoration
+
+The Session keeps a transient scroll snapshot containing only the stable
+`messageId` of the bottom-most visible message. The snapshot is captured once
+when an active View becomes inactive, before its hidden ancestor makes geometry
+unavailable. A retained hidden View keeps its native DOM scroll state; the
+snapshot is used only after eviction and remount.
+
+On restore, resolve the current index from `displayMessages` by `messageId`:
+
+- virtual mode calls `virtualizer.scrollToIndex(index, { align: "end" })`;
+- non-virtual mode aligns the mounted message element's bottom with the scroll
+  viewport bottom;
+- if the ID no longer exists, scroll to the conversation bottom.
+
+Background appends therefore do not invalidate the snapshot. The design does
+not persist a mutable message index, raw `scrollTop`, or an offset inside the
+message. A pending one-shot autofocus for a newly added message takes
+precedence over restoration. Changing Rendering or Virtualization captures the
+same bottom anchor before changing list layout and restores it afterwards.
+
+TanStack Virtual writes virtual container height and row transforms directly.
+When Virtualization changes to Off, React reuses those keyed nodes, so the
+non-virtual branch explicitly restores container `height: auto` and row
+`transform: none`, `top: auto`, and `left: auto`. It does not force a list
+remount, because doing so could discard editor-local state and drafts.
+
+### Message navigator active anchor
+
+The navigator continues to highlight the message containing the viewport
+center, or the message whose edge is nearest to that center when it falls in a
+gap. Ties prefer the earlier message, matching the existing behavior. Tracking
+is View-local and transient; it is not part of the Session scroll snapshot.
+
+One scheduler serves both list backends. During scroll or layout activity it
+updates the highlighted anchor at most once every two animation frames. After
+the viewport geometry remains unchanged for two consecutive frames, it runs an
+exact reconciliation so the final highlight is correct. Navigator clicks set
+the target highlight immediately and the tracker subsequently reconciles it.
+
+- Virtualized lists resolve both progressive and settled updates from the
+  virtualizer's currently measured items, so work is proportional to mounted
+  rows.
+- Non-virtual lists use `elementsFromPoint()` at the viewport center, with a
+  small symmetric vertical probe when the center lands in a gap. The previous
+  anchor remains while no row is hit. Only the settled reconciliation measures
+  all message rows, so ordinary scroll frames no longer force O(message count)
+  geometry reads.
+- Resize, message-count, collapsed-state, streaming-layout, activation, and
+  virtualization-mode changes enter the same settle path. Hidden cached Views
+  stop tracking and reconcile after activation.
 
 ## On Demand Static Highlighting
 
@@ -351,17 +454,29 @@ turn actual Dialogs non-modal.
 
 ### Unit and Component Tests
 
-- Pure LRU behavior: activation order, capacity, shrink, active retention,
-  removal, rename identity, and Trace exclusion.
+- Pure LRU behavior: shared Thread/Trace activation order, capacity, shrink,
+  active retention, removal, and rename identity.
 - Setting parsing/persistence: default 3, accepted 1-10, invalid fallback, and
   immediate update.
-- Session/View lifecycle: eviction unmounts View but retains the exact Store;
-  remount observes messages and history added while absent.
+- Session/View lifecycle for Thread and Trace: eviction unmounts View but
+  retains the exact Store; remount observes messages and history added while
+  absent.
 - Background run: a transport continues emitting into an evicted Session and
   completes without a View.
-- Draft safety: Full, On Demand, and Fast drafts commit before eviction.
+- Draft safety: Full, On Demand, and Fast drafts commit before Thread or Trace
+  eviction.
 - Rendering compatibility: Full, On Demand, and Fast select the intended
   renderer and old stored values remain valid.
+- Virtualization policy: Off, Auto, Custom, and On resolve independently from
+  rendering; Custom defaults to 20; invalid values fall back safely.
+- Auto threshold: every memory tier uses the Full baseline, applies Full `x1`,
+  On Demand `x1.5`, and Fast `x2`, then clamps the result to 10-200. Re-entering
+  Auto recomputes the tier, rendering changes recompute the multiplier, and
+  ordinary tab switches do neither.
+- Scroll restoration: virtual and non-virtual paths restore the current index
+  of the saved bottom-anchor ID with end alignment; background appends preserve
+  the anchor; a missing ID falls back to the conversation bottom; pending
+  autofocus wins.
 - On Demand: highlighted preview, safe escaping, pointer/keyboard activation,
   one active repeated editor, blur commit, readonly behavior, and tab
   deactivation.
@@ -390,9 +505,11 @@ Before implementation, run the benchmark at the current base commit. After
 implementation, run the same benchmark on the feature branch.
 
 The benchmark uses `mise run dev:cef` with an isolated temporary
-`LLM_SPACE_HOME` and generated non-sensitive fixtures. The standard long Thread
-contains 54 messages; the multi-tab scenario opens 10 equivalent Threads and
-sets cached views to 3.
+`LLM_SPACE_HOME` and generated non-sensitive fixtures. The multi-tab scenario
+opens 10 equivalent Threads and sets View cache to 3. A separate scaling matrix
+runs Full, On Demand, and Fast with virtualization forced Off across increasing
+message counts to identify the non-virtual performance knee on the development
+machine.
 
 For Full, On Demand, and Fast where available, collect multiple samples and
 report the median plus slower-tail sample for:
@@ -404,6 +521,14 @@ report the median plus slower-tail sample for:
 - click-to-mounted time for Settings, Tools Add, Examples, and Variables;
 - scrolling frame duration for the long active Thread.
 
+The scaling matrix also records initial mount, overlay response, active cached
+switch, evicted-view remount, DOM/editor resources, and long tasks. The measured
+Full knee calibrates the 32-GB memory-tier baseline with a conservative safety
+margin; lower-memory tiers are derived downward. The same run records the On
+Demand `x1.5` and Fast `x2` tradeoffs. The final report records the exact tiers
+selected and separates measured 32-GB behavior from inferred lower- and
+higher-memory tiers.
+
 Separately verify that a Session whose View is evicted can receive a complete
 stream, persist its resulting Thread, and show the full result when remounted.
 
@@ -413,21 +538,26 @@ The comparison report will distinguish:
 - benefit from On Demand versus Full and Fast;
 - benefit from non-modal ordinary menus;
 - remount cost introduced by LRU eviction;
-- any remaining active-long-thread cost that requires later virtualization.
+- the retained-cost and rapid-scroll tradeoff of configurable virtualization.
 
 The benchmark must not read real workspace files or settings. Temporary runtime
 data and processes are removed after the run.
 
 ## Acceptance Criteria
 
-- At most the configured number of ordinary Thread Views are mounted.
+- At most the configured number of Thread and Trace Views are mounted.
 - Open Thread Sessions are not bounded by the View cache.
-- An evicted running Thread completes and remounts with complete messages and
-  the same undo/redo history.
+- An evicted running Thread or Trace completes and remounts with complete
+  messages and the same undo/redo history.
 - No typed draft is lost when a View is evicted.
 - Running Tabs remain non-closable.
 - On Demand displays static syntax highlighting and clearly communicates its
   focus-before-edit tradeoff in Settings.
+- Virtualization offers Off, Auto, Custom, and On independently from Message
+  rendering; Auto uses the benchmarked memory-tier baseline, `x1/x1.5/x2`
+  rendering multipliers, and hard 10-200 bounds.
+- Evicted virtual and non-virtual lists restore the saved message ID with end
+  alignment after background appends.
 - Tools Add and Examples retain pointer and keyboard behavior with
   `modal={false}`.
 - Invalid cache settings safely use 3.
