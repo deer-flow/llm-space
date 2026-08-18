@@ -8,7 +8,7 @@ import type {
   ThreadSnapshot,
 } from "@llm-space/core";
 import { isMetaUserMessage } from "@llm-space/core/generator";
-import { planCompaction } from "@llm-space/core/thread";
+import { planCompaction, type ThreadRunTransport } from "@llm-space/core/thread";
 import {
   ChevronDownIcon,
   EllipsisIcon,
@@ -118,6 +118,8 @@ export interface ThreadPlaygroundProps {
   viewMounted?: boolean;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
+  /** Host-owned full-loop transport; bun drives tools and ReAct. */
+  runTransport?: ThreadRunTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
   runtimeId?: string;
   /** Recreate only the thread store while preserving per-tab UI selections. */
@@ -178,6 +180,7 @@ function _ThreadPlayground({ storeKey, ...props }: ThreadPlaygroundProps) {
 function _ThreadPlaygroundStore({
   initialValue,
   transport,
+  runTransport,
   runtimeId,
   onApplyCompaction,
   viewMounted = true,
@@ -205,6 +208,7 @@ function _ThreadPlaygroundStore({
     const promptFiles = createRuntimePromptFiles(files, ownerRuntimeId);
     return createThreadStore(initialValue, {
       transport,
+      runTransport,
       resolveModel: (saved) =>
         resolveModelConfig(
           providersRef.current,

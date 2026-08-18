@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentTransport } from "@llm-space/core";
+import type { ThreadRunTransport } from "@llm-space/core/thread";
 
 import { createThreadStore } from "../../../../src/components/thread-playground/stores/thread-store";
 
@@ -333,6 +334,90 @@ describe("auto-run tool results", () => {
     expect(contexts[0]).toMatchObject({
       thread: { title: "Owning thread" },
       variables: { current_working_directory: "/workspace" },
+    });
+  });
+
+  test("uses the host run transport instead of local auto-run when both exist", async () => {
+    let localToolCalls = 0;
+    const runTransport: ThreadRunTransport = async function* (_request, options) {
+      expect(options.policy).toMatchObject({
+        autoRunTools: true,
+        reactLoop: false,
+      });
+      expect(options.thread.context?.messages?.at(-1)?.role).toBe("user");
+      yield {
+        type: "agent_event",
+        event: _event({
+          type: "message_start",
+          message: { role: "assistant" },
+        }),
+      };
+      yield {
+        type: "agent_event",
+        event: _event({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+        }),
+      };
+      yield {
+        type: "agent_event",
+        event: _event({
+          type: "message_update",
+          assistantMessageEvent: {
+            type: "text_delta",
+            contentIndex: 0,
+            delta: "Host ran this",
+          },
+        }),
+      };
+      yield {
+        type: "agent_event",
+        event: _event({ type: "message_end", message: { role: "assistant" } }),
+      };
+      yield {
+        type: "run_end",
+        reason: "completed",
+        policy: {
+          autoRunTools: true,
+          reactLoop: false,
+          maxTurns: 50,
+        },
+        messages: options.thread.context?.messages ?? [],
+      };
+    };
+    const store = createThreadStore(
+      {
+        context: {
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              content: [{ type: "text", text: "Go" }],
+            },
+          ],
+        },
+      },
+      {
+        resolveModel: () => ({ provider: "test", id: "test" }),
+        getAutoRunTools: () => true,
+        executeTool: () => {
+          localToolCalls += 1;
+          return Promise.resolve({
+            content: [{ type: "text", text: "should not run" }],
+            isError: false,
+          });
+        },
+        runTransport,
+      }
+    );
+
+    await store.getState().run();
+
+    expect(localToolCalls).toBe(0);
+    const assistant = store.getState().thread.context?.messages?.at(-1);
+    expect(assistant).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: "Host ran this" }],
     });
   });
 });

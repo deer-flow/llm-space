@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { AgentEvent, AgentStreamRequest } from "@llm-space/core";
+import type {
+  AgentEvent,
+  AgentStreamRequest,
+  Thread,
+} from "@llm-space/core";
+import type { ThreadRunPolicy } from "@llm-space/core/thread";
 
 import type {
   AbortStreamThreadPayload,
@@ -63,7 +68,9 @@ await mock.module("@/lib/electrobun", () => ({
   electrobun: { rpc: RPC },
 }));
 
-const { createRpcTransport } = await import("./rpc-transport");
+const { createRpcThreadRunTransport, createRpcTransport } = await import(
+  "./rpc-transport"
+);
 
 const REQUEST: AgentStreamRequest = {
   model: { provider: "test", id: "test" },
@@ -206,5 +213,70 @@ describe("createRpcTransport", () => {
     expect(received).toEqual(queued);
     expect(RPC.listenerCount).toBe(0);
     expect(RPC.aborts).toEqual([]);
+  });
+});
+
+const POLICY: ThreadRunPolicy = {
+  autoRunTools: true,
+  reactLoop: true,
+  maxTurns: 50,
+};
+const THREAD: Thread = {
+  context: {
+    messages: [
+      { id: "user-1", role: "user", content: [{ type: "text", text: "Go" }] },
+    ],
+  },
+};
+
+describe("createRpcThreadRunTransport", () => {
+  beforeEach(() => {
+    RPC.reset();
+  });
+
+  test("forwards policy and thread with the run request", async () => {
+    const iterator = createRpcThreadRunTransport()(REQUEST, {
+      policy: POLICY,
+      thread: THREAD,
+      onPause: "pause",
+    })[Symbol.asyncIterator]();
+    const next = iterator.next();
+    const streamId = RPC.starts.at(-1)?.streamId;
+    if (!streamId) {
+      throw new Error("transport did not start an RPC stream");
+    }
+
+    expect(RPC.starts[0]).toMatchObject({
+      streamId,
+      request: REQUEST,
+      policy: POLICY,
+      thread: THREAD,
+      onPause: "pause",
+    });
+
+    RPC.emit({ streamId, type: "tool_start", toolCallIds: ["call-1"] });
+    RPC.emit({
+      streamId,
+      type: "tool_result",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "ok" }],
+      isError: false,
+    });
+    RPC.emit({ streamId, type: "done" });
+
+    expect(await next).toEqual({
+      value: { type: "tool_start", toolCallIds: ["call-1"] },
+      done: false,
+    });
+    expect(await iterator.next()).toEqual({
+      value: {
+        type: "tool_result",
+        toolCallId: "call-1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      },
+      done: false,
+    });
+    expect(await iterator.next()).toEqual({ value: undefined, done: true });
   });
 });

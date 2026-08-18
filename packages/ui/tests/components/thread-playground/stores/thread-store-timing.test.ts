@@ -84,6 +84,9 @@ describe("assistant message timing", () => {
     const savedRun = store.getState().runHistory[0];
     if (!savedRun?.thread) throw new Error("Expected inline run snapshot");
     expect(savedRun.thread.context?.messages?.at(-1)).toEqual(assistant);
+    expect(savedRun).toMatchObject({
+      policy: { autoRunTools: false, reactLoop: false, maxTurns: 50 },
+    });
   });
 
   test("archives a completed run before publishing idle state", async () => {

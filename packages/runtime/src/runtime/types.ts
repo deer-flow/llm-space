@@ -21,10 +21,13 @@ import type {
   SkillsSettings,
   SystemProxyDetection,
   Thread,
+  ThreadRunPolicy,
   ThreadRunReference,
   ThreadRunSnapshot,
   ThreadSnapshot,
+  ToolCallOutput,
 } from "@llm-space/core";
+import type { ThreadRunPauseReason } from "@llm-space/core/thread";
 
 import type {
   TraceConnectedProjectInput,
@@ -69,6 +72,10 @@ export interface RuntimeStreamRequestPayload extends RuntimeScopedParams {
   streamId: string;
   request: AgentStreamRequest;
   connection?: ProviderConnectionRef;
+  policy?: ThreadRunPolicy;
+  /** Prepared Thread used to execute tools and continue ReAct turns. */
+  thread?: Thread;
+  onPause?: "pause" | "fail";
 }
 
 export interface UpdateProviderProfileInput extends ProviderProfilePatch {
@@ -82,6 +89,20 @@ export interface RuntimeAbortStreamPayload extends RuntimeScopedParams {
 
 export type RuntimeStreamResponsePayload =
   | { streamId: string; type: "event"; event: AgentEvent }
+  | { streamId: string; type: "tool_start"; toolCallIds: string[] }
+  | {
+      streamId: string;
+      type: "tool_result";
+      toolCallId: string;
+      content: ToolCallOutput["content"];
+      isError: boolean;
+    }
+  | {
+      streamId: string;
+      type: "paused";
+      reason: ThreadRunPauseReason;
+      toolCallIds: string[];
+    }
   | { streamId: string; type: "done" }
   | { streamId: string; type: "error"; message: string };
 

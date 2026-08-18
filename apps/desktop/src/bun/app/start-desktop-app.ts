@@ -240,6 +240,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     skillsManager,
     streaming,
     tools: host.tools,
+    pluginTools: pluginManager.tools,
     traceManager,
     rmPath: async (workspacePath) => {
       // Run history is stored outside the workspace and deliberately stays

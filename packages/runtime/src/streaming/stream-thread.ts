@@ -1,5 +1,13 @@
-import type { CustomModel } from "@llm-space/core";
+import {
+  convertToPiContext,
+  type CustomModel,
+  type SkillInfo,
+} from "@llm-space/core";
 import { streamAgent } from "@llm-space/core/server";
+import {
+  type ExecuteThreadTool,
+  runThreadLoop,
+} from "@llm-space/core/thread";
 
 import type { ModelManager } from "../models";
 import type {
@@ -7,6 +15,14 @@ import type {
   RuntimeStreamRequestPayload,
   RuntimeStreamResponsePayload,
 } from "../runtime";
+
+export interface StreamThreadRunHost {
+  executeTool: ExecuteThreadTool;
+  loadSkills?: () => Promise<SkillInfo[]>;
+  loadFile?: (path: string) => Promise<string>;
+  fileExists?: (path: string) => Promise<boolean>;
+  resolvePath?: (path: string) => Promise<string>;
+}
 
 /** Process-scoped agent streaming and model-connection controller. */
 export class StreamThreadController {
@@ -22,7 +38,8 @@ export class StreamThreadController {
   /** Run an agent stream and push each event back through the caller's sender. */
   async run(
     payload: RuntimeStreamRequestPayload,
-    send: (message: RuntimeStreamResponsePayload) => void
+    send: (message: RuntimeStreamResponsePayload) => void,
+    host?: StreamThreadRunHost
   ): Promise<void> {
     const { streamId, request } = payload;
     const abortController = new AbortController();
@@ -41,13 +58,29 @@ export class StreamThreadController {
       const connection = await this._modelManager.resolveConnection(
         connectionRef
       );
-      for await (const event of streamAgent(request, {
+      const streamOptions = {
         models: await this._modelManager.getAvailableModels(),
         getApiKey: () => connection.apiKey,
         getBaseUrl: () => connection.baseUrl,
         getHeaders: () => connection.headers,
         signal: abortController.signal,
-      })) {
+      };
+      if (payload.thread) {
+        const reason = await this._runLoop(
+          payload,
+          send,
+          streamOptions,
+          host
+        );
+        outcome =
+          reason === "aborted"
+            ? "aborted"
+            : reason === "failed"
+              ? "error"
+              : "completed";
+        return;
+      }
+      for await (const event of streamAgent(request, streamOptions)) {
         send({ streamId, type: "event", event });
       }
       outcome = "completed";
@@ -73,6 +106,87 @@ export class StreamThreadController {
         hasSystemPrompt: Boolean(request.context.systemPrompt),
       });
     }
+  }
+
+  private async _runLoop(
+    payload: RuntimeStreamRequestPayload,
+    send: (message: RuntimeStreamResponsePayload) => void,
+    streamOptions: Parameters<typeof streamAgent>[1],
+    host?: StreamThreadRunHost
+  ): Promise<"completed" | "aborted" | "failed"> {
+    const thread = payload.thread;
+    if (!thread) {
+      throw new Error("Thread is required to run the tool loop.");
+    }
+    const { streamId, request } = payload;
+    let endReason: "completed" | "aborted" | "failed" = "completed";
+    for await (const event of runThreadLoop({
+      thread,
+      messages: thread.context?.messages ?? [],
+      policy: payload.policy,
+      signal: streamOptions.signal,
+      onPause: payload.onPause ?? "pause",
+      executeTool: host?.executeTool,
+      loadSkills: host?.loadSkills,
+      loadFile: host?.loadFile,
+      fileExists: host?.fileExists,
+      resolvePath: host?.resolvePath,
+      streamTurn: (context) =>
+        streamAgent(
+          {
+            ...request,
+            context: convertToPiContext(context),
+          },
+          streamOptions
+        ),
+    })) {
+      if (event.type === "agent_event") {
+        send({ streamId, type: "event", event: event.event });
+        continue;
+      }
+      if (event.type === "tool_start") {
+        send({
+          streamId,
+          type: "tool_start",
+          toolCallIds: event.toolCallIds,
+        });
+        continue;
+      }
+      if (event.type === "tool_result") {
+        send({
+          streamId,
+          type: "tool_result",
+          toolCallId: event.toolCallId,
+          content: event.content,
+          isError: event.isError,
+        });
+        continue;
+      }
+      if (event.type === "paused") {
+        send({
+          streamId,
+          type: "paused",
+          reason: event.reason,
+          toolCallIds: event.toolCallIds,
+        });
+        continue;
+      }
+      if (event.reason === "aborted") {
+        endReason = "aborted";
+        continue;
+      }
+      if (event.reason === "failed") {
+        endReason = "failed";
+        send({
+          streamId,
+          type: "error",
+          message: event.error ?? "Thread run failed",
+        });
+        continue;
+      }
+      send({ streamId, type: "done" });
+    }
+    return endReason;
   }
 
   /** Abort one in-flight stream. */

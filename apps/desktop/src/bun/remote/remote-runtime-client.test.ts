@@ -382,6 +382,73 @@ describe("RemoteRuntimeClient", () => {
     });
   });
 
+  test("forwards loop policy and tool events", async () => {
+    const messages: unknown[] = [];
+    let requestBody: unknown;
+    await _withFetch(
+      async (request) => {
+        requestBody = await request.json();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const encoder = new TextEncoder();
+            controller.enqueue(encoder.encode("data: [START]\n\n"));
+            controller.enqueue(
+              encoder.encode(
+                'data: {"type":"tool_start","toolCallIds":["call-1"]}\n\n'
+              )
+            );
+            controller.enqueue(
+              encoder.encode(
+                'data: {"type":"tool_result","toolCallId":"call-1","content":[{"type":"text","text":"ok"}],"isError":false}\n\n'
+              )
+            );
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      },
+      async () => {
+        const client = new RemoteRuntimeClient({
+          id: "remote:test",
+          name: "Test Remote",
+          baseUrl: "http://remote.test",
+          token: "secret",
+        });
+        await client.streamThread(
+          {
+            streamId: "s1",
+            request: {} as AgentStreamRequest,
+            policy: { autoRunTools: true, reactLoop: true, maxTurns: 50 },
+            thread: { title: "Headless" },
+            onPause: "fail",
+          },
+          (message) => messages.push(message)
+        );
+      }
+    );
+
+    expect(requestBody).toEqual({
+      request: {},
+      policy: { autoRunTools: true, reactLoop: true, maxTurns: 50 },
+      thread: { title: "Headless" },
+      onPause: "fail",
+    });
+    expect(messages).toEqual([
+      { streamId: "s1", type: "tool_start", toolCallIds: ["call-1"] },
+      {
+        streamId: "s1",
+        type: "tool_result",
+        toolCallId: "call-1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      },
+      { streamId: "s1", type: "done" },
+    ]);
+  });
+
   test("does not complete after a remote stream error", async () => {
     const messages: unknown[] = [];
     await _withSseServer(

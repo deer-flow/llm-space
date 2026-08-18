@@ -14,9 +14,11 @@ import type {
   SearchSettings,
   SystemProxyDetection,
   Thread,
+  ThreadRunPolicy,
   ThreadRunReference,
   ThreadRunSnapshot,
   ThreadSnapshot,
+  ToolCallOutput,
   ThreadLocator,
   ThreadStorageView,
   PluginCommandView,
@@ -35,6 +37,7 @@ import type {
   McpServerView,
 } from "@llm-space/core";
 import type { SkillContent, SkillInfo, SkillsSettings } from "@llm-space/core";
+import type { ThreadRunPauseReason } from "@llm-space/core/thread";
 import type { RPCSchema } from "electrobun";
 
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
@@ -68,11 +71,28 @@ export interface StreamThreadRequestPayload extends RuntimeScopedParams {
   request: AgentStreamRequest;
   /** Per-tab connection choice; never persisted into the thread. */
   connection?: ProviderConnectionRef;
+  policy?: ThreadRunPolicy;
+  thread?: Thread;
+  onPause?: "pause" | "fail";
 }
 
 /** A bun→webview chunk of a streaming agent run, keyed by `streamId`. */
 export type StreamThreadResponsePayload =
   | { streamId: string; type: "event"; event: AgentEvent }
+  | { streamId: string; type: "tool_start"; toolCallIds: string[] }
+  | {
+      streamId: string;
+      type: "tool_result";
+      toolCallId: string;
+      content: ToolCallOutput["content"];
+      isError: boolean;
+    }
+  | {
+      streamId: string;
+      type: "paused";
+      reason: ThreadRunPauseReason;
+      toolCallIds: string[];
+    }
   | { streamId: string; type: "done" }
   | { streamId: string; type: "error"; message: string };
 

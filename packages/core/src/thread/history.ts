@@ -6,6 +6,7 @@ import type {
   ThreadEvaluationRubric,
   ThreadEvaluationRubricSnapshot,
   ThreadEvaluationRunScores,
+  ThreadRunPolicy,
   ThreadRunSnapshot,
   ThreadSnapshot,
 } from "../types";
@@ -16,6 +17,7 @@ import {
   type RunHistoryEntry,
   type RunSnapshot,
 } from "./run-history-entry";
+import { normalizeThreadRunPolicy } from "./run-policy";
 import { emptyModelUsage, isModelUsage } from "./usage";
 
 export {
@@ -125,6 +127,11 @@ export function normalizeRunHistory(
       isModelUsage(run.usage)
         ? run.usage
         : undefined;
+    const policy = normalizeThreadRunPolicy(
+      Object.prototype.hasOwnProperty.call(run, "policy")
+        ? run.policy
+        : undefined
+    );
     return [
       {
         id,
@@ -133,6 +140,7 @@ export function normalizeRunHistory(
           ? run.thread
           : snapshotThread(run.thread),
         ...(usage ? { usage } : {}),
+        ...(policy ? { policy } : {}),
       },
     ];
   });
@@ -606,7 +614,11 @@ export function recordRun(
   runHistory: RunHistoryEntry[],
   thread: Thread,
   timestamp: number = Date.now(),
-  options: { id?: string; usage?: ModelUsage | null } = {}
+  options: {
+    id?: string;
+    usage?: ModelUsage | null;
+    policy?: ThreadRunPolicy;
+  } = {}
 ): RunHistoryEntry[] {
   const usage = options.usage ?? emptyModelUsage();
   const next = [
@@ -616,6 +628,7 @@ export function recordRun(
       thread: snapshotThread(thread),
       timestamp,
       usage,
+      ...(options.policy ? { policy: options.policy } : {}),
     },
   ];
   return next;

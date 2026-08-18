@@ -1,5 +1,6 @@
 import {
   readUserTextFile,
+  resolveUserPath,
   userTextFileExists,
   type LocalFileSystem,
 } from "@llm-space/core/server";
@@ -7,9 +8,14 @@ import {
 import type { McpManager } from "../mcp";
 import type { ModelManager } from "../models";
 import type { NetworkSettingsManager } from "../network";
+import type { PluginToolRegistry } from "../plugins";
 import type { SearchSettingsManager } from "../search";
 import type { SkillsManager } from "../skills";
-import type { StreamThreadController } from "../streaming";
+import {
+  createRuntimeExecuteTool,
+  type StreamThreadController,
+  type StreamThreadRunHost,
+} from "../streaming";
 import type { ToolRegistry } from "../tools/tool-registry";
 import type { TraceManager } from "../traces";
 
@@ -31,6 +37,7 @@ export interface LocalRuntimeClientDependencies {
   skillsManager: SkillsManager;
   streaming: StreamThreadController;
   tools: ToolRegistry;
+  pluginTools?: PluginToolRegistry;
   traceManager: TraceManager;
   rmPath?: (path: string) => Promise<void>;
 }
@@ -429,7 +436,11 @@ export class LocalRuntimeClient implements RuntimeClient {
     payload: RuntimeStreamRequestPayload,
     send: (message: RuntimeStreamResponsePayload) => void
   ) {
-    return this._deps.streaming.run(payload, send);
+    return this._deps.streaming.run(
+      payload,
+      send,
+      this._threadRunHost(payload.connection)
+    );
   }
 
   abortStream(payload: RuntimeAbortStreamPayload) {
@@ -438,5 +449,22 @@ export class LocalRuntimeClient implements RuntimeClient {
 
   shutdown() {
     this._deps.streaming.shutdown();
+  }
+
+  private _threadRunHost(
+    connection?: RuntimeStreamRequestPayload["connection"]
+  ): StreamThreadRunHost {
+    return {
+      executeTool: createRuntimeExecuteTool({
+        tools: this._deps.tools,
+        mcpManager: this._deps.mcpManager,
+        pluginTools: this._deps.pluginTools,
+        connection,
+      }),
+      loadSkills: () => Promise.resolve(this.skillsListAvailable()),
+      loadFile: (path) => this.readTextFile(path),
+      fileExists: (path) => this.textFileExists(path),
+      resolvePath: (path) => Promise.resolve(resolveUserPath(path)),
+    };
   }
 }

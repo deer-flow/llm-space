@@ -203,6 +203,25 @@ describe("run history persistence", () => {
     expect(next.at(-1)?.id).toBe("run-latest");
   });
 
+  test("records run policy and keeps old snapshots without one", () => {
+    const withPolicy = recordRun([], { title: "Latest" }, 100, {
+      id: "run-latest",
+      policy: { autoRunTools: true, reactLoop: true, maxTurns: 50 },
+    });
+    expect(withPolicy[0]).toMatchObject({
+      id: "run-latest",
+      policy: { autoRunTools: true, reactLoop: true, maxTurns: 50 },
+    });
+
+    const legacy = normalizeRunHistory([
+      { id: "old", thread: {}, timestamp: 1 },
+    ]);
+    expect(legacy[0]).toMatchObject({ id: "old" });
+    expect(
+      legacy[0] && "policy" in legacy[0] ? legacy[0].policy : undefined
+    ).toBeUndefined();
+  });
+
   test("merges legacy snapshots with the versioned index and keeps the last duplicate", () => {
     const normalized = normalizeRunHistory(
       [{ id: "same", thread: { title: "Legacy" }, timestamp: 1 }],

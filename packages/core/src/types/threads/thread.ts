@@ -180,6 +180,17 @@ export const ThreadSnapshot = Type.Object(THREAD_FIELDS);
 export type ThreadSnapshot = Static<typeof ThreadSnapshot>;
 
 /**
+ * How one completed run drove model turns and tool execution. Copied onto the
+ * run request so the record can explain the loop that produced it.
+ */
+export const ThreadRunPolicy = Type.Object({
+  autoRunTools: Type.Boolean(),
+  reactLoop: Type.Boolean(),
+  maxTurns: Type.Integer({ minimum: 1 }),
+});
+export type ThreadRunPolicy = Static<typeof ThreadRunPolicy>;
+
+/**
  * A completed run in a thread's durable debug timeline.
  */
 export const ThreadRunSnapshot = Type.Object({
@@ -206,6 +217,12 @@ export const ThreadRunSnapshot = Type.Object({
    * Epoch milliseconds (`Date.now()`) when the run completed.
    */
   timestamp: Type.Number(),
+
+  /**
+   * How this run drove model turns and tool execution. Older snapshots omit
+   * the field; missing means the loop settings were not recorded.
+   */
+  policy: Type.Optional(ThreadRunPolicy),
 });
 export type ThreadRunSnapshot = Static<typeof ThreadRunSnapshot>;
 

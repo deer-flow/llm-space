@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { createFileSystemClient, createRpcTransport } from "@/client";
+import { createFileSystemClient, createRpcThreadRunTransport, createRpcTransport } from "@/client";
 import type { RuntimeId } from "@/shared/runtime";
 
 import { runFileMutationWithGuard } from "../file-system-tree-view/file-mutation-guard";
@@ -73,6 +73,10 @@ function _ThreadTabPane({
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
   const rpcTransport = useMemo(
     () => createRpcTransport(runtimeId),
+    [runtimeId]
+  );
+  const rpcRunTransport = useMemo(
+    () => createRpcThreadRunTransport(runtimeId),
     [runtimeId]
   );
   const {
@@ -405,6 +409,7 @@ function _ThreadTabPane({
       active={active}
       viewMounted={viewMounted}
       transport={rpcTransport}
+      runTransport={rpcRunTransport}
       runtimeId={runtimeId}
       onChange={handleChange}
       onStreamingStart={handleStreamingStart}

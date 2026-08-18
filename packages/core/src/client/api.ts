@@ -1,8 +1,13 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
+import type {
+  ThreadRunEvent,
+  ThreadRunPolicy,
+  ThreadRunTransport,
+} from "../thread/run-loop";
 import type { AgentStreamRequest } from "../types/agent";
 import type { ModelConfig, ProviderConnectionRef } from "../types/models";
-import type { ThreadContext } from "../types/threads";
+import type { Thread, ThreadContext } from "../types/threads";
 
 import { convertToPiContext } from "./converters";
 import {
@@ -40,5 +45,42 @@ export async function* streamThread(
   yield* transport(request, {
     signal: config.signal,
     connection: config.connection,
+  });
+}
+
+/** Stream a full tool loop from a host that already owns {@link runThreadLoop}. */
+export async function* runThread(
+  args: {
+    context: ThreadContext;
+    model: ModelConfig;
+    thread: Thread;
+    policy: ThreadRunPolicy;
+  },
+  config: {
+    signal?: AbortSignal;
+    transport: ThreadRunTransport;
+    connection?: ProviderConnectionRef;
+    onPause?: "pause" | "fail";
+  }
+): AsyncGenerator<ThreadRunEvent> {
+  if (!isRunnableConversation(args.context.messages)) {
+    throw new Error(RUN_LAST_MESSAGE_ERROR);
+  }
+  const request: AgentStreamRequest = {
+    model: {
+      provider: args.model.provider,
+      id: args.model.id,
+    },
+    config: {
+      model: args.model.params,
+    },
+    context: convertToPiContext(args.context),
+  };
+  yield* config.transport(request, {
+    signal: config.signal,
+    connection: config.connection,
+    policy: args.policy,
+    thread: args.thread,
+    onPause: config.onPause,
   });
 }

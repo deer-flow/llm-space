@@ -201,6 +201,9 @@ export class RemoteRuntimeClient implements RuntimeClient {
         body: JSON.stringify({
           request: payload.request,
           ...(payload.connection ? { connection: payload.connection } : {}),
+          ...(payload.policy ? { policy: payload.policy } : {}),
+          ...(payload.thread ? { thread: payload.thread } : {}),
+          ...(payload.onPause ? { onPause: payload.onPause } : {}),
         }),
         signal: controller.signal,
       });
@@ -218,18 +221,37 @@ export class RemoteRuntimeClient implements RuntimeClient {
           send({ streamId: payload.streamId, type: "done" });
           return;
         }
-        const event = JSON.parse(value) as
-          AgentEvent | { type: "error"; message: string };
-        if (event.type === "error") {
+        const parsed = JSON.parse(value) as
+          | AgentEvent
+          | { type: "error"; message: string }
+          | Extract<
+              RuntimeStreamResponsePayload,
+              { type: "tool_start" | "tool_result" | "paused" }
+            >;
+        if ("type" in parsed && parsed.type === "error") {
           send({
             streamId: payload.streamId,
             type: "error",
-            message: event.message,
+            message: parsed.message,
           });
           return;
-        } else {
-          send({ streamId: payload.streamId, type: "event", event });
         }
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          "type" in parsed &&
+          (parsed.type === "tool_start" ||
+            parsed.type === "tool_result" ||
+            parsed.type === "paused")
+        ) {
+          send({ ...parsed, streamId: payload.streamId });
+          continue;
+        }
+        send({
+          streamId: payload.streamId,
+          type: "event",
+          event: parsed,
+        });
       }
       throw new Error("Remote runtime stream ended before [DONE].");
     } finally {
