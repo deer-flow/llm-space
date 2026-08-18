@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  useMessageVirtualization,
+  type MessageVirtualizationMode,
+} from "@llm-space/ui/components/message-virtualization-provider";
+import {
   isModelAvailable,
   useDefaultModel,
   useModels,
@@ -16,6 +20,7 @@ import {
 } from "@llm-space/ui/components/theme-provider";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
+import { Input } from "@llm-space/ui/ui/input";
 import {
   Select,
   SelectContent,
@@ -42,6 +47,12 @@ import { useCommands } from "@/commands";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
+
+import {
+  MAX_VIEW_CACHE_SIZE,
+  MIN_VIEW_CACHE_SIZE,
+  useViewCacheSize,
+} from "../thread-tabs/view-cache-size";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
@@ -85,6 +96,36 @@ function SettingsSection({
         {children}
       </div>
     </section>
+  );
+}
+
+function VirtualizationThresholdInput({
+  value,
+  onCommit,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const next = Number(draft);
+    onCommit(next);
+    setDraft(String(Number.isSafeInteger(next) && next > 0 ? next : 20));
+  };
+  return (
+    <Input
+      className="w-20"
+      type="number"
+      min={1}
+      aria-label="Virtualization threshold"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
   );
 }
 
@@ -295,6 +336,16 @@ export function GeneralPage() {
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
+  const {
+    autoThreshold,
+    customThreshold,
+    fullBaseThreshold,
+    mode: virtualizationMode,
+    renderingMultiplier,
+    setCustomThreshold,
+    setMode: setVirtualizationMode,
+  } = useMessageVirtualization();
+  const [viewCacheSize, setViewCacheSize] = useViewCacheSize();
   const [updateMode, setUpdateMode] = useUpdateMode();
   const {
     primaryColor,
@@ -375,11 +426,14 @@ export function GeneralPage() {
             </div>
           </SettingsRow>
 
+        </SettingsSection>
+
+        <SettingsSection title="Performance">
           <SettingsRow
             label={
               <RowLabel
-                title="Rendering"
-                hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
+                title="Message rendering"
+                hint="Full keeps every message editor mounted. On Demand uses lightweight syntax highlighting and activates an editor after focus, so placing the caret may require a second click. Fast uses plain text for the lowest overhead."
               />
             }
           >
@@ -387,12 +441,79 @@ export function GeneralPage() {
               value={fidelity}
               onValueChange={(v) => setFidelity(v as RenderingFidelity)}
             >
-              <SelectTrigger className="w-32" aria-label="Rendering fidelity">
+              <SelectTrigger className="w-32" aria-label="Message rendering">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="rich">Full</SelectItem>
+                <SelectItem value="on-demand">On Demand</SelectItem>
                 <SelectItem value="lite">Fast</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+
+          <SettingsRow
+            label={
+              <RowLabel
+                title="Virtualization"
+                hint={
+                  virtualizationMode === "auto"
+                    ? `Current threshold: ${autoThreshold} messages (Full baseline ${fullBaseThreshold} × ${renderingMultiplier}). Fast scrolling can briefly show blank space.`
+                    : "Reduces mounted message rows in long conversations. Fast scrolling can briefly show blank space."
+                }
+              />
+            }
+          >
+            <div className="flex items-center gap-2">
+              {virtualizationMode === "custom" ? (
+                <VirtualizationThresholdInput
+                  value={customThreshold}
+                  onCommit={setCustomThreshold}
+                />
+              ) : null}
+              <Select
+                value={virtualizationMode}
+                onValueChange={(value) =>
+                  setVirtualizationMode(value as MessageVirtualizationMode)
+                }
+              >
+                <SelectTrigger className="w-32" aria-label="Virtualization">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">Off</SelectItem>
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="on">On</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SettingsRow>
+
+          <SettingsRow
+            label={
+              <RowLabel
+                title="View cache"
+                hint="Maximum recently used Thread and Trace views kept mounted, including the active view. Background sessions keep running after a view is released."
+              />
+            }
+          >
+            <Select
+              value={String(viewCacheSize)}
+              onValueChange={(value) => setViewCacheSize(Number(value))}
+            >
+              <SelectTrigger className="w-32" aria-label="View cache">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(
+                  { length: MAX_VIEW_CACHE_SIZE - MIN_VIEW_CACHE_SIZE + 1 },
+                  (_, index) => MIN_VIEW_CACHE_SIZE + index
+                ).map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </SettingsRow>

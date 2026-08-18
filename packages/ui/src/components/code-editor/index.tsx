@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -18,8 +19,23 @@ import { Textarea } from "../../ui/textarea";
 import { Tooltip } from "../tooltip";
 
 import type { CodeEditorHandle, CodeEditorProps } from "./editor";
+import { useRegisterEditorCommit } from "./editor-commit-scope";
+import { OnDemandCodeEditor } from "./on-demand-code-editor";
 
+export type CodeEditorRenderMode = "full" | "on-demand" | "plain";
 export type { CodeEditorHandle, CodeEditorProps } from "./editor";
+export {
+  collectStaticDecorations,
+  createRangeHighlightEnhancement,
+  createRegexHighlightEnhancement,
+} from "./editor-enhancement";
+export type {
+  CodeMirrorOnlyEnhancement,
+  EditorEnhancement,
+  RangeHighlightEnhancement,
+  RegexHighlightEnhancement,
+  StaticDecorationRange,
+} from "./editor-enhancement";
 
 // CodeMirror is the single heaviest first-paint dependency (~200 kB gzipped) and
 // only mounts inside editors, so load it on demand. The surrounding UI and the
@@ -113,6 +129,8 @@ const PlainTextCodeEditor = forwardRef<
     scrollOnFocus,
     value,
     onChange,
+    onAutoFocusComplete,
+    onBlur,
     onKeyDown,
     onPaste,
     onRetry,
@@ -122,10 +140,23 @@ const PlainTextCodeEditor = forwardRef<
   const draftRef = useRef(value);
   const committedRef = useRef(value);
   const focusedRef = useRef(false);
+  const autoFocusCompletedRef = useRef(false);
   // Uncontrolled: the DOM textarea owns its value while the user types, so a
   // keystroke writes only to `draftRef` and never re-renders React. External
   // updates and imperative insertions are pushed in by `setDraftValue`.
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (!autoFocus) {
+      autoFocusCompletedRef.current = false;
+      return;
+    }
+    const textarea = textareaRef.current;
+    if (!textarea || autoFocusCompletedRef.current) return;
+    textarea.focus();
+    autoFocusCompletedRef.current = true;
+    onAutoFocusComplete?.();
+  }, [autoFocus, onAutoFocusComplete]);
 
   const setDraftValue = useCallback((next: string) => {
     draftRef.current = next;
@@ -147,6 +178,7 @@ const PlainTextCodeEditor = forwardRef<
       committedRef.current = draftRef.current;
     }
   }, [onChange]);
+  useRegisterEditorCommit(commit);
 
   const insertText = useCallback(
     (text: string) => {
@@ -210,6 +242,7 @@ const PlainTextCodeEditor = forwardRef<
         onBlur={() => {
           focusedRef.current = false;
           commit();
+          onBlur?.();
         }}
         onChange={handleChange}
         onFocus={() => {
@@ -239,14 +272,9 @@ const PlainTextCodeEditor = forwardRef<
   );
 });
 
-export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
-  function CodeEditor(props, ref) {
+const FullCodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
+  function FullCodeEditor(props, ref) {
     const [retryKey, setRetryKey] = useState(0);
-    // "Lite" rendering fidelity: skip CodeMirror and use the lightweight
-    // plain-text editor (a <textarea>) — still editable, just no highlighting.
-    if (props.plain) {
-      return <PlainTextCodeEditor {...props} ref={ref} />;
-    }
     return (
       <CodeEditorErrorBoundary
         resetKey={retryKey}
@@ -263,5 +291,25 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         </Suspense>
       </CodeEditorErrorBoundary>
     );
+  }
+);
+
+export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
+  function CodeEditor({ plain, renderMode, ...props }, ref) {
+    const mode: CodeEditorRenderMode =
+      renderMode ?? (plain ? "plain" : "full");
+    if (mode === "plain") {
+      return <PlainTextCodeEditor {...props} ref={ref} />;
+    }
+    if (mode === "on-demand") {
+      return (
+        <OnDemandCodeEditor
+          {...props}
+          ref={ref}
+          FullEditor={FullCodeEditor}
+        />
+      );
+    }
+    return <FullCodeEditor {...props} ref={ref} />;
   }
 );

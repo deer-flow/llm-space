@@ -107,6 +107,10 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { runtimeId: RuntimeId };
       };
+      systemInfo: {
+        params: Record<string, never>;
+        response: { totalMemoryBytes: number };
+      };
       remoteListServers: {
         params: Record<string, never>;
         response: RemoteServerView[];
