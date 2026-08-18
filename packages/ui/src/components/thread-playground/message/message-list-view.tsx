@@ -22,6 +22,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { PlusIcon } from "lucide-react";
 import {
   memo,
+  type CSSProperties,
   type Ref,
   useCallback,
   useEffect,
@@ -36,6 +37,7 @@ import { Button } from "@llm-space/ui/ui/button";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 
+import { useMessageVirtualization } from "../../message-virtualization-provider";
 import {
   type RunValidationIssue,
   useThreadStore,
@@ -50,16 +52,37 @@ import {
   ImageDisplayProvider,
   type ImageDisplayContextValue,
 } from "./image-display-context";
+import {
+  createMessageAnchorTrackingScheduler,
+  findClosestMessageRowIndex,
+  findMessageRowIndexFromHitElements,
+  getViewportCenterProbeYs,
+  type MessageAnchorTrackingScheduler,
+} from "./message-anchor-tracking";
 import { MessageListItem } from "./message-list-item";
 import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
 
-const MESSAGE_VIRTUALIZATION_THRESHOLD = 20;
 const MESSAGE_OVERSCAN = 5;
+const MESSAGE_ANCHOR_PROBE_DISTANCE = 16;
+const MESSAGE_SCROLL_RESTORE_MAX_FRAMES = 120;
+const MESSAGE_SCROLL_RESTORE_TOLERANCE = 2;
 const MESSAGE_HEIGHT_CACHE_LIMIT = 1_000;
 const MESSAGE_HEIGHT_CACHE = new Map<string, number>();
 const DND_MODIFIERS = [restrictToVerticalAxis];
+
+// TanStack Virtual's direct DOM update mode writes these properties outside
+// React. Explicit non-virtual values make React take ownership of them during
+// an On -> Off transition, so reused list and row nodes return to normal flow.
+export const NON_VIRTUAL_MESSAGE_LIST_STYLE = {
+  height: "auto",
+} satisfies CSSProperties;
+export const NON_VIRTUAL_MESSAGE_ROW_STYLE = {
+  left: "auto",
+  top: "auto",
+  transform: "none",
+} satisfies CSSProperties;
 
 function _messageHeightCacheKey(message: Message, collapsed: boolean) {
   return `${message.id}:${collapsed ? "collapsed" : "expanded"}`;
@@ -106,9 +129,7 @@ function _estimateMessageHeight(message: Message, collapsed: boolean) {
 }
 
 export interface ThreadScrollSnapshot {
-  messageId: string | null;
-  offset: number;
-  scrollTop: number;
+  messageId: string;
 }
 
 export interface ScrollAnchorMeasurement {
@@ -118,28 +139,93 @@ export interface ScrollAnchorMeasurement {
 }
 
 export function captureThreadScrollSnapshotFromMeasurements(
-  scrollTop: number,
   viewportTop: number,
+  viewportBottom: number,
   anchors: readonly ScrollAnchorMeasurement[]
-): ThreadScrollSnapshot {
-  const anchor = anchors.find(({ bottom }) => bottom > viewportTop);
-  return {
-    messageId: anchor?.id ?? null,
-    offset: anchor ? anchor.top - viewportTop : 0,
-    scrollTop,
-  };
+): ThreadScrollSnapshot | null {
+  const visibleAnchors = anchors.filter(
+    ({ top, bottom }) => top < viewportBottom && bottom > viewportTop
+  );
+  const anchor = visibleAnchors.at(-1);
+  return anchor ? { messageId: anchor.id } : null;
 }
 
-export function resolveThreadScrollTop(
+export function resolveThreadScrollEndDelta(
   snapshot: ThreadScrollSnapshot,
-  currentScrollTop: number,
-  viewportTop: number,
+  viewportBottom: number,
   anchors: readonly ScrollAnchorMeasurement[]
-): number {
+): number | null {
   const anchor = anchors.find(({ id }) => id === snapshot.messageId);
-  return anchor
-    ? currentScrollTop + anchor.top - viewportTop - snapshot.offset
-    : snapshot.scrollTop;
+  return anchor ? anchor.bottom - viewportBottom : null;
+}
+
+export function resolveThreadScrollSnapshotMessageIndex(
+  snapshot: ThreadScrollSnapshot,
+  messageIds: readonly string[]
+): number {
+  return messageIds.indexOf(snapshot.messageId);
+}
+
+export function createThreadScrollRestorationScheduler({
+  requestFrame,
+  cancelFrame,
+  restore,
+  isRestored,
+  onRestored,
+  maxFrames = MESSAGE_SCROLL_RESTORE_MAX_FRAMES,
+}: {
+  requestFrame: (callback: FrameRequestCallback) => number;
+  cancelFrame: (handle: number) => void;
+  restore: () => void;
+  isRestored: () => boolean;
+  onRestored: () => void;
+  maxFrames?: number;
+}): { dispose(): void } {
+  let frameId: number | null = null;
+  let disposed = false;
+  let attempted = false;
+  let frameCount = 0;
+  let stableFrames = 0;
+
+  const schedule = () => {
+    if (!disposed && frameId === null) {
+      frameId = requestFrame(runFrame);
+    }
+  };
+  const runFrame: FrameRequestCallback = () => {
+    frameId = null;
+    if (disposed) return;
+    frameCount += 1;
+
+    if (attempted && isRestored()) {
+      stableFrames += 1;
+      if (stableFrames >= 2) {
+        disposed = true;
+        onRestored();
+        return;
+      }
+    } else {
+      stableFrames = 0;
+      restore();
+      attempted = true;
+    }
+    if (frameCount >= maxFrames) {
+      disposed = true;
+      return;
+    }
+    schedule();
+  };
+
+  schedule();
+  return {
+    dispose() {
+      disposed = true;
+      if (frameId !== null) {
+        cancelFrame(frameId);
+        frameId = null;
+      }
+    },
+  };
 }
 
 function _getScrollViewport(content: HTMLElement | null): HTMLElement | null {
@@ -165,24 +251,68 @@ function _measureMessageAnchors(content: HTMLElement): ScrollAnchorMeasurement[]
 function _captureThreadScrollSnapshot(
   viewport: HTMLElement,
   content: HTMLElement
-): ThreadScrollSnapshot {
+): ThreadScrollSnapshot | null {
+  const viewportRect = viewport.getBoundingClientRect();
   return captureThreadScrollSnapshotFromMeasurements(
-    viewport.scrollTop,
-    viewport.getBoundingClientRect().top,
+    viewportRect.top,
+    viewportRect.bottom,
     _measureMessageAnchors(content)
   );
 }
 
-function _restoreThreadScrollSnapshot(
+function _restoreNonVirtualThreadScrollSnapshot(
   snapshot: ThreadScrollSnapshot,
   viewport: HTMLElement,
   content: HTMLElement
 ): void {
-  viewport.scrollTop = resolveThreadScrollTop(
+  const delta = resolveThreadScrollEndDelta(
     snapshot,
-    viewport.scrollTop,
-    viewport.getBoundingClientRect().top,
+    viewport.getBoundingClientRect().bottom,
     _measureMessageAnchors(content)
+  );
+  viewport.scrollTop =
+    delta === null ? viewport.scrollHeight : viewport.scrollTop + delta;
+}
+
+function _findNonVirtualMessageIndexAtViewportCenter(
+  viewport: HTMLElement,
+  content: HTMLElement
+): number | null {
+  const viewportRect = viewport.getBoundingClientRect();
+  const viewportCenterX = viewportRect.left + viewport.clientWidth / 2;
+  const ownerDocument = viewport.ownerDocument;
+  for (const y of getViewportCenterProbeYs(
+    viewportRect.top,
+    viewport.clientHeight,
+    MESSAGE_ANCHOR_PROBE_DISTANCE
+  )) {
+    const index = findMessageRowIndexFromHitElements(
+      ownerDocument.elementsFromPoint(viewportCenterX, y),
+      content
+    );
+    if (index !== null) return index;
+  }
+  return null;
+}
+
+function _findExactNonVirtualMessageIndex(
+  viewport: HTMLElement,
+  content: HTMLElement
+): number | null {
+  const viewportCenter =
+    viewport.getBoundingClientRect().top + viewport.clientHeight / 2;
+  return findClosestMessageRowIndex(
+    viewportCenter,
+    Array.from(
+      content.querySelectorAll<HTMLElement>("[data-message-row-index]")
+    ).map((row) => {
+      const rect = row.getBoundingClientRect();
+      return {
+        index: Number(row.dataset.messageRowIndex),
+        top: rect.top,
+        bottom: rect.bottom,
+      };
+    })
   );
 }
 
@@ -237,7 +367,11 @@ export function MessageListView({
     null
   );
   const activeMessageIndexRef = useRef<number | null>(null);
+  const anchorTrackingSchedulerRef =
+    useRef<MessageAnchorTrackingScheduler | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const { shouldVirtualize: shouldVirtualizeMessageCount } =
+    useMessageVirtualization();
   const messages = useMemo(
     () => messagesFromProps ?? storeMessages ?? [],
     [messagesFromProps, storeMessages]
@@ -266,8 +400,7 @@ export function MessageListView({
     () => new Set(collapsedMessageIds),
     [collapsedMessageIds]
   );
-  const shouldVirtualize =
-    displayRows.length > MESSAGE_VIRTUALIZATION_THRESHOLD;
+  const shouldVirtualize = shouldVirtualizeMessageCount(displayRows.length);
   const getMessageKey = useCallback(
     (index: number) => displayMessages[index]?.id ?? index,
     [displayMessages]
@@ -318,25 +451,19 @@ export function MessageListView({
       }
       return height;
     },
-    onChange: (instance) => {
+    onChange: () => {
       if (!shouldVirtualize) {
         return;
       }
-      const viewportHeight = instance.scrollRect?.height ?? 0;
-      if (viewportHeight <= 0) {
-        return;
-      }
-      const index = findCenteredVirtualItemIndex(
-        instance.getVirtualItems(),
-        instance.scrollOffset ?? 0,
-        viewportHeight
-      );
-      if (activeMessageIndexRef.current !== index) {
-        activeMessageIndexRef.current = index;
-        setActiveMessageIndex(index);
-      }
+      anchorTrackingSchedulerRef.current?.notifyViewportChange();
     },
   });
+  const displayMessagesRef = useRef(displayMessages);
+  displayMessagesRef.current = displayMessages;
+  const shouldVirtualizeRef = useRef(shouldVirtualize);
+  shouldVirtualizeRef.current = shouldVirtualize;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
   const addMessageSuggested =
     runValidationIssue?.resolution?.type === "appendUserMessage";
 
@@ -401,7 +528,7 @@ export function MessageListView({
   const scrollToMessageIndex = useCallback(
     (
       index: number,
-      align: "auto" | "center",
+      align: "auto" | "center" | "end",
       behavior: ScrollBehavior = "auto"
     ) => {
       if (shouldVirtualize) {
@@ -411,7 +538,8 @@ export function MessageListView({
       contentRef.current
         ?.querySelector<HTMLElement>(`[data-message-row-index="${index}"]`)
         ?.scrollIntoView({
-          block: align === "center" ? "center" : "nearest",
+          block:
+            align === "center" ? "center" : align === "end" ? "end" : "nearest",
           behavior,
         });
     },
@@ -431,6 +559,65 @@ export function MessageListView({
     },
     [scrollToMessageIndex]
   );
+  const restoreScrollSnapshot = useCallback(
+    (snapshot: ThreadScrollSnapshot) => {
+      const index = resolveThreadScrollSnapshotMessageIndex(
+        snapshot,
+        displayMessagesRef.current.map((message) => message.id)
+      );
+      if (index < 0) {
+        scrollToBottom();
+        return;
+      }
+      if (shouldVirtualizeRef.current) {
+        virtualizerRef.current.scrollToIndex(index, {
+          align: "end",
+          behavior: "auto",
+        });
+        return;
+      }
+      const viewport = getScrollElement();
+      const content = contentRef.current;
+      if (viewport && content) {
+        _restoreNonVirtualThreadScrollSnapshot(snapshot, viewport, content);
+      }
+    },
+    [getScrollElement, scrollToBottom]
+  );
+  const isScrollSnapshotRestored = useCallback(
+    (snapshot: ThreadScrollSnapshot) => {
+      const viewport = getScrollElement();
+      const content = contentRef.current;
+      if (!viewport || !content || viewport.clientHeight <= 0) {
+        return false;
+      }
+      const index = resolveThreadScrollSnapshotMessageIndex(
+        snapshot,
+        displayMessagesRef.current.map((message) => message.id)
+      );
+      if (index < 0) {
+        return (
+          Math.abs(
+            viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop
+          ) <= MESSAGE_SCROLL_RESTORE_TOLERANCE
+        );
+      }
+      const row = content.querySelector<HTMLElement>(
+        `[data-message-row-index="${index}"]`
+      );
+      const target = shouldVirtualizeRef.current
+        ? row
+        : row?.querySelector<HTMLElement>("[data-message-id]");
+      if (!target) return false;
+      return (
+        Math.abs(
+          target.getBoundingClientRect().bottom -
+            viewport.getBoundingClientRect().bottom
+        ) <= MESSAGE_SCROLL_RESTORE_TOLERANCE
+      );
+    },
+    [getScrollElement]
+  );
 
   useEffect(() => {
     if (shouldVirtualize && !measurementsFrozen) {
@@ -438,60 +625,65 @@ export function MessageListView({
     }
   }, [measurementsFrozen, shouldVirtualize, virtualizer]);
   useEffect(() => {
-    if (shouldVirtualize) {
-      return;
-    }
+    if (measurementsFrozen) return;
     const viewport = getScrollElement();
     const content = contentRef.current;
     if (!viewport || !content) {
       return;
     }
 
-    let frameId: number | null = null;
-    const updateActiveMessage = () => {
-      frameId = null;
-      const viewportCenter =
-        viewport.getBoundingClientRect().top + viewport.clientHeight / 2;
-      let closestIndex: number | null = null;
-      let closestDistance = Number.POSITIVE_INFINITY;
-      for (const row of content.querySelectorAll<HTMLElement>(
-        "[data-message-row-index]"
-      )) {
-        const rect = row.getBoundingClientRect();
-        const distance =
-          viewportCenter < rect.top
-            ? rect.top - viewportCenter
-            : viewportCenter > rect.bottom
-              ? viewportCenter - rect.bottom
-              : 0;
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = Number(row.dataset.messageRowIndex);
+    const readVirtualMessageIndex = () => {
+      const instance = virtualizerRef.current;
+      return findCenteredVirtualItemIndex(
+        instance.getVirtualItems(),
+        instance.scrollOffset ?? 0,
+        instance.scrollRect?.height ?? 0
+      );
+    };
+    const resolveProgressiveIndex = () =>
+      shouldVirtualize
+        ? readVirtualMessageIndex()
+        : _findNonVirtualMessageIndexAtViewportCenter(viewport, content);
+    const resolveExactIndex = () =>
+      shouldVirtualize
+        ? readVirtualMessageIndex()
+        : _findExactNonVirtualMessageIndex(viewport, content);
+    const scheduler = createMessageAnchorTrackingScheduler({
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+      readViewportSignature: () =>
+        `${viewport.scrollTop}:${viewport.scrollHeight}:${viewport.clientHeight}`,
+      readProgressiveIndex: resolveProgressiveIndex,
+      readExactIndex: resolveExactIndex,
+      onIndex: (index, exact) => {
+        if (index === null && !exact) return;
+        if (activeMessageIndexRef.current !== index) {
+          activeMessageIndexRef.current = index;
+          setActiveMessageIndex(index);
         }
-      }
-      if (activeMessageIndexRef.current !== closestIndex) {
-        activeMessageIndexRef.current = closestIndex;
-        setActiveMessageIndex(closestIndex);
-      }
-    };
-    const scheduleUpdate = () => {
-      if (frameId === null) {
-        frameId = requestAnimationFrame(updateActiveMessage);
-      }
-    };
-    const resizeObserver = new ResizeObserver(scheduleUpdate);
+      },
+    });
+    anchorTrackingSchedulerRef.current = scheduler;
+    const notifyViewportChange = () => scheduler.notifyViewportChange();
+    const resizeObserver = new ResizeObserver(notifyViewportChange);
     resizeObserver.observe(viewport);
     resizeObserver.observe(content);
-    viewport.addEventListener("scroll", scheduleUpdate, { passive: true });
-    scheduleUpdate();
+    viewport.addEventListener("scroll", notifyViewportChange, {
+      passive: true,
+    });
+    scheduler.notifyViewportChange();
     return () => {
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId);
+      if (anchorTrackingSchedulerRef.current === scheduler) {
+        anchorTrackingSchedulerRef.current = null;
       }
+      scheduler.dispose();
       resizeObserver.disconnect();
-      viewport.removeEventListener("scroll", scheduleUpdate);
+      viewport.removeEventListener("scroll", notifyViewportChange);
     };
-  }, [displayRows.length, getScrollElement, shouldVirtualize]);
+  }, [getScrollElement, measurementsFrozen, shouldVirtualize]);
+  useEffect(() => {
+    anchorTrackingSchedulerRef.current?.notifyViewportChange();
+  }, [collapsedMessageIds, displayRows.length, streamingMessageId]);
   useEffect(() => {
     if (status === "running") {
       scrollToBottom();
@@ -529,33 +721,83 @@ export function MessageListView({
     return () => {
       const viewport = _getScrollViewport(content);
       if (content && viewport) {
-        onScrollSnapshotChange(
-          _captureThreadScrollSnapshot(viewport, content)
-        );
+        const snapshot = _captureThreadScrollSnapshot(viewport, content);
+        if (snapshot) {
+          onScrollSnapshotChange(snapshot);
+        }
       }
     };
   }, [active, isSnapshotView, onScrollSnapshotChange]);
 
-  // A retained hidden View keeps its DOM scrollTop. This only does work for a
-  // View recreated after LRU eviction. A newly appended/inserted message owns
-  // focus and scrolling, so its one-shot autofocus takes precedence.
+  // A retained hidden View keeps its DOM scrollTop. A recreated View retries
+  // until its target stays aligned across two frames: Radix enables viewport
+  // scrolling from a passive effect, and virtual rows settle asynchronously.
+  // A newly appended/inserted message still owns focus and scrolling.
   useLayoutEffect(() => {
     if (restoredScrollRef.current || !active || isSnapshotView) return;
     if (pendingAutoFocusMessageId) {
       restoredScrollRef.current = true;
       return;
     }
-    const content = contentRef.current;
-    const viewport = _getScrollViewport(content);
-    if (initialScrollSnapshot && content && viewport) {
-      _restoreThreadScrollSnapshot(initialScrollSnapshot, viewport, content);
-    }
-    restoredScrollRef.current = true;
+    if (!initialScrollSnapshot) return;
+    const scheduler = createThreadScrollRestorationScheduler({
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+      restore: () => restoreScrollSnapshot(initialScrollSnapshot),
+      isRestored: () => isScrollSnapshotRestored(initialScrollSnapshot),
+      onRestored: () => {
+        restoredScrollRef.current = true;
+      },
+    });
+    return () => scheduler.dispose();
   }, [
     active,
     initialScrollSnapshot,
+    isScrollSnapshotRestored,
     isSnapshotView,
     pendingAutoFocusMessageId,
+    restoreScrollSnapshot,
+  ]);
+
+  // Switching virtualization changes the list layout in place. Capture the
+  // bottom-most visible message before React replaces the old layout, then
+  // align that same message to the viewport end in the new layout.
+  const layoutSwitchSnapshotRef = useRef<{
+    virtualized: boolean;
+    snapshot: ThreadScrollSnapshot;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const pending = layoutSwitchSnapshotRef.current;
+    if (
+      active &&
+      !isSnapshotView &&
+      !pendingAutoFocusMessageId &&
+      pending &&
+      pending.virtualized !== shouldVirtualize
+    ) {
+      restoreScrollSnapshot(pending.snapshot);
+    }
+    layoutSwitchSnapshotRef.current = null;
+
+    if (!active || isSnapshotView) return;
+    const content = contentRef.current;
+    return () => {
+      const viewport = _getScrollViewport(content);
+      if (!content || !viewport) return;
+      const snapshot = _captureThreadScrollSnapshot(viewport, content);
+      if (snapshot) {
+        layoutSwitchSnapshotRef.current = {
+          virtualized: shouldVirtualize,
+          snapshot,
+        };
+      }
+    };
+  }, [
+    active,
+    isSnapshotView,
+    pendingAutoFocusMessageId,
+    restoreScrollSnapshot,
+    shouldVirtualize,
   ]);
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -612,7 +854,10 @@ export function MessageListView({
                     })}
                   </div>
                 ) : (
-                  <div className="w-full pt-3">
+                  <div
+                    className="w-full pt-3"
+                    style={NON_VIRTUAL_MESSAGE_LIST_STYLE}
+                  >
                     {displayRows.map((row, index) => (
                       <MessageRow
                         key={row.message.id}
@@ -718,6 +963,7 @@ function MessageRow({
         "w-full",
         virtualized && "absolute top-0 left-0 will-change-transform"
       )}
+      style={virtualized ? undefined : NON_VIRTUAL_MESSAGE_ROW_STYLE}
       data-index={index}
       data-message-row-index={index}
     >

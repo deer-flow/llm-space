@@ -130,6 +130,8 @@ export interface ThreadPlaygroundProps {
   initialScrollSnapshot?: ThreadScrollSnapshot | null;
   /** Records the latest active-to-inactive scroll snapshot. */
   onScrollSnapshotChange?: (snapshot: ThreadScrollSnapshot) => void;
+  /** Registers the imperative draft-commit boundary for this disposable View. */
+  onEditorCommitScopeReady?: (handle: EditorCommitScopeHandle | null) => void;
   /** The streaming transport used by runs (e.g. HTTP or Electrobun RPC). */
   transport?: AgentTransport;
   /** Runtime that owns this playground. Used to route tool calls. */
@@ -179,10 +181,7 @@ export type ThreadPlaygroundViewProps = Omit<
   | "archiveRunSnapshot"
   | "readRunSnapshot"
   | "viewMounted"
-> & {
-  /** Registers the imperative draft-commit boundary for this disposable View. */
-  onEditorCommitScopeReady?: (handle: EditorCommitScopeHandle | null) => void;
-};
+>;
 
 export function ThreadPlayground({
   loading,

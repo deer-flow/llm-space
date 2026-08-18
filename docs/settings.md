@@ -39,7 +39,9 @@ The General page configures app-level defaults.
 | Language | Language setting. Only English (US) is supported for now; more languages are coming. |
 | Appearance | App theme. Match the system setting, or force light or dark mode. |
 | Primary color | Accent color used for buttons, links, and highlights. |
-| Rendering | Message rendering mode. `Full` renders messages with full editors; `Fast` shows plain text for smoother scrolling in large Threads. |
+| Message rendering | `Full` keeps full editors mounted, `On Demand` uses static syntax highlighting until focused, and `Fast` uses plain text. |
+| Virtualization | Controls whether long message lists mount only visible rows. `Auto` uses physical memory and Message rendering, `Custom` uses a message-count threshold, and `Off`/`On` force the behavior. |
+| View cache | Maximum recently used Thread and Trace views retained in the UI, including the active View. Releasing a View does not stop its background Session. |
 | Default model | The model used for new Threads. Also used as fallback when a Thread's saved model is no longer available. |
 | Workspace folder | The current workspace directory, where Thread files are stored. Click the path to open it in the system file manager. |
 | Share anonymous usage analytics | Whether to share anonymous usage data. Anonymous data only includes product actions, never prompts, messages, or API keys. |

@@ -37,6 +37,7 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 
 import { runRemoteRuntimeActionIfAllowed } from "@/components/remote-runtime-actions";
+import { paneIdForTab } from "@/components/thread-tabs/pane-mutation-actions";
 import { RuntimePaneHost } from "@/components/thread-tabs/runtime-pane-host";
 import { RuntimeRunTracker } from "@/components/thread-tabs/runtime-run-tracker";
 import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
@@ -44,7 +45,6 @@ import { SerializedPersistence } from "@/components/thread-tabs/serialized-persi
 import { settleStreamingPane } from "@/components/thread-tabs/settle-streaming-pane";
 import { usePaneRefreshAcknowledgement } from "@/components/thread-tabs/use-pane-refresh-ack";
 import type { AppTab } from "@/components/thread-tabs/use-thread-tabs";
-import { useThreadViewLru } from "@/components/thread-tabs/use-thread-view-lru";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
@@ -492,7 +492,7 @@ function _CommitScopeView({
   );
 }
 
-function _ThreadViewLruHarness({
+function _ViewLruHarness({
   activeId,
   capacity,
   events,
@@ -507,21 +507,23 @@ function _ThreadViewLruHarness({
   const commitPane = useCallback((paneId: string) => {
     handlesRef.current.get(paneId)?.commitAll();
   }, []);
-  const retained = useThreadViewLru({
-    tabs,
-    activeId,
-    capacity,
-    commitPane,
-  });
-  return tabs.map((tab) =>
-    tab.type === "thread" && retained.has(tab.paneId) ? (
-      <_CommitScopeView
-        key={tab.paneId}
-        events={events}
-        handles={handlesRef.current}
-        paneId={tab.paneId}
-      />
-    ) : null
+  return (
+    <RuntimePaneHost
+      tabs={tabs}
+      activeId={activeId}
+      getPaneKey={paneIdForTab}
+      maxMountedPanes={capacity}
+      onBeforeViewUnmount={commitPane}
+      renderPane={(tab, _active, viewMounted) =>
+        viewMounted ? (
+          <_CommitScopeView
+            events={events}
+            handles={handlesRef.current}
+            paneId={paneIdForTab(tab)}
+          />
+        ) : null
+      }
+    />
   );
 }
 
@@ -732,8 +734,8 @@ describe("ThreadPlayground Session/View lifecycle", () => {
   });
 });
 
-describe("Thread View LRU draft commits", () => {
-  const tabs: AppTab[] = ["a", "b"].map((id) => ({
+describe("View LRU draft commits", () => {
+  const threadTabs: AppTab[] = ["a", "b"].map((id) => ({
     id: `thread:${id}`,
     type: "thread",
     path: `/${id}.json`,
@@ -744,11 +746,11 @@ describe("Thread View LRU draft commits", () => {
   test("commits every registered editor before an evicted view unmounts", async () => {
     const events: string[] = [];
     const render = (activeId: string) => (
-      <_ThreadViewLruHarness
+      <_ViewLruHarness
         activeId={activeId}
         capacity={1}
         events={events}
-        tabs={tabs}
+        tabs={threadTabs}
       />
     );
     activeRoot = _createRoot();
@@ -766,11 +768,11 @@ describe("Thread View LRU draft commits", () => {
   test("does not request a commit when no view is evicted", async () => {
     const events: string[] = [];
     const render = (activeId: string) => (
-      <_ThreadViewLruHarness
+      <_ViewLruHarness
         activeId={activeId}
         capacity={2}
         events={events}
-        tabs={tabs}
+        tabs={threadTabs}
       />
     );
     activeRoot = _createRoot();
@@ -780,9 +782,83 @@ describe("Thread View LRU draft commits", () => {
 
     expect(events).toEqual([]);
   });
+
+  test("commits a Trace editor before an evicted view unmounts", async () => {
+    const events: string[] = [];
+    const tabs: AppTab[] = [
+      threadTabs[0],
+      {
+        id: "trace:project:trace",
+        type: "trace",
+        runtimeId: "local",
+        projectId: "project",
+        traceKey: "trace",
+        title: "Trace",
+      },
+    ];
+    const render = (activeId: string) => (
+      <_ViewLruHarness
+        activeId={activeId}
+        capacity={1}
+        events={events}
+        tabs={tabs}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => activeRoot?.render(render(tabs[0].id)));
+    await act(async () => activeRoot?.render(render(tabs[1].id)));
+    await act(async () => activeRoot?.render(render(tabs[0].id)));
+
+    expect(events).toEqual([
+      "commit:pane:a:message",
+      "commit:pane:a:tool-result",
+      "unmount:pane:a",
+      "commit:trace:project:trace:message",
+      "commit:trace:project:trace:tool-result",
+      "unmount:trace:project:trace",
+    ]);
+  });
 });
 
 describe("RuntimePaneHost", () => {
+  test("defaults to retaining the three most recently active pane views", async () => {
+    const panes: TestPane[] = ["a", "b", "c", "d"].map((id) => ({
+      id: `pane-${id}`,
+      runtimeId: "local",
+    }));
+    const mountedByPane = new Map<string, boolean>();
+    const getPaneKey = (pane: TestPane) => pane.id;
+    const renderPane = (
+      pane: TestPane,
+      _active: boolean,
+      viewMounted: boolean
+    ) => {
+      mountedByPane.set(pane.id, viewMounted);
+      return null;
+    };
+    const render = (activeId: string) => (
+      <RuntimePaneHost
+        tabs={panes}
+        activeId={activeId}
+        getPaneKey={getPaneKey}
+        renderPane={renderPane}
+      />
+    );
+    activeRoot = _createRoot();
+
+    for (const pane of panes) {
+      await act(async () => activeRoot?.render(render(pane.id)));
+    }
+
+    expect(Object.fromEntries(mountedByPane)).toEqual({
+      "pane-a": false,
+      "pane-b": true,
+      "pane-c": true,
+      "pane-d": true,
+    });
+  });
+
   test("switching active panes does not rerender an unrelated hidden pane", async () => {
     const panes: TestPane[] = [
       { id: "pane-a", runtimeId: "local" },
