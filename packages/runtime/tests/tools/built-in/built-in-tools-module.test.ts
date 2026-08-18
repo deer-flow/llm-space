@@ -92,6 +92,7 @@ describe("built-in tools module", () => {
       "write",
       "skill",
       "edit",
+      "apply_patch",
       "ls",
       "tree",
       "grep",

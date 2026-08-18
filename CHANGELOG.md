@@ -4,6 +4,19 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2026-08-18
+
+### Added
+
+- A Codex-compatible `apply_patch` built-in Tool can apply validated multi-file
+  add, update, delete, and move operations, with context matching and clear
+  guidance to prefer it for file-content changes.
+
+### Changed
+
+- The Bash Tool directs agents to use dedicated file-editing Tools when
+  modifying existing file contents.
+
 ## [4.13.0] - 2026-08-17
 
 This release makes long Threads scroll more smoothly, resolves working

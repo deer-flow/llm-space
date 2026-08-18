@@ -2,6 +2,7 @@ import {
   CircleHelpIcon,
   CloudSunIcon,
   Edit3Icon,
+  FilePenLineIcon,
   FileOutputIcon,
   FileSearchIcon,
   FileTextIcon,
@@ -23,6 +24,7 @@ import {
 const ICON_BY_KEY: Record<string, LucideIcon> = {
   "file-text": FileTextIcon,
   "file-output": FileOutputIcon,
+  "file-pen-line": FilePenLineIcon,
   pencil: Edit3Icon,
   "list-tree": ListTreeIcon,
   "folder-tree": FolderTreeIcon,
@@ -44,6 +46,7 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   read: "file-text",
   write: "file-output",
   edit: "pencil",
+  apply_patch: "file-pen-line",
   ls: "list-tree",
   tree: "folder-tree",
   skill: "sparkles",

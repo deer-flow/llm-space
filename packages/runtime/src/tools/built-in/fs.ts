@@ -13,6 +13,8 @@ import {
   type ToolEntry,
 } from "../tool-registry";
 
+import { applyPatch } from "./apply-patch";
+
 export interface FsBuiltInToolsDependencies {
   workspaceRoot: string;
   findSkill: (name: string) => SkillContent | null;
@@ -311,6 +313,37 @@ export async function edit(
   const totalReplaced = replaceAll ? occurrences : 1;
   return `Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? "" : "s"} in ${filePath}`;
 }
+
+// -- apply_patch --------------------------------------------------------------
+
+export const applyPatchTool: BuiltinTool = {
+  type: "builtin",
+  name: "apply_patch",
+  icon: "file-pen-line",
+  description: `The default tool for modifying file contents. Whenever a task requires changing the contents of one or more existing files, prefer apply_patch over write, edit, or bash. This applies even to small single-file changes such as editing page copy, translating UI text, changing code, or updating configuration. Use another tool to modify existing file contents only when apply_patch cannot express the required change.
+
+Applies a patch using the Codex patch format. Relative paths are resolved from the workspace root. Example that adds one file and deletes another:
+
+*** Begin Patch
+*** Add File: notes/new.txt
++hello
+*** Delete File: notes/old.txt
+*** End Patch
+
+For updates, use *** Update File: path followed by one or more @@ hunks whose lines begin with a space (context), - (remove), or + (add). A patch may combine add, update, delete, and move operations.`,
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["patch"],
+    properties: {
+      patch: {
+        type: "string",
+        description: "The complete Codex-style patch to apply",
+      },
+    },
+    additionalProperties: false,
+  },
+};
 
 // -- ls -----------------------------------------------------------------------
 
@@ -622,7 +655,7 @@ export const bashTool: BuiltinTool = {
   name: "bash",
   icon: "terminal",
   description:
-    "Executes a bash command and returns stdout, stderr, and exit code. Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-export env vars, and re-source files as needed on every call.",
+    "Executes a bash command and returns stdout, stderr, and exit code. Do not use bash to modify existing file contents; use an available dedicated file-editing tool instead. Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-export env vars, and re-source files as needed on every call.",
   strict: true,
   parameters: {
     type: "object",
@@ -810,6 +843,12 @@ export function createFsBuiltInTools(
           _requireStringAllowEmpty(args, "new_string"),
           _optionalBoolean(args, "replace_all") ?? false
         );
+      },
+    },
+    {
+      tool: applyPatchTool,
+      async execute(args: Record<string, unknown>) {
+        return applyPatch(_requireString(args, "patch"), workspaceRoot);
       },
     },
     {

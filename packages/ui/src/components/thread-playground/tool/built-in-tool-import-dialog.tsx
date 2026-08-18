@@ -67,6 +67,7 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
   "read",
   "write",
   "edit",
+  "apply_patch",
   "ls",
   "tree",
   "grep",
