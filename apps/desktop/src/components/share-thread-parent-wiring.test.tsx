@@ -542,7 +542,7 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
             onRunStart: () => true,
           }}
           mutationRevision={0}
-          commitThreadView={() => undefined}
+          commitView={() => undefined}
           onViewCommitScopeReady={() => undefined}
         />
       </_Providers>

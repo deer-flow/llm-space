@@ -1,5 +1,6 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
+import { MessageVirtualizationProvider } from "@llm-space/ui/components/message-virtualization-provider";
 import {
   ThemeProvider,
   useTheme,
@@ -13,21 +14,29 @@ import { PluginCommandExecutionProvider } from "@/components/plugin-command-exec
 
 import { QueryProvider } from "./query-provider";
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({
+  children,
+  totalMemoryBytes,
+}: {
+  children: React.ReactNode;
+  totalMemoryBytes: number | null;
+}) {
   return (
     <ThemeProvider>
-      <ExperimentalProvider>
-        <QueryProvider>
-          <TooltipProvider delayDuration={1000}>
-            <PluginCommandExecutionProvider>
-              <div className="flex size-full flex-col">
-                <ThemedToaster />
-                {children}
-              </div>
-            </PluginCommandExecutionProvider>
-          </TooltipProvider>
-        </QueryProvider>
-      </ExperimentalProvider>
+      <MessageVirtualizationProvider totalMemoryBytes={totalMemoryBytes}>
+        <ExperimentalProvider>
+          <QueryProvider>
+            <TooltipProvider delayDuration={1000}>
+              <PluginCommandExecutionProvider>
+                <div className="flex size-full flex-col">
+                  <ThemedToaster />
+                  {children}
+                </div>
+              </PluginCommandExecutionProvider>
+            </TooltipProvider>
+          </QueryProvider>
+        </ExperimentalProvider>
+      </MessageVirtualizationProvider>
     </ThemeProvider>
   );
 }

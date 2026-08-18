@@ -39,6 +39,7 @@ import { fsReveal } from "./fs-reveal";
 import { createPromptFileRpcHandlers } from "./prompt-files";
 import { createShareThreadHandler } from "./share-thread";
 import { forwardStreamThread } from "./stream-thread-request";
+import { readSystemInfo } from "./system-info";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -98,6 +99,7 @@ export function createMainWindowRPC({
         listRuntimes: () => Promise.resolve(runtimeRouter.list()),
         getDefaultRuntime: () =>
           Promise.resolve({ runtimeId: runtimeRouter.getDefaultRuntimeId() }),
+        systemInfo: () => Promise.resolve(readSystemInfo()),
         remoteListServers: () =>
           Promise.resolve(remoteServerManager.listServers()),
         remoteAddServer: ({ server }) =>
