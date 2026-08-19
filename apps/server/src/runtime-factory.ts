@@ -3,7 +3,7 @@ import path from "node:path";
 
 import {
   createBuiltInToolsModule,
-  createConfiguredArkImageGenerator,
+  createConfiguredImageGenerator,
   createLocalFileSystem,
   LocalRuntimeClient,
   McpManager,
@@ -33,7 +33,7 @@ export async function createServerRuntime(
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
-  const generateImage = createConfiguredArkImageGenerator({
+  const generateImage = createConfiguredImageGenerator({
     modelManager,
     env: process.env,
   });

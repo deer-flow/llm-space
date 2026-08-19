@@ -26,7 +26,7 @@ import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
 import { LocalStorageManager } from "../local-storage";
 import { McpManager } from "../mcp";
-import { createConfiguredArkImageGenerator, ModelManager } from "../models";
+import { createConfiguredImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
 import {
   PluginCommandExecutionController,
@@ -65,7 +65,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const networkSettings = new NetworkSettingsManager();
   const mcpManager = new McpManager();
   const modelManager = new ModelManager();
-  const generateImage = createConfiguredArkImageGenerator({
+  const generateImage = createConfiguredImageGenerator({
     modelManager,
     env: process.env,
   });
