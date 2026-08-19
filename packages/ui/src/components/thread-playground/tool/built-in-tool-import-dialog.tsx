@@ -42,6 +42,7 @@ import { Switch } from "@llm-space/ui/ui/switch";
 import { ProviderProfileSelector } from "../model/provider-profile-selector";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
+import { sortToolsByName } from "./sort-tools-by-name";
 import {
   getToolConnectionProviderId,
   toolProfileSelectionScope,
@@ -67,6 +68,7 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
   "read",
   "write",
   "edit",
+  "apply_patch",
   "ls",
   "tree",
   "grep",
@@ -246,6 +248,13 @@ function _BuiltInToolImportDialog({
     );
     for (const tool of filteredTools) {
       result.get(_categoryForTool(tool.name))!.push(tool);
+    }
+    for (const categoryTools of result.values()) {
+      categoryTools.splice(
+        0,
+        categoryTools.length,
+        ...sortToolsByName(categoryTools)
+      );
     }
     return result;
   }, [filteredTools]);

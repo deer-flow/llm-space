@@ -24,7 +24,8 @@ function getExtensionForStore(
   store: ThreadStore,
   placeKey: string | undefined,
   onInspect: (name: string) => void,
-  loadSkills: () => Promise<SkillInfo[]>
+  loadSkills: () => Promise<SkillInfo[]>,
+  resolvePath: (path: string) => Promise<string>
 ): Extension[] {
   let byPlace = extensionByStore.get(store);
   if (!byPlace) {
@@ -42,7 +43,8 @@ function getExtensionForStore(
         resolvePromptVariableValue(
           name,
           store.getState().thread.context,
-          loadSkills
+          loadSkills,
+          resolvePath
         ),
       listVariables: () =>
         listPromptVariableCompletions(store.getState().thread.context),
@@ -77,7 +79,7 @@ export function usePromptVariableExtensionForContext(
 ): Extension[] {
   const fallbackStore = useContext(ThreadStoreContext);
   const resolvedStore = store ?? fallbackStore;
-  const { skills, actions } = useHostServices();
+  const { skills, files, actions } = useHostServices();
   const loadSkills = useCallback(
     () => listEnabledPromptVariableSkills(skills),
     [skills]
@@ -92,7 +94,8 @@ export function usePromptVariableExtensionForContext(
             name,
             context,
             placeKey,
-            loadSkills
+            loadSkills,
+            (path) => files.resolvePath(path)
           ),
         listVariables: () => listPromptVariableCompletions(context),
       });
@@ -104,7 +107,8 @@ export function usePromptVariableExtensionForContext(
       resolvedStore,
       placeKey,
       (name) => actions.openVariables(name),
-      loadSkills
+      loadSkills,
+      (path) => files.resolvePath(path)
     );
-  }, [context, placeKey, resolvedStore, actions, loadSkills]);
+  }, [context, placeKey, resolvedStore, actions, files, loadSkills]);
 }

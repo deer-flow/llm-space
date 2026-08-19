@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  resolvePromptVariableValue,
+  resolvePromptVariableValueForPlace,
+} from "../../src/thread/prompt-variable-display";
+import {
   createDefaultThreadVariables,
   DEFAULT_WORKING_DIRECTORY,
   removePromptVariableSnapshotNames,
@@ -57,6 +61,78 @@ describe("built-in working directory variable", () => {
       }),
     });
     expect(out.systemPrompt).toBe("Workspace: /path/that/does/not/exist");
+  });
+
+  test("resolves a home-relative value to an absolute path before rendering", async () => {
+    const { context: out } = await renderThreadPromptVariables({
+      context: context("Workspace: {{current_working_directory}}", {
+        variables: {
+          current_working_directory: {
+            type: "workingDirectory",
+            value: "~/Desktop/llm-space-project",
+          },
+        },
+        snapshot: {
+          variables: {
+            systemPrompt: {
+              current_working_directory: "~/Desktop/frozen-project",
+            },
+          },
+        },
+      }),
+      resolvePath: (value) =>
+        Promise.resolve(value.replace("~", "/Users/tester")),
+    });
+    expect(out.systemPrompt).toBe(
+      "Workspace: /Users/tester/Desktop/llm-space-project"
+    );
+    expect(
+      out.snapshot?.variables?.systemPrompt?.current_working_directory
+    ).toBe("/Users/tester/Desktop/llm-space-project");
+  });
+
+  test("previews absolute paths for both live and legacy frozen values", async () => {
+    const oldContext = context("{{current_working_directory}}", {
+      variables: {
+        current_working_directory: {
+          type: "workingDirectory",
+          value: "~/Desktop/llm-space-project",
+        },
+      },
+      snapshot: {
+        variables: {
+          systemPrompt: {
+            current_working_directory: "~/Desktop/old-project",
+          },
+        },
+      },
+    });
+    const resolvePath = (value: string) =>
+      Promise.resolve(value.replace("~", "/Users/tester"));
+
+    expect(
+      await resolvePromptVariableValue(
+        "current_working_directory",
+        oldContext,
+        () => Promise.resolve([]),
+        resolvePath
+      )
+    ).toEqual({
+      status: "ok",
+      value: "/Users/tester/Desktop/llm-space-project",
+    });
+    expect(
+      await resolvePromptVariableValueForPlace(
+        "current_working_directory",
+        oldContext,
+        "systemPrompt",
+        () => Promise.resolve([]),
+        resolvePath
+      )
+    ).toEqual({
+      status: "ok",
+      value: "/Users/tester/Desktop/old-project",
+    });
   });
 });
 

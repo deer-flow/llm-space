@@ -35,8 +35,8 @@ export type ThreadCurrentDateVariable = Static<
 >;
 
 /**
- * The thread's working directory. The value is user-editable and intentionally
- * not validated or created; templates and tools decide how to use it.
+ * The thread's working directory. Non-empty values are absolute paths. The
+ * value is user-editable and intentionally not validated or created.
  */
 export const ThreadWorkingDirectoryVariable = Type.Object({
   type: Type.Literal("workingDirectory"),

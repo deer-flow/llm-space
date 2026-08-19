@@ -264,6 +264,28 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: { fullScreen: boolean };
       };
+      localStorageGet: {
+        params: Record<string, never>;
+        response: {
+          initialized: boolean;
+          values: Record<string, string>;
+        };
+      };
+      localStorageInitialize: {
+        params: { values: Record<string, string> };
+        response: {
+          initialized: boolean;
+          values: Record<string, string>;
+        };
+      };
+      localStorageSet: {
+        params: { key: string; value: string };
+        response: null;
+      };
+      localStorageRemove: {
+        params: { key: string };
+        response: null;
+      };
       // Resolve a directory under the llm-space root, creating it (recursively)
       // if missing, and return its absolute path. The renderer can't touch the
       // filesystem or read the root itself.
@@ -426,6 +448,12 @@ export interface DesktopRPCType {
       fsDirectoryExists: {
         params: { path: string };
         response: { exists: boolean };
+      };
+      // Expand a user-authored path (including a leading `~`) and return its
+      // absolute form without requiring it to exist.
+      fsResolveUserPath: {
+        params: { path: string };
+        response: { path: string };
       };
       // Open the native file picker (for a "file content" prompt variable).
       // `path` is null when the user cancels.
@@ -771,6 +799,9 @@ export interface DesktopRPCType {
       // Cancel the in-flight deep-link shared-thread import (aborts the read; no
       // file is written). Sent when the user clicks Cancel on the import modal.
       cancelSharedImport: Record<string, never>;
+      // Sent only after the renderer has attached its shared-import listener.
+      // Cold-start URLs stay buffered in bun until this handshake completes.
+      deepLinkReady: Record<string, never>;
     };
   }>;
   webview: RPCSchema<{

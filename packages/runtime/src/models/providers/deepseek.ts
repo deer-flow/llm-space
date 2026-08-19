@@ -12,7 +12,10 @@ type DeepSeekApi = "openai-completions" | "openai-responses";
 
 export function deepseekProvider(): Provider<DeepSeekApi> {
   const models = Object.values(DEEPSEEK_MODELS).map((model) => {
-    if (model.id !== "deepseek-v4-flash") {
+    if (
+      model.id !== "deepseek-v4-flash" &&
+      model.id !== "deepseek-v4-pro"
+    ) {
       return model;
     }
     return {

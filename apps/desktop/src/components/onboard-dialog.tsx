@@ -141,7 +141,7 @@ export function OnboardDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[calc(100vw-2rem)] max-w-[1040px]! overflow-hidden border-white/10 bg-[#050809] p-0 shadow-[0_34px_120px_rgba(0,0,0,0.7)]"
+        className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[1040px]! overflow-hidden border-white/10 bg-[#050809] p-0 shadow-[0_34px_120px_rgba(0,0,0,0.7)]"
         showCloseButton={false}
         onInteractOutside={(event) => {
           event.preventDefault();
@@ -150,7 +150,7 @@ export function OnboardDialog({
           event.preventDefault();
         }}
       >
-        <div className="relative isolate aspect-video min-h-[34rem] overflow-hidden rounded-lg bg-[#050809] text-white">
+        <div className="relative isolate aspect-video max-h-[calc(100dvh-2rem)] min-h-0 overflow-hidden rounded-lg bg-[#050809] text-white">
           <div className="onboard-background-enter pointer-events-none absolute inset-0">
             <img
               src="/images/onboard-no-top-light.png"
@@ -235,7 +235,7 @@ export function OnboardDialog({
               </div>
             </div>
             <_OnboardSetupPanel
-              className="onboard-action-enter onboard-action-enter-4 w-[22rem] shrink-0"
+              className="onboard-panel-enter w-[22rem] shrink-0"
               configured={models.length > 0}
               readyProviderName={readyProviderName}
               detectedProviders={detectedProviders}

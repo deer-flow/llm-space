@@ -1,10 +1,103 @@
 # Changelog
 
-English | [简体中文](./CHANGELOG.zh-CN.md)
-
 All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [4.14.1] - 2026-08-19
+
+### Fixed
+
+- Built-in and Plugin Tool import lists are sorted alphabetically, making
+  Tools easier to find regardless of capitalization.
+
+## [4.14.0] - 2026-08-18
+
+### Added
+
+- A Codex-compatible `apply_patch` built-in Tool can apply validated multi-file
+  add, update, delete, and move operations, with context matching and clear
+  guidance to prefer it for file-content changes.
+
+### Changed
+
+- The Bash Tool directs agents to use dedicated file-editing Tools when
+  modifying existing file contents.
+
+## [4.13.0] - 2026-08-17
+
+This release makes long Threads scroll more smoothly, resolves working
+directories to stable absolute paths, and refines navigation and onboarding
+feedback.
+
+### Changed
+
+- Working-directory prompt variables expand user-authored paths and persist
+  non-empty values as absolute paths across desktop runs, prompt previews,
+  compaction, code generation, and generated LangGraph projects.
+- Web-search Tool results show a compact four-result preview that can expand
+  on demand without introducing a nested vertical scroll area.
+- Message navigation anchors provide clearer focus and hover proximity, while
+  the onboarding setup panel enters with a more cohesive transition.
+
+### Fixed
+
+- Conversations with a small number of large messages avoid unnecessary
+  virtualization, while long conversations use adaptive and cached height
+  estimates, wider pre-rendering, and compositor-backed positioning. This
+  prevents upward-scroll traps, scrollbar jumps, and blank frames during fast
+  trackpad or Magic Mouse scrolling.
+
+## [4.12.3] - 2026-08-17
+
+### Fixed
+
+- Dialog actions remain visible in short windows while editors, forms, and
+  detailed content scroll or resize within the available viewport.
+- Onboarding, sharing, feature reminders, and SSH host-key confirmation adapt
+  to reduced window heights without clipping their primary controls.
+
+## [4.12.2] - 2026-08-16
+
+### Fixed
+
+- Executing one or more Tool calls manually no longer shifts the conversation
+  viewport when successful or failed results expand after delayed editor and
+  virtual-list measurement.
+
+## [4.12.1] - 2026-08-14
+
+### Fixed
+
+- The Performance edition once again loads its packaged renderer at startup.
+  Appearance preferences are hydrated from disk before React mounts without
+  adding an unsupported query string to Electrobun's `views://` URL.
+
+## [4.12.0] - 2026-08-14
+
+This release makes generated media durable, improves update visibility and
+model-provider management, and stabilizes long streaming conversations.
+
+### Added
+
+- Generated images and other media are persisted to an output directory so
+  results remain available after the generating Tool call finishes.
+- The update dialog reports download progress while a new desktop build is
+  being fetched.
+
+### Changed
+
+- Model-provider connection profiles use a clearer nested management layout
+  with more consistent editing controls.
+- Renderer preferences, including the selected theme, are persisted through a
+  single disk-backed local-storage service in `settings/local-storage.json`.
+
+### Fixed
+
+- Long Assistant messages no longer cause the conversation to jump when
+  streaming ends, and the message ruler selects the item containing the
+  viewport center instead of a nearby shorter message.
+- Provider editor spacing and Plugin directory actions are more consistent.
 
 ## [4.11.0] - 2026-08-11
 

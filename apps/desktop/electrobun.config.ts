@@ -91,9 +91,10 @@ export default {
     },
   },
   scripts: {
-    // Both run right before their respective codesign step. Workaround for
-    // electrobun#485 (x64-only, no-op elsewhere); see the script header.
-    postBuild: "scripts/fix-x64-headerpad.ts",
+    // The inner-bundle hook installs the macOS launcher that preserves cold
+    // deep links, then applies the x64 headerpad workaround. The wrapper hook
+    // only needs the headerpad fix. Both run before their codesign step.
+    postBuild: "scripts/post-build.ts",
     postWrap: "scripts/fix-x64-headerpad.ts",
   },
   release: {

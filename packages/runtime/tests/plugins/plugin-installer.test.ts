@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -42,7 +43,7 @@ describe("installPluginZip", () => {
     });
     await installPluginZip({ homePath, archive: second });
     expect(await readFile(path.join(target, "new.txt"), "utf8")).toBe("new");
-    expect(readFile(path.join(target, "old.txt"), "utf8")).rejects.toThrow();
+    await assert.rejects(readFile(path.join(target, "old.txt"), "utf8"));
   });
 
   test("installs scoped package names below their scope directory", async () => {
@@ -69,10 +70,11 @@ describe("installPluginZip", () => {
       "../escape.txt": strToU8("escape"),
       "package.json": strToU8(JSON.stringify({ name: "safe-plugin" })),
     });
-    expect(installPluginZip({ homePath, archive })).rejects.toThrow(
-      "Unsafe path"
+    await assert.rejects(
+      installPluginZip({ homePath, archive }),
+      /Unsafe path/
     );
-    expect(readFile(outside, "utf8")).rejects.toThrow();
+    await assert.rejects(readFile(outside, "utf8"));
   });
 
   test("leaves an existing plugin untouched when validation fails", async () => {
@@ -85,8 +87,9 @@ describe("installPluginZip", () => {
         JSON.stringify({ name: "Invalid Name", version: "1.0.0" })
       ),
     });
-    expect(installPluginZip({ homePath, archive })).rejects.toThrow(
-      "Invalid npm package name"
+    await assert.rejects(
+      installPluginZip({ homePath, archive }),
+      /Invalid npm package name/
     );
     expect(await readFile(target, "utf8")).toBe("keep");
   });

@@ -24,6 +24,7 @@ import { activateWindowForDeepLink } from "../deep-link/activate-window";
 import { setDeepLinkHandler } from "../deep-link/launch";
 import { moveToTrash, openPath, revealInFileManager } from "../fs";
 import { DesktopHost } from "../host/desktop-host";
+import { LocalStorageManager } from "../local-storage";
 import { McpManager } from "../mcp";
 import { createConfiguredImageGenerator, ModelManager } from "../models";
 import { NetworkSettingsManager } from "../network";
@@ -58,6 +59,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const homePath = getLlmSpaceHomePath();
   const workspacePath = path.join(homePath, "workspace");
   const analytics = new Analytics();
+  const localStorageManager = new LocalStorageManager();
   // Apply the configured proxy to `process.env` before anything spawns a
   // subprocess (MCP) or makes a request, so egress is routed from the start.
   const networkSettings = new NetworkSettingsManager();
@@ -74,6 +76,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   let mainWindow: BrowserWindow | null = null;
   let rpc: MainWindowRPC | null = null;
   let deepLink: DeepLinkHandler | null = null;
+  let rendererAcceptsDeepLinks = false;
+  let deepLinkHandlerInstalled = false;
+  const deepLinkScheme = resolveDeepLinkScheme(
+    process.env.LLM_SPACE_DEEP_LINK_SCHEME
+  );
   const getRpc = (): MainWindowRPC => {
     if (!rpc) throw new Error("Main window RPC is not ready.");
     return rpc;
@@ -81,6 +88,21 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const getMainWindow = (): BrowserWindow => {
     if (!mainWindow) throw new Error("Main window is not ready.");
     return mainWindow;
+  };
+  const installDeepLinkHandler = (): void => {
+    if (
+      deepLinkHandlerInstalled ||
+      !rendererAcceptsDeepLinks ||
+      !mainWindow ||
+      !deepLink
+    ) {
+      return;
+    }
+    deepLinkHandlerInstalled = true;
+    setDeepLinkHandler((url) => {
+      activateWindowForDeepLink(getMainWindow(), url, deepLinkScheme);
+      void deepLink?.handle(url);
+    });
   };
   const githubAuth = new GitHubAuthManager({
     onChange: (state) => getRpc().send.githubAuthChanged(state),
@@ -280,10 +302,15 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       analytics,
       executeCommand: (command) => executeCommand(command, getMainWindow()),
       onCancelSharedImport: () => deepLink?.cancel(),
+      onDeepLinkReady: () => {
+        rendererAcceptsDeepLinks = true;
+        installDeepLinkHandler();
+      },
       githubAuth,
       getMainWindow,
       gistWriter,
       homePath,
+      localStorageManager,
       runtimeRouter,
       remoteServerManager,
       skillsManager,
@@ -294,7 +321,11 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
     remoteServerManager.setStatusListener((payload) =>
       getRpc().send.remoteServerStatusChanged(payload)
     );
-    mainWindow = await createMainWindow({ rpc, executeCommand });
+    mainWindow = await createMainWindow({
+      rpc,
+      executeCommand,
+      localStorageValues: localStorageManager.snapshot().values,
+    });
 
     // The window + rpc are ready — wire the importer and flush any deep links
     // buffered at process entry during a cold-start launch (see deep-link/launch).
@@ -304,13 +335,7 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       threadStorages: pluginManager.threadStorages,
       getRpc,
     });
-    const deepLinkScheme = resolveDeepLinkScheme(
-      process.env.LLM_SPACE_DEEP_LINK_SCHEME
-    );
-    setDeepLinkHandler((url) => {
-      activateWindowForDeepLink(getMainWindow(), url, deepLinkScheme);
-      void deepLink?.handle(url);
-    });
+    installDeepLinkHandler();
 
     analytics.capture("app_opened", { isFirstOpen: analytics.isFirstRun });
     void updater.start();

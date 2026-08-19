@@ -4,8 +4,9 @@ name: Release
 # which bumps apps/desktop/package.json, commits and tags).
 # A `-canary` suffix in the tag selects the canary channel; otherwise stable.
 #
-# Jobs: meta (validate tag) → build (macOS arm64 + x64 matrix: sign, notarize,
-# smoke-test) → publish. Artifacts land in two places:
+# Jobs: meta (validate tag) → validate + builds in parallel → publish. The macOS
+# arm64 + x64 matrix signs, notarizes and smoke-tests both editions. Artifacts
+# land in two places:
 #   - the rolling `updates` release — the machine-readable update feed the
 #     in-app updater polls (`release.baseUrl` in electrobun.config.ts)
 #   - a versioned release per tag — DMGs for humans (static notes)
@@ -75,8 +76,19 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
 
-      # Typecheck once on cheap ubuntu, failing fast before the macOS build
-      # matrix spins up (tsc output is architecture-independent).
+  # Typecheck once on cheap Ubuntu (tsc output is architecture-independent),
+  # but do it alongside the expensive build matrix. Publish still requires this
+  # job, so the quality gate is unchanged; only the former ~70s serial wait is
+  # removed from the release critical path.
+  validate:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+
       - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
 
       - run: bun install --frozen-lockfile
@@ -224,9 +236,13 @@ jobs:
             exit 1
           fi
           sleep 15
-          # The real main process runs `./bun …/MacOS/../Resources/main.js`
-          # (argv[0] is `./bun`, so matching on MacOS/bun would not work).
-          pgrep -f "$APP/Contents/MacOS/../Resources/main.js" > /dev/null || {
+          # Match the canonical main.js path passed by the launcher. The custom
+          # deep-link launcher resolves `MacOS/../Resources` before spawning Bun,
+          # unlike Electrobun's stock launcher; matching the old non-canonical
+          # path therefore reports a false failure even while Bun is alive.
+          MAIN_JS="$(cd "$APP/Contents/Resources" && pwd -P)/main.js"
+          pgrep -f "$MAIN_JS" > /dev/null || {
+            ps -ax -o pid=,command= | grep '[m]ain.js' || true
             echo "::error::app did not stay alive after relaunch"
             exit 1
           }
@@ -268,7 +284,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [meta, build, build-server]
+    needs: [meta, validate, build, build-server]
     runs-on: ubuntu-latest
     # Uploading two editions' worth of artifacts; the Performance tarballs are
     # an order of magnitude bigger than the regular ones.

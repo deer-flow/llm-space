@@ -17,6 +17,7 @@ import {
 import { Input } from "@llm-space/ui/ui/input";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { sortToolsByName } from "./sort-tools-by-name";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
 export function PluginToolImportDialog({
@@ -82,8 +83,8 @@ export function PluginToolImportDialog({
     () => [...new Set(filteredTools.map((tool) => tool.pluginId))],
     [filteredTools]
   );
-  const selectedTools = filteredTools.filter(
-    (tool) => tool.pluginId === selectedPluginId
+  const selectedTools = sortToolsByName(
+    filteredTools.filter((tool) => tool.pluginId === selectedPluginId)
   );
 
   return (

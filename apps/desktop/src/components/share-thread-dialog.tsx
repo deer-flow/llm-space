@@ -237,8 +237,8 @@ export function ShareThreadDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
-          <div className="relative overflow-hidden border-b">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <div className="relative shrink-0 overflow-hidden border-b">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:30px_30px] opacity-20 [mask-image:radial-gradient(circle_at_78%_50%,black,transparent_64%)]"
@@ -268,56 +268,58 @@ export function ShareThreadDialog({
             </div>
           </div>
 
-          {status === "success" ? (
-            <ShareSuccess
-              shareUrl={shareUrl}
-              copied={copied}
-              onCopy={handleCopy}
-              onOpen={() =>
-                executeCommand({ type: "openLink", args: { url: shareUrl } })
-              }
-            />
-          ) : (
-            <div className="flex h-72 flex-col gap-4 p-6">
-              <div className="space-y-2.5">
-                <label htmlFor="share-title" className="text-xs font-medium">
-                  Title
-                </label>
-                <Input
-                  id="share-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Untitled thread"
-                  disabled={busy}
-                />
-              </div>
+          <div className="min-h-0 shrink overflow-y-auto">
+            {status === "success" ? (
+              <ShareSuccess
+                shareUrl={shareUrl}
+                copied={copied}
+                onCopy={handleCopy}
+                onOpen={() =>
+                  executeCommand({ type: "openLink", args: { url: shareUrl } })
+                }
+              />
+            ) : (
+              <div className="flex h-72 flex-col gap-4 p-6">
+                <div className="space-y-2.5">
+                  <label htmlFor="share-title" className="text-xs font-medium">
+                    Title
+                  </label>
+                  <Input
+                    id="share-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Untitled thread"
+                    disabled={busy}
+                  />
+                </div>
 
-              <div className="flex flex-1 flex-col gap-2.5">
-                <label
-                  htmlFor="share-description"
-                  className="text-xs font-medium"
-                >
-                  Description
-                </label>
-                <Textarea
-                  id="share-description"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Add a short note for the people opening this link…"
-                  disabled={busy}
-                  rows={3}
-                  className="min-h-28 flex-1 resize-none"
-                />
+                <div className="flex flex-1 flex-col gap-2.5">
+                  <label
+                    htmlFor="share-description"
+                    className="text-xs font-medium"
+                  >
+                    Description
+                  </label>
+                  <Textarea
+                    id="share-description"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Add a short note for the people opening this link…"
+                    disabled={busy}
+                    rows={3}
+                    className="min-h-28 flex-1 resize-none"
+                  />
+                </div>
+                {status === "error" ? (
+                  <p className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">
+                    {errorMessage}
+                  </p>
+                ) : null}
               </div>
-              {status === "error" ? (
-                <p className="border-destructive/20 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">
-                  {errorMessage}
-                </p>
-              ) : null}
-            </div>
-          )}
+            )}
+          </div>
 
-          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl sm:justify-between">
+          <DialogFooter className="border-t bg-background/80 shrink-0 px-6 py-4 backdrop-blur-xl sm:justify-between">
             <Button
               variant="ghost"
               onClick={() =>

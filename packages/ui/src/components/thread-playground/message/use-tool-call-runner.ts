@@ -13,6 +13,11 @@ import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useToolExecutor } from "../tool/use-tool-executor";
 import { listEnabledPromptVariableSkills } from "../variable/prompt-variable-skills";
 
+import {
+  findMessageScrollTarget,
+  preserveScrollOffsetAfterLayout,
+} from "./message-scroll-stability";
+
 export interface ToolCallOutcome {
   isError: boolean;
   isFirecrawlLimit: boolean;
@@ -72,7 +77,10 @@ export function useToolCallRunner(messageId: string) {
           toolCall.input.arguments,
           { thread: owningThread, variables }
         );
-        updateToolCallOutput(messageId, toolCall.id, content, isError);
+        preserveScrollOffsetAfterLayout(
+          findMessageScrollTarget(messageId),
+          () => updateToolCallOutput(messageId, toolCall.id, content, isError)
+        );
         const text = getToolResultText(content);
         return {
           isError,
@@ -81,7 +89,10 @@ export function useToolCallRunner(messageId: string) {
       } catch (error) {
         const text =
           error instanceof Error ? error.message : "Tool call failed";
-        updateToolCallOutputText(messageId, toolCall.id, text, true);
+        preserveScrollOffsetAfterLayout(
+          findMessageScrollTarget(messageId),
+          () => updateToolCallOutputText(messageId, toolCall.id, text, true)
+        );
         return { isError: true, isFirecrawlLimit: isFirecrawlLimitError(text) };
       }
     },

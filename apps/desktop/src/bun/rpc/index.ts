@@ -1,4 +1,7 @@
-import { userDirectoryExists } from "@llm-space/core/server";
+import {
+  resolveUserPath,
+  userDirectoryExists,
+} from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
 import {
   installPluginZip,
@@ -18,6 +21,7 @@ import {
   runUv,
   writeProjectFile,
 } from "../fs";
+import type { LocalStorageManager } from "../local-storage";
 import type { PluginCommandExecutionController } from "../plugins/plugin-command-execution-controller";
 import {
   dismissGithubStarReminder,
@@ -50,11 +54,14 @@ export interface MainWindowRPCDependencies {
   executeCommand: (command: Command) => void;
   /** Cancel the in-flight deep-link shared-thread import (Cancel button). */
   onCancelSharedImport: () => void;
+  /** Release buffered launch URLs once the renderer listener is attached. */
+  onDeepLinkReady: () => void;
   githubAuth: GitHubAuthManager;
   getMainWindow: () => BrowserWindow;
   /** Publishes a thread as a secret gist for the `shareThread` request. */
   gistWriter: GistThreadWriter;
   homePath: string;
+  localStorageManager: LocalStorageManager;
   runtimeRouter: RuntimeRouter;
   remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
@@ -69,10 +76,12 @@ export function createMainWindowRPC({
   analytics,
   executeCommand,
   onCancelSharedImport,
+  onDeepLinkReady,
   githubAuth,
   getMainWindow,
   gistWriter,
   homePath,
+  localStorageManager,
   runtimeRouter,
   remoteServerManager,
   skillsManager,
@@ -189,6 +198,21 @@ export function createMainWindowRPC({
           const mainWindow = getMainWindow();
           return { fullScreen: mainWindow.isFullScreen() };
         },
+        localStorageGet: () => Promise.resolve(localStorageManager.snapshot()),
+        localStorageInitialize: ({ values }) => {
+          _assertLocalStorageValues(values);
+          return Promise.resolve(localStorageManager.initialize(values));
+        },
+        localStorageSet: ({ key, value }) => {
+          _assertLocalStorageKey(key);
+          localStorageManager.setItem(key, value);
+          return Promise.resolve(null);
+        },
+        localStorageRemove: ({ key }) => {
+          _assertLocalStorageKey(key);
+          localStorageManager.removeItem(key);
+          return Promise.resolve(null);
+        },
         ensureRootDir: ({ relativePath }) => {
           const dir = ensureRootDir(homePath, relativePath);
           return Promise.resolve({ path: dir });
@@ -286,6 +310,8 @@ export function createMainWindowRPC({
         fsDirectoryExists: async ({ path }) => ({
           exists: await userDirectoryExists(path),
         }),
+        fsResolveUserPath: ({ path }) =>
+          Promise.resolve({ path: resolveUserPath(path) }),
         // Native file picker for a "file content" prompt variable.
         fsPickFile: async () => {
           const selected = await Utils.openFileDialog({
@@ -541,8 +567,19 @@ export function createMainWindowRPC({
           analytics.capture(event, properties),
         executeCommand: (command) => executeCommand(command),
         cancelSharedImport: () => onCancelSharedImport(),
+        deepLinkReady: () => onDeepLinkReady(),
       },
     },
   });
   return rpc;
+}
+
+function _assertLocalStorageKey(key: string): void {
+  if (!key.startsWith("llm-space")) {
+    throw new Error(`Unmanaged localStorage key: ${key}`);
+  }
+}
+
+function _assertLocalStorageValues(values: Record<string, string>): void {
+  for (const key of Object.keys(values)) _assertLocalStorageKey(key);
 }

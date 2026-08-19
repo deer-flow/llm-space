@@ -23,6 +23,7 @@ describe("runtime prompt files", () => {
   test("prepares generated projects from the store's owning runtime", async () => {
     const accesses: { path: string; runtimeId: string }[] = [];
     const files = {
+      resolvePath: (path: string) => Promise.resolve(path),
       readText: (
         path: string,
         { runtimeId }: { runtimeId: string }
@@ -72,6 +73,7 @@ describe("runtime prompt files", () => {
 
   test("requires explicit ownership instead of falling through to a default", () => {
     const files = {
+      resolvePath: (path: string) => Promise.resolve(path),
       readText: () => Promise.resolve("LOCAL LEAK"),
       exists: () => Promise.resolve(true),
       directoryExists: () => Promise.resolve(null),
@@ -105,6 +107,7 @@ describe("runtime prompt files", () => {
       runtimeId?: string;
     }[] = [];
     const files = {
+      resolvePath: (path: string) => Promise.resolve(path),
       readText: (
         path: string,
         options?: { runtimeId?: string }

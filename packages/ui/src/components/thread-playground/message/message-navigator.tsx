@@ -1,7 +1,7 @@
 import type { Message } from "@llm-space/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BotIcon, ImageIcon, UserIcon, WrenchIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@llm-space/ui/lib/utils";
 import {
@@ -25,6 +25,7 @@ function _MessageNavigator({
   onJump: (index: number) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const getItemKey = useCallback(
     (index: number) => messages[index]?.id ?? index,
     [messages]
@@ -53,7 +54,7 @@ function _MessageNavigator({
     >
       <div
         ref={viewportRef}
-        className="hover:bg-background/70 focus-within:bg-background/70 pointer-events-auto max-h-[45vh] w-7 overflow-y-auto rounded-full opacity-65 transition-[background-color,opacity] focus-within:opacity-100 hover:opacity-100"
+        className="bg-background/50 hover:bg-background/70! focus-within:bg-background/70! pointer-events-auto max-h-[45vh] w-7 overflow-x-hidden overflow-y-scroll rounded-full [scrollbar-width:none] transition-colors [&::-webkit-scrollbar]:hidden"
       >
         <div
           className="relative w-full"
@@ -74,10 +75,12 @@ function _MessageNavigator({
               >
                 <MessageAnchor
                   active={virtualItem.index === activeIndex}
+                  hoveredIndex={hoveredIndex}
                   index={virtualItem.index}
                   message={message}
                   total={messages.length}
                   onJump={onJump}
+                  onHover={setHoveredIndex}
                 />
               </div>
             );
@@ -90,16 +93,20 @@ function _MessageNavigator({
 
 function _MessageAnchor({
   active,
+  hoveredIndex,
   index,
   message,
   total,
   onJump,
+  onHover,
 }: {
   active: boolean;
+  hoveredIndex: number | null;
   index: number;
   message: Message;
   total: number;
   onJump: (index: number) => void;
+  onHover: (index: number | null) => void;
 }) {
   const preview = useMemo(() => messagePreview(message), [message]);
   const imageCount = message.content.filter(
@@ -108,6 +115,16 @@ function _MessageAnchor({
   const toolCount =
     message.role === "assistant" ? (message.toolCalls?.length ?? 0) : 0;
   const roleLabel = message.role === "user" ? "User" : "Assistant";
+  const hoverDistance =
+    hoveredIndex === null ? Number.POSITIVE_INFINITY : Math.abs(index - hoveredIndex);
+  const scaleClass =
+    hoverDistance === 0
+      ? "scale-x-[0.8]"
+      : hoverDistance === 1
+        ? "scale-x-[0.65]"
+        : hoverDistance === 2
+          ? "scale-x-[0.5]"
+          : "scale-x-[0.4]";
 
   return (
     <HoverCard openDelay={250} closeDelay={100}>
@@ -118,11 +135,18 @@ function _MessageAnchor({
           className="group/anchor flex h-3 w-5 shrink-0 cursor-pointer items-center rounded-sm outline-none"
           type="button"
           onClick={() => onJump(index)}
+          onFocus={() => onHover(index)}
+          onBlur={() => onHover(null)}
+          onMouseEnter={() => onHover(index)}
+          onMouseLeave={() => onHover(null)}
         >
           <span
             className={cn(
-              "bg-muted-foreground/55 group-hover/anchor:bg-foreground group-focus-visible/anchor:bg-foreground h-0.5 w-5 origin-left scale-x-[0.4] transform-gpu rounded-full transition-[scale,background-color] group-hover/anchor:scale-x-100 group-focus-visible/anchor:scale-x-100 motion-reduce:transition-none",
-              active ? "bg-accent-foreground" : ""
+              "group-hover/anchor:bg-foreground group-focus-visible/anchor:bg-foreground h-0.5 w-5 origin-left transform-gpu rounded-full transition-[scale,background-color,opacity] group-hover/anchor:opacity-100 group-focus-visible/anchor:opacity-100 motion-reduce:transition-none",
+              scaleClass,
+              active
+                ? "bg-accent-foreground opacity-100"
+                : "bg-muted-foreground opacity-70"
             )}
           />
         </button>

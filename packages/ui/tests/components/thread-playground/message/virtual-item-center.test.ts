@@ -20,4 +20,15 @@ describe("findCenteredVirtualItemIndex", () => {
       findCenteredVirtualItemIndex([{ index: 1, start: 0, end: 10 }], 0, 0)
     ).toBeNull();
   });
+
+  test("prefers a long item containing viewport center over a short predecessor", () => {
+    const items = [
+      { index: 1, start: 100, end: 200 },
+      { index: 2, start: 220, end: 2220 },
+    ];
+
+    // The previous item's center (150) is closer than the long item's center
+    // (1220), but the viewport center (500) is visibly inside the long item.
+    expect(findCenteredVirtualItemIndex(items, 300, 400)).toBe(2);
+  });
 });
