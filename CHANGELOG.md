@@ -4,6 +4,13 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.1] - 2026-08-19
+
+### Fixed
+
+- Built-in and Plugin Tool import lists are sorted alphabetically, making
+  Tools easier to find regardless of capitalization.
+
 ## [4.14.0] - 2026-08-18
 
 ### Added
