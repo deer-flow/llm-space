@@ -11,6 +11,7 @@
 | 文档                                             | 说明                                                                         |
 | ------------------------------------------------ | ---------------------------------------------------------------------------- |
 | [快速开始](./get-started.zh-CN.md)               | 从安装、模型配置到运行第一个 Thread。                                        |
+| [Windows 本地开发](./windows-development.zh-CN.md) | 在全新的 Windows 计算机上配置工具链、代理并启动桌面应用。                   |
 | [核心概念](./core-concepts.zh-CN.md)             | 解释 Thread、Model、Model Provider、Tools、Messages、Tool Calls 和文件格式。 |
 | [变量与模板](./variables-and-templates.zh-CN.md) | 用 `{{变量}}` 复用内容，用模板添加逻辑：`@include`、条件判断和循环。         |
 | [对话压缩](./compaction.zh-CN.md)                | 预览并渐进式压缩较早轮次，同时原样保留最近的工作内容。                       |
