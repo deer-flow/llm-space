@@ -13,6 +13,8 @@ import type {
 } from "../types/messages";
 import { parseJSON, uuid } from "../utils";
 
+import type { AgentStreamEvent } from "./events";
+
 export type ToolCallContent = Omit<ToolCall, "arguments"> & {
   arguments: string;
 };
@@ -33,7 +35,7 @@ type AssistantMessageEvent = Extract<
 type AssistantToolCall = NonNullable<AssistantMessage["toolCalls"]>[number];
 
 export function reduceMessages(
-  event: AgentEvent,
+  event: AgentStreamEvent,
   {
     streamingMessage = null,
     content = [],
@@ -43,6 +45,8 @@ export function reduceMessages(
   }
 ): ReduceResult | null {
   switch (event.type) {
+    case "agent_status_environment":
+      return null;
     case "message_start":
       if (event.message.role !== "assistant") {
         return null;

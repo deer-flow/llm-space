@@ -1,4 +1,5 @@
 export * from "./api";
+export * from "./events";
 export * from "./reducer";
 export * from "./run-eligibility";
 export * from "./transport";

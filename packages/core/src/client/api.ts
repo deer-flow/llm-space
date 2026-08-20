@@ -1,10 +1,9 @@
-import type { AgentEvent } from "@earendil-works/pi-agent-core";
-
 import type { AgentStreamRequest } from "../types/agent";
 import type { ModelConfig, ProviderConnectionRef } from "../types/models";
 import type { ThreadContext } from "../types/threads";
 
 import { convertToPiContext } from "./converters";
+import type { AgentStreamEvent } from "./events";
 import {
   isRunnableConversation,
   RUN_LAST_MESSAGE_ERROR,
@@ -20,7 +19,7 @@ export async function* streamThread(
     /** Ephemeral provider profile selection; never written into the thread. */
     connection?: ProviderConnectionRef;
   } = {}
-): AsyncGenerator<AgentEvent> {
+): AsyncGenerator<AgentStreamEvent> {
   if (!isRunnableConversation(args.context.messages)) {
     throw new Error(RUN_LAST_MESSAGE_ERROR);
   }

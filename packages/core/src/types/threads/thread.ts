@@ -1,5 +1,6 @@
 import { Type, type Static } from "typebox";
 
+import { AgentStatusSettings } from "../../agent-status/types";
 import {
   type AssistantMessage,
   Message,
@@ -144,6 +145,11 @@ export const ThreadContext = Type.Object({
    * Runtime snapshot values captured while running the thread.
    */
   snapshot: Type.Optional(ThreadContextSnapshot),
+
+  /**
+   * Agent 状态栏的持久化组件选择与时间模拟偏移。
+   */
+  agentStatus: Type.Optional(AgentStatusSettings),
 
   /**
    * The messages of the thread.
