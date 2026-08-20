@@ -36,8 +36,7 @@ export function useToolCallRunner(messageId: string) {
   const runtimeId = useThreadStore((state) => state.runtimeId);
   const executeTool = useToolExecutor(runtimeId);
   const ownerRuntimeId = runtimeId ?? "local";
-  const { updateToolCallOutput, updateToolCallOutputText } =
-    useThreadStoreActions();
+  const { recordToolCallResult } = useThreadStoreActions();
 
   const toolsByName = useMemo(
     () =>
@@ -72,28 +71,42 @@ export function useToolCallRunner(messageId: string) {
                 fileExists: promptFiles.fileExists,
               })
             : {};
-        const { content, isError } = await executeTool(
-          tool,
-          toolCall.input.arguments,
-          { thread: owningThread, variables }
-        );
-        preserveScrollOffsetAfterLayout(
-          findMessageScrollTarget(messageId),
-          () => updateToolCallOutput(messageId, toolCall.id, content, isError)
-        );
-        const text = getToolResultText(content);
+        const result = await executeTool(tool, toolCall.input.arguments, {
+          thread: owningThread,
+          variables,
+        });
+        const scrollTarget = findMessageScrollTarget(messageId);
+        let completion: ReturnType<typeof recordToolCallResult>;
+        preserveScrollOffsetAfterLayout(scrollTarget, () => {
+          completion = recordToolCallResult(messageId, toolCall.id, result);
+        });
+        const output = await completion!;
+        if (!output) {
+          return null;
+        }
+        const text = getToolResultText(output.content);
         return {
-          isError,
-          isFirecrawlLimit: isError && isFirecrawlLimitError(text),
+          isError: output.isError ?? false,
+          isFirecrawlLimit:
+            (output.isError ?? false) && isFirecrawlLimitError(text),
         };
       } catch (error) {
-        const text =
-          error instanceof Error ? error.message : "Tool call failed";
-        preserveScrollOffsetAfterLayout(
-          findMessageScrollTarget(messageId),
-          () => updateToolCallOutputText(messageId, toolCall.id, text, true)
-        );
-        return { isError: true, isFirecrawlLimit: isFirecrawlLimitError(text) };
+        const text = error instanceof Error ? error.message : "工具调用失败";
+        const scrollTarget = findMessageScrollTarget(messageId);
+        let completion: ReturnType<typeof recordToolCallResult>;
+        preserveScrollOffsetAfterLayout(scrollTarget, () => {
+          completion = recordToolCallResult(messageId, toolCall.id, {
+            content: [{ type: "text", text }],
+            isError: true,
+            error,
+          });
+        });
+        const output = await completion!;
+        const outputText = output ? getToolResultText(output.content) : text;
+        return {
+          isError: true,
+          isFirecrawlLimit: isFirecrawlLimitError(outputText),
+        };
       }
     },
     [
@@ -102,10 +115,9 @@ export function useToolCallRunner(messageId: string) {
       messageId,
       resolveTool,
       ownerRuntimeId,
+      recordToolCallResult,
       skills,
       thread,
-      updateToolCallOutput,
-      updateToolCallOutputText,
     ]
   );
 

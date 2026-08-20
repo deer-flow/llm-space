@@ -37,10 +37,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import {
-  createShareThreadAction,
-  useHostServices,
-} from "@llm-space/ui/host";
+import { createShareThreadAction, useHostServices } from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -61,6 +58,8 @@ import {
 import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { AgentStatusBar } from "./agent-status/agent-status-bar";
+import { AgentStatusListView } from "./agent-status/agent-status-list-view";
 import { GenerateProjectButton } from "./codegen/generate-project-button";
 import { MessageListView } from "./message/message-list-view";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
@@ -278,8 +277,7 @@ function ThreadPlaygroundContent({
     isMetaUserMessage(s.thread.context)
   );
   const canCompact = useMemo(
-    () =>
-      planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
+    () => planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
     [hasMetaUserPrompt, messages]
   );
   const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
@@ -586,6 +584,15 @@ function ThreadPlaygroundContent({
                     </div>
                   </div>
                   <div className={"flex w-full border-b py-2"}>
+                    <div className="text-muted-foreground w-20 shrink-0 text-xs whitespace-nowrap">
+                      Agent Status
+                    </div>
+                    {/* 与 Tools 一样展示已选择项；详细选择集中在 Add 对话框。 */}
+                    <div className="flex max-h-24 grow items-start overflow-y-auto">
+                      <AgentStatusListView readonly={readonly} />
+                    </div>
+                  </div>
+                  <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
                       Variables
                     </div>
@@ -631,6 +638,7 @@ function ThreadPlaygroundContent({
           <RunHistoryListView onClose={closeHistory} />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <AgentStatusBar />
     </div>
   );
 }
