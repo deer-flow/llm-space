@@ -1,17 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-  mkdtemp,
-  realpath,
-  rm,
-  truncate,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, realpath, rm, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { createBuiltInToolsModule } from "../../../src/tools/built-in/built-in-tools-module";
 import { ToolRegistry } from "../../../src/tools/tool-registry";
-
 
 const TEMP_DIRS: string[] = [];
 
@@ -28,6 +21,10 @@ describe("built-in tools module", () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "bash-tool-"));
     TEMP_DIRS.push(directory);
     const expectedDirectory = await realpath(directory);
+    const expectedShellDirectory =
+      process.platform === "win32"
+        ? "/tmp/" + path.basename(expectedDirectory)
+        : expectedDirectory;
     const tools = new ToolRegistry();
     createBuiltInToolsModule({
       env: {},
@@ -52,7 +49,7 @@ describe("built-in tools module", () => {
       {
         type: "text",
         text: JSON.stringify(
-          { stdout: `${expectedDirectory}\n`, stderr: "", exitCode: 0 },
+          { stdout: `${expectedShellDirectory}\n`, stderr: "", exitCode: 0 },
           null,
           2
         ),
@@ -101,6 +98,8 @@ describe("built-in tools module", () => {
       "present_files",
       "generate_image",
       "todo_write",
+      "rewrite_todo_list",
+      "update_todo_status",
       "sleep",
       "ask_user_question",
     ]);
@@ -121,6 +120,28 @@ describe("built-in tools module", () => {
         },
       ],
     });
+  });
+
+  test("注册 Agent Status TODO 管理工具", () => {
+    const tools = new ToolRegistry();
+    const module = createBuiltInToolsModule({
+      env: {},
+      findSkill: () => null,
+      generateImage: () => Promise.reject(new Error("unused")),
+      getSearchSettings: () => ({
+        provider: "firecrawl",
+        braveApiKey: "",
+        firecrawlApiKey: "",
+        tavilyApiKey: "",
+      }),
+      workspaceRoot: "/tmp/workspace",
+    });
+    module.register(tools);
+    tools.freeze();
+
+    const names = tools.listTools().map((tool) => tool.name);
+    expect(names).toContain("rewrite_todo_list");
+    expect(names).toContain("update_todo_status");
   });
 
   test("reports a missing dependency", () => {

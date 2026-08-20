@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import type { Dirent } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, type Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -655,7 +656,7 @@ export const bashTool: BuiltinTool = {
   name: "bash",
   icon: "terminal",
   description:
-    "Executes a bash command and returns stdout, stderr, and exit code. Do not use bash to modify existing file contents; use an available dedicated file-editing tool instead. Each invocation runs in a fresh shell — cwd, exported variables, and other shell state do not persist. Every command must be self-contained: re-cd to the target directory, re-export env vars, and re-source files as needed on every call.",
+    "Executes a bash command and returns stdout, stderr, and exit code. Do not use bash to modify existing file contents; use an available dedicated file-editing tool instead. Each invocation starts in the tracked working directory. A successful cd updates that directory for later calls; exported variables and other shell state do not persist.",
   strict: true,
   parameters: {
     type: "object",
@@ -669,7 +670,7 @@ export const bashTool: BuiltinTool = {
       command: {
         type: "string",
         description:
-          "The bash command to execute. Must be self-contained — include cd, export, and any other setup inline, because prior invocations leave no lasting shell state.",
+          "The bash command to execute. Successful directory changes are tracked, but exports and other shell state must be repeated in later calls.",
       },
       timeout: {
         type: "number",
@@ -684,26 +685,152 @@ export const bashTool: BuiltinTool = {
 const BASH_DEFAULT_TIMEOUT_MS = 120_000;
 const BASH_MAX_TIMEOUT_MS = 600_000;
 
+export interface ResolveBashExecutableOptions {
+  platform?: string;
+  env?: Readonly<Record<string, string | undefined>>;
+  exists?: (candidate: string) => boolean;
+}
+
+export function resolveBashExecutable(
+  options: ResolveBashExecutableOptions = {}
+): string {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32") {
+    return "bash";
+  }
+  const env = options.env ?? process.env;
+  const exists = options.exists ?? existsSync;
+  const configured = env.GIT_BASH?.trim();
+  if (configured && exists(configured)) {
+    return configured;
+  }
+
+  const defaultProgramFiles = path.win32.join(
+    "C:" + path.win32.sep,
+    "Program Files"
+  );
+  const roots = [
+    env.ProgramFiles,
+    env.ProgramW6432,
+    env["ProgramFiles(x86)"],
+    defaultProgramFiles,
+  ].filter((root): root is string => Boolean(root?.trim()));
+  for (const root of new Set(roots)) {
+    const candidate = path.win32.join(root, "Git", "bin", "bash.exe");
+    if (exists(candidate)) {
+      return candidate;
+    }
+  }
+  return "bash";
+}
+
 export async function bash(
   command: string,
-  workspaceRoot: string,
+  workingDirectory: string,
   timeout?: number
-): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}> {
+): Promise<ToolCallResponse> {
   const timeoutMs = Math.min(
     timeout ?? BASH_DEFAULT_TIMEOUT_MS,
     BASH_MAX_TIMEOUT_MS
   );
+  const marker = "__LLM_SPACE_CWD_" + randomUUID().replaceAll("-", "") + "__";
   const { stdout, stderr, code } = await _run(
-    "bash",
-    ["-c", command],
+    resolveBashExecutable(),
+    ["-c", _withWorkingDirectoryProbe(command, marker)],
     timeoutMs,
-    workspaceRoot
+    workingDirectory
   );
-  return { stdout, stderr, exitCode: code };
+  const probed = _extractWorkingDirectory(stdout, marker);
+  const nextWorkingDirectory = probed.workingDirectory
+    ? _normalizeShellWorkingDirectory(probed.workingDirectory)
+    : undefined;
+  const changedDirectory =
+    code === 0 &&
+    nextWorkingDirectory &&
+    !_sameWorkingDirectory(nextWorkingDirectory, workingDirectory)
+      ? nextWorkingDirectory
+      : undefined;
+  return createToolCallResponse(
+    [
+      {
+        type: "text",
+        text: JSON.stringify(
+          { stdout: probed.stdout, stderr, exitCode: code },
+          null,
+          2
+        ),
+      },
+    ],
+    changedDirectory
+      ? [
+          {
+            type: "working-directory",
+            workingDirectory: changedDirectory,
+          },
+        ]
+      : undefined
+  );
+}
+
+function _withWorkingDirectoryProbe(command: string, marker: string): string {
+  return [
+    command,
+    "__llm_space_exit_code=$?",
+    'printf "%s%s" "' + marker + '" "$(pwd -W 2>/dev/null || pwd -P)"',
+    'exit "$__llm_space_exit_code"',
+  ].join(String.fromCharCode(10));
+}
+
+function _extractWorkingDirectory(
+  stdout: string,
+  marker: string
+): { stdout: string; workingDirectory?: string } {
+  const markerIndex = stdout.lastIndexOf(marker);
+  if (markerIndex < 0) {
+    return { stdout };
+  }
+  const workingDirectory = stdout.slice(markerIndex + marker.length).trim();
+  return {
+    stdout: stdout.slice(0, markerIndex),
+    ...(workingDirectory ? { workingDirectory } : {}),
+  };
+}
+
+function _normalizeShellWorkingDirectory(workingDirectory: string): string {
+  if (process.platform !== "win32") {
+    return path.normalize(workingDirectory);
+  }
+  const slashPath = workingDirectory.replaceAll("\\", "/");
+  if (slashPath.length >= 3 && slashPath[1] === ":") {
+    return path.win32.normalize(slashPath);
+  }
+  if (
+    slashPath.startsWith("/mnt/") &&
+    slashPath.length >= 7 &&
+    slashPath[6] === "/"
+  ) {
+    const driveRoot = slashPath[5].toUpperCase() + ":" + path.win32.sep;
+    return path.win32.join(driveRoot, slashPath.slice(7));
+  }
+  if (
+    slashPath.startsWith("/") &&
+    slashPath.length >= 3 &&
+    slashPath[2] === "/"
+  ) {
+    const driveRoot = slashPath[1].toUpperCase() + ":" + path.win32.sep;
+    return path.win32.join(driveRoot, slashPath.slice(3));
+  }
+  return path.win32.normalize(slashPath);
+}
+
+function _sameWorkingDirectory(left: string, right: string): boolean {
+  if (process.platform === "win32") {
+    return (
+      path.win32.normalize(left).toLowerCase() ===
+      path.win32.normalize(right).toLowerCase()
+    );
+  }
+  return path.normalize(left) === path.normalize(right);
 }
 
 // -- skill --------------------------------------------------------------------
@@ -890,10 +1017,17 @@ export function createFsBuiltInTools(
     },
     {
       tool: bashTool,
-      async execute(args: Record<string, unknown>) {
+      async execute(
+        args: Record<string, unknown>,
+        config?: Record<string, unknown>
+      ) {
+        const configuredWorkingDirectory = config?.workingDirectory;
         return bash(
           _requireString(args, "command"),
-          workspaceRoot,
+          typeof configuredWorkingDirectory === "string" &&
+            configuredWorkingDirectory.trim().length > 0
+            ? configuredWorkingDirectory
+            : workspaceRoot,
           _optionalNumber(args, "timeout")
         );
       },

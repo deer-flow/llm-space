@@ -1,4 +1,5 @@
 import type { BuiltinTool } from "@llm-space/core";
+import { AGENT_STATUS_TODO_TOOLS } from "@llm-space/core/agent-status";
 
 import type { ToolEntry } from "../tool-registry";
 
@@ -163,6 +164,12 @@ export const miscBuiltInTools: ToolEntry[] = [
       return todo_write();
     },
   },
+  ...AGENT_STATUS_TODO_TOOLS.map((tool) => ({
+    tool,
+    async execute() {
+      return todo_write();
+    },
+  })),
   {
     tool: sleepTool,
     async execute(args: Record<string, unknown>) {

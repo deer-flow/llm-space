@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AgentEvent, AgentStreamRequest } from "@llm-space/core";
+import type { AgentStreamEvent, AgentStreamRequest } from "@llm-space/core";
 import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
 import type { RuntimeCapability } from "@llm-space/runtime/runtime";
 
@@ -305,9 +305,7 @@ describe("RemoteRuntimeClient", () => {
       }
     );
 
-    expect(
-      requests.map(({ method, params }) => ({ method, params }))
-    ).toEqual([
+    expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
       {
         method: "fs.archiveRun",
         params: {
@@ -330,7 +328,7 @@ describe("RemoteRuntimeClient", () => {
   });
 
   test("parses SSE stream events", async () => {
-    const events: AgentEvent[] = [];
+    const events: AgentStreamEvent[] = [];
     let requestBody: unknown;
     await _withFetch(
       async (request) => {

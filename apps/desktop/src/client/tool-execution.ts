@@ -1,8 +1,9 @@
-import type {
-  BuiltinTool,
-  BuiltinToolCallResponse,
-  McpTool,
-  PluginTool,
+import {
+  resolveAgentStatusWorkingDirectory,
+  type BuiltinTool,
+  type BuiltinToolCallResponse,
+  type McpTool,
+  type PluginTool,
 } from "@llm-space/core";
 import type { ExecuteToolOptions } from "@llm-space/ui/host";
 
@@ -56,17 +57,29 @@ export async function executeTool(
       isError: result.isError ?? false,
     };
   }
+  const trackedWorkingDirectory = resolveAgentStatusWorkingDirectory(
+    options.thread.context,
+    options.variables
+  );
   const result = await callBuiltInTool(
     {
       name: tool.name,
       arguments: args,
-      config: tool.config,
+      config: {
+        ...tool.config,
+        ...(trackedWorkingDirectory
+          ? { workingDirectory: trackedWorkingDirectory }
+          : {}),
+      },
       connection: options.connection,
     },
     runtimeId
   );
   return {
     content: result.content,
+    ...(result.effects?.length
+      ? { effects: result.effects.map((effect) => ({ ...effect })) }
+      : {}),
     isError: false,
   };
 }
