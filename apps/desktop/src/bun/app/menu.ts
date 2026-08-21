@@ -9,10 +9,10 @@ import type { Command } from "../../shared/commands";
 import { isChineseLocale } from "./locales";
 
 /**
- * The update item shared by the macOS app submenu and the Windows File menu:
- * normally "Check for Updates…"; once an update is downloaded it becomes
- * "Restart to Update" (VS Code pattern). `setUpdateReadyInMenu` rebuilds the
- * whole menu — `setApplicationMenu` is idempotent and can be re-called anytime.
+ * The update item in the app submenu: normally "Check for Updates…"; once an
+ * update is downloaded it becomes "Restart to Update" (VS Code pattern).
+ * `setUpdateReadyInMenu` rebuilds the whole menu — `setApplicationMenu` is
+ * idempotent and can be re-called anytime.
  */
 function _updateItem(updateReady: boolean): ApplicationMenuItemConfig {
   return updateReady
@@ -85,11 +85,7 @@ function _fileSubmenu(): ApplicationMenuItemConfig[] {
   ];
 }
 
-/**
- * `pasteAndMatchStyle` is macOS-only; the flag keeps the two platforms'
- * Edit menus otherwise identical.
- */
-function _editSubmenu(mac: boolean): ApplicationMenuItemConfig[] {
+function _editSubmenu(): ApplicationMenuItemConfig[] {
   return [
     { role: "undo" },
     { role: "redo" },
@@ -97,7 +93,7 @@ function _editSubmenu(mac: boolean): ApplicationMenuItemConfig[] {
     { role: "cut" },
     { role: "copy" },
     { role: "paste" },
-    ...(mac ? [{ role: "pasteAndMatchStyle" as const }] : []),
+    { role: "pasteAndMatchStyle" },
     { role: "delete" },
     { role: "selectAll" },
   ];
@@ -141,15 +137,11 @@ function _viewSubmenu(): ApplicationMenuItemConfig[] {
   ];
 }
 
-/**
- * `bringAllToFront` and `toggleFullScreen` are macOS-only; the flag keeps
- * the two platforms' Window menus otherwise identical.
- */
-function _windowSubmenu(mac: boolean): ApplicationMenuItemConfig[] {
+function _windowSubmenu(): ApplicationMenuItemConfig[] {
   return [
     { role: "minimize" },
-    ...(mac ? [{ role: "bringAllToFront" as const }] : []),
-    { type: "divider" as const },
+    { role: "bringAllToFront" },
+    { type: "divider" },
     {
       label: "Select Previous Tab",
       action: "selectPreviousTab",
@@ -160,12 +152,8 @@ function _windowSubmenu(mac: boolean): ApplicationMenuItemConfig[] {
       action: "selectNextTab",
       accelerator: "CommandOrControl+Option+Right",
     },
-    ...(mac
-      ? [
-          { type: "divider" as const },
-          { role: "toggleFullScreen" as const, accelerator: "CommandOrControl+Shift+F" },
-        ]
-      : []),
+    { type: "divider" },
+    { role: "toggleFullScreen", accelerator: "CommandOrControl+Shift+F" },
   ];
 }
 
@@ -184,54 +172,20 @@ function _helpSubmenu(): ApplicationMenuItemConfig[] {
   ];
 }
 
-/** macOS menu bar: App / File / Edit / View / Window / Help. */
-function _buildMacMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
+/**
+ * The native application menu is a macOS convention: the menu bar leads with
+ * the app submenu. Windows (and Linux, when it ships) deliberately have no
+ * native menu — the in-app UI owns the commands.
+ */
+function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
   return [
     _appSubmenu(updateReady),
     { label: "File", submenu: _fileSubmenu() },
-    { label: "Edit", submenu: _editSubmenu(true) },
+    { label: "Edit", submenu: _editSubmenu() },
     { label: "View", submenu: _viewSubmenu() },
-    { label: "Window", role: "window", submenu: _windowSubmenu(true) },
+    { label: "Window", role: "window", submenu: _windowSubmenu() },
     { label: "Help", submenu: _helpSubmenu() },
   ];
-}
-
-/**
- * Windows has no app submenu: Settings, the update item and Quit move into
- * File, and the Edit/Window menus drop their macOS-only roles.
- */
-function _buildWindowsMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
-  return [
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "Settings...",
-          action: "settings",
-          accelerator: "CommandOrControl+,",
-        },
-        _updateItem(updateReady),
-        { type: "divider" },
-        ..._fileSubmenu(),
-        { type: "divider" },
-        {
-          label: "Quit LLM Space",
-          role: "quit",
-          accelerator: "CommandOrControl+Q",
-        },
-      ],
-    },
-    { label: "Edit", submenu: _editSubmenu(false) },
-    { label: "View", submenu: _viewSubmenu() },
-    { label: "Window", role: "window", submenu: _windowSubmenu(false) },
-    { label: "Help", submenu: _helpSubmenu() },
-  ];
-}
-
-function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
-  return process.platform === "win32"
-    ? _buildWindowsMenu(updateReady)
-    : _buildMacMenu(updateReady);
 }
 
 /**
@@ -240,6 +194,7 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
  * ready. `null` restores the default item.
  */
 export function setUpdateReadyInMenu(version: string | null) {
+  if (process.platform !== "darwin") return;
   ApplicationMenu.setApplicationMenu(_buildMenu(version !== null));
 }
 
@@ -300,12 +255,13 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
 
 /**
  * Install the application menu and wire its actions to the main window. Called
- * once after the window exists.
+ * once after the window exists. macOS only — Windows/Linux have no native menu.
  */
 export function registerMenuActions(
   window: BrowserWindow,
   executeCommand: (command: Command, window: BrowserWindow) => void
 ) {
+  if (process.platform !== "darwin") return;
   ApplicationMenu.setApplicationMenu(_buildMenu(false));
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
