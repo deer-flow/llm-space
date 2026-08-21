@@ -9,7 +9,10 @@ import { Route, Routes, useParams } from "react-router-dom";
 
 import { webHost, webModelClient } from "@/host/web-host";
 import { App as Landing } from "@/landing/app";
-import { I18nProvider as LandingI18nProvider } from "@/landing/lib/i18n";
+import {
+  I18nProvider as LandingI18nProvider,
+  useI18n as useLandingI18n,
+} from "@/landing/lib/i18n";
 import { NotFound } from "@/not-found";
 import { ThreadViewer } from "@/thread-viewer";
 
@@ -37,10 +40,29 @@ function SharedThreadRoute() {
   const { connectorId, threadId } = useParams();
   const connector = connectorId ? CONNECTORS[connectorId] : undefined;
   if (!connector || !threadId) return <NotFound />;
-  // The playground's copy comes from the shared `@llm-space/ui` messages, so
-  // the viewer needs the shared provider (the landing has its own).
   return (
-    <I18nProvider>
+    <SharedThreadViewer connector={connector} threadId={threadId} />
+  );
+}
+
+/**
+ * The playground's copy comes from the shared `@llm-space/ui` messages, so the
+ * viewer needs the shared provider — the landing has its own. `initialLang` is
+ * seeded from the landing provider's already-resolved language (that
+ * resolution covers the landingLanguage-then-navigator priority). The viewer
+ * stays display-only: no switcher, no persistence writes — `initialLang` makes
+ * the provider's async path unnecessary.
+ */
+function SharedThreadViewer({
+  connector,
+  threadId,
+}: {
+  connector: ThreadConnector;
+  threadId: string;
+}) {
+  const { lang } = useLandingI18n();
+  return (
+    <I18nProvider initialLang={lang}>
       <ThreadViewer connector={connector} threadId={threadId} />
     </I18nProvider>
   );
