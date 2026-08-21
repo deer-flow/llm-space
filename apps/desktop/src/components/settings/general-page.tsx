@@ -15,6 +15,7 @@ import {
   type Theme,
 } from "@llm-space/ui/components/theme-provider";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
+import { LANGUAGES, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Select,
@@ -292,6 +293,7 @@ function useUpdateMode(): [UpdateMode, (mode: UpdateMode) => void] {
 }
 
 export function GeneralPage() {
+  const { lang, setLang, t } = useI18n();
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
@@ -314,17 +316,26 @@ export function GeneralPage() {
           <SettingsRow
             label={
               <RowLabel
-                title="Language"
-                hint="English only for now — more languages are coming."
+                title={t.settings.language}
+                hint={t.settings.languageHint}
               />
             }
           >
-            <Select defaultValue="en-US" disabled>
-              <SelectTrigger className="w-32" aria-label="Language">
+            <Select
+              value={lang}
+              onValueChange={(v) => setLang(v as "en" | "zh")}
+            >
+              <SelectTrigger className="w-48" aria-label={t.settings.language}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="en-US">English (US)</SelectItem>
+                <SelectGroup>
+                  {LANGUAGES.map(({ code, label }) => (
+                    <SelectItem key={code} value={code}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </SettingsRow>

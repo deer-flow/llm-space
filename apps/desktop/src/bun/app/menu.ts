@@ -184,6 +184,21 @@ export function setUpdateReadyInMenu(version: string | null) {
   ApplicationMenu.setApplicationMenu(_buildMenu(version !== null));
 }
 
+let _menuLang: "en" | "zh" = isChineseLocale() ? "zh" : "en";
+const _menuUpdateReady = false;
+
+function _rebuildMenu() {
+  if (process.platform !== "darwin") return;
+  ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady));
+}
+
+/** Rebuild the native menu after a UI-language change (macOS only). */
+export function setMenuLanguage(lang: "en" | "zh") {
+  if (_menuLang === lang) return;
+  _menuLang = lang;
+  _rebuildMenu();
+}
+
 /**
  * The native menu items carry a string `action`; map each to the {@link Command}
  * it dispatches. Everything then flows through the single `executeCommandInBun`

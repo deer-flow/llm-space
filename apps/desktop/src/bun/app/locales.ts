@@ -36,7 +36,25 @@ export function getOsLocale() {
   }
 }
 
-/** Whether the OS display language is Chinese. */
+let _currentLocale: string | null = null;
+
+/** The effective locale — the OS display language until the user overrides it. */
+function _effectiveLocale(): string {
+  if (_currentLocale === null) _currentLocale = getOsLocale();
+  return _currentLocale;
+}
+
+/** Override the process locale when the user switches the UI language. */
+export function setAppLocale(lang: "en" | "zh") {
+  _currentLocale = lang === "zh" ? "zh-cn" : "en";
+}
+
+/** The current effective locale (OS default until the user overrides it). */
+export function getCurrentLocale(): string {
+  return _effectiveLocale();
+}
+
+/** Whether the effective UI locale is Chinese. */
 export function isChineseLocale() {
-  return getOsLocale().startsWith("zh");
+  return _effectiveLocale().startsWith("zh");
 }

@@ -15,4 +15,8 @@ export const zh: Messages = {
     copied: "已复制",
     loading: "加载中…",
   },
+  settings: {
+    language: "语言",
+    languageHint: "界面语言",
+  },
 };

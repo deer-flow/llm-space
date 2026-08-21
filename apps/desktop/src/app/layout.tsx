@@ -4,31 +4,43 @@ import {
   ThemeProvider,
   useTheme,
 } from "@llm-space/ui/components/theme-provider";
+import { I18nProvider } from "@llm-space/ui/lib/i18n";
 import "@llm-space/ui/styles/globals.css";
 import { Toaster } from "@llm-space/ui/ui/sonner";
 import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
 import { PluginCommandExecutionProvider } from "@/components/plugin-command-execution-provider";
+import { electrobun } from "@/lib/electrobun";
 
 import { QueryProvider } from "./query-provider";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
-      <ExperimentalProvider>
-        <QueryProvider>
-          <TooltipProvider delayDuration={1000}>
-            <PluginCommandExecutionProvider>
-              <div className="flex size-full flex-col">
-                <ThemedToaster />
-                {children}
-              </div>
-            </PluginCommandExecutionProvider>
-          </TooltipProvider>
-        </QueryProvider>
-      </ExperimentalProvider>
-    </ThemeProvider>
+    <I18nProvider
+      resolveOsLocale={async () => {
+        const result = await electrobun.rpc?.request("getOsLocale", {});
+        return result?.locale ?? "";
+      }}
+      onLanguageChanged={(lang) => {
+        electrobun.rpc?.send("languageChanged", { lang });
+      }}
+    >
+      <ThemeProvider>
+        <ExperimentalProvider>
+          <QueryProvider>
+            <TooltipProvider delayDuration={1000}>
+              <PluginCommandExecutionProvider>
+                <div className="flex size-full flex-col">
+                  <ThemedToaster />
+                  {children}
+                </div>
+              </PluginCommandExecutionProvider>
+            </TooltipProvider>
+          </QueryProvider>
+        </ExperimentalProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }
 

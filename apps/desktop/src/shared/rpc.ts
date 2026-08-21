@@ -766,6 +766,12 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: null;
       };
+      // The OS display language (lowercase locale tag, e.g. `zh-cn`), for the
+      // renderer's first-run language resolution. Pure read.
+      getOsLocale: {
+        params: Record<string, never>;
+        response: { locale: string };
+      };
       // The next unseen one-time feature reminder (`null` once all are seen).
       // Pure read — recording is deferred to `featureReminderMarkSeen`, so this
       // is idempotent and can't burn a reminder that never actually showed.
@@ -793,6 +799,9 @@ export interface DesktopRPCType {
       // A unified command dispatched from the webview to run in the bun process
       // (e.g. window zoom / reload). See `shared/commands.ts`.
       executeCommand: Command;
+      // The user changed the UI language; bun rebuilds the native menu and
+      // switches its error-copy locale.
+      languageChanged: { lang: "en" | "zh" };
       // Fire-and-forget: a renderer-only, anonymous analytics event. The bun
       // side is the single network egress for telemetry. See `shared/analytics.ts`.
       captureAnalyticsEvent: AnalyticsEvent;
