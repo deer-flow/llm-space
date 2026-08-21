@@ -24,6 +24,7 @@ import { toast } from "sonner";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -64,6 +65,7 @@ export function PromptVariablesListView({
   const rawVariableVariants = useThreadStore(
     (s) => s.thread.context?.variableVariants
   );
+  const { t } = useI18n();
   const { variables, variableVariants } = useMemo(
     () =>
       normalizePromptVariableState({
@@ -91,7 +93,7 @@ export function PromptVariablesListView({
           kind: "builtIn" as const,
           name,
           variable,
-          status: variable.value.trim() || "(empty)",
+          status: variable.value.trim() || t.playground.variable.empty,
         };
       }
       if (variable.type === "json") {
@@ -99,7 +101,9 @@ export function PromptVariablesListView({
           kind: "builtIn" as const,
           name,
           variable,
-          status: variable.value.trim() ? "JSON" : "(empty)",
+          status: variable.value.trim()
+            ? t.playground.variable.json
+            : t.playground.variable.empty,
         };
       }
       if (variable.type === "file") {
@@ -107,7 +111,7 @@ export function PromptVariablesListView({
           kind: "builtIn" as const,
           name,
           variable,
-          status: variable.value.trim() || "(no file)",
+          status: variable.value.trim() || t.playground.variable.noFile,
         };
       }
       return {
@@ -115,20 +119,22 @@ export function PromptVariablesListView({
         name,
         variable,
         status: includesAllSkills(variable)
-          ? "All skills"
+          ? t.playground.variable.allSkills
           : variable.skillNames.length === 0
-            ? "None selected"
-            : `${variable.skillNames.length} selected`,
+            ? t.playground.variable.noneSelected
+            : formatString(t.playground.variable.selectedCount, {
+                n: variable.skillNames.length,
+              }),
       };
     });
     const custom = Object.entries(customValues).map(([name, value]) => ({
       kind: "custom" as const,
       name,
       value,
-      status: value.trim() ? value : "(empty)",
+      status: value.trim() ? value : t.playground.variable.empty,
     }));
     return [...builtIns, ...custom];
-  }, [customValues, variables]);
+  }, [customValues, t, variables]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSelection, setInitialSelection] =
     useState<PromptVariableSelection | null>(null);
@@ -189,7 +195,7 @@ export function PromptVariablesListView({
             onClick={openManage}
           >
             <PlusIcon className="size-3" />
-            Add
+            {t.playground.variable.add}
           </Button>
         )}
         <PromptVariablesDialog
@@ -218,6 +224,7 @@ function _VariableEntry({
   onOpen: (item: VariableListItem) => void;
 }) {
   const VariableIcon = _variableIcon(item);
+  const { t } = useI18n();
   const token = `{{${item.name}}}`;
   return (
     <div className="group/variable bg-secondary hover:text-accent-foreground inline-flex h-6 shrink-0 items-center rounded-md text-xs/relaxed transition-colors">
@@ -244,7 +251,10 @@ function _VariableEntry({
               item.warning &&
                 "text-orange-300 group-hover/variable:text-orange-300"
             )}
-            aria-label={`Manage ${item.name} variable`}
+            aria-label={formatString(
+              t.playground.variable.manageVariable,
+              { name: item.name }
+            )}
             disabled={disabled}
             onClick={() => onOpen(item)}
           >
@@ -257,25 +267,26 @@ function _VariableEntry({
         content={
           <div className="max-w-56">
             <div>
-              Copy <span className="font-mono">{token}</span>
+              {formatString(t.playground.variable.copyToken, { token })}
             </div>
             <div className="text-muted-foreground pt-1">
-              Paste it into your prompt, messages, or tool results to reference
-              this variable.
+              {t.playground.variable.pasteHint}
             </div>
           </div>
         }
       >
         <button
           type="button"
-          aria-label={`Copy ${token}`}
+          aria-label={formatString(t.playground.variable.copyToken, { token })}
           className="text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 opacity-0 outline-none group-hover/variable:opacity-100 hover:opacity-100 focus-visible:ring-2"
           onClick={() => {
             void navigator.clipboard.writeText(token);
-            toast.success(`Copied ${token}`, {
-              description:
-                "Paste it into your prompt, messages, or tool results to reference this variable.",
-            });
+            toast.success(
+              formatString(t.playground.variable.copiedToken, { token }),
+              {
+                description: t.playground.variable.pasteHint,
+              }
+            );
           }}
         >
           <CopyIcon className="size-3" />

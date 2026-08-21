@@ -12,6 +12,13 @@ import { toast } from "sonner";
 import { format } from "timeago.js";
 
 import { useHostServices } from "@llm-space/ui/host";
+import {
+  formatString,
+  langToTimeago,
+  type Lang,
+  type Messages,
+  useI18n,
+} from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -45,6 +52,7 @@ function _McpToolImportDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { actions, mcp } = useHostServices();
+  const { t, lang } = useI18n();
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<string>("");
   const [tools, setTools] = useState<McpToolSummary[]>([]);
@@ -77,14 +85,16 @@ function _McpToolImportDialog({
             : (next[0]?.id ?? "")
       );
     } catch (error) {
-      toast.error("Failed to load MCP servers", {
+      toast.error(t.playground.tools.failedToLoadMcpServers, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error
+            ? error.message
+            : t.playground.message.pleaseTryAgain,
       });
     } finally {
       setLoadingServers(false);
     }
-  }, [initialServerId, mcp, runtimeId]);
+  }, [initialServerId, mcp, runtimeId, t]);
 
   const refreshTools = useCallback(
     async (serverId: string) => {
@@ -104,15 +114,17 @@ function _McpToolImportDialog({
       } catch (error) {
         setTools([]);
         await refreshServers();
-        toast.error("Failed to load MCP tools", {
+        toast.error(t.playground.tools.failedToLoadMcpTools, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error
+              ? error.message
+              : t.playground.message.pleaseTryAgain,
         });
       } finally {
         setLoadingTools(false);
       }
     },
-    [mcp, refreshServers, runtimeId]
+    [mcp, refreshServers, runtimeId, t]
   );
 
   useEffect(() => {
@@ -201,9 +213,9 @@ function _McpToolImportDialog({
         }}
       >
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add MCP tools</DialogTitle>
+          <DialogTitle>{t.playground.tools.addMcpTools}</DialogTitle>
           <DialogDescription>
-            Choose a server, then add one or more MCP tools to this thread.
+            {t.playground.tools.addMcpToolsDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -211,7 +223,9 @@ function _McpToolImportDialog({
             <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
               {servers.length === 0 ? (
                 <div className="text-muted-foreground px-2 py-6 text-center text-xs">
-                  {loadingServers ? "Loading…" : "No servers"}
+                  {loadingServers
+                    ? t.playground.tools.loadingEllipsis
+                    : t.playground.tools.noServers}
                 </div>
               ) : (
                 servers.map((server) => {
@@ -281,16 +295,16 @@ function _McpToolImportDialog({
               onClick={openMcpSettings}
             >
               <Settings2 className="size-3.5" />
-              Configure MCP
+              {t.playground.tools.configureMcp}
             </Button>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {servers.length === 0 ? (
                 <div className="text-muted-foreground flex flex-col items-center gap-3 px-3 py-8 text-center text-sm">
-                  <span>No MCP servers configured.</span>
+                  <span>{t.playground.tools.noMcpServersConfigured}</span>
                   <Button size="sm" variant="outline" onClick={openMcpSettings}>
-                    Open settings
+                    {t.playground.tools.openSettings}
                   </Button>
                 </div>
               ) : tools.length === 0 ? (
@@ -301,7 +315,13 @@ function _McpToolImportDialog({
                     )}
                   >
                     {errorText ??
-                      `${_serverReadinessLabel(selectedServer)} · no tools loaded`}
+                      formatString(t.playground.tools.noToolsLoaded, {
+                        label: _serverReadinessLabel(
+                          selectedServer,
+                          t,
+                          lang
+                        ),
+                      })}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button
@@ -315,10 +335,10 @@ function _McpToolImportDialog({
                       ) : (
                         <RefreshCw className="size-4" />
                       )}
-                      Test server
+                      {t.playground.tools.testServer}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={openMcpSettings}>
-                      Open settings
+                      {t.playground.tools.openSettings}
                     </Button>
                   </div>
                 </div>
@@ -373,7 +393,12 @@ function _McpToolImportDialog({
                       <Switch
                         checked={exists}
                         disabled={!tool.available}
-                        aria-label={`${exists ? "Remove" : "Add"} ${tool.directName}`}
+                        aria-label={formatString(
+                          exists
+                            ? t.playground.tools.removeTool
+                            : t.playground.tools.addTool,
+                          { name: tool.directName }
+                        )}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
                         }
@@ -392,15 +417,23 @@ function _McpToolImportDialog({
 
 export const McpToolImportDialog = memo(_McpToolImportDialog);
 
-function _serverReadinessLabel(server: McpServerView | null): string {
+function _serverReadinessLabel(
+  server: McpServerView | null,
+  t: Messages,
+  lang: Lang
+): string {
   if (!server) {
-    return "Untested";
+    return t.playground.tools.untested;
   }
   const readiness = server.readiness;
   const label = getMcpReadinessLabel(readiness);
   const parts = [label];
   if (readiness?.testedAt) {
-    parts.push(`tested ${format(readiness.testedAt)}`);
+    parts.push(
+      formatString(t.playground.tools.testedAt, {
+        time: format(readiness.testedAt, langToTimeago(lang)),
+      })
+    );
   }
   return parts.join(" · ");
 }

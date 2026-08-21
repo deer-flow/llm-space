@@ -15,6 +15,7 @@ import {
 import React, { memo, useCallback, useMemo } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 
 
@@ -48,6 +49,7 @@ function _ToolListItem({
     [parameters]
   );
   const displayName = getToolDisplayName(tool);
+  const { t } = useI18n();
   const handleRemove = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
@@ -75,7 +77,7 @@ function _ToolListItem({
             <div className="max-w-80 text-xs">
               <div className="font-mono font-bold">{displayName}</div>
               <div className="pt-1 opacity-60">
-                Runs inside the provider&apos;s model request.
+                {t.playground.tools.runsInsideProviderRequest}
               </div>
               <pre className="mt-2 overflow-auto">
                 {JSON.stringify(tool.config, null, 2)}
@@ -114,8 +116,19 @@ function _ToolListItem({
             className="focus-visible:ring-ring/30 text-muted-foreground group-hover/tool:text-foreground inline-flex h-full items-center gap-1 rounded-l-md pl-2 outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50"
             aria-label={
               tool.type === "function"
-                ? `Edit ${displayName} tool`
-                : `Manage ${displayName} ${tool.type === "mcp" ? "MCP" : tool.type === "builtin" ? "built-in" : tool.type === "plugin" ? "Plugin" : "provider-hosted"} tool`
+                ? formatString(t.playground.tools.editTool, {
+                    name: displayName,
+                  })
+                : formatString(
+                    tool.type === "mcp"
+                      ? t.playground.tools.manageMcpTool
+                      : tool.type === "builtin"
+                        ? t.playground.tools.manageBuiltInTool
+                        : tool.type === "plugin"
+                          ? t.playground.tools.managePluginTool
+                          : t.playground.tools.manageProviderHostedTool,
+                    { name: displayName }
+                  )
             }
             disabled={editDisabled}
             onClick={() => onEdit(tool)}
@@ -125,11 +138,13 @@ function _ToolListItem({
           </button>
         </span>
       </Tooltip>
-      <Tooltip content="Remove tool">
+      <Tooltip content={t.playground.tools.removeToolTitle}>
         <button
           type="button"
           disabled={readonly}
-          aria-label={`Remove ${displayName} tool`}
+          aria-label={formatString(t.playground.tools.removeToolItem, {
+            name: displayName,
+          })}
           className={cn(
             "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 outline-none hover:opacity-100 focus-visible:ring-2",
             readonly ? "opacity-0!" : "opacity-0 group-hover/tool:opacity-100"

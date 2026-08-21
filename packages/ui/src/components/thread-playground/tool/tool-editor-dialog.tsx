@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -43,6 +44,7 @@ export function ToolEditorDialog({
   tool: FunctionTool | null;
 }) {
   const { addTool, updateTool } = useThreadStoreActions();
+  const { t } = useI18n();
   const threadModel = useThreadStore((s) => s.thread.model);
   const [text, setText] = useState("");
   const [originalName, setOriginalName] = useState<string | null>(null);
@@ -113,14 +115,16 @@ export function ToolEditorDialog({
     try {
       const normalized = normalizeTool(parseJSON(text));
       if (normalized.type !== "function") {
-        toast.error("Error", {
-          description: "MCP tools cannot be edited as function tools",
+        toast.error(t.playground.tools.error, {
+          description: t.playground.tools.mcpToolsCannotBeEdited,
         });
         return;
       }
       parsed = normalized;
     } catch {
-      toast.error("Error", { description: "Invalid JSON" });
+      toast.error(t.playground.tools.error, {
+        description: t.playground.tools.invalidJson,
+      });
       return;
     }
 
@@ -142,21 +146,23 @@ export function ToolEditorDialog({
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {originalName ? "Edit tool" : "Add function tool"}
+            {originalName
+              ? t.playground.tools.editFunctionTool
+              : t.playground.tools.addFunctionTool}
           </DialogTitle>
           <DialogDescription>
-            A function tool consists of a name, description, and parameters.
-            Parameters are defined using JSON Schema. Since the tool is
-            customized, you need to provide a response at runtime.
+            {t.playground.tools.functionToolDescription}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">Definition</div>
+            <div className="text-sm font-medium">
+              {t.playground.tools.definition}
+            </div>
             <div className="flex items-center gap-2">
               <GeneratePopoverButton
-                placeholder="Describe what your function does (or paste your function declaration code), and we'll generate a definition."
+                placeholder={t.playground.tools.generateFunctionPlaceholder}
                 onGenerate={handleGenerate}
               />
               <ExamplesMenu
@@ -177,9 +183,11 @@ export function ToolEditorDialog({
 
         <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.playground.tools.cancel}
           </Button>
-          <Button onClick={handleSave}>{tool ? "Save" : "Create"}</Button>
+          <Button onClick={handleSave}>
+            {tool ? t.playground.tools.save : t.playground.tools.create}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

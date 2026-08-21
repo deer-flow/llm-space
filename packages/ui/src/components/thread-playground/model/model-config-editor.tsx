@@ -5,6 +5,7 @@ import {
   useResolveModelConfig,
 } from "@llm-space/ui/components/model-provider";
 import { useHostServices } from "@llm-space/ui/host";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 
 import { useThreadStore } from "../stores";
@@ -25,6 +26,7 @@ export function ModelConfigEditor({
   // are no models at all.
   const savedModel = useThreadStore((s) => s.thread.model);
   const modelName = useThreadStore((s) => s.thread.modelName);
+  const { t } = useI18n();
   const { presentational } = useHostServices();
   const model = useResolveModelConfig(savedModel);
   const resolvedModel = useModel({
@@ -60,7 +62,7 @@ export function ModelConfigEditor({
             // No model provider list on the web viewer — show the name that was
             // resolved at share time (or the raw saved id) as static text.
             <span className="text-muted-foreground truncate px-2 font-mono text-sm">
-              {modelName ?? savedModel?.id ?? "(No model)"}
+              {modelName ?? savedModel?.id ?? t.playground.model.noModel}
             </span>
           ) : (
             <div className="flex w-full min-w-0 items-center gap-2">
