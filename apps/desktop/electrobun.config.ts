@@ -101,7 +101,7 @@ export default {
     // exe and refreshes its zip, which are created after the earlier hooks
     // run. All three run before their codesign step.
     postBuild: "scripts/post-build.ts",
-    postWrap: "scripts/fix-x64-headerpad.ts",
+    postWrap: "scripts/post-wrap.ts",
     postPackage: "scripts/post-package.ts",
   },
   release: {
