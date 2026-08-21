@@ -1,9 +1,8 @@
 import {
-  DEFAULT_WINDOW_FRAME,
-  getWindowFrame,
   getWindowFullScreen,
   getWindowMaximized,
   getWindowZoom,
+  resolveWindowFrame,
   WindowStateStore,
 } from "@llm-space/core/server";
 import { BrowserWindow, Updater } from "electrobun/bun";
@@ -52,7 +51,7 @@ export async function createMainWindow({
   const url = await getMainViewUrl(localStorageValues);
   const windowStateStore = await WindowStateStore.load();
   const windowState = windowStateStore.state;
-  const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
+  const savedFrame = resolveWindowFrame(windowState);
   const savedZoom = getWindowZoom(windowState) ?? 1;
 
   const window = new BrowserWindow({
