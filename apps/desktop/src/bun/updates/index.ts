@@ -41,6 +41,7 @@ export class UpdaterService {
 
   async checkForUpdates(manual: boolean): Promise<void> {
     if (process.platform !== "darwin") {
+      this._isPassManual = manual;
       this._sendStatus({
         state: "error",
         message: "Updates are not supported on this platform.",
