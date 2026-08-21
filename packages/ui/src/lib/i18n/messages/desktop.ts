@@ -231,7 +231,7 @@ export const desktop = {
     refreshFailed: "Failed to refresh trace",
     idCopied: "Trace ID copied",
     copyFailed: "Could not copy trace ID",
-    copyId: "Copy trace ID",
+    copyId: "Copy Trace ID",
     titleRequired: "Trace title is required.",
     titleControlCharacter: "Trace title contains a control character.",
   },

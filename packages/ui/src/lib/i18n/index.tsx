@@ -64,10 +64,12 @@ export function I18nProvider({
   useEffect(() => {
     if (!resolveOsLocale || resolvedRef.current) return;
     let cancelled = false;
-    void resolveOsLocale().then((osLocale) => {
-      if (cancelled || resolvedRef.current) return;
-      setLangState(resolveInitialLang(null, osLocale, _browserLanguages()));
-    });
+    void resolveOsLocale()
+      .then((osLocale) => {
+        if (cancelled || resolvedRef.current) return;
+        setLangState(resolveInitialLang(null, osLocale, _browserLanguages()));
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
