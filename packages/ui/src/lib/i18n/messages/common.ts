@@ -4,6 +4,7 @@ export const common = {
   cancel: "Cancel",
   close: "Close",
   delete: "Delete",
+  replace: "Replace",
   add: "Add",
   retry: "Retry",
   save: "Save",

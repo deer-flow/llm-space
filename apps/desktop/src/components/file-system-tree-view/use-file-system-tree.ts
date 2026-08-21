@@ -7,6 +7,7 @@ import {
   type Thread,
   type Tool,
 } from "@llm-space/core";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import {
   LOCAL_STORAGE_KEYS,
   readLocalStorage,
@@ -245,6 +246,7 @@ export function useFileSystemTree(
   reconciliation: FileMutationReconciliation = {}
 ): FileSystemTree {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
   // Restore the directories that were open last session (shallowest-first, so
   // each parent loads before its children); entries whose directory no longer
@@ -494,7 +496,7 @@ export function useFileSystemTree(
     ): Promise<string | null> => {
       if (!src) return null;
       if (isSelfOrDescendant(src, destDir)) {
-        toast.error("Cannot move a folder into itself.");
+        toast.error(t.desktop.fileTree.cannotMoveFolderIntoItself);
         return null;
       }
       const srcParent = parentOf(src);
@@ -588,7 +590,7 @@ export function useFileSystemTree(
         return null;
       }
     },
-    [acquireMutation, qc, fs, reconciliation, runtimeId]
+    [acquireMutation, qc, fs, reconciliation, runtimeId, t]
   );
 
   const rename = useCallback(

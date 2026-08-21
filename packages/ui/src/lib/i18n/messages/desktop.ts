@@ -121,6 +121,27 @@ export const desktop = {
     saved: "Thread saved",
     imported: "Thread imported",
   },
+  fileTree: {
+    emptyTitle: "No Threads Yet",
+    emptyDescription: "Create a thread to get started.",
+    trashName: "Trash",
+    recycleBinName: "Recycle Bin",
+    moveToTrashTitle: 'Move “{name}” to the {trash}?',
+    restoreFromTrash: "You can restore it from the {trash} later.",
+    replaceTitle: 'Replace “{name}”?',
+    replaceDescriptionFolder:
+      "A folder with this name already exists here. Replacing it moves the existing folder to the {trash}.",
+    replaceDescriptionThread:
+      "A thread with this name already exists here. Replacing it moves the existing thread to the {trash}.",
+    newFromExamples: "New from Examples",
+    newFolderInRoot: "New folder in workspace root",
+    moreActionsForRoot: "More actions for workspace root",
+    newFromExamplesInNode: "New from Examples in {node}",
+    newFolderInNode: "New folder in {node}",
+    moreActionsForNode: "More actions for {node}",
+    importFromFiles: "Import from Files...",
+    cannotMoveFolderIntoItself: "Cannot move a folder into itself.",
+  },
   updateDialog: {
     checkingTitle: "Checking for updates",
     checkingDescription: "Contacting the update server…",
