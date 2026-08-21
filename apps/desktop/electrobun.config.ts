@@ -95,10 +95,14 @@ export default {
   },
   scripts: {
     // The inner-bundle hook installs the macOS launcher that preserves cold
-    // deep links, then applies the x64 headerpad workaround. The wrapper hook
-    // only needs the headerpad fix. Both run before their codesign step.
+    // deep links, then applies the x64 headerpad workaround and embeds the
+    // Windows icon into the bundle exes. The wrapper hook only needs the
+    // headerpad fix. The final hook re-embeds the icon into the Windows Setup
+    // exe and refreshes its zip, which are created after the earlier hooks
+    // run. All three run before their codesign step.
     postBuild: "scripts/post-build.ts",
     postWrap: "scripts/fix-x64-headerpad.ts",
+    postPackage: "scripts/post-package.ts",
   },
   release: {
     // Burned into every shipped bundle — the updater fetches
