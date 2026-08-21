@@ -2,21 +2,33 @@ import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import path from "node:path";
+import path, { dirname } from "node:path";
+
+import { decompressTarZst, parseTar, resolveZigZstdExe } from "./win-tar";
 
 // electrobun's Windows "Setup" exe is a self-extracting extractor with console
 // output — no wizard, no uninstaller. This hook compiles a standard Inno Setup
-// wizard installer straight from the already-built (icon-embedded) bundle at
-// build/<channel>-win-x64/LLMSpace-<channel>/, so [Files] installs the real
-// directory — the tar/extractor path never enters the picture. The wizard
-// installer is the primary Windows deliverable; electrobun's exe/zip/tar stay
-// as side artifacts. Local-only: requires Inno Setup 6 on the machine
-// (`winget install JRSoftware.InnoSetup`); not part of CI. Runs in postPackage,
-// after electrobun created its own Setup exe / zip / artifacts.
+// wizard installer so [Files] installs the real app bundle — the tar/extractor
+// path never enters the picture. The wizard installer is the primary Windows
+// deliverable; electrobun's exe/zip/tar stay as side artifacts. Local-only:
+// requires Inno Setup 6 on the machine (`winget install JRSoftware.InnoSetup`);
+// not part of CI. Runs in postPackage, after electrobun created its own Setup
+// exe / zip / artifacts.
+//
+// At postPackage the app bundle folder is gone: electrobun deletes it after
+// tarring (src/cli/index.ts — `rmSync(appBundleFolderPath, ...)` when
+// buildEnvironment !== "dev") and replaces it with the self-extracting wrapper
+// (extractor stub + Resources/<hash>.tar.zst). The only complete copy of the
+// bundle left is the channel's tar.zst, so this hook decompresses it and
+// extracts the bundle into a dot-prefixed staging dir (never scanned by
+// `*-win-x64` walks or the icon-embed hook), then compiles ISCC from there.
+// Channels without a tar.zst (e.g. dev) are skipped.
 if (process.platform !== "win32") process.exit(0);
 
 const desktopRoot = path.resolve(import.meta.dir, "..");
@@ -46,16 +58,41 @@ for (const channelDir of readdirSync(buildDir)) {
   if (!channelDir.endsWith("-win-x64")) continue;
   const channelPath = path.join(buildDir, channelDir);
 
-  const bundle = readdirSync(channelPath, { withFileTypes: true }).find(
-    (entry) => entry.isDirectory() && entry.name.startsWith("LLMSpace-")
-  );
-  if (!bundle) {
-    console.warn(`[build-wizard-installer] no LLMSpace-* bundle in ${channelPath}, skipping`);
+  const tarZst = readdirSync(channelPath)
+    .filter((name) => name.endsWith(".tar.zst") && name !== "prev.tar.zst")
+    .sort()[0];
+  if (!tarZst) {
+    console.warn(`[build-wizard-installer] no .tar.zst in ${channelPath}, skipping`);
     continue;
   }
-  const channel = bundle.name.replace("LLMSpace-", "");
-  const bundlePath = path.join(channelPath, bundle.name);
+  const channel = channelDir.replace("-win-x64", "");
   const issPath = path.join(channelPath, `installer-${channel}.iss`);
+
+  const zigZstd = resolveZigZstdExe();
+  const tarPath = path.join(channelPath, `.wizard-${tarZst}.tar`); // temporary decompressed tar
+  const stagingDir = path.join(channelPath, ".wizard-app-bundle"); // ISCC compile source
+  decompressTarZst(zigZstd, path.join(channelPath, tarZst), tarPath);
+  const entries = parseTar(readFileSync(tarPath));
+  if (existsSync(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
+  mkdirSync(stagingDir, { recursive: true });
+  for (const entry of entries) {
+    // electrobun's tar is rooted at the bundle folder (e.g. LLMSpace-canary/);
+    // strip that leading component so staging holds the bundle contents
+    // directly and `Source: "<stagingDir>\*"` installs {app}\bin\launcher.exe.
+    const slash = entry.name.indexOf("/");
+    const rel = slash === -1 ? entry.name : entry.name.slice(slash + 1);
+    if (!rel) continue;
+    const dest = path.join(stagingDir, rel);
+    if (entry.type === "5") {
+      mkdirSync(dest, { recursive: true });
+    } else if (entry.type === "0") {
+      mkdirSync(dirname(dest), { recursive: true });
+      writeFileSync(dest, entry.data);
+    }
+  }
+  console.info(
+    `[build-wizard-installer] extracted ${entries.length} entries from ${tarZst} to ${stagingDir}`
+  );
 
   // String.raw keeps backslashes literal — a plain template literal would
   // turn `\b`/`\t`/`\*` into escapes and corrupt the .iss.
@@ -84,7 +121,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
-Source: "${bundlePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "${stagingDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -95,24 +132,31 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 `;
   writeFileSync(issPath, iss);
 
-  console.info(`[build-wizard-installer] compiling ${issPath} (ISCC: ${iscc})`);
-  execFileSync(iscc, ["/Qp", `/O${channelPath}`, issPath]);
+  try {
+    console.info(`[build-wizard-installer] compiling ${issPath} (ISCC: ${iscc})`);
+    execFileSync(iscc, ["/Qp", `/O${channelPath}`, issPath]);
 
-  const setupExeName = `LLMSpace-Setup-${channel}.exe`;
-  const setupExePath = path.join(channelPath, setupExeName);
-  console.info(`[build-wizard-installer] wrote ${setupExePath}`);
+    const setupExeName = `LLMSpace-Setup-${channel}.exe`;
+    const setupExePath = path.join(channelPath, setupExeName);
+    console.info(`[build-wizard-installer] wrote ${setupExePath}`);
 
-  const prefix = [
-    Bun.env.ELECTROBUN_BUILD_ENV,
-    Bun.env.ELECTROBUN_OS,
-    Bun.env.ELECTROBUN_ARCH,
-  ]
-    .filter(Boolean)
-    .join("-");
-  const artifactDir = Bun.env.ELECTROBUN_ARTIFACT_DIR;
-  if (artifactDir && prefix) {
-    const dest = path.join(artifactDir, `${prefix}-${setupExeName}`);
-    copyFileSync(setupExePath, dest);
-    console.info(`[build-wizard-installer] artifact ${dest}`);
+    const prefix = [
+      Bun.env.ELECTROBUN_BUILD_ENV,
+      Bun.env.ELECTROBUN_OS,
+      Bun.env.ELECTROBUN_ARCH,
+    ]
+      .filter(Boolean)
+      .join("-");
+    const artifactDir = Bun.env.ELECTROBUN_ARTIFACT_DIR;
+    if (artifactDir && prefix) {
+      const dest = path.join(artifactDir, `${prefix}-${setupExeName}`);
+      copyFileSync(setupExePath, dest);
+      console.info(`[build-wizard-installer] artifact ${dest}`);
+    }
+  } finally {
+    // Never leave half-built staging or a temp tar behind — clean up on both
+    // success and compile failure (ISCC throwing exits non-zero).
+    rmSync(stagingDir, { recursive: true, force: true });
+    rmSync(tarPath, { force: true });
   }
 }
