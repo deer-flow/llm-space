@@ -5,6 +5,7 @@ import {
   type SearchProviderId,
   type SearchSettings,
 } from "@llm-space/core";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import { ApiKeyField } from "./api-key-field";
 import { SettingsPage } from "./settings-page";
 
 export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<SearchSettings>(
     DEFAULT_SEARCH_SETTINGS
   );
@@ -49,43 +51,50 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         const saved = await setSearchSettings(next, runtimeId);
         setSettings(saved);
       } catch (error) {
-        toast.error("Failed to save search settings", {
+        toast.error(t.settings.search.failedToSave, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       }
     },
-    [runtimeId]
+    [runtimeId, t]
   );
 
   return (
     <SettingsPage
-      title="Search"
+      title={t.settings.search.title}
       className="pt-0"
       description={
         <>
-          Choose the provider for the built-in <code>web_search</code> tool.
-          When Brave Search is selected, <code>web_fetch</code> continues to use
-          Firecrawl for safe page extraction.
+          {t.settings.search.descriptionPrefix}
+          <code>web_search</code>
+          {t.settings.search.descriptionMiddle}
+          <code>web_fetch</code>
+          {t.settings.search.descriptionSuffix}
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <div className="flex h-14 items-center justify-between gap-4">
-          <span className="text-sm">Search provider</span>
+          <span className="text-sm">{t.settings.search.providerLabel}</span>
           <Select
             value={settings.provider}
             onValueChange={(value) =>
               void persist({ ...settings, provider: value as SearchProviderId })
             }
           >
-            <SelectTrigger className="w-40" aria-label="Search provider">
+            <SelectTrigger
+              className="w-40"
+              aria-label={t.settings.search.providerLabel}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="brave">Brave Search</SelectItem>
-              <SelectItem value="firecrawl">Firecrawl</SelectItem>
-              <SelectItem value="tavily">Tavily</SelectItem>
+              <SelectItem value="brave">{t.settings.search.providers.brave}</SelectItem>
+              <SelectItem value="firecrawl">
+                {t.settings.search.providers.firecrawl}
+              </SelectItem>
+              <SelectItem value="tavily">{t.settings.search.providers.tavily}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -93,7 +102,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         <Separator />
 
         <ApiKeyField
-          label="Brave Search API key"
+          label={t.settings.search.apiKeys.brave}
           value={settings.braveApiKey}
           getKeyUrl="https://api-dashboard.search.brave.com/app/keys"
           onChange={(e) =>
@@ -103,7 +112,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         />
 
         <ApiKeyField
-          label="Firecrawl API key"
+          label={t.settings.search.apiKeys.firecrawl}
           value={settings.firecrawlApiKey}
           getKeyUrl="https://www.firecrawl.dev/app/api-keys"
           onChange={(e) =>
@@ -113,7 +122,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         />
 
         <ApiKeyField
-          label="Tavily API key"
+          label={t.settings.search.apiKeys.tavily}
           value={settings.tavilyApiKey}
           getKeyUrl="https://app.tavily.com/home"
           onChange={(e) =>
@@ -123,9 +132,15 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         />
 
         <p className="text-muted-foreground text-xs">
-          Values starting with <code>$</code> are read from the environment
-          (e.g. <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
-          <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>).
+          {t.settings.search.valuesHintPrefix}
+          <code>$</code>
+          {t.settings.search.valuesHintMiddle}
+          <code>$BRAVE_SEARCH_API_KEY</code>
+          {t.settings.search.valuesHintSeparator}
+          <code>$FIRECRAWL_API_KEY</code>
+          {t.settings.search.valuesHintSeparator}
+          <code>$TAVILY_API_KEY</code>
+          {t.settings.search.valuesHintEnd}
         </p>
       </div>
     </SettingsPage>

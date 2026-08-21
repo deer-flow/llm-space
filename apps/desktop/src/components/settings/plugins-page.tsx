@@ -8,6 +8,7 @@ import type {
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Link } from "@llm-space/ui/components/link";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
   Accordion,
@@ -90,10 +91,9 @@ import { SettingsPage } from "./settings-page";
 
 const PLUGIN_DOCUMENTATION_URL =
   "https://github.com/deer-flow/llm-space/blob/main/docs/plugins.md";
-const REVEAL_LABEL =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
-    ? "Reveal in Explorer"
-    : "Reveal in Finder";
+
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
 
 const PLUGIN_WALL_ICONS: readonly LucideIcon[] = [
   Wrench,
@@ -129,16 +129,6 @@ const EXTENSION_KIND_ICONS: Record<PluginExtensionKind, LucideIcon> = {
   settings: Settings2,
 };
 
-const EXTENSION_KIND_LABELS: Record<PluginExtensionKind, string> = {
-  skill: "Skills",
-  mcp: "MCP Servers",
-  model: "Models",
-  command: "Commands",
-  tool: "Tools",
-  threadStorage: "Thread Storage",
-  settings: "Settings",
-};
-
 const EXTENSION_KIND_ORDER: readonly PluginExtensionKind[] = [
   "skill",
   "mcp",
@@ -154,6 +144,7 @@ export function PluginsPage({
 }: {
   preferredPluginId?: string;
 }) {
+  const { t } = useI18n();
   const [plugins, setPlugins] = useState<PluginView[]>([]);
   const [pluginsPath, setPluginsPath] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -208,36 +199,35 @@ export function PluginsPage({
 
   return (
     <SettingsPage
-      title="Plugins"
+      title={t.settings.dialog.tabs.plugins}
       description={
         <span>
-          Extend LLM Space with skills, MCP servers, model providers, commands,
-          and thread storage. Plugins are installed in the{" "}
+          {t.settings.plugins.descriptionPrefix}
           <button
             type="button"
             className="text-foreground underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!pluginsPath}
             onClick={() => pluginsPath && _reveal(pluginsPath)}
           >
-            plugins directory
+            {t.settings.plugins.pluginsDirectory}
           </button>
-          .
+          {t.settings.plugins.descriptionSuffix}
         </span>
       }
       className="flex size-full min-h-0"
     >
       {loading ? (
         <div className="flex h-full items-center justify-center">
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">{t.common.loading}</p>
         </div>
       ) : null}
       {!loading && plugins.length === 0 ? (
         <SettingsEmptyState
           icon={Puzzle}
           wallIcons={PLUGIN_WALL_ICONS}
-          label="No plugins installed"
-          title="Add new powers to LLM Space"
-          description="Plugins bundle tools, skills, model providers, MCP servers, commands, and custom thread storage into installable extensions."
+          label={t.settings.plugins.noPluginsInstalled}
+          title={t.settings.plugins.emptyTitle}
+          description={t.settings.plugins.emptyDescription}
           actions={
             <>
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -248,13 +238,13 @@ export function PluginsPage({
                   onClick={() => pluginsPath && _reveal(pluginsPath)}
                 >
                   <FolderOpen />
-                  Open plugins folder
+                  {t.settings.plugins.openFolder}
                 </Button>
                 <Button disabled={refreshing} onClick={() => void refresh()}>
                   <RefreshCw
                     className={refreshing ? "animate-spin" : undefined}
                   />
-                  Refresh plugins
+                  {t.settings.plugins.refresh}
                 </Button>
               </div>
               <Button
@@ -264,7 +254,7 @@ export function PluginsPage({
                 size="sm"
               >
                 <Link href={PLUGIN_DOCUMENTATION_URL}>
-                  Learn more <ArrowUpRightIcon />
+                  {t.common.learnMore} <ArrowUpRightIcon />
                 </Link>
               </Button>
             </>
@@ -272,18 +262,22 @@ export function PluginsPage({
           capabilities={[
             {
               icon: Wrench,
-              title: "Tools & skills",
-              description: "Give the model new actions and reusable expertise.",
+              title: t.settings.plugins.capabilities.toolsAndSkills.title,
+              description:
+                t.settings.plugins.capabilities.toolsAndSkills.description,
             },
             {
               icon: Cable,
-              title: "Models & connections",
-              description: "Add model providers and connect MCP servers.",
+              title: t.settings.plugins.capabilities.modelsAndConnections.title,
+              description:
+                t.settings.plugins.capabilities.modelsAndConnections
+                  .description,
             },
             {
               icon: Command,
-              title: "Commands & storage",
-              description: "Customize workflows and how threads are saved.",
+              title: t.settings.plugins.capabilities.commandsAndStorage.title,
+              description:
+                t.settings.plugins.capabilities.commandsAndStorage.description,
             },
           ]}
         />
@@ -324,6 +318,7 @@ function PluginList({
   onChanged: (plugins: PluginView[]) => void;
   onRefresh: () => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -344,8 +339,8 @@ function PluginList({
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
         <Input
           className="h-8 pl-7"
-          aria-label="Search plugins"
-          placeholder="Search plugins"
+          aria-label={t.settings.plugins.search}
+          placeholder={t.settings.plugins.search}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -357,10 +352,11 @@ function PluginList({
               <EmptyMedia variant="icon" className="text-muted-foreground">
                 <Search />
               </EmptyMedia>
-              <EmptyTitle>No matching plugins</EmptyTitle>
+              <EmptyTitle>{t.settings.plugins.noMatching}</EmptyTitle>
               <EmptyDescription className="text-xs">
-                No plugin matches &quot;{query.trim()}&quot;. Try another
-                search.
+                {formatString(t.settings.plugins.noMatchFor, {
+                  query: query.trim(),
+                })}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -385,7 +381,7 @@ function PluginList({
         onClick={onRefresh}
       >
         <RefreshCw className={refreshing ? "animate-spin" : undefined} />
-        Refresh plugins
+        {t.settings.plugins.refresh}
       </Button>
     </div>
   );
@@ -402,6 +398,7 @@ function PluginListItem({
   onSelect: () => void;
   onChanged: (plugins: PluginView[]) => void;
 }) {
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reloading, setReloading] = useState(false);
@@ -411,7 +408,11 @@ function PluginListItem({
     setReloading(true);
     try {
       onChanged(await reloadPlugin(plugin.id));
-      toast.success(`Reloaded ${plugin.displayName}`);
+      toast.success(
+        formatString(t.settings.plugins.reloaded, {
+          name: plugin.displayName,
+        })
+      );
     } catch (error) {
       _showError(error);
     } finally {
@@ -424,7 +425,11 @@ function PluginListItem({
     setUninstalling(true);
     try {
       onChanged(await uninstallPlugin(plugin.id));
-      toast.success(`Uninstalled ${plugin.displayName}`);
+      toast.success(
+        formatString(t.settings.plugins.uninstalled, {
+          name: plugin.displayName,
+        })
+      );
     } catch (error) {
       _showError(error);
     } finally {
@@ -436,7 +441,9 @@ function PluginListItem({
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Select plugin ${plugin.displayName}`}
+      aria-label={formatString(t.settings.plugins.selectPlugin, {
+        name: plugin.displayName,
+      })}
       className={cn(
         "group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
         selected ? "bg-muted font-medium" : "hover:bg-muted/50"
@@ -477,8 +484,12 @@ function PluginListItem({
             <span
               role="button"
               tabIndex={0}
-              aria-label={`${plugin.displayName} plugin actions`}
-              title={`${plugin.displayName} plugin actions`}
+              aria-label={formatString(t.settings.plugins.pluginActions, {
+                name: plugin.displayName,
+              })}
+              title={formatString(t.settings.plugins.pluginActions, {
+                name: plugin.displayName,
+              })}
               className={cn(
                 "text-muted-foreground hover:bg-accent hover:text-foreground absolute inset-0 inline-flex items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
                 menuOpen && "opacity-100"
@@ -495,14 +506,14 @@ function PluginListItem({
           >
             <DropdownMenuItem onSelect={() => _reveal(plugin.path)}>
               <FolderOpen />
-              {REVEAL_LABEL}
+              {_isWindows ? t.common.revealInExplorer : t.common.revealInFinder}
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={plugin.version === "unknown" || reloading}
               onSelect={() => void handleReload()}
             >
               <RefreshCw className={reloading ? "animate-spin" : undefined} />
-              Reload
+              {t.common.reload}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -511,7 +522,7 @@ function PluginListItem({
               onSelect={() => setConfirmOpen(true)}
             >
               <Trash2 />
-              Uninstall
+              {t.settings.plugins.uninstall}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -520,14 +531,17 @@ function PluginListItem({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Uninstall ${plugin.displayName}?`}
+        title={formatString(t.settings.plugins.uninstallTitle, {
+          name: plugin.displayName,
+        })}
         description={
           <>
-            This permanently deletes the Plugin folder at{" "}
-            <span className="font-mono">{plugin.path}</span>.
+            {t.settings.plugins.uninstallPrefix}
+            <span className="font-mono">{plugin.path}</span>
+            {t.settings.plugins.uninstallSuffix}
           </>
         }
-        confirmLabel="Uninstall"
+        confirmLabel={t.settings.plugins.uninstall}
         dimBackground={false}
         onConfirm={() => void handleUninstall()}
       />
@@ -542,6 +556,7 @@ function PluginEditor({
   plugin: PluginView | null;
   onChanged: (plugins: PluginView[]) => void;
 }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<JsonObject>(plugin?.settings ?? {});
   const [reloading, setReloading] = useState(false);
   const settingsError = plugin?.extensions.find(
@@ -556,7 +571,7 @@ function PluginEditor({
   if (!plugin) {
     return (
       <div className="text-muted-foreground flex min-w-0 grow items-center justify-center text-sm">
-        Select a plugin from the left sidebar
+        {t.settings.plugins.selectFromSidebar}
       </div>
     );
   }
@@ -607,7 +622,9 @@ function PluginEditor({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Enabled</span>
+              <span className="text-sm font-medium">
+                {t.settings.plugins.enabled}
+              </span>
               <Switch
                 checked={plugin.enabled}
                 disabled={
@@ -643,7 +660,7 @@ function PluginEditor({
                 }}
               >
                 <RefreshCw className={reloading ? "animate-spin" : undefined} />
-                Reload
+                {t.common.reload}
               </Button>
             ) : null}
             <Button
@@ -651,7 +668,7 @@ function PluginEditor({
               variant="ghost"
               onClick={() => _reveal(plugin.path)}
             >
-              <FolderOpen /> Reveal folder
+              <FolderOpen /> {t.settings.plugins.revealFolder}
             </Button>
           </div>
 
@@ -660,14 +677,14 @@ function PluginEditor({
               value="general"
               className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
             >
-              General
+              {t.settings.plugins.tabs.general}
             </TabsTrigger>
             {plugin.settingsSchema || settingsError ? (
               <TabsTrigger
                 value="settings"
                 className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
               >
-                Settings
+                {t.settings.plugins.tabs.settings}
               </TabsTrigger>
             ) : null}
           </TabsList>
@@ -680,25 +697,37 @@ function PluginEditor({
           <ScrollArea className="h-full w-full max-w-full">
             <div className="flex max-w-full min-w-0 flex-col gap-8 pt-5 pr-4 pb-4">
               <section className="space-y-3">
-                <h4 className="text-sm font-medium">Plugin</h4>
+                <h4 className="text-sm font-medium">
+                  {t.settings.plugins.pluginHeading}
+                </h4>
                 <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
-                  <span className="text-muted-foreground">Compatibility</span>
-                  <span>{plugin.engineRange ?? "Not specified"}</span>
+                  <span className="text-muted-foreground">
+                    {t.settings.plugins.compatibility}
+                  </span>
+                  <span>
+                    {plugin.engineRange ?? t.settings.plugins.notSpecified}
+                  </span>
                   {plugin.author ? (
                     <>
-                      <span className="text-muted-foreground">Author</span>
+                      <span className="text-muted-foreground">
+                        {t.settings.plugins.author}
+                      </span>
                       <span>{plugin.author}</span>
                     </>
                   ) : null}
                   {plugin.license ? (
                     <>
-                      <span className="text-muted-foreground">License</span>
+                      <span className="text-muted-foreground">
+                        {t.settings.plugins.license}
+                      </span>
                       <span>{plugin.license}</span>
                     </>
                   ) : null}
                   {plugin.homepage ? (
                     <>
-                      <span className="text-muted-foreground">Homepage</span>
+                      <span className="text-muted-foreground">
+                        {t.settings.plugins.homepage}
+                      </span>
                       <Link
                         href={plugin.homepage}
                         className="min-w-0 truncate underline underline-offset-2"
@@ -707,11 +736,15 @@ function PluginEditor({
                       </Link>
                     </>
                   ) : null}
-                  <span className="text-muted-foreground">Location</span>
+                  <span className="text-muted-foreground">
+                    {t.settings.plugins.location}
+                  </span>
                   <button
                     type="button"
                     className="hover:text-foreground min-w-0 truncate text-left font-mono underline underline-offset-2"
-                    title={`Open ${plugin.path}`}
+                    title={formatString(t.settings.plugins.openPath, {
+                      path: plugin.path,
+                    })}
                     onClick={() => _reveal(plugin.path)}
                   >
                     {plugin.path}
@@ -721,7 +754,9 @@ function PluginEditor({
 
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium">Extensions</h4>
+                  <h4 className="text-sm font-medium">
+                    {t.settings.plugins.extensions}
+                  </h4>
                   <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                     {plugin.extensions.length}
                   </span>
@@ -743,7 +778,7 @@ function PluginEditor({
                                 aria-hidden="true"
                               />
                               <span className="truncate text-xs font-medium">
-                                {EXTENSION_KIND_LABELS[group.kind]}
+                                {t.settings.plugins.extensionKinds[group.kind]}
                               </span>
                               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none tabular-nums">
                                 {group.extensions.length}
@@ -768,17 +803,20 @@ function PluginEditor({
                                     )}
                                     title={
                                       extension.error
-                                        ? "Error"
+                                        ? t.settings.plugins.status.error
                                         : extension.active
-                                          ? "Active"
-                                          : "Inactive"
+                                          ? t.settings.plugins.status.active
+                                          : t.settings.plugins.status.inactive
                                     }
                                   />
                                   {extension.sourcePath ? (
                                     <button
                                       type="button"
                                       className="hover:text-foreground flex w-0 min-w-0 grow cursor-pointer flex-col overflow-hidden text-left underline-offset-2"
-                                      title={`Reveal ${extension.sourcePath}`}
+                                      title={formatString(
+                                        t.settings.plugins.revealPath,
+                                        { path: extension.sourcePath }
+                                      )}
                                       onClick={() =>
                                         _reveal(extension.sourcePath!)
                                       }
@@ -820,14 +858,16 @@ function PluginEditor({
                   </Accordion>
                 ) : (
                   <p className="text-muted-foreground text-xs">
-                    This plugin has no discovered extensions.
+                    {t.settings.plugins.noExtensions}
                   </p>
                 )}
               </section>
 
               {errors.length > 0 ? (
                 <section className="min-w-0 space-y-3">
-                  <h4 className="text-sm font-medium">Diagnostics</h4>
+                  <h4 className="text-sm font-medium">
+                    {t.settings.plugins.diagnostics}
+                  </h4>
                   {errors.map((error) =>
                     error ? (
                       <div
@@ -849,7 +889,7 @@ function PluginEditor({
                             variant="outline"
                             onClick={() => _reveal(error.logPath)}
                           >
-                            <ScrollText /> Reveal log
+                            <ScrollText /> {t.settings.plugins.revealLog}
                           </Button>
                           <Button
                             size="sm"
@@ -858,7 +898,7 @@ function PluginEditor({
                               void navigator.clipboard.writeText(error.logPath)
                             }
                           >
-                            <Copy /> Copy path
+                            <Copy /> {t.settings.plugins.copyPath}
                           </Button>
                         </div>
                       </div>
@@ -873,7 +913,7 @@ function PluginEditor({
         <TabsContent value="settings" className="min-h-0 pt-5 pr-4 pb-4">
           {settingsError ? (
             <p className="text-destructive text-xs">
-              Settings are unavailable because config.schema.json is invalid.
+              {t.settings.plugins.settingsInvalid}
             </p>
           ) : plugin.settingsSchema ? (
             <ScrollArea className="h-full">
@@ -937,6 +977,7 @@ function SchemaFields({
   onCommit: (value: JsonObject) => void;
   prefix?: string;
 }) {
+  const { t } = useI18n();
   const properties = _asObject(schema.properties) ?? {};
   return (
     <div className="space-y-4">
@@ -1034,7 +1075,13 @@ function SchemaFields({
                       if (_isJsonValue(parsed))
                         onCommit(_set(value, path, parsed));
                     } catch {
-                      _showError(new Error(`${title} must be valid JSON.`));
+                      _showError(
+                        new Error(
+                          formatString(t.settings.plugins.validJsonError, {
+                            title,
+                          })
+                        )
+                      );
                     }
                   }}
                 />

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -32,6 +33,7 @@ export function ThreadStorageDialog({
   getThread: () => Promise<Thread | null>;
   onImported: (thread: Thread) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [storages, setStorages] = useState<
     Awaited<ReturnType<typeof listThreadStorages>>
   >([]);
@@ -61,7 +63,7 @@ export function ThreadStorageDialog({
         );
       })
       .catch(_showError);
-  }, [mode, open]);
+  }, [mode, open, t]);
 
   const submit = async () => {
     if (!storageId) return;
@@ -69,22 +71,25 @@ export function ThreadStorageDialog({
     try {
       if (mode === "save") {
         const thread = await getThread();
-        if (!thread) throw new Error("Open a local thread before saving.");
+        if (!thread) throw new Error(t.desktop.threadStorage.openLocalThreadFirst);
         const locator = await writeThreadStorage(
           storageId,
           thread,
           resourceId.trim() || undefined
         );
         setResourceId(locator.id);
-        toast.success("Thread saved", { description: _locatorText(locator) });
+        toast.success(t.desktop.threadStorage.saved, {
+          description: _locatorText(locator),
+        });
       } else {
-        if (!resourceId.trim()) throw new Error("Resource ID is required.");
+        if (!resourceId.trim())
+          throw new Error(t.desktop.threadStorage.resourceIdRequired);
         const locator = await resolveLatestThreadStorage(
           storageId,
           resourceId.trim()
         );
         await onImported(await readThreadStorage(storageId, locator));
-        toast.success("Thread imported", {
+        toast.success(t.desktop.threadStorage.imported, {
           description: _locatorText(locator),
         });
         onOpenChange(false);
@@ -101,11 +106,13 @@ export function ThreadStorageDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === "save" ? "Save to…" : "Import from…"}
+            {mode === "save"
+              ? t.desktop.threadStorage.saveTo
+              : t.desktop.threadStorage.importFrom}
           </DialogTitle>
         </DialogHeader>
         <label className="space-y-1 text-sm">
-          <span>Thread Storage</span>
+          <span>{t.desktop.threadStorage.title}</span>
           <select
             className="bg-background h-9 w-full rounded-md border px-3"
             value={storageId}
@@ -120,22 +127,26 @@ export function ThreadStorageDialog({
         </label>
         <label className="space-y-1 text-sm">
           <span>
-            Resource ID{" "}
-            {mode === "save" ? "(optional; leave empty to create)" : ""}
+            {t.desktop.threadStorage.resourceIdLabel}{" "}
+            {mode === "save" ? t.desktop.threadStorage.resourceIdOptional : ""}
           </span>
           <Input
             value={resourceId}
             onChange={(event) => setResourceId(event.target.value)}
-            placeholder="Opaque storage resource ID"
+            placeholder={t.desktop.threadStorage.resourceIdAria}
           />
         </label>
         {available.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No compatible Thread Storage is available.
+            {t.desktop.threadStorage.noStorage}
           </p>
         ) : null}
         <Button disabled={busy || !storageId} onClick={() => void submit()}>
-          {busy ? "Working…" : mode === "save" ? "Save" : "Import"}
+          {busy
+            ? t.desktop.threadStorage.working
+            : mode === "save"
+              ? t.common.save
+              : t.common.import}
         </Button>
       </DialogContent>
     </Dialog>

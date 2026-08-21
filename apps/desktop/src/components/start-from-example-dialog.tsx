@@ -5,6 +5,7 @@ import {
   isPromptExample,
   type PromptExample,
 } from "@llm-space/ui/components/thread-playground/examples/prompts";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -29,11 +30,11 @@ const FEATURE_ART: Record<(typeof FEATURED_IDS)[number], string> = {
 
 const FEATURE_META: Record<
   (typeof FEATURED_IDS)[number],
-  { eyebrow: string }
+  { eyebrow: "cleanSlate" | "recommended" | "researchMode" }
 > = {
-  blank: { eyebrow: "Clean slate" },
-  "general-agent": { eyebrow: "Recommended" },
-  "deep-research": { eyebrow: "Research mode" },
+  blank: { eyebrow: "cleanSlate" },
+  "general-agent": { eyebrow: "recommended" },
+  "deep-research": { eyebrow: "researchMode" },
 };
 
 export function StartFromExampleDialog({
@@ -45,6 +46,7 @@ export function StartFromExampleDialog({
   onOpenChange: (open: boolean) => void;
   onSelectExample: (example: PromptExample) => void;
 }) {
+  const { t } = useI18n();
   const examples = PROMPT_EXAMPLES.filter(isPromptExample);
   const featured = FEATURED_IDS.map((id) =>
     examples.find((example) => example.id === id)
@@ -77,14 +79,13 @@ export function StartFromExampleDialog({
             </div>
             <div className="min-w-0">
               <div className="text-primary mb-1 text-[9px] font-semibold tracking-[0.2em] uppercase">
-                New thread
+                {t.desktop.startFromExample.title}
               </div>
               <DialogTitle className="font-heading text-xl font-semibold tracking-tight">
-                Choose how you want to begin
+                {t.desktop.startFromExample.description}
               </DialogTitle>
               <DialogDescription className="mt-1 max-w-xl text-xs leading-relaxed">
-                Start clean, launch a capable agent, or pick a featured template.
-                Everything can be changed after creation.
+                {t.desktop.startFromExample.hint}
               </DialogDescription>
             </div>
           </div>
@@ -116,10 +117,10 @@ export function StartFromExampleDialog({
                   id="quick-start-heading"
                   className="text-muted-foreground text-[11px] font-semibold tracking-[0.16em] uppercase"
                 >
-                  Quick start
+                  {t.desktop.startFromExample.quickStart}
                 </h3>
                 <span className="text-muted-foreground text-[11px]">
-                  Pick one to create immediately
+                  {t.desktop.startFromExample.quickStartHint}
                 </span>
               </div>
               <div className="grid gap-2.5 md:grid-cols-3">
@@ -140,10 +141,15 @@ export function StartFromExampleDialog({
                   className="text-muted-foreground flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em] uppercase"
                 >
                   <BlocksIcon className="size-3.5" />
-                  Featured templates
+                  {t.desktop.startFromExample.featuredTemplates}
                 </h3>
                 <span className="text-muted-foreground text-[11px]">
-                  {specialists.length} templates
+                  {specialists.length === 1
+                    ? t.desktop.startFromExample.templateCount.one
+                    : formatString(
+                        t.desktop.startFromExample.templateCount.other,
+                        { count: specialists.length }
+                      )}
                 </span>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
@@ -170,6 +176,7 @@ function FeaturedExample({
   example: PromptExample;
   onSelect: () => void;
 }) {
+  const { t } = useI18n();
   const meta = FEATURE_META[example.id as keyof typeof FEATURE_META];
 
   return (
@@ -191,14 +198,14 @@ function FeaturedExample({
       <span
         className="relative self-start rounded-full border border-white/15 bg-black/25 px-2 py-0.5 text-[8px] font-semibold tracking-[0.12em] text-white/70 uppercase backdrop-blur-md"
       >
-        {meta.eyebrow}
+        {t.desktop.startFromExample.featureEyebrows[meta.eyebrow]}
       </span>
       <div className="relative mt-auto w-full min-w-0">
         <h4 className="font-heading text-base font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.7)]">
-          {_shortLabel(example)}
+          {_shortLabel(example, t)}
         </h4>
         <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-white/85 drop-shadow-[0_1px_2px_rgb(0_0_0/0.8)]">
-          {_plainDescription(example)}
+          {_plainDescription(example, t)}
         </p>
       </div>
     </button>
@@ -212,6 +219,7 @@ function SpecialistExample({
   example: PromptExample;
   onSelect: () => void;
 }) {
+  const { t } = useI18n();
   const Icon = example.icon;
 
   return (
@@ -226,7 +234,7 @@ function SpecialistExample({
       <div className="min-w-0 grow">
         <h4 className="font-heading text-sm font-semibold">{example.label}</h4>
         <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-relaxed">
-          {_plainDescription(example)}
+          {_plainDescription(example, t)}
         </p>
       </div>
       <ArrowRightIcon className="text-muted-foreground/50 size-4 shrink-0 transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-primary" />
@@ -234,13 +242,19 @@ function SpecialistExample({
   );
 }
 
-function _shortLabel(example: PromptExample): string {
-  return example.id === "blank" ? "Blank Thread" : example.label;
+function _shortLabel(
+  example: PromptExample,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
+  return example.id === "blank" ? t.desktop.startFromExample.blankThread : example.label;
 }
 
-function _plainDescription(example: PromptExample): string {
+function _plainDescription(
+  example: PromptExample,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   if (example.id === "blank") {
-    return "A clean canvas with a simple assistant prompt you can customize.";
+    return t.desktop.startFromExample.blankThreadDescription;
   }
   return example.description
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")

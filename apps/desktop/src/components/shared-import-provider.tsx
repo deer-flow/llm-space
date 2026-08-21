@@ -1,5 +1,6 @@
 "use client";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -26,6 +27,7 @@ import type { SharedImportStatusPayload } from "@/shared/shared-import";
  */
 export function SharedImportProvider() {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   const [importing, setImporting] = useState(false);
   // Set on Cancel so a racing `success` from bun is ignored.
   const cancelledRef = useRef(false);
@@ -48,7 +50,11 @@ export function SharedImportProvider() {
           args: { path: payload.path },
         });
         toast.success(
-          payload.title ? `Imported "${payload.title}"` : "Thread imported"
+          payload.title
+            ? formatString(t.desktop.sharedImport.imported, {
+                title: payload.title,
+              })
+            : t.desktop.sharedImport.importedTitle
         );
       } else {
         toast.error(payload.message);
@@ -58,7 +64,7 @@ export function SharedImportProvider() {
     rpc.addMessageListener("sharedImportStatusChanged", handle);
     rpc.send.deepLinkReady({});
     return () => rpc.removeMessageListener("sharedImportStatusChanged", handle);
-  }, [executeCommand]);
+  }, [executeCommand, t]);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
@@ -75,9 +81,9 @@ export function SharedImportProvider() {
     >
       <DialogContent showCloseButton={false} className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Importing thread</DialogTitle>
+          <DialogTitle>{t.desktop.sharedImport.importingTitle}</DialogTitle>
           <DialogDescription>
-            Fetching and saving it to your workspace…
+            {t.desktop.sharedImport.fetching}
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-center py-4">
@@ -85,7 +91,7 @@ export function SharedImportProvider() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
         </DialogFooter>
       </DialogContent>

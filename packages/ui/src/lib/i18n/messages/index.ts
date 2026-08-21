@@ -1,5 +1,6 @@
 import { commands } from "./commands";
 import { common } from "./common";
+import { desktop } from "./desktop";
 import { errors } from "./errors";
 import { menu } from "./menu";
 import { playground } from "./playground";
@@ -15,4 +16,5 @@ export const en = {
   reminders,
   errors,
   playground,
+  desktop,
 };

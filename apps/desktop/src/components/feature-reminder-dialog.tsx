@@ -104,7 +104,7 @@ export function FeatureReminderDialog() {
               className="bg-muted/75 hover:bg-muted/85! text-foreground/80 absolute top-2 right-2 rounded-full"
               variant="ghost"
               size="icon-sm"
-              aria-label="Dismiss"
+              aria-label={t.common.dismiss}
             >
               <XIcon className="size-3" />
             </Button>
@@ -124,7 +124,7 @@ export function FeatureReminderDialog() {
           </p>
           <div className="mt-3 flex justify-end">
             <Button variant="outline" size="sm" onClick={handleLearnMore}>
-              Learn more
+              {t.common.learnMore}
               <ArrowUpRightIcon className="size-3.5" />
             </Button>
           </div>

@@ -86,7 +86,7 @@ export function CommandPalette({
   const visiblePluginCommands = pluginCommands.filter((command) => {
     try {
       return (
-        parsePluginCommandInvocation(search, command) !== null ||
+        parsePluginCommandInvocation(search, command, t) !== null ||
         matchesCommandText(
           `${command.displayName} ${command.description ?? ""} ${pluginCommandQualifiedName(command)}`,
           search
@@ -109,18 +109,18 @@ export function CommandPalette({
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <Command shouldFilter={false}>
         <CommandInput
-          placeholder="Search commands or enter arguments..."
+          placeholder={t.desktop.commandPalette.searchPlaceholder}
           value={search}
           onValueChange={setSearch}
         />
         <CommandList>
-          <CommandEmpty>No commands found.</CommandEmpty>
+          <CommandEmpty>{t.desktop.commandPalette.noCommandsFound}</CommandEmpty>
           {types.map((type) => (
             <CommandItem key={type} onSelect={() => run(type)}>
               {t.commands[type]}
             </CommandItem>
           ))}
-          {onSaveTo && matchesCommandText("Save to", search) ? (
+          {onSaveTo && matchesCommandText(t.desktop.commandPalette.saveTo, search) ? (
             <CommandItem
               value="Save to Thread Storage"
               onSelect={() => {
@@ -128,10 +128,11 @@ export function CommandPalette({
                 onSaveTo();
               }}
             >
-              Save to…
+              {t.desktop.commandPalette.saveTo}
             </CommandItem>
           ) : null}
-          {onImportFrom && matchesCommandText("Import from", search) ? (
+          {onImportFrom &&
+          matchesCommandText(t.desktop.commandPalette.importFrom, search) ? (
             <CommandItem
               value="Import from Thread Storage"
               onSelect={() => {
@@ -139,7 +140,7 @@ export function CommandPalette({
                 onImportFrom();
               }}
             >
-              Import from…
+              {t.desktop.commandPalette.importFrom}
             </CommandItem>
           ) : null}
           {visiblePluginCommands.map((command) => (
@@ -149,7 +150,7 @@ export function CommandPalette({
               onSelect={() => {
                 let args: string[];
                 try {
-                  args = parsePluginCommandInvocation(search, command) ?? [];
+                  args = parsePluginCommandInvocation(search, command, t) ?? [];
                 } catch (error) {
                   toast.error(
                     error instanceof Error ? error.message : String(error)

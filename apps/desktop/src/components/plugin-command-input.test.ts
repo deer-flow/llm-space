@@ -1,28 +1,32 @@
 import { describe, expect, test } from "bun:test";
 
+import { MESSAGES } from "@llm-space/ui/lib/i18n/messages";
+
 import {
   parsePluginCommandArguments,
   parsePluginCommandInvocation,
   pluginCommandQualifiedName,
 } from "./plugin-command-input";
 
+const t = MESSAGES.en;
+
 describe("Plugin Command palette arguments", () => {
   test("parses whitespace and quoted arguments", () => {
-    expect(parsePluginCommandArguments(`skill "abc" '123'`)).toEqual([
+    expect(parsePluginCommandArguments(`skill "abc" '123'`, t)).toEqual([
       "skill",
       "abc",
       "123",
     ]);
     expect(
-      parsePluginCommandArguments(`"" 'two words' escaped\\ value`)
+      parsePluginCommandArguments(`"" 'two words' escaped\\ value`, t)
     ).toEqual(["", "two words", "escaped value"]);
   });
 
   test("rejects incomplete quoting instead of executing partial input", () => {
-    expect(() => parsePluginCommandArguments(`skill "abc`)).toThrow(
+    expect(() => parsePluginCommandArguments(`skill "abc`, t)).toThrow(
       'Unclosed " quote'
     );
-    expect(() => parsePluginCommandArguments("skill\\")).toThrow(
+    expect(() => parsePluginCommandArguments("skill\\", t)).toThrow(
       "Trailing escape"
     );
   });
@@ -33,12 +37,12 @@ describe("Plugin Command palette arguments", () => {
       displayName: "Sync skills",
     };
     expect(
-      parsePluginCommandInvocation(`sync skill "abc" '123'`, command)
+      parsePluginCommandInvocation(`sync skill "abc" '123'`, command, t)
     ).toEqual(["skill", "abc", "123"]);
-    expect(parsePluginCommandInvocation("Sync skills all", command)).toEqual([
-      "all",
-    ]);
-    expect(parsePluginCommandInvocation("other value", command)).toBeNull();
+    expect(
+      parsePluginCommandInvocation("Sync skills all", command, t)
+    ).toEqual(["all"]);
+    expect(parsePluginCommandInvocation("other value", command, t)).toBeNull();
     expect(pluginCommandQualifiedName(command)).toBe("demo/sync");
     expect(
       pluginCommandQualifiedName({
