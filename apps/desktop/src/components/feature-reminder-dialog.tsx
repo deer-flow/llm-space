@@ -82,8 +82,8 @@ export function FeatureReminderDialog() {
 
   if (!reminder) return null;
 
-  // Reminder ids and tree keys share a shape (`jinja-templates` ↔
-  // `jinjaTemplates`); resolve the copy subtree by id.
+  // The message tree is keyed directly by reminder id, so resolve the copy
+  // subtree by the id itself.
   const reminderCopy = t.reminders[reminder.id as keyof typeof t.reminders];
   if (!reminderCopy) return null;
 

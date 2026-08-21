@@ -1,12 +1,12 @@
 /**
- * One-time feature-reminder copy, keyed by the camelCase form of the reminder
- * `id` (`jinja-templates` → `jinjaTemplates`). `FeatureReminder` entries carry
- * `eyebrowKey`/`titleKey`/`descriptionKey` dot paths; consumers resolve the
- * subtree by id via `t.reminders[reminder.id as keyof typeof t.reminders]`.
- * The `{% for %}` / `{{ variable }}` literals stay verbatim in every locale.
+ * One-time feature-reminder copy, keyed directly by reminder id. Reminder ids
+ * are stable — never reordered or reused — so a dictionary keyed by id is
+ * unique by construction; consumers resolve the subtree by id via
+ * `t.reminders[reminder.id as keyof typeof t.reminders]`. The `{% for %}` /
+ * `{{ variable }}` literals stay verbatim in every locale.
  */
 export const reminders = {
-  jinjaTemplates: {
+  "jinja-templates": {
     eyebrow: "New feature",
     title: "Jinja templating in your prompts",
     description:

@@ -116,7 +116,7 @@ export const zh: Messages = {
     },
   },
   reminders: {
-    jinjaTemplates: {
+    "jinja-templates": {
       eyebrow: "新功能",
       title: "在提示词中使用 Jinja 模板",
       description:
