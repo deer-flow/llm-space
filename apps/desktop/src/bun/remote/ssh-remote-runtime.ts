@@ -23,6 +23,9 @@ import {
   shellQuote,
 } from "./ssh-command";
 import {
+  formatHealthCheckTimeout,
+  formatRemotePortMismatch,
+  formatRemotePortsExhausted,
   formatSshBootstrapFailure,
   parseMissingRuntimeBinaryFailure,
   parseRemotePortInUseFailure,
@@ -170,15 +173,14 @@ async function _startInstalledRuntime(input: {
       }
       if (portFailure.port !== remotePort) {
         throw new Error(
-          `Remote runtime reported port ${portFailure.port} in use, but this connection attempted port ${remotePort}.`,
+          formatRemotePortMismatch(portFailure.port, remotePort),
           { cause: error }
         );
       }
       if (attempt === MAX_REMOTE_PORT_ATTEMPTS) {
-        throw new Error(
-          `Could not find an available per-connection remote port after ${MAX_REMOTE_PORT_ATTEMPTS} attempts; no existing listener was stopped. Retry the connection or configure a different remote server port.`,
-          { cause: error }
-        );
+        throw new Error(formatRemotePortsExhausted(MAX_REMOTE_PORT_ATTEMPTS), {
+          cause: error,
+        });
       }
       input.options.onProgress?.({
         stage: "server-start",
@@ -398,9 +400,10 @@ async function _waitForHealth(
     }
   }
   throw new Error(
-    `SSH remote runtime bootstrap failed during health-check: ${
-      lastError instanceof Error ? lastError.message : String(lastError)
-    }. Expected protocol ${REMOTE_RUNTIME_PROTOCOL_VERSION}.`
+    formatHealthCheckTimeout(
+      lastError instanceof Error ? lastError.message : String(lastError),
+      REMOTE_RUNTIME_PROTOCOL_VERSION
+    )
   );
 }
 

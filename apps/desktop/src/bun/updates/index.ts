@@ -1,6 +1,8 @@
+import { MESSAGES } from "@llm-space/ui/lib/i18n/messages";
 import { Updater, type UpdateStatusEntry } from "electrobun/bun";
 
 import type { UpdateMode, UpdateStatus } from "../../shared/updates";
+import { isChineseLocale } from "../app/locales";
 import { setUpdateReadyInMenu } from "../app/menu";
 
 import {
@@ -14,12 +16,22 @@ const INITIAL_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60_000;
 const APPLY_GRACE_MS = 5_000;
 
+/** The current locale's error templates (`t.errors`), resolved per call. */
+const _errors = () => MESSAGES[isChineseLocale() ? "zh" : "en"].errors;
+
 export interface UpdateStatusMessage {
   status: UpdateStatus;
   manual: boolean;
 }
 
-/** Process-scoped updater state and scheduling. */
+/**
+ * Process-scoped updater state and scheduling.
+ *
+ * Updates only work on macOS today (electrobun's `Updater` and the .patch
+ * update feed are macOS-shaped); on other platforms the service is inert —
+ * no background checks, and manual checks report that updates are
+ * unsupported.
+ */
 export class UpdaterService {
   private _isCheckInFlight = false;
   private _isPassManual = false;
@@ -33,6 +45,14 @@ export class UpdaterService {
   ) {}
 
   async checkForUpdates(manual: boolean): Promise<void> {
+    if (process.platform !== "darwin") {
+      this._isPassManual = manual;
+      this._sendStatus({
+        state: "error",
+        message: _errors().updatesUnsupportedPlatform,
+      });
+      return;
+    }
     if (this._isCheckInFlight) {
       if (manual && !this._isPassManual) {
         this._isPassManual = true;
@@ -74,7 +94,7 @@ export class UpdaterService {
       }
       if (!Updater.updateInfo()?.updateReady) {
         const message =
-          Updater.updateInfo()?.error || "download did not complete";
+          Updater.updateInfo()?.error || _errors().updatesDownloadIncomplete;
         this._sendStatus({ state: "error", message });
         return;
       }
@@ -89,6 +109,13 @@ export class UpdaterService {
   }
 
   async applyUpdateAndRestart(): Promise<void> {
+    if (process.platform !== "darwin") {
+      this._sendStatus({
+        state: "error",
+        message: _errors().updatesUnsupportedPlatform,
+      });
+      return;
+    }
     try {
       await Updater.applyUpdate();
     } catch (error) {
@@ -116,6 +143,7 @@ export class UpdaterService {
   }
 
   async start(): Promise<void> {
+    if (process.platform !== "darwin") return;
     const { channel, hash, version, identifier } = await Updater.getLocalInfo();
     if (channel === "dev") return;
 

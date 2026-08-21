@@ -11,13 +11,20 @@
 export interface FeatureReminder {
   /**
    * Stable key, stored in `featureRemindersSeen`. Never rename or reuse an id —
-   * already-seen users would re-see it (or a renamed one would re-fire).
+   * already-seen users would re-see it (or a renamed one would re-fire). The
+   * id's camelCase form keys the reminder's copy in the message tree
+   * (`t.reminders`), so id changes and copy drift together.
    */
   id: string;
-  /** Small label above the title, e.g. "New feature". */
-  eyebrow?: string;
-  title: string;
-  description: string;
+  /**
+   * Dot path into the message tree, e.g. "reminders.jinjaTemplates.eyebrow".
+   * Optional: some reminders have no small eyebrow label above the title.
+   */
+  eyebrowKey?: string;
+  /** Dot path into the message tree, e.g. "reminders.jinjaTemplates.title". */
+  titleKey: string;
+  /** Dot path into the message tree, e.g. "reminders.jinjaTemplates.description". */
+  descriptionKey: string;
   /** Remote (GitHub-hosted) banner image URL. */
   imageUrl: string;
   /**
@@ -31,12 +38,9 @@ export interface FeatureReminder {
 export const FEATURE_REMINDERS: FeatureReminder[] = [
   {
     id: "jinja-templates",
-    eyebrow: "New feature",
-    title: "Jinja templating in your prompts",
-    description:
-      "Write prompts with real Jinja — loops, conditionals, and variables like " +
-      "{% for %}, {% if %}, and {{ variable }}. Build dynamic, reusable prompt " +
-      "templates that adapt to your data instead of editing text by hand.",
+    eyebrowKey: "reminders.jinjaTemplates.eyebrow",
+    titleKey: "reminders.jinjaTemplates.title",
+    descriptionKey: "reminders.jinjaTemplates.description",
     imageUrl:
       "https://raw.githubusercontent.com/deer-flow/llm-space/main/docs/images/reminders/jinja-templates.png",
     link: "https://github.com/deer-flow/llm-space/blob/main/docs/variables-and-templates.md",

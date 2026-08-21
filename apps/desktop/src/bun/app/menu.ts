@@ -1,3 +1,4 @@
+import { MESSAGES, type Messages } from "@llm-space/ui/lib/i18n/messages";
 import {
   ApplicationMenu,
   type ApplicationMenuItemConfig,
@@ -9,22 +10,32 @@ import type { Command } from "../../shared/commands";
 import { isChineseLocale } from "./locales";
 
 /**
- * The app (first) submenu. Its update item is the one dynamic piece: normally
- * "Check for Updates…"; once an update is downloaded it becomes
- * "Restart to Update" (VS Code pattern). `setUpdateReadyInMenu` rebuilds the
- * whole menu — `setApplicationMenu` is idempotent and can be re-called anytime.
+ * The update item in the app submenu: normally "Check for Updates…"; once an
+ * update is downloaded it becomes "Restart to Update" (VS Code pattern).
+ * `setUpdateReadyInMenu` rebuilds the whole menu — `setApplicationMenu` is
+ * idempotent and can be re-called anytime.
  */
-function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
-  const updateItem = updateReady
-    ? { label: "Restart to Update", action: "restartToUpdate" }
-    : { label: "Check for Updates...", action: "checkForUpdates" };
+function _updateItem(
+  updateReady: boolean,
+  t: Messages
+): ApplicationMenuItemConfig {
+  return updateReady
+    ? { label: t.menu.app.restartToUpdate, action: "restartToUpdate" }
+    : { label: t.menu.app.checkUpdates, action: "checkForUpdates" };
+}
+
+/** The app (first) submenu — macOS only (the menu bar leads with the app name). */
+function _appSubmenu(
+  updateReady: boolean,
+  t: Messages
+): ApplicationMenuItemConfig {
   return {
     submenu: [
-      { label: "About LLM Space", role: "about" },
-      updateItem,
+      { label: t.menu.app.about, role: "about" },
+      _updateItem(updateReady, t),
       { type: "divider" },
       {
-        label: "Settings...",
+        label: t.menu.app.settings,
         action: "settings",
         accelerator: "CommandOrControl+,",
       },
@@ -34,7 +45,7 @@ function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
       { role: "showAll" },
       { type: "divider" },
       {
-        label: "Quit LLM Space",
+        label: t.menu.app.quit,
         role: "quit",
         accelerator: "CommandOrControl+Q",
       },
@@ -42,136 +53,148 @@ function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
   };
 }
 
-function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
+function _fileSubmenu(t: Messages): ApplicationMenuItemConfig[] {
   return [
-    _appSubmenu(updateReady),
     {
-      label: "File",
-      submenu: [
-        {
-          label: "New File",
-          action: "newThread",
-          accelerator: "CommandOrControl+N",
-        },
-        { label: "New from Examples...", action: "newFromExamples" },
-        { type: "divider" },
-        {
-          label: "New Folder",
-          action: "newFolder",
-          accelerator: "CommandOrControl+Shift+N",
-        },
-        { type: "divider" },
-        { label: "Import from Files...", action: "importFiles" },
-        { label: "Import from Clipboard", action: "importFromClipboard" },
-        { type: "divider" },
-        { label: "Share...", action: "shareThread" },
-        { type: "divider" },
-        { label: "Refresh Workspace", action: "refreshTree" },
-        { label: "Reveal Workspace Folder", action: "revealWorkspaceFolder" },
-        { type: "divider" },
-        {
-          label: "Close Tab",
-          action: "closeTab",
-          accelerator: "CommandOrControl+W",
-        },
-        { label: "Close Others", action: "closeOtherTabs" },
-        { label: "Close All Tabs", action: "closeAllTabs" },
-        { type: "divider" },
-        {
-          label: "Reopen Closed Tabs",
-          action: "reopenClosedTabs",
-          accelerator: "CommandOrControl+Shift+T",
-        },
-      ],
+      label: t.menu.file.newFile,
+      action: "newThread",
+      accelerator: "CommandOrControl+N",
+    },
+    { label: t.menu.file.newFromExamples, action: "newFromExamples" },
+    { type: "divider" },
+    {
+      label: t.menu.file.newFolder,
+      action: "newFolder",
+      accelerator: "CommandOrControl+Shift+N",
+    },
+    { type: "divider" },
+    { label: t.menu.file.importFiles, action: "importFiles" },
+    { label: t.menu.file.importClipboard, action: "importFromClipboard" },
+    { type: "divider" },
+    { label: t.menu.file.share, action: "shareThread" },
+    { type: "divider" },
+    { label: t.menu.file.refreshWorkspace, action: "refreshTree" },
+    { label: t.menu.file.revealWorkspace, action: "revealWorkspaceFolder" },
+    { type: "divider" },
+    {
+      label: t.menu.file.closeTab,
+      action: "closeTab",
+      accelerator: "CommandOrControl+W",
+    },
+    { label: t.menu.file.closeOthers, action: "closeOtherTabs" },
+    { label: t.menu.file.closeAll, action: "closeAllTabs" },
+    { type: "divider" },
+    {
+      label: t.menu.file.reopenClosed,
+      action: "reopenClosedTabs",
+      accelerator: "CommandOrControl+Shift+T",
+    },
+  ];
+}
+
+function _editSubmenu(): ApplicationMenuItemConfig[] {
+  return [
+    { role: "undo" },
+    { role: "redo" },
+    { type: "divider" },
+    { role: "cut" },
+    { role: "copy" },
+    { role: "paste" },
+    { role: "pasteAndMatchStyle" },
+    { role: "delete" },
+    { role: "selectAll" },
+  ];
+}
+
+function _viewSubmenu(t: Messages): ApplicationMenuItemConfig[] {
+  return [
+    {
+      label: t.menu.view.commandPalette,
+      action: "commandPalette",
+      accelerator: "CommandOrControl+Shift+P",
+    },
+    { type: "divider" },
+    {
+      label: t.menu.view.toggleSidebar,
+      action: "toggleSidebar",
+      accelerator: "CommandOrControl+B",
+    },
+    { type: "divider" },
+    {
+      label: t.menu.view.reload,
+      action: "reload",
+      accelerator: "CommandOrControl+Shift+R",
+    },
+    { type: "divider" },
+    {
+      label: t.menu.view.zoomIn,
+      action: "zoomIn",
+      accelerator: "CommandOrControl+Plus",
     },
     {
-      label: "Edit",
-      submenu: [
-        { role: "undo" },
-        { role: "redo" },
-        { type: "divider" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "pasteAndMatchStyle" },
-        { role: "delete" },
-        { role: "selectAll" },
-      ],
+      label: t.menu.view.zoomOut,
+      action: "zoomOut",
+      accelerator: "CommandOrControl+-",
     },
     {
-      label: "View",
-      submenu: [
-        {
-          label: "Command Palette...",
-          action: "commandPalette",
-          accelerator: "CommandOrControl+Shift+P",
-        },
-        { type: "divider" },
-        {
-          label: "Toggle Sidebar",
-          action: "toggleSidebar",
-          accelerator: "CommandOrControl+B",
-        },
-        { type: "divider" },
-        {
-          label: "Reload",
-          action: "reload",
-          accelerator: "CommandOrControl+Shift+R",
-        },
-        { type: "divider" },
-        {
-          label: "Zoom In",
-          action: "zoomIn",
-          accelerator: "CommandOrControl+Plus",
-        },
-        {
-          label: "Zoom Out",
-          action: "zoomOut",
-          accelerator: "CommandOrControl+-",
-        },
-        {
-          label: "Reset Zoom",
-          action: "resetZoom",
-          accelerator: "CommandOrControl+0",
-        },
-      ],
+      label: t.menu.view.resetZoom,
+      action: "resetZoom",
+      accelerator: "CommandOrControl+0",
+    },
+  ];
+}
+
+function _windowSubmenu(t: Messages): ApplicationMenuItemConfig[] {
+  return [
+    { role: "minimize" },
+    { role: "bringAllToFront" },
+    { type: "divider" },
+    {
+      label: t.menu.window.selectPrevious,
+      action: "selectPreviousTab",
+      accelerator: "CommandOrControl+Option+Left",
     },
     {
-      label: "Window",
-      role: "window",
-      submenu: [
-        { role: "minimize" },
-        { role: "bringAllToFront" },
-        { type: "divider" },
-        {
-          label: "Select Previous Tab",
-          action: "selectPreviousTab",
-          accelerator: "CommandOrControl+Option+Left",
-        },
-        {
-          label: "Select Next Tab",
-          action: "selectNextTab",
-          accelerator: "CommandOrControl+Option+Right",
-        },
-        { type: "divider" },
-        { role: "toggleFullScreen", accelerator: "CommandOrControl+Shift+F" },
-      ],
+      label: t.menu.window.selectNext,
+      action: "selectNextTab",
+      accelerator: "CommandOrControl+Option+Right",
     },
-    {
-      label: "Help",
-      submenu: [
-        { label: "View Documentation", action: "openDocument" },
-        { type: "divider" },
-        { label: "Visit Official Website", action: "openOfficialWebsite" },
-        { label: "Visit GitHub Project", action: "openGitHubProject" },
-        { label: "Visit Harness 101", action: "openHarness101" },
-        { type: "divider" },
-        { label: "Report Bug", action: "reportBugs" },
-        { label: "Donate", action: "donate" },
-        { type: "divider" },
-        { label: "Onboard", action: "onboard" },
-      ],
-    },
+    { type: "divider" },
+    { role: "toggleFullScreen", accelerator: "CommandOrControl+Shift+F" },
+  ];
+}
+
+function _helpSubmenu(t: Messages): ApplicationMenuItemConfig[] {
+  return [
+    { label: t.menu.help.viewDocs, action: "openDocument" },
+    { type: "divider" },
+    { label: t.menu.help.officialSite, action: "openOfficialWebsite" },
+    { label: t.menu.help.github, action: "openGitHubProject" },
+    { label: t.menu.help.harness101, action: "openHarness101" },
+    { type: "divider" },
+    { label: t.menu.help.reportBug, action: "reportBugs" },
+    { label: t.menu.help.donate, action: "donate" },
+    { type: "divider" },
+    { label: t.menu.help.onboard, action: "onboard" },
+  ];
+}
+
+/**
+ * The native application menu is a macOS convention: the menu bar leads with
+ * the app submenu. Windows (and Linux, when it ships) deliberately have no
+ * native menu — the in-app UI owns the commands.
+ */
+function _buildMenu(
+  updateReady: boolean,
+  t: Messages
+): ApplicationMenuItemConfig[] {
+  return [
+    _appSubmenu(updateReady, t),
+    { label: t.menu.file.label, submenu: _fileSubmenu(t) },
+    { label: t.menu.edit.label, submenu: _editSubmenu() },
+    { label: t.menu.view.label, submenu: _viewSubmenu(t) },
+    { label: t.menu.window.label, role: "window", submenu: _windowSubmenu(t) },
+    { label: t.menu.help.label, submenu: _helpSubmenu(t) },
   ];
 }
 
@@ -181,15 +204,16 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
  * ready. `null` restores the default item.
  */
 export function setUpdateReadyInMenu(version: string | null) {
-  ApplicationMenu.setApplicationMenu(_buildMenu(version !== null));
+  _menuUpdateReady = version !== null;
+  _rebuildMenu();
 }
 
 let _menuLang: "en" | "zh" = isChineseLocale() ? "zh" : "en";
-const _menuUpdateReady = false;
+let _menuUpdateReady = false;
 
 function _rebuildMenu() {
   if (process.platform !== "darwin") return;
-  ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady));
+  ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady, MESSAGES[_menuLang]));
 }
 
 /** Rebuild the native menu after a UI-language change (macOS only). */
@@ -256,13 +280,14 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
 
 /**
  * Install the application menu and wire its actions to the main window. Called
- * once after the window exists.
+ * once after the window exists. macOS only — Windows/Linux have no native menu.
  */
 export function registerMenuActions(
   window: BrowserWindow,
   executeCommand: (command: Command, window: BrowserWindow) => void
 ) {
-  ApplicationMenu.setApplicationMenu(_buildMenu(false));
+  if (process.platform !== "darwin") return;
+  ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady, MESSAGES[_menuLang]));
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
     const command = MENU_ACTION_COMMANDS[action];
