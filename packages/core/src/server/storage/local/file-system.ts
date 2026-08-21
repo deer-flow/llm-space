@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { lstatSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
@@ -247,9 +248,26 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
    * that would escape it.
    */
   private _resolve(p: string): string {
-    const real = path.resolve(this.root, this._relative(p));
+    if (path.posix.isAbsolute(p) || path.win32.isAbsolute(p)) {
+      throw new Error(`Path must be relative to the storage root: ${p}`);
+    }
+    const relative = this._relative(p);
+    const real = path.resolve(this.root, relative);
     if (real !== this.root && !real.startsWith(this.root + path.sep)) {
       throw new Error(`Path escapes the storage root: ${p}`);
+    }
+    let current = this.root;
+    for (const part of relative.split(path.sep)) {
+      if (!part) continue;
+      current = path.join(current, part);
+      try {
+        if (lstatSync(current).isSymbolicLink()) {
+          throw new Error(`Symbolic links are not allowed in storage paths: ${p}`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
+        throw error;
+      }
     }
     return real;
   }
