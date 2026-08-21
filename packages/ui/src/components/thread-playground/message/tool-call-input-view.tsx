@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PreviewDialog } from "@llm-space/ui/components/preview-dialog-lazy";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices, type BuiltinToolsHost } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -46,14 +47,16 @@ type LinkKind = "path" | "skill" | "url";
 async function _reveal(
   builtinTools: BuiltinToolsHost,
   kind: "path" | "skill",
-  value: string
+  value: string,
+  t: ReturnType<typeof useI18n>["t"]
 ): Promise<void> {
   try {
     const target = kind === "skill" ? formatSkillLocator(value) : value;
     await builtinTools.fsReveal(target);
   } catch (error) {
-    toast.error("Failed to reveal in file manager", {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(t.playground.message.failedToReveal, {
+      description:
+        error instanceof Error ? error.message : t.playground.message.pleaseTryAgain,
     });
   }
 }
@@ -169,6 +172,7 @@ function _ToolCallArgumentRow({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const { actions, builtinTools } = useHostServices();
+  const { t } = useI18n();
   const valueText = formatJson(value);
   const isObject = typeof value === "object" && value !== null;
   // Only object values can expand into their full, pretty-printed form; strings
@@ -178,23 +182,30 @@ function _ToolCallArgumentRow({
       setExpanded((prev) => !prev);
     }
   }, [isObject]);
-  const copyText = useCallback(async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`${label} copied`);
-    } catch {
-      toast.error(`Failed to copy ${label.toLowerCase()}`);
-    }
-  }, []);
+  const copyText = useCallback(
+    async (text: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(formatString(t.playground.message.copiedWithLabel, { label }));
+      } catch {
+        toast.error(
+          formatString(t.playground.message.failedToCopy, {
+            label: label.toLowerCase(),
+          })
+        );
+      }
+    },
+    [t]
+  );
   const copyTextContent = useCallback(() => {
     if (typeof value !== "string") {
       return;
     }
-    void copyText(value, "Text content");
-  }, [copyText, value]);
+    void copyText(value, t.playground.message.textContent);
+  }, [copyText, t, value]);
   const copyValueJson = useCallback(() => {
-    void copyText(formatJson(value), "Value JSON");
-  }, [copyText, value]);
+    void copyText(formatJson(value), t.playground.message.valueJson);
+  }, [copyText, t, value]);
   const openPreview = useCallback(() => {
     setPreviewOpen(true);
   }, []);
@@ -206,8 +217,8 @@ function _ToolCallArgumentRow({
       actions.openLink(value);
       return;
     }
-    void _reveal(builtinTools, linkKind, value);
-  }, [actions, builtinTools, linkKind, value]);
+    void _reveal(builtinTools, linkKind, value, t);
+  }, [actions, builtinTools, linkKind, t, value]);
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -222,7 +233,9 @@ function _ToolCallArgumentRow({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
-            aria-label={`Open actions for ${argumentKey}`}
+            aria-label={formatString(t.playground.message.openActionsFor, {
+              name: argumentKey,
+            })}
             className={cn(
               "text-muted-foreground absolute top-0.5 left-0 size-5 aria-expanded:visible",
               // Object rows always show their expand/collapse chevron; other
@@ -257,8 +270,8 @@ function _ToolCallArgumentRow({
             <>
               <DropdownMenuItem onSelect={handleActivate}>
                 {linkKind === "url"
-                  ? "Open in Browser"
-                  : "Reveal in File Manager"}
+                  ? t.playground.message.openInBrowserTitleCase
+                  : t.playground.message.revealInFileManagerTitleCase}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -266,25 +279,27 @@ function _ToolCallArgumentRow({
           {isObject ? (
             <>
               <DropdownMenuItem onSelect={toggleExpanded}>
-                {expanded ? "Collapse" : "Expand"}
+                {expanded
+                  ? t.playground.message.collapse
+                  : t.playground.message.expand}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           ) : null}
           {typeof value === "string" ? (
             <DropdownMenuItem onSelect={copyTextContent}>
-              Copy Text Content
+              {t.playground.message.copyTextContent}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem onSelect={copyValueJson}>
-            Copy Value as JSON
+            {t.playground.message.copyValueAsJson}
           </DropdownMenuItem>
           {typeof value === "string" ? (
             <>
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onSelect={openPreview}>
-                Preview Value...
+                {t.playground.message.previewValue}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -293,7 +308,7 @@ function _ToolCallArgumentRow({
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onSelect={openPreview}>
-                View JSON...
+                {t.playground.message.viewJson}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -307,12 +322,18 @@ function _ToolCallArgumentRow({
         expanded={expanded}
         onToggle={toggleExpanded}
         onActivate={linkKind ? handleActivate : undefined}
-        activateTitle={linkKind === "url" ? "Open in browser" : "Reveal in file manager"}
+        activateTitle={
+          linkKind === "url"
+            ? t.playground.message.openInBrowser
+            : t.playground.message.revealInFileManager
+        }
       />
       {typeof value === "string" ? (
         <PreviewDialog
           open={previewOpen}
-          title={`View value of "${argumentKey}"`}
+          title={formatString(t.playground.message.viewValueOf, {
+            name: argumentKey,
+          })}
           value={value}
           onOpenChange={setPreviewOpen}
         />
@@ -320,7 +341,9 @@ function _ToolCallArgumentRow({
       {isObject ? (
         <PreviewDialog
           open={previewOpen}
-          title={`View value of "${argumentKey}"`}
+          title={formatString(t.playground.message.viewValueOf, {
+            name: argumentKey,
+          })}
           type="json"
           value={valueText}
           onOpenChange={setPreviewOpen}
@@ -344,6 +367,7 @@ function _PathArrayArgumentRow({
   trailingComma: boolean;
 }) {
   const { builtinTools } = useHostServices();
+  const { t } = useI18n();
   return (
     <div className="w-full min-w-0 py-0.5 pl-1.5">
       <div className="whitespace-pre">
@@ -359,9 +383,9 @@ function _PathArrayArgumentRow({
           <span className="shrink-0">{"    "}</span>
           <button
             type="button"
-            title="Reveal in file manager"
+            title={t.playground.message.revealInFileManager}
             className="hover:text-primary min-w-0 cursor-pointer truncate underline-offset-2 hover:underline"
-            onClick={() => void _reveal(builtinTools, "path", p)}
+            onClick={() => void _reveal(builtinTools, "path", p, t)}
           >
             {formatJson(p)}
           </button>
@@ -405,6 +429,7 @@ function ArgumentLine({
 }) {
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const pointerDraggedRef = useRef(false);
+  const { t } = useI18n();
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
     if (event.button !== 0) {
       return;
@@ -488,7 +513,13 @@ function ArgumentLine({
     // The click handler lives on `line` itself; the wrapping span here is only
     // the tooltip trigger. Adding another onClick would fire onToggle twice as
     // the event bubbles, cancelling the toggle out.
-    <Tooltip content={`Click to ${expanded ? "collapse" : "expand"}`}>
+    <Tooltip
+      content={
+        expanded
+          ? t.playground.message.clickToCollapse
+          : t.playground.message.clickToExpand
+      }
+    >
       <span>{line}</span>
     </Tooltip>
   );

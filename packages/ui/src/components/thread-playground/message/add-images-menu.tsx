@@ -3,6 +3,7 @@
 import { ClipboardPasteIcon, FileIcon, ImagePlusIcon } from "lucide-react";
 import { useCallback, useRef } from "react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +12,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
-
 
 import { useThreadStoreActions } from "../stores/thread-store";
 
@@ -40,6 +40,7 @@ export function AddImagesMenu({
   disabled?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
   const { addMessageImageContent } = useThreadStoreActions();
 
   const addImage = useCallback(
@@ -94,7 +95,7 @@ export function AddImagesMenu({
         type="file"
         accept="image/*"
         multiple
-        aria-label="Image files"
+        aria-label={t.playground.message.addImagesInputLabel}
         className="hidden"
         onChange={handleFilesSelected}
       />
@@ -103,21 +104,21 @@ export function AddImagesMenu({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Add image to message"
+            aria-label={t.playground.message.addImageToMessage}
             disabled={disabled}
           >
             <ImagePlusIcon className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Add Images</DropdownMenuLabel>
+          <DropdownMenuLabel>{t.playground.message.addImages}</DropdownMenuLabel>
           <DropdownMenuItem onSelect={handleFromFiles}>
             <FileIcon />
-            From Files
+            {t.playground.message.fromFiles}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleFromClipboard}>
             <ClipboardPasteIcon />
-            From Clipboard
+            {t.playground.message.fromClipboard}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

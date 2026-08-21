@@ -3,6 +3,7 @@ import { ImageIcon, XIcon } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@llm-space/ui/ui/dialog";
@@ -31,6 +32,7 @@ function _ImageContentView({
 }) {
   const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const { t } = useI18n();
 
   const imageSrc = `data:${image.mimeType};base64,${image.data}`;
 
@@ -68,9 +70,12 @@ function _ImageContentView({
             "text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors",
             className
           )}
-          aria-label="Open image preview"
+          aria-label={t.playground.message.openImagePreview}
         >
-          <ImageIcon className="size-3.5" />[Image #{imageNumber}]
+          <ImageIcon className="size-3.5" />
+          {formatString(t.playground.message.imagePlaceholder, {
+            n: imageNumber ?? 0,
+          })}
         </button>
       ) : (
         <div
@@ -81,7 +86,7 @@ function _ImageContentView({
           onClick={handleOpenPreview}
           role="button"
           tabIndex={0}
-          aria-label="Open image preview"
+          aria-label={t.playground.message.openImagePreview}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
@@ -100,12 +105,12 @@ function _ImageContentView({
             )}
           />
           {!readonly && onRemove && (
-            <Tooltip content="Remove image">
+            <Tooltip content={t.playground.message.removeImage}>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 className="bg-background/80 absolute top-1 right-1 rounded-full border opacity-0 transition-opacity group-hover/image:opacity-100"
-                aria-label="Remove image"
+                aria-label={t.playground.message.removeImage}
                 onClick={handleRemove}
               >
                 <XIcon className="size-4" />
@@ -121,7 +126,9 @@ function _ImageContentView({
           showCloseButton
           onClick={() => setPreviewOpen(false)}
         >
-          <DialogTitle className="sr-only">Image preview</DialogTitle>
+          <DialogTitle className="sr-only">
+            {t.playground.message.imagePreview}
+          </DialogTitle>
           <img
             src={imageSrc}
             alt=""

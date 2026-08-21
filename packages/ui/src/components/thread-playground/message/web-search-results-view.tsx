@@ -3,6 +3,7 @@ import { GlobeIcon } from "lucide-react";
 import { memo, useState } from "react";
 
 import { Link } from "@llm-space/ui/components/link";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 
 interface WebSearchResult {
   title: string;
@@ -107,6 +108,7 @@ function _prettyUrl(url: string): string {
  */
 function _WebSearchResultsView({ results }: { results: WebSearchResult[] }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useI18n();
   const canExpand = results.length > DEFAULT_VISIBLE_RESULTS;
   const visibleResults = expanded
     ? results
@@ -124,8 +126,10 @@ function _WebSearchResultsView({ results }: { results: WebSearchResult[] }) {
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded
-            ? "Show fewer results"
-            : `Show ${results.length - DEFAULT_VISIBLE_RESULTS} more results`}
+            ? t.playground.message.showFewerResults
+            : formatString(t.playground.message.showMoreResults, {
+                n: results.length - DEFAULT_VISIBLE_RESULTS,
+              })}
         </button>
       ) : null}
     </div>

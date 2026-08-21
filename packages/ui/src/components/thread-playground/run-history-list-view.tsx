@@ -35,6 +35,7 @@ import { format } from "timeago.js";
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, langToTimeago, useI18n } from "@llm-space/ui/lib/i18n";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -44,16 +45,9 @@ import { RunEvaluationDialog } from "./run-evaluation-dialog";
 import { RunTraceView } from "./run-trace-view";
 import { useThreadStore, useThreadStoreActions } from "./stores";
 
-const VERDICT_LABELS: Record<EvaluationRecord["verdict"], string> = {
-  leftBetter: "Run A Better",
-  rightBetter: "Run B Better",
-  tie: "Tie",
-  pass: "Pass",
-  fail: "Fail",
-};
-
 function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   const [containerRef] = useAutoAnimation();
+  const { t } = useI18n();
   const runHistory = useThreadStore((s) => s.runHistory);
   const evaluations = useThreadStore((s) => s.evaluations);
   const evaluationRubrics = useThreadStore((s) => s.evaluationRubrics);
@@ -132,15 +126,17 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       .catch((error) => {
         if (!current) return;
         setInspectingRunId(null);
-        toast.error("Failed to load run snapshot", {
+        toast.error(t.playground.runHistory.failedToLoadRunSnapshot, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error
+              ? error.message
+              : t.playground.message.pleaseTryAgain,
         });
       });
     return () => {
       current = false;
     };
-  }, [inspectingRunEntry, loadRunSnapshot]);
+  }, [inspectingRunEntry, loadRunSnapshot, t]);
   useEffect(() => {
     setComparisonRuns(null);
   }, [selectedRunIds]);
@@ -166,15 +162,17 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
         setComparisonRuns([loaded[0], loaded[1]]);
         setEvaluationOpen(true);
       } catch (error) {
-        toast.error("Failed to load run snapshots", {
+        toast.error(t.playground.runHistory.failedToLoadRunSnapshots, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error
+              ? error.message
+              : t.playground.message.pleaseTryAgain,
         });
       } finally {
         setComparisonLoading(false);
       }
     },
-    [loadRunSnapshot]
+    [loadRunSnapshot, t]
   );
   const openEvaluation = useCallback(
     (leftRunId: string, rightRunId: string) => {
@@ -196,13 +194,15 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       try {
         restoreThread((await loadRunSnapshot(run)).thread);
       } catch (error) {
-        toast.error("Failed to load run snapshot", {
+        toast.error(t.playground.runHistory.failedToLoadRunSnapshot, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error
+              ? error.message
+              : t.playground.message.pleaseTryAgain,
         });
       }
     },
-    [loadRunSnapshot, restoreThread]
+    [loadRunSnapshot, restoreThread, t]
   );
   const inspectRunFromHistory = useCallback((run: RunHistoryEntry) => {
     setComparisonRuns(null);
@@ -233,34 +233,39 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
           <Button
             variant="ghost"
             size="sm"
-            aria-label="Back to run history"
+            aria-label={t.playground.runHistory.backToRunHistory}
             onClick={handleBackToHistory}
           >
             <ArrowLeftIcon className="size-3" />
-            Back
+            {t.playground.runHistory.back}
           </Button>
           <div className="min-w-0 flex-1 px-1">
-            <div className="text-foreground truncate text-sm">Inspect Run</div>
+            <div className="text-foreground truncate text-sm">
+              {t.playground.runHistory.inspectRun}
+            </div>
             <div className="text-muted-foreground text-[0.625rem]">
-              {inspectingRunIndex + 1} of {runs.length}
+              {formatString(t.playground.message.indexOfTotal, {
+                current: inspectingRunIndex + 1,
+                total: runs.length,
+              })}
             </div>
           </div>
-          <Tooltip content="Previous run">
+          <Tooltip content={t.playground.runHistory.previousRun}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Inspect previous run"
+              aria-label={t.playground.runHistory.inspectPreviousRun}
               disabled={!canInspectPrevious}
               onClick={inspectPreviousRun}
             >
               <ChevronLeftIcon className="size-3" />
             </Button>
           </Tooltip>
-          <Tooltip content="Next run">
+          <Tooltip content={t.playground.runHistory.nextRun}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Inspect next run"
+              aria-label={t.playground.runHistory.inspectNextRun}
               disabled={!canInspectNext}
               onClick={inspectNextRun}
             >
@@ -270,7 +275,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Close run history"
+            aria-label={t.playground.runHistory.closeRunHistory}
             onClick={onClose}
           >
             <XIcon className="size-3" />
@@ -280,7 +285,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
           <RunTraceView className="min-h-0 flex-1" run={inspectingRun} />
         ) : (
           <div className="text-muted-foreground flex min-h-0 flex-1 items-center justify-center text-xs">
-            Loading run snapshot...
+            {t.playground.runHistory.loadingRunSnapshot}
           </div>
         )}
       </div>
@@ -290,12 +295,12 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex size-full flex-col">
       <div className="text-muted-foreground flex h-12 shrink-0 items-center justify-between border-b pl-3 text-sm">
-        <div>Run history</div>
+        <div>{t.playground.runHistory.runHistory}</div>
         <div className="pr-2">
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Close run history"
+            aria-label={t.playground.runHistory.closeRunHistory}
             onClick={onClose}
           >
             <XIcon className="size-3" />
@@ -305,9 +310,13 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
       <div className="border-b px-3 py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-xs font-medium">Compare Runs</div>
+            <div className="text-xs font-medium">
+              {t.playground.runHistory.compareRuns}
+            </div>
             <div className="text-muted-foreground text-[0.625rem]">
-              {selectedRuns.length}/2 selected
+              {formatString(t.playground.runHistory.selectedCount, {
+                n: selectedRuns.length,
+              })}
             </div>
           </div>
           <Button
@@ -316,7 +325,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             onClick={handleCompareSelected}
           >
             <GitCompareArrowsIcon className="size-3" />
-            Compare
+            {t.playground.runHistory.compare}
           </Button>
         </div>
       </div>
@@ -327,7 +336,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
         <ItemGroup className="gap-3.5!">
           {runs.length === 0 ? (
             <div className="text-muted-foreground m-auto text-xs">
-              No runs yet
+              {t.playground.runHistory.noRunsYet}
             </div>
           ) : (
             runs.map((run, index) => (
@@ -372,9 +381,9 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             setRunPendingRemoval(null);
           }
         }}
-        title="Remove Run?"
-        description="This removes the saved run from this thread and removes any evaluations that reference it."
-        confirmLabel="Remove"
+        title={t.playground.runHistory.removeRunTitle}
+        description={t.playground.runHistory.removeRunDescription}
+        confirmLabel={t.playground.runHistory.remove}
         onConfirm={() => {
           const run = runPendingRemoval;
           setRunPendingRemoval(null);
@@ -390,9 +399,9 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             setEvaluationPendingRemoval(null);
           }
         }}
-        title="Remove Evaluation?"
-        description="This removes the saved evaluation from this thread. The compared runs are kept."
-        confirmLabel="Remove"
+        title={t.playground.runHistory.removeEvaluationTitle}
+        description={t.playground.runHistory.removeEvaluationDescription}
+        confirmLabel={t.playground.runHistory.remove}
         onConfirm={() => {
           const evaluation = evaluationPendingRemoval;
           setEvaluationPendingRemoval(null);
@@ -427,7 +436,8 @@ function _RunHistoryItem({
   const summary = runEntrySummary(run);
   const modelLabel = runEntryModelLabel(run);
   const messageCountLabel = runEntryMessageCountLabel(run);
-  const time = format(run.timestamp);
+  const { t, lang } = useI18n();
+  const time = format(run.timestamp, langToTimeago(lang));
   const handleInspect = useCallback(() => {
     onInspectRun(run);
   }, [onInspectRun, run]);
@@ -452,7 +462,10 @@ function _RunHistoryItem({
       variant="muted"
       role="listitem"
       tabIndex={0}
-      aria-label={`Inspect run from ${time}: ${summary}`}
+      aria-label={formatString(t.playground.runHistory.inspectRunFrom, {
+        time,
+        summary,
+      })}
       className={cn(
         "group hover:bg-muted/70 focus-visible:ring-ring relative cursor-pointer flex-col items-start gap-1.5 focus-visible:ring-[3px]",
         selected && "ring-primary/50 ring-1",
@@ -467,7 +480,7 @@ function _RunHistoryItem({
           {summary}
         </ItemDescription>
         <div className="shrink-0" onClick={stopInspectClick}>
-          <Tooltip content="Remove run">
+          <Tooltip content={t.playground.runHistory.removeRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -475,7 +488,9 @@ function _RunHistoryItem({
                 "hover:text-destructive pointer-events-none opacity-0 transition-opacity",
                 "group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
               )}
-              aria-label={`Remove run from ${time}`}
+              aria-label={formatString(t.playground.runHistory.removeRunFrom, {
+                time,
+              })}
               onClick={() => onRequestRemove(run)}
             >
               <Trash2Icon className="size-3" />
@@ -496,7 +511,13 @@ function _RunHistoryItem({
           className="flex shrink-0 items-center gap-0.5"
           onClick={stopInspectClick}
         >
-          <Tooltip content={selected ? "Remove from comparison" : "Select run"}>
+          <Tooltip
+            content={
+              selected
+                ? t.playground.runHistory.removeFromComparison
+                : t.playground.runHistory.selectRun
+            }
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -507,8 +528,14 @@ function _RunHistoryItem({
               )}
               aria-label={
                 selected
-                  ? `Remove run from comparison: ${summary}`
-                  : `Select run for comparison: ${summary}`
+                  ? formatString(
+                      t.playground.runHistory.removeRunFromComparison,
+                      { summary }
+                    )
+                  : formatString(
+                      t.playground.runHistory.selectRunForComparison,
+                      { summary }
+                    )
               }
               aria-pressed={selected}
               onClick={() => onToggleSelected(run.id)}
@@ -525,21 +552,31 @@ function _RunHistoryItem({
               </span>
             </Button>
           </Tooltip>
-          <Tooltip content="Inspect run">
+          <Tooltip content={t.playground.runHistory.inspectRunTooltip}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={`Inspect run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
+              aria-label={formatString(t.playground.runHistory.inspectRunDetails, {
+                time,
+                summary,
+                model: modelLabel,
+                messages: messageCountLabel,
+              })}
               onClick={() => onInspectRun(run)}
             >
               <EyeIcon className="size-3" />
             </Button>
           </Tooltip>
-          <Tooltip content="Restore run">
+          <Tooltip content={t.playground.runHistory.restoreRun}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={`Restore run from ${time}: ${summary}. ${modelLabel}. ${messageCountLabel}`}
+              aria-label={formatString(t.playground.runHistory.restoreRunDetails, {
+                time,
+                summary,
+                model: modelLabel,
+                messages: messageCountLabel,
+              })}
               onClick={() => onRestore(run)}
             >
               <RotateCcwIcon className="size-3" />
@@ -572,6 +609,7 @@ function _EvaluationList({
       const rightRun = runById.get(evaluation.rightRunId);
       return leftRun && rightRun ? [{ evaluation, leftRun, rightRun }] : [];
     });
+  const { t } = useI18n();
 
   if (visibleEvaluations.length === 0) {
     return null;
@@ -580,7 +618,7 @@ function _EvaluationList({
   return (
     <div className="mt-5 flex flex-col gap-2">
       <div className="text-muted-foreground text-xs font-medium">
-        Evaluations
+        {t.playground.runHistory.evaluations}
       </div>
       <ItemGroup className="gap-2!">
         {visibleEvaluations.map(({ evaluation, leftRun, rightRun }) => (
@@ -611,7 +649,8 @@ function _EvaluationListItem({
   onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
   onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
-  const verdictLabel = VERDICT_LABELS[evaluation.verdict];
+  const { t, lang } = useI18n();
+  const verdictLabel = t.playground.eval.verdict[evaluation.verdict];
   const leftAverage = averageScoreForRun(
     evaluation.rubric,
     evaluation.runScores,
@@ -647,7 +686,9 @@ function _EvaluationListItem({
       variant="outline"
       role="listitem"
       tabIndex={0}
-      aria-label={`Open saved evaluation: ${verdictLabel}`}
+      aria-label={formatString(t.playground.runHistory.openSavedEvaluation, {
+        verdict: verdictLabel,
+      })}
       className="group hover:bg-foreground/5! focus-visible:ring-ring cursor-pointer flex-col items-start gap-1 focus-visible:ring-[3px]"
       onClick={handleOpen}
       onKeyDown={handleOpenKeyDown}
@@ -656,10 +697,10 @@ function _EvaluationListItem({
         <span className="text-xs font-medium">{verdictLabel}</span>
         <div className="flex shrink-0 items-center gap-1">
           <span className="text-muted-foreground text-[0.625rem]">
-            {format(evaluation.updatedAt)}
+            {format(evaluation.updatedAt, langToTimeago(lang))}
           </span>
           <div onClick={stopOpenClick}>
-            <Tooltip content="Remove evaluation">
+            <Tooltip content={t.playground.runHistory.removeEvaluation}>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -667,7 +708,10 @@ function _EvaluationListItem({
                   "hover:text-destructive pointer-events-none opacity-0 transition-opacity",
                   "group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
                 )}
-                aria-label={`Remove evaluation: ${verdictLabel}`}
+                aria-label={formatString(
+                  t.playground.runHistory.removeEvaluationWithVerdict,
+                  { verdict: verdictLabel }
+                )}
                 onClick={() => onRequestRemove(evaluation)}
               >
                 <Trash2Icon className="size-3" />
@@ -677,8 +721,10 @@ function _EvaluationListItem({
         </div>
       </div>
       <div className="text-muted-foreground line-clamp-2 w-full font-mono text-[0.625rem]">
-        A: {runEntrySummary(leftRun)}
-        {"\n"}B: {runEntrySummary(rightRun)}
+        {formatString(t.playground.runHistory.evaluationSummary, {
+          left: runEntrySummary(leftRun),
+          right: runEntrySummary(rightRun),
+        })}
       </div>
       {evaluation.rubric &&
         leftAverage !== null &&
@@ -686,12 +732,21 @@ function _EvaluationListItem({
         delta !== null && (
           <div className="w-full text-[0.625rem]">
             <div className="text-muted-foreground truncate">
-              {evaluation.rubric.name} · v{evaluation.rubric.revision}
+              {formatString(t.playground.eval.rubricOption, {
+                name: evaluation.rubric.name,
+                revision: evaluation.rubric.revision,
+              })}
             </div>
             <div className="font-mono tabular-nums">
-              A {leftAverage.toFixed(1)} · B {rightAverage.toFixed(1)} · Δ{" "}
-              {delta >= 0 ? "+" : ""}
-              {delta.toFixed(1)}
+              {formatString(
+                t.playground.runHistory.evaluationAverageSummary,
+                {
+                  a: leftAverage.toFixed(1),
+                  b: rightAverage.toFixed(1),
+                  sign: delta >= 0 ? "+" : "",
+                  delta: delta.toFixed(1),
+                }
+              )}
             </div>
           </div>
         )}

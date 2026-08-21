@@ -3,6 +3,7 @@ import { CloudIcon } from "lucide-react";
 import { memo, useMemo } from "react";
 
 import { Link } from "@llm-space/ui/components/link";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 
 import { summarizeProviderHostedActivity } from "./provider-hosted-tool-activity-utils";
 
@@ -15,6 +16,7 @@ function _ProviderHostedToolActivityList({
     () => activities.map(summarizeProviderHostedActivity),
     [activities]
   );
+  const { t } = useI18n();
   if (activities.length === 0) return null;
   return (
     <div className="flex flex-col gap-2 px-2 pt-2 pb-1">
@@ -38,8 +40,11 @@ function _ProviderHostedToolActivityList({
               )}
               {summary.sources.length > 0 && (
                 <span className="text-muted-foreground ml-auto">
-                  {summary.sources.length} source
-                  {summary.sources.length === 1 ? "" : "s"}
+                  {summary.sources.length === 1
+                    ? t.playground.message.sourceCount.one
+                    : formatString(t.playground.message.sourceCount.other, {
+                        n: summary.sources.length,
+                      })}
                 </span>
               )}
             </summary>

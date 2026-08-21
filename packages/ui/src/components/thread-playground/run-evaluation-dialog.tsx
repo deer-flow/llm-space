@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { format } from "timeago.js";
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { formatString, langToTimeago, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -41,15 +42,12 @@ import { EvaluationRubricEditor } from "./evaluation-rubric-editor";
 import { RunEvaluationScorecard } from "./run-evaluation-scorecard";
 import { RunTraceView } from "./run-trace-view";
 
-const VERDICT_OPTIONS: {
-  value: EvaluationRecord["verdict"];
-  label: string;
-}[] = [
-  { value: "leftBetter", label: "Run A Better" },
-  { value: "rightBetter", label: "Run B Better" },
-  { value: "tie", label: "Tie" },
-  { value: "pass", label: "Pass" },
-  { value: "fail", label: "Fail" },
+const VERDICT_OPTIONS: EvaluationRecord["verdict"][] = [
+  "leftBetter",
+  "rightBetter",
+  "tie",
+  "pass",
+  "fail",
 ];
 
 export function RunEvaluationDialog({
@@ -98,6 +96,7 @@ export function RunEvaluationDialog({
   const [prevOpen, setPrevOpen] = useState(false);
   const identity = `${leftRun?.id ?? ""}:${rightRun?.id ?? ""}:${evaluation?.id ?? ""}`;
   const [prevIdentity, setPrevIdentity] = useState(identity);
+  const { t, lang } = useI18n();
 
   // Reinitialize the dialog when it opens or the run/evaluation identity changes. Adjusting
   // during render (not via useEffect) avoids a stale frame between the two
@@ -127,10 +126,13 @@ export function RunEvaluationDialog({
 
   const title = useMemo(() => {
     if (!leftRun || !rightRun) {
-      return "Compare Runs";
+      return t.playground.eval.compareRunsTitle;
     }
-    return `${format(leftRun.timestamp)} vs ${format(rightRun.timestamp)}`;
-  }, [leftRun, rightRun]);
+    return formatString(t.playground.eval.runComparisonTitle, {
+      left: format(leftRun.timestamp, langToTimeago(lang)),
+      right: format(rightRun.timestamp, langToTimeago(lang)),
+    });
+  }, [lang, leftRun, rightRun, t]);
 
   const runScores = useMemo(() => {
     if (!selectedRubric || !leftRun || !rightRun) {
@@ -175,12 +177,12 @@ export function RunEvaluationDialog({
         : {}),
     });
     if (!saved) {
-      toast.error("Unable to save evaluation", {
-        description: "Check the selected runs and rubric scores.",
+      toast.error(t.playground.eval.unableToSaveEvaluation, {
+        description: t.playground.eval.checkRunsAndRubricScores,
       });
       return;
     }
-    toast.success("Evaluation saved");
+    toast.success(t.playground.eval.evaluationSaved);
     onOpenChange(false);
   };
 
@@ -193,17 +195,17 @@ export function RunEvaluationDialog({
   };
 
   const dialogTitle = inspectingRun
-    ? "Inspect Run"
+    ? t.playground.eval.inspectRun
     : rubricEditorOpen
       ? editingRubric
-        ? "Edit rubric"
-        : "Create rubric"
-      : "Evaluate Runs";
+        ? t.playground.eval.editRubric
+        : t.playground.eval.createRubric
+      : t.playground.eval.evaluateRuns;
   const dialogDescription = inspectingRun
-    ? "Saved run evidence from this comparison."
+    ? t.playground.eval.inspectRunDescription
     : rubricEditorOpen
-      ? "Create reusable criteria for manual run comparison in this thread."
-      : "Compare two durable runs and save a structured evaluation with this thread.";
+      ? t.playground.eval.editRubricDescription
+      : t.playground.eval.evaluateRunsDescription;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,7 +220,7 @@ export function RunEvaluationDialog({
             <div className="flex justify-end border-t px-4 py-3">
               <Button variant="ghost" onClick={() => setInspectingRun(null)}>
                 <ArrowLeftIcon className="size-3" />
-                Back to Evaluation
+                {t.playground.eval.backToEvaluation}
               </Button>
             </div>
           </>
@@ -254,17 +256,24 @@ export function RunEvaluationDialog({
               <div className="text-muted-foreground mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span>{title}</span>
                 {evaluation && (
-                  <span>Last saved {format(evaluation.updatedAt)}</span>
+                  <span>
+                    {formatString(t.playground.eval.lastSaved, {
+                      time: format(
+                        evaluation.updatedAt,
+                        langToTimeago(lang)
+                      ),
+                    })}
+                  </span>
                 )}
               </div>
               <div className="flex flex-col gap-3 lg:flex-row">
                 <_RunComparisonPanel
-                  label="Run A"
+                  label={t.playground.eval.runA}
                   run={leftRun}
                   onInspectRun={setInspectingRun}
                 />
                 <_RunComparisonPanel
-                  label="Run B"
+                  label={t.playground.eval.runB}
                   run={rightRun}
                   onInspectRun={setInspectingRun}
                 />
@@ -297,31 +306,35 @@ export function RunEvaluationDialog({
                   }}
                 />
                 <div>
-                  <div className="text-xs font-medium">Verdict</div>
+                  <div className="text-xs font-medium">
+                    {t.playground.eval.verdictLabel}
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {VERDICT_OPTIONS.map((option) => {
-                      const selected = verdict === option.value;
+                    {VERDICT_OPTIONS.map((value) => {
+                      const selected = verdict === value;
                       return (
                         <Button
-                          key={option.value}
+                          key={value}
                           type="button"
                           variant={selected ? "default" : "outline"}
                           aria-pressed={selected}
-                          onClick={() => setVerdict(option.value)}
+                          onClick={() => setVerdict(value)}
                         >
                           {selected && <CheckIcon className="size-3" />}
-                          {option.label}
+                          {t.playground.eval.verdict[value]}
                         </Button>
                       );
                     })}
                   </div>
                 </div>
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs font-medium">Evaluation Note</span>
+                  <span className="text-xs font-medium">
+                    {t.playground.eval.evaluationNote}
+                  </span>
                   <Textarea
                     className="min-h-24"
                     value={note}
-                    placeholder="Why did this run pass, fail, or beat the other one?"
+                    placeholder={t.playground.eval.evaluationNotePlaceholder}
                     onChange={(event) => setNote(event.target.value)}
                   />
                 </label>
@@ -329,26 +342,26 @@ export function RunEvaluationDialog({
             </div>
             <div className="flex justify-end gap-2 border-t px-4 py-3">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Close
+                {t.playground.eval.close}
               </Button>
               <Button disabled={!canSave} onClick={handleSave}>
                 <SaveIcon className="size-3" />
-                Save Evaluation
+                {t.playground.eval.saveEvaluation}
               </Button>
             </div>
           </>
         ) : (
           <div className="text-muted-foreground px-4 py-8 text-center text-xs">
-            Select two runs to compare.
+            {t.playground.eval.selectTwoRunsToCompare}
           </div>
         )}
       </DialogContent>
       <ConfirmDialog
         open={removeScoresOpen}
         onOpenChange={setRemoveScoresOpen}
-        title="Remove rubric scores?"
-        description="Saving without a rubric permanently removes the saved rubric snapshot and all criterion scores from this evaluation. This cannot be undone."
-        confirmLabel="Remove scores and save"
+        title={t.playground.eval.removeRubricScoresTitle}
+        description={t.playground.eval.removeRubricScoresDescription}
+        confirmLabel={t.playground.eval.removeScoresAndSave}
         dimBackground={false}
         onConfirm={() => {
           setRemoveScoresOpen(false);
@@ -368,6 +381,7 @@ function _RunComparisonPanel({
   run: RunSnapshot;
   onInspectRun: (run: RunSnapshot) => void;
 }) {
+  const { t, lang } = useI18n();
   return (
     <section className="bg-muted/30 flex min-w-0 flex-1 flex-col rounded-lg border">
       <div className="border-b px-3 py-2">
@@ -378,14 +392,17 @@ function _RunComparisonPanel({
               type="button"
               variant="ghost"
               size="sm"
-              aria-label={`Inspect ${label}: ${summarizeRun(run.thread)}`}
+              aria-label={formatString(t.playground.eval.inspectWithSummary, {
+                label,
+                summary: summarizeRun(run.thread),
+              })}
               onClick={() => onInspectRun(run)}
             >
               <EyeIcon className="size-3" />
-              Inspect
+              {t.playground.eval.inspect}
             </Button>
             <div className="text-muted-foreground text-[0.625rem]">
-              {format(run.timestamp)}
+              {format(run.timestamp, langToTimeago(lang))}
             </div>
           </div>
         </div>
@@ -394,23 +411,32 @@ function _RunComparisonPanel({
         </div>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-3 py-2 text-[0.625rem]">
-        <_MetaValue label="Model" value={runModelLabel(run.thread)} />
-        <_MetaValue label="Messages" value={runMessageCountLabel(run.thread)} />
+        <_MetaValue label={t.playground.eval.model} value={runModelLabel(run.thread)} />
         <_MetaValue
-          label="Captured"
+          label={t.playground.eval.messages}
+          value={runMessageCountLabel(run.thread)}
+        />
+        <_MetaValue
+          label={t.playground.eval.captured}
           value={new Date(run.timestamp).toLocaleString()}
         />
       </div>
       <div className="flex min-h-0 flex-col gap-3 p-3">
         <_TextExcerpt
-          label="System Prompt"
-          value={run.thread.context?.systemPrompt?.trim() || "No system prompt"}
+          label={t.playground.eval.systemPrompt}
+          value={
+            run.thread.context?.systemPrompt?.trim() ||
+            t.playground.eval.noSystemPrompt
+          }
         />
         <_TextExcerpt
-          label="Last User Message"
+          label={t.playground.eval.lastUserMessage}
           value={runLastUserText(run.thread)}
         />
-        <_TextExcerpt label="Result" value={runResultText(run.thread)} />
+        <_TextExcerpt
+          label={t.playground.eval.result}
+          value={runResultText(run.thread)}
+        />
       </div>
     </section>
   );
