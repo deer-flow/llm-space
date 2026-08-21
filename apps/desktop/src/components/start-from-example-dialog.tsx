@@ -148,7 +148,7 @@ export function StartFromExampleDialog({
                     ? t.desktop.startFromExample.templateCount.one
                     : formatString(
                         t.desktop.startFromExample.templateCount.other,
-                        { count: specialists.length }
+                        { n: specialists.length }
                       )}
                 </span>
               </div>
