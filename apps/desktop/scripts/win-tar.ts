@@ -85,15 +85,15 @@ export function writeUstarTar(entries: TarEntry[]): Uint8Array {
     header.set(textEncoder.encode(octal(0, 7) + "\0"), 116); // gid
     header.set(textEncoder.encode(octal(entry.data.length, 11) + "\0"), 124);
     header.set(textEncoder.encode(octal(entry.mtime, 11) + "\0"), 136);
+    header[156] = entry.type.charCodeAt(0);
+    header.set(textEncoder.encode("ustar\0"), 257);
+    header.set(textEncoder.encode("00"), 263);
+    header.set(textEncoder.encode(prefix), 345);
     // checksum: sum over header with the checksum field as spaces
     header.fill(0x20, 148, 156);
     let sum = 0;
     for (const b of header) sum += b;
     header.set(textEncoder.encode(octal(sum, 6) + "\0 "), 148);
-    header[156] = entry.type.charCodeAt(0);
-    header.set(textEncoder.encode("ustar\0"), 257);
-    header.set(textEncoder.encode("00"), 263);
-    header.set(textEncoder.encode(prefix), 345);
     chunks.push(header);
     if (entry.data.length > 0) {
       chunks.push(entry.data);
