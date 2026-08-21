@@ -544,9 +544,9 @@ export const playground = {
     deleteVariableNamed: "Delete {name}",
     deleteVariableTitle: "Delete variable?",
     deleteReferencedVariableDescription:
-      'This thread references "{{name}}". Deleting this variable will leave unresolved placeholders.',
+      'This thread references "{name}". Deleting this variable will leave unresolved placeholders.',
     deleteVariableDescription:
-      'This removes "{{name}}" and its value from this thread.',
+      'This removes "{name}" and its value from this thread.',
     selectVariableToEdit: "Select a variable to edit.",
     addCustomVariableToProvideValue:
       "Add a custom variable to provide a reusable value.",

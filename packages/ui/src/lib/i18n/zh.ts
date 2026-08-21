@@ -691,9 +691,9 @@ export const zh: Messages = {
       deleteVariableNamed: "删除 {name}",
       deleteVariableTitle: "删除此变量？",
       deleteReferencedVariableDescription:
-        "此会话引用了“{{name}}”。删除此变量将留下未解析的占位符。",
+        "此会话引用了“{name}”。删除此变量将留下未解析的占位符。",
       deleteVariableDescription:
-        "这将从本会话中移除“{{name}}”及其值。",
+        "这将从本会话中移除“{name}”及其值。",
       selectVariableToEdit: "选择一个变量进行编辑。",
       addCustomVariableToProvideValue: "添加自定义变量以提供可复用的值。",
       currentDate: "当前日期",

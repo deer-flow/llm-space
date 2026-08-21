@@ -39,6 +39,19 @@ describe("formatString", () => {
   test("ignores unused vars and handles numbers", () => {
     expect(formatString("{n} items", { n: 3, unused: "yes" })).toBe("3 items");
   });
+  test("a braced value survives (single replacement, no triple braces)", () => {
+    expect(formatString("Copy {token}", { token: "{{foo}}" })).toBe(
+      "Copy {{foo}}"
+    );
+  });
+  test("delete-variable confirmation renders {{name}} without triple braces", () => {
+    expect(
+      formatString(
+        'This removes "{name}" and its value from this thread.',
+        { name: "{{foo}}" }
+      )
+    ).toBe('This removes "{{foo}}" and its value from this thread.');
+  });
 });
 
 describe("resolveInitialLang", () => {
