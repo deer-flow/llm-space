@@ -58,12 +58,15 @@ export async function createMainWindow({
   const window = new BrowserWindow({
     title: "LLM Space",
     url,
-    titleBarStyle: "hiddenInset",
+    // macOS draws the traffic lights over the webview and hides the titlebar;
+    // Windows has neither, so these options are macOS-only.
+    ...(process.platform === "win32"
+      ? {}
+      : {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightOffset: { x: 2, y: 16 },
+        }),
     rpc,
-    trafficLightOffset: {
-      x: 2,
-      y: 16,
-    },
     frame: savedFrame,
   });
 
