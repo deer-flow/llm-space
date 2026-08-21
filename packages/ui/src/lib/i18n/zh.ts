@@ -1581,8 +1581,8 @@ export const zh: Messages = {
         other: "检测到服务商",
       },
       providerDetectedDescription: {
-        one: "一键添加即可立即开始构建。",
-        other: "一键添加即可立即开始构建。",
+        one: "从列表中添加检测到的服务商即可开始使用。",
+        other: "从列表中添加检测到的服务商即可开始使用。",
       },
       addDetectedProvider: "添加检测到的服务商 {name}",
       detectedLocally: "在本地检测到",

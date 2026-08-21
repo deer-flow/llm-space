@@ -47,8 +47,8 @@ export const desktop = {
       other: "Providers detected",
     },
     providerDetectedDescription: {
-      one: "Add it in one click to start building right away.",
-      other: "Add them in one click to start building right away.",
+      one: "Add a detected provider from the list to get started.",
+      other: "Add detected providers from the list to get started.",
     },
     addDetectedProvider: "Add detected provider {name}",
     detectedLocally: "Detected locally",
