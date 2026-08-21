@@ -88,6 +88,9 @@ export default {
     },
     win: {
       bundleCEF: false,
+      // A PNG is fine: electrobun converts it to .ico (png-to-ico) and embeds
+      // it into the exe with rcedit.
+      icon: "icon.iconset/icon_256x256.png",
     },
   },
   scripts: {
