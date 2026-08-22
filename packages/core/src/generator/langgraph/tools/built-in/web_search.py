@@ -133,6 +133,50 @@ def _brave_search(query: str, limit: int, include_content: bool) -> list[dict]:
     return results
 
 
+def _searxng_search(query: str, limit: int, include_content: bool) -> list[dict]:
+    """SearXNG web search (self-hosted). Requires ``SEARXNG_BASE_URL``."""
+    base_url = os.environ.get("SEARXNG_BASE_URL", "").strip().rstrip("/")
+    if not base_url:
+        raise RuntimeError(
+            "SearXNG service URL is not configured. Set SEARXNG_BASE_URL."
+        )
+
+    res = requests.get(
+        f"{base_url}/search",
+        params={
+            "q": query,
+            "format": "json",
+            "language": "auto",
+            "pageno": 1,
+            "limit": limit,
+        },
+        headers={
+            "Accept": "application/json",
+            # SearXNG botdetection rejects requests without a client IP; the
+            # instance must trust this proxy (server.trust_x_forwarded_for).
+            "X-Forwarded-For": "127.0.0.1",
+            "X-Real-IP": "127.0.0.1",
+        },
+    )
+    if not res.ok:
+        raise RuntimeError(f"web_search failed: {res.status_code}")
+
+    results = []
+    for item in res.json().get("results") or []:
+        content = item.get("content")
+        results.append(
+            {
+                "title": item.get("title") or "Untitled",
+                "url": item.get("url") or "",
+                "snippet": content,
+                "content": _truncate_text(content, 2_000)
+                if include_content and content
+                else None,
+            }
+        )
+    return results
+
+
 @tool
 def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list[dict]:
     """Search the web and return LLM-friendly results.
@@ -140,7 +184,7 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
     Search the web and return LLM-friendly results.
 
     The backend is chosen by the ``SEARCH_PROVIDER`` environment variable
-    (``firecrawl`` by default, or ``tavily``/``brave``).
+    (``firecrawl`` by default, or ``tavily``/``brave``/``searxng``).
 
     Args:
         query: The search query string to look up on the web.
@@ -153,4 +197,6 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
         return _tavily_search(query, limit, includeContent)
     if provider == "brave":
         return _brave_search(query, limit, includeContent)
+    if provider == "searxng":
+        return _searxng_search(query, limit, includeContent)
     return _firecrawl_search(query, limit, includeContent)
