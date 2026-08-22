@@ -215,10 +215,21 @@ class FakeResponse:
 captured = {}
 requests = types.ModuleType("requests")
 
+error_response = FakeResponse(
+    {"error": "Bot detected. Link to the CAPTCHA page: http://localhost/captcha"}
+)
+error_response.ok = False
+error_response.status_code = 500
+
+call_count = {"n": 0}
+
 def fake_get(url, params=None, headers=None):
     captured["url"] = url
     captured["params"] = params
     captured["headers"] = headers
+    call_count["n"] += 1
+    if call_count["n"] == 2:
+        return error_response
     return FakeResponse({"results": [{"title": "LLM Space", "url": "https://example.com", "content": "A workbench."}]})
 
 requests.get = fake_get
@@ -236,6 +247,12 @@ assert captured["url"] == "http://localhost:8080/search", captured
 assert captured["params"] == {"q": "LLM Space", "format": "json", "language": "auto", "pageno": 1, "limit": 5}, captured
 assert captured["headers"]["X-Forwarded-For"] == "127.0.0.1", captured
 assert captured["headers"]["X-Real-IP"] == "127.0.0.1", captured
+
+try:
+    module.web_search("blocked", limit=1, includeContent=False)
+    raise SystemExit("expected RuntimeError for non-OK SearXNG response")
+except RuntimeError as exc:
+    assert "Bot detected. Link to the CAPTCHA page: http://localhost/captcha" in str(exc), str(exc)
 
 os.environ.pop("SEARXNG_BASE_URL", None)
 try:

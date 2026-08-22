@@ -158,11 +158,23 @@ def _searxng_search(query: str, limit: int, include_content: bool) -> list[dict]
             "X-Real-IP": "127.0.0.1",
         },
     )
+    json_body = res.json()
     if not res.ok:
-        raise RuntimeError(f"web_search failed: {res.status_code}")
+        # Surface the SearXNG error body when present (mirrors _brave_search's
+        # error-surfacing pattern): `error` is a string, or an object carrying
+        # a `detail`.
+        error = json_body.get("error")
+        if isinstance(error, dict):
+            error = error.get("detail")
+        raise RuntimeError(
+            error
+            or json_body.get("message")
+            or json_body.get("detail")
+            or f"web_search failed: {res.status_code}"
+        )
 
     results = []
-    for item in res.json().get("results") or []:
+    for item in json_body.get("results") or []:
         content = item.get("content")
         results.append(
             {

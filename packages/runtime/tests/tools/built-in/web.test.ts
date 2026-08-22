@@ -316,12 +316,47 @@ describe("Searxng Search provider", () => {
     );
   });
 
-  test("surfaces non-OK search responses", async () => {
+  test("surfaces error details returned by SearXNG", async () => {
     globalThis.fetch = ((input) => {
       void input;
       return Promise.resolve(
-        Response.json({ error: "boom" }, { status: 500 })
+        Response.json(
+          {
+            error:
+              "Bot detected. Link to the CAPTCHA page: http://localhost/captcha",
+          },
+          { status: 429 }
+        )
       );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => ({
+        provider: "searxng",
+        braveApiKey: "",
+        firecrawlApiKey: "",
+        tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
+      }),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe(
+      "Bot detected. Link to the CAPTCHA page: http://localhost/captcha"
+    );
+  });
+
+  test("falls back to the status message when the non-OK body has no error", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(Response.json({ nope: true }, { status: 500 }));
     }) as typeof fetch;
 
     const search = createWebBuiltInTools({

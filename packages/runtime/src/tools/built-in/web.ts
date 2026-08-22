@@ -351,6 +351,10 @@ interface SearxngSearchResponse {
     url?: string;
     content?: string;
   }[];
+  /** Non-OK responses may carry an `error` (string or `{ detail }`) / `message`. */
+  error?: string | { detail?: string };
+  message?: string;
+  detail?: string;
 }
 
 /**
@@ -396,12 +400,20 @@ class SearxngSearchProvider implements SearchProvider {
         "X-Real-IP": "127.0.0.1",
       },
     });
+    const json = (await res.json()) as SearxngSearchResponse;
 
     if (!res.ok) {
-      throw new Error(`web_search failed: ${res.status}`);
+      // Surface the SearXNG error body when present (Brave's error-surfacing
+      // pattern): `error` is a string, or an object carrying a `detail`.
+      const error = json.error;
+      throw new Error(
+        (typeof error === "string" ? error : error?.detail) ??
+          json.message ??
+          json.detail ??
+          `web_search failed: ${res.status}`
+      );
     }
 
-    const json = (await res.json()) as SearxngSearchResponse;
     return (json.results ?? []).map((item) => ({
       title: item.title ?? "Untitled",
       url: item.url ?? "",
