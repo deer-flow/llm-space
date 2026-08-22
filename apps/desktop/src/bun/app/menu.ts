@@ -212,11 +212,10 @@ let _menuLang: "en" | "zh" = isChineseLocale() ? "zh" : "en";
 let _menuUpdateReady = false;
 
 function _rebuildMenu() {
-  if (process.platform !== "darwin") return;
   ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady, MESSAGES[_menuLang]));
 }
 
-/** Rebuild the native menu after a UI-language change (macOS only). */
+/** Rebuild the native menu after a UI-language change. */
 export function setMenuLanguage(lang: "en" | "zh") {
   if (_menuLang === lang) return;
   _menuLang = lang;
@@ -280,13 +279,12 @@ const MENU_ACTION_COMMANDS: Record<string, Command> = {
 
 /**
  * Install the application menu and wire its actions to the main window. Called
- * once after the window exists. macOS only — Windows/Linux have no native menu.
+ * once after the window exists.
  */
 export function registerMenuActions(
   window: BrowserWindow,
   executeCommand: (command: Command, window: BrowserWindow) => void
 ) {
-  if (process.platform !== "darwin") return;
   ApplicationMenu.setApplicationMenu(_buildMenu(_menuUpdateReady, MESSAGES[_menuLang]));
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;

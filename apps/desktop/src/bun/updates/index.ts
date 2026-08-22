@@ -24,14 +24,7 @@ export interface UpdateStatusMessage {
   manual: boolean;
 }
 
-/**
- * Process-scoped updater state and scheduling.
- *
- * Updates only work on macOS today (electrobun's `Updater` and the .patch
- * update feed are macOS-shaped); on other platforms the service is inert —
- * no background checks, and manual checks report that updates are
- * unsupported.
- */
+/** Process-scoped updater state and scheduling. */
 export class UpdaterService {
   private _isCheckInFlight = false;
   private _isPassManual = false;
@@ -45,14 +38,6 @@ export class UpdaterService {
   ) {}
 
   async checkForUpdates(manual: boolean): Promise<void> {
-    if (process.platform !== "darwin") {
-      this._isPassManual = manual;
-      this._sendStatus({
-        state: "error",
-        message: _errors().updatesUnsupportedPlatform,
-      });
-      return;
-    }
     if (this._isCheckInFlight) {
       if (manual && !this._isPassManual) {
         this._isPassManual = true;
@@ -109,13 +94,6 @@ export class UpdaterService {
   }
 
   async applyUpdateAndRestart(): Promise<void> {
-    if (process.platform !== "darwin") {
-      this._sendStatus({
-        state: "error",
-        message: _errors().updatesUnsupportedPlatform,
-      });
-      return;
-    }
     try {
       await Updater.applyUpdate();
     } catch (error) {
@@ -143,7 +121,6 @@ export class UpdaterService {
   }
 
   async start(): Promise<void> {
-    if (process.platform !== "darwin") return;
     const { channel, hash, version, identifier } = await Updater.getLocalInfo();
     if (channel === "dev") return;
 
