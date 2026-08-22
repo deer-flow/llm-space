@@ -52,6 +52,7 @@ import {
 import { MessageListItem } from "./message-list-item";
 import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
+import { followMessageViewportBottom } from "./message-scroll-stability";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
 
 const MESSAGE_VIRTUALIZATION_THRESHOLD = 20;
@@ -300,12 +301,6 @@ export function MessageListView({
     },
     [messageIds, moveMessage]
   );
-  const scrollToBottom = useCallback(() => {
-    const viewport = getScrollElement();
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
-    }
-  }, [getScrollElement]);
   const scrollToMessageIndex = useCallback(
     (
       index: number,
@@ -401,10 +396,16 @@ export function MessageListView({
     };
   }, [displayRows.length, getScrollElement, shouldVirtualize]);
   useEffect(() => {
-    if (status === "running") {
-      scrollToBottom();
+    if (status !== "running") {
+      return;
     }
-  }, [status, scrollToBottom]);
+    const viewport = getScrollElement();
+    const content = contentRef.current;
+    if (!viewport || !content) {
+      return;
+    }
+    return followMessageViewportBottom(viewport, content);
+  }, [getScrollElement, status]);
   useEffect(() => {
     if (!autoFocusMessageId) {
       return;
@@ -455,8 +456,11 @@ export function MessageListView({
                 items={messageIds}
                 strategy={verticalListSortingStrategy}
               >
+                {/* TanStack writes the virtual height directly to the DOM, so
+                    these layouts must not reuse the same container node. */}
                 {shouldVirtualize ? (
                   <div
+                    key="virtualized"
                     ref={virtualizer.containerRef}
                     className="relative w-full"
                   >
@@ -482,7 +486,7 @@ export function MessageListView({
                     })}
                   </div>
                 ) : (
-                  <div className="w-full pt-3">
+                  <div key="standard" className="w-full pt-3">
                     {displayRows.map((row, index) => (
                       <MessageRow
                         key={row.message.id}
