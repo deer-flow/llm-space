@@ -11,7 +11,12 @@ import os from "node:os";
 import path from "node:path";
 
 import { getWindowStatePath } from "../../../src/server/paths";
-import { WindowStateStore } from "../../../src/server/window-state";
+import {
+  DEFAULT_WINDOW_FRAME,
+  isValidWindowFrame,
+  resolveWindowFrame,
+  WindowStateStore,
+} from "../../../src/server/window-state";
 
 const ORIGINAL_HOME = process.env.LLM_SPACE_HOME;
 const TEMP_DIRS: string[] = [];
@@ -69,5 +74,52 @@ describe("WindowStateStore", () => {
       frame: { x: 10, y: 20, width: 1000, height: 700 },
       zoom: 1.2,
     });
+  });
+});
+
+describe("resolveWindowFrame", () => {
+  test("returns the default frame when state.frame is absent", () => {
+    expect(resolveWindowFrame({})).toBe(DEFAULT_WINDOW_FRAME);
+    expect(resolveWindowFrame({ isMaximized: true })).toBe(DEFAULT_WINDOW_FRAME);
+  });
+
+  test("returns the frame when it is valid", () => {
+    const frame = { x: 80, y: 80, width: 1280, height: 800 };
+    expect(resolveWindowFrame({ frame })).toEqual(frame);
+  });
+
+  test.each([
+    { x: -32000, y: 80, width: 1280, height: 800 },
+    { x: 80, y: -32000, width: 1280, height: 800 },
+    { x: 80, y: 80, width: 99, height: 800 },
+    { x: 80, y: 80, width: 1280, height: 99 },
+  ])("returns the default frame for invalid frame %o", (frame) => {
+    expect(resolveWindowFrame({ frame })).toBe(DEFAULT_WINDOW_FRAME);
+  });
+});
+
+describe("isValidWindowFrame", () => {
+  test("accepts boundary values", () => {
+    expect(
+      isValidWindowFrame({ x: -20000, y: -20000, width: 100, height: 100 })
+    ).toBe(true);
+  });
+
+  test("rejects frames below the position boundary", () => {
+    expect(isValidWindowFrame({ x: -20001, y: 80, width: 1280, height: 800 })).toBe(
+      false
+    );
+    expect(isValidWindowFrame({ x: 80, y: -20001, width: 1280, height: 800 })).toBe(
+      false
+    );
+  });
+
+  test("rejects frames smaller than the minimum size", () => {
+    expect(isValidWindowFrame({ x: 80, y: 80, width: 99, height: 800 })).toBe(
+      false
+    );
+    expect(isValidWindowFrame({ x: 80, y: 80, width: 1280, height: 99 })).toBe(
+      false
+    );
   });
 });

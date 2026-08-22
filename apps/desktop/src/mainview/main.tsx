@@ -68,4 +68,11 @@ async function startRenderer(): Promise<void> {
   );
 }
 
+// WebView2 (Windows) pops its native default context menu — Back, Reload,
+// Inspect… — wherever the page doesn't handle right-click itself. The app's
+// own context menus are DOM-driven React handlers and are unaffected; this
+// listener only cancels the native menu. Keyboard copy/paste shortcuts still
+// work; only the native menu's Cut/Copy/Paste items disappear.
+document.addEventListener("contextmenu", (event) => event.preventDefault());
+
 void startRenderer();

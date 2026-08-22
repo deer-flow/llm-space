@@ -1,9 +1,8 @@
 import {
-  DEFAULT_WINDOW_FRAME,
-  getWindowFrame,
   getWindowFullScreen,
   getWindowMaximized,
   getWindowZoom,
+  resolveWindowFrame,
   WindowStateStore,
 } from "@llm-space/core/server";
 import { BrowserWindow, Updater } from "electrobun/bun";
@@ -52,18 +51,21 @@ export async function createMainWindow({
   const url = await getMainViewUrl(localStorageValues);
   const windowStateStore = await WindowStateStore.load();
   const windowState = windowStateStore.state;
-  const savedFrame = getWindowFrame(windowState) ?? DEFAULT_WINDOW_FRAME;
+  const savedFrame = resolveWindowFrame(windowState);
   const savedZoom = getWindowZoom(windowState) ?? 1;
 
   const window = new BrowserWindow({
     title: "LLM Space",
     url,
-    titleBarStyle: "hiddenInset",
+    // macOS draws the traffic lights over the webview and hides the titlebar;
+    // Windows has neither, so these options are macOS-only.
+    ...(process.platform === "win32"
+      ? {}
+      : {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightOffset: { x: 2, y: 16 },
+        }),
     rpc,
-    trafficLightOffset: {
-      x: 2,
-      y: 16,
-    },
     frame: savedFrame,
   });
 
