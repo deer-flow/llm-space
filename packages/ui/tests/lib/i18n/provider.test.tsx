@@ -16,7 +16,10 @@ import { I18nProvider, useI18n } from "../../../src/lib/i18n";
 // real events (see the message-scroll regression test).
 const TEST_DOM = installReactTestDom();
 // The adapter exposes storage on `window` only; mirror it as a global so the
-// tests below can call `localStorage` directly.
+// tests below can call `localStorage` directly. Keep the previous value and
+// restore it afterwards (same discipline as `TEST_DOM.restore()` above) so
+// the fake can't leak into suites that run after this file.
+const PREVIOUS_LOCAL_STORAGE = globalThis.localStorage;
 globalThis.localStorage = window.localStorage;
 // Bun's partial navigator exposes no language properties; give it a non-zh
 // preference so the provider's browser-languages fallback resolves to `en`.
@@ -45,6 +48,11 @@ afterEach(() => {
 
 afterAll(() => {
   TEST_DOM.restore();
+  if (PREVIOUS_LOCAL_STORAGE === undefined) {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  } else {
+    globalThis.localStorage = PREVIOUS_LOCAL_STORAGE;
+  }
 });
 
 function mount(node: ReactNode) {
