@@ -9,9 +9,9 @@
 export const menu = {
   app: {
     about: "About LLM Space",
-    checkUpdates: "Check for Updates…",
+    checkUpdates: "Check for Updates...",
     restartToUpdate: "Restart to Update",
-    settings: "Settings…",
+    settings: "Settings...",
     hide: "Hide LLM Space",
     hideOthers: "Hide Others",
     showAll: "Show All",
@@ -20,11 +20,11 @@ export const menu = {
   file: {
     label: "File",
     newFile: "New File",
-    newFromExamples: "New from Examples…",
+    newFromExamples: "New from Examples...",
     newFolder: "New Folder",
-    importFiles: "Import from Files…",
+    importFiles: "Import from Files...",
     importClipboard: "Import from Clipboard",
-    share: "Share…",
+    share: "Share...",
     refreshWorkspace: "Refresh Workspace",
     revealWorkspace: "Reveal Workspace Folder",
     closeTab: "Close Tab",
@@ -45,7 +45,7 @@ export const menu = {
   },
   view: {
     label: "View",
-    commandPalette: "Command Palette…",
+    commandPalette: "Command Palette...",
     toggleSidebar: "Toggle Sidebar",
     reload: "Reload",
     zoomIn: "Zoom In",
