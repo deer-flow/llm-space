@@ -5,6 +5,7 @@ import {
   type SearchProviderId,
   type SearchSettings,
 } from "@llm-space/core";
+import { Input } from "@llm-space/ui/ui/input";
 import {
   Select,
   SelectContent,
@@ -86,6 +87,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
               <SelectItem value="brave">Brave Search</SelectItem>
               <SelectItem value="firecrawl">Firecrawl</SelectItem>
               <SelectItem value="tavily">Tavily</SelectItem>
+              <SelectItem value="searxng">SearXNG</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -121,6 +123,25 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
           }
           onBlur={() => void persist(settings)}
         />
+
+        {settings.provider === "searxng" ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">SearXNG service URL</span>
+            <Input
+              type="url"
+              value={settings.searxngBaseUrl}
+              placeholder="http://localhost:8080"
+              aria-label="SearXNG service URL"
+              onChange={(e) =>
+                setSettings({ ...settings, searxngBaseUrl: e.target.value })
+              }
+              onBlur={() => void persist(settings)}
+            />
+            <p className="text-muted-foreground text-xs">
+              Self-hosted SearXNG instance. No API key required.
+            </p>
+          </div>
+        ) : null}
 
         <p className="text-muted-foreground text-xs">
           Values starting with <code>$</code> are read from the environment

@@ -39,6 +39,8 @@ describe("built-in tool sources manifest", () => {
   it("covers the expected built-in tools", () => {
     expect(BUILTIN_TOOL_SOURCES.read).toContain("def read(");
     expect(BUILTIN_TOOL_SOURCES.web_search).toContain("SEARCH_PROVIDER");
+    expect(BUILTIN_TOOL_SOURCES.web_search).toContain("SEARXNG_BASE_URL");
+    expect(BUILTIN_TOOL_SOURCES.web_search).toContain("_searxng_search");
     expect(Object.keys(BUILTIN_TOOL_SOURCES).length).toBeGreaterThanOrEqual(16);
   });
 
@@ -177,6 +179,101 @@ assert revealed == [str(target)]
       ]);
 
       expect(stdout).toBe("");
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("executes the generated searxng web_search with stubbed requests", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "llm-space-python-searxng-")
+    );
+    const sourcePath = path.join(root, "web_search.py");
+    try {
+      await writeFile(sourcePath, BUILTIN_TOOL_SOURCES.web_search!, "utf8");
+      const script = `
+import importlib.util, os, sys, types
+
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+
+class FakeResponse:
+    ok = True
+    status_code = 200
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+captured = {}
+requests = types.ModuleType("requests")
+
+error_response = FakeResponse(
+    {"error": "Bot detected. Link to the CAPTCHA page: http://localhost/captcha"}
+)
+error_response.ok = False
+error_response.status_code = 500
+
+call_count = {"n": 0}
+
+def fake_get(url, params=None, headers=None):
+    captured["url"] = url
+    captured["params"] = params
+    captured["headers"] = headers
+    call_count["n"] += 1
+    if call_count["n"] == 2:
+        return error_response
+    return FakeResponse({"results": [{"title": "LLM Space", "url": "https://example.com", "content": "A workbench."}]})
+
+requests.get = fake_get
+sys.modules["requests"] = requests
+
+spec = importlib.util.spec_from_file_location("web_search", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+os.environ["SEARCH_PROVIDER"] = "searxng"
+os.environ["SEARXNG_BASE_URL"] = "http://localhost:8080"
+out = module.web_search("LLM Space", limit=5, includeContent=True)
+assert out == [{"title": "LLM Space", "url": "https://example.com", "snippet": "A workbench.", "content": "A workbench."}], repr(out)
+assert captured["url"] == "http://localhost:8080/search", captured
+assert captured["params"] == {"q": "LLM Space", "format": "json", "language": "auto", "pageno": 1, "limit": 5}, captured
+assert captured["headers"]["X-Forwarded-For"] == "127.0.0.1", captured
+assert captured["headers"]["X-Real-IP"] == "127.0.0.1", captured
+
+try:
+    module.web_search("blocked", limit=1, includeContent=False)
+    raise SystemExit("expected RuntimeError for non-OK SearXNG response")
+except RuntimeError as exc:
+    assert "Bot detected. Link to the CAPTCHA page: http://localhost/captcha" in str(exc), str(exc)
+
+os.environ.pop("SEARXNG_BASE_URL", None)
+try:
+    module.web_search("x", limit=1, includeContent=False)
+    raise SystemExit("expected RuntimeError for missing SEARXNG_BASE_URL")
+except RuntimeError as exc:
+    assert "SEARXNG_BASE_URL" in str(exc), str(exc)
+
+print("ok")
+`;
+      const child = Bun.spawn(
+        ["python3", "-c", script, sourcePath],
+        { stdout: "pipe", stderr: "pipe" }
+      );
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+
+      expect(stdout).toContain("ok");
       expect(stderr).toBe("");
       expect(exitCode).toBe(0);
     } finally {
