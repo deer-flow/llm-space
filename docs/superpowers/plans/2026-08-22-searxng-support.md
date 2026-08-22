@@ -619,6 +619,7 @@ spec = importlib.util.spec_from_file_location("web_search", sys.argv[1])
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
+os.environ["SEARCH_PROVIDER"] = "searxng"  # required — dispatch defaults to firecrawl without it
 os.environ["SEARXNG_BASE_URL"] = "http://localhost:8080"
 out = module.web_search("LLM Space", limit=5, includeContent=True)
 assert out == [{"title": "LLM Space", "url": "https://example.com", "snippet": "A workbench.", "content": "A workbench."}], repr(out)
