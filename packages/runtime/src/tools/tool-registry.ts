@@ -37,11 +37,15 @@ interface StructuredToolCallResponse extends ToolCallResponse {
  * cannot be mistaken for the runtime response contract.
  */
 export function createToolCallResponse(
-  content: ToolCallResponse["content"]
+  content: ToolCallResponse["content"],
+  effects?: ToolCallResponse["effects"]
 ): ToolCallResponse {
   const response: StructuredToolCallResponse = {
     [STRUCTURED_TOOL_CALL_RESPONSE]: true,
     content,
+    ...(effects?.length
+      ? { effects: effects.map((effect) => ({ ...effect })) }
+      : {}),
   };
   return response;
 }
@@ -132,7 +136,12 @@ export class ToolRegistry {
     }
     const result = await entry.execute(args, config, { connection });
     if (_isToolCallResponse(result)) {
-      return { content: result.content };
+      return {
+        content: result.content,
+        ...(result.effects?.length
+          ? { effects: result.effects.map((effect) => ({ ...effect })) }
+          : {}),
+      };
     }
     return {
       content: [{ type: "text", text: _serializeToolResult(result) }],

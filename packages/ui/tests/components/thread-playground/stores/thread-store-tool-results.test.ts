@@ -197,6 +197,9 @@ describe("auto-run tool results", () => {
     const store = createThreadStore(
       {
         context: {
+          agentStatus: {
+            components: ["timestamps", "tool-counter"],
+          },
           messages: [
             {
               id: "user-1",
@@ -232,12 +235,19 @@ describe("auto-run tool results", () => {
     const assistant = messages.at(-1);
     expect(assistant?.role).toBe("assistant");
     if (assistant?.role !== "assistant") {
-      throw new Error("Expected an assistant message");
+      throw new Error("预期得到 assistant 消息");
     }
-    expect(assistant.toolCalls?.[0]?.output).toEqual({
-      content: outputContent,
-      isError: false,
-    });
+    const output = assistant.toolCalls?.[0]?.output;
+    expect(output?.isError).toBe(false);
+    expect(output?.agentStatus?.ordinal).toBe(1);
+    expect(typeof output?.agentStatus?.timestamp).toBe("number");
+    expect(output?.content).toContainEqual(outputContent[1]);
+    const firstOutputContent = output?.content[0];
+    expect(firstOutputContent?.type).toBe("text");
+    if (firstOutputContent?.type !== "text") {
+      throw new Error("预期工具输出首项为文本");
+    }
+    expect(firstOutputContent.text).toContain("[image file: pixel.png]");
   });
 
   test("shares one owning Thread and variables snapshot across a Plugin Tool batch", async () => {

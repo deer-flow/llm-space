@@ -1,19 +1,29 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import {
+  applyAgentStatusConfiguration,
   AssistantMessage,
+  backfillAgentStatusUserTimestamps,
+  createAgentStatusRuntime,
   getMessageText,
   getToolDisplayName,
   getToolKey,
   isDangerousBashCommand,
+  isAgentStatusTodoTool,
   isExecutableTool,
   Message,
   normalizeThread,
+  normalizeAgentStatusThread,
+  normalizeAgentStatusSettings,
   reduceMessages,
   streamThread,
   Tool as ToolSchema,
   uuid,
   type AgentTransport,
   type AgentEvent,
+  type AgentStatusComponent,
+  type AgentStatusEffect,
+  type AgentStatusEnvironment,
+  type AgentStatusSnapshot,
   type BuiltinTool,
   type McpTool,
   type PluginTool,
@@ -105,9 +115,20 @@ const _noFileExists = (): Promise<boolean> => Promise.resolve(false);
  */
 const MAX_AUTO_TOOL_TURNS = 50;
 
+export interface RecordToolCallResultInput {
+  content: ToolCallOutput["content"];
+  isError: boolean;
+  error?: unknown;
+  effects?: AgentStatusEffect[];
+}
+
 export type ThreadStoreStatus = "idle" | "preparing" | "running";
 export interface ThreadState {
   thread: Thread;
+  /** 供状态栏窄订阅的缓存快照，避免渲染阶段扫描完整 transcript。 */
+  agentStatusSnapshot: AgentStatusSnapshot;
+  /** 最近一次 runtime 探测环境，仅供当前会话展示，不写入 Thread。 */
+  agentStatusEnvironment?: AgentStatusEnvironment;
   runtimeId?: string;
   streamingMessage: AssistantMessage | null;
   status: ThreadStoreStatus;
@@ -188,6 +209,16 @@ export interface ThreadState {
   addTool(tool: Tool): boolean;
   updateTool(name: string, tool: Tool): boolean;
   removeTool(name: string): void;
+  setAgentStatusComponent(
+    component: AgentStatusComponent,
+    enabled: boolean
+  ): void;
+  setAgentStatusTimeOffset(offsetMs: number): void;
+  recordToolCallResult(
+    messageId: string,
+    toolCallId: string,
+    result: RecordToolCallResultInput
+  ): Promise<ToolCallOutput | undefined>;
   toggleMessageRole(id: string): void;
   toggleMessageCollapsed(id: string): void;
   abort(): void;
@@ -243,6 +274,7 @@ export function createThreadStore(
     ) => Promise<{
       content: ToolCallOutput["content"];
       isError: boolean;
+      effects?: AgentStatusEffect[];
     }>;
     /**
      * Load the enabled local skills used when rendering prompt variables.
@@ -261,14 +293,23 @@ export function createThreadStore(
     resolvePath?: (path: string) => Promise<string>;
     /** Monotonic clock used for client-observed model timing. */
     now?: () => number;
+    /** 写入 Agent 状态元数据的墙上时钟；不得复用单调计时器。 */
+    wallClock?: () => number;
     /** Archive a completed run outside the main thread document. */
     archiveRunSnapshot?: (run: RunSnapshot) => Promise<ThreadRunReference>;
     /** Load a complete run snapshot from an opaque persisted reference. */
     readRunSnapshot?: (snapshotRef: string) => Promise<ThreadSnapshot>;
   } = {}
 ): ThreadStore {
-  const normalizedInputThread = ensureThreadVariableState(
-    normalizeThread(initialThread)
+  const wallClock = options.wallClock ?? Date.now;
+  const normalizedThread = normalizeAgentStatusThread(
+    ensureThreadVariableState(normalizeThread(initialThread))
+  );
+  const initialTimeOffsetMs =
+    normalizedThread.context?.agentStatus?.simulatedTimeOffsetMs ?? 0;
+  const normalizedInputThread = backfillAgentStatusUserTimestamps(
+    normalizedThread,
+    () => wallClock() + initialTimeOffsetMs
   );
   const initialRunHistory = normalizeRunHistory(
     normalizedInputThread.runHistory,
@@ -286,12 +327,21 @@ export function createThreadStore(
     evaluations: initialEvaluations,
     evaluationRubrics: initialEvaluationRubrics,
   });
+  const _createAgentStatusSnapshot = (
+    thread: Thread,
+    environment?: AgentStatusEnvironment
+  ): AgentStatusSnapshot =>
+    createAgentStatusRuntime({
+      now: wallClock,
+      ...(environment ? { environment } : {}),
+    }).snapshot(thread.context ?? {});
 
   const store = createStore<ThreadState>()(
     subscribeWithSelector((set, get) => {
       // --- internal helpers ---------------------------------------------------
 
       let stopActiveRun: (() => void) | null = null;
+      let agentStatusCommitQueue: Promise<void> = Promise.resolve();
       const loadedRuns = new Map<string, RunSnapshot>();
 
       const cacheLoadedRun = (run: RunSnapshot) => {
@@ -304,18 +354,38 @@ export function createThreadStore(
         return run;
       };
 
-      const patchThread = (partial: Partial<Thread>) => {
+      const patchThread = (
+        partial: Partial<Thread>,
+        refreshAgentStatusSnapshot = false
+      ) => {
         const next = { ...get().thread, ...partial };
-        set({ thread: next });
+        const streaming = get().status === "running";
+        set({
+          thread: next,
+          ...(refreshAgentStatusSnapshot
+            ? {
+                agentStatusSnapshot: _createAgentStatusSnapshot(
+                  next,
+                  get().agentStatusEnvironment
+                ),
+              }
+            : {}),
+        });
         // Streaming changes are folded into a single record by run(); skip them
         // here so each chunk doesn't become its own undo step.
-        if (get().status !== "running") {
+        if (!streaming) {
           set({ changeHistory: recordSnapshot(get().changeHistory, next) });
         }
       };
 
-      const patchContext = (partial: Partial<Thread["context"]>) => {
-        patchThread({ context: { ...get().thread.context, ...partial } });
+      const patchContext = (
+        partial: Partial<Thread["context"]>,
+        refreshAgentStatusSnapshot = false
+      ) => {
+        patchThread(
+          { context: { ...get().thread.context, ...partial } },
+          refreshAgentStatusSnapshot
+        );
       };
 
       const getVariableState = () =>
@@ -327,7 +397,8 @@ export function createThreadStore(
         systemPrompt = get().thread.context?.systemPrompt,
         // Variable names whose captured snapshot values must be dropped so their
         // existing references re-render with the edited value (see below).
-        invalidateSnapshotNames?: Iterable<string>
+        invalidateSnapshotNames?: Iterable<string>,
+        refreshAgentStatusSnapshot = false
       ) => {
         const partial: Partial<Thread["context"]> = {
           variables,
@@ -340,7 +411,7 @@ export function createThreadStore(
             invalidateSnapshotNames
           );
         }
-        patchContext(partial);
+        patchContext(partial, refreshAgentStatusSnapshot);
       };
 
       const defaultCustomValues = (variableVariants: ThreadVariableVariants) =>
@@ -406,17 +477,23 @@ export function createThreadStore(
         }
       };
 
-      const setMessages = (messages: Message[]) => {
-        patchContext({ messages });
+      const setMessages = (
+        messages: Message[],
+        refreshAgentStatusSnapshot = false
+      ) => {
+        patchContext({ messages }, refreshAgentStatusSnapshot);
         reconcileRunValidationIssue(messages);
       };
 
       /** Replace the messages array; skips the update if nothing changed. */
-      const updateMessages = (updater: (messages: Message[]) => Message[]) => {
+      const updateMessages = (
+        updater: (messages: Message[]) => Message[],
+        refreshAgentStatusSnapshot = false
+      ) => {
         const messages = get().thread.context?.messages ?? [];
         const next = updater(messages);
         if (next !== messages) {
-          setMessages(next);
+          setMessages(next, refreshAgentStatusSnapshot);
         }
       };
 
@@ -428,7 +505,8 @@ export function createThreadStore(
       /** Replace a single message by id; no-op (same array ref) if not found. */
       const updateMessage = (
         id: string,
-        updater: (message: Message) => Message
+        updater: (message: Message) => Message,
+        refreshAgentStatusSnapshot = false
       ) => {
         updateMessages((messages) => {
           let changed = false;
@@ -440,7 +518,7 @@ export function createThreadStore(
             return updater(message);
           });
           return changed ? next : messages;
-        });
+        }, refreshAgentStatusSnapshot);
       };
 
       /**
@@ -493,11 +571,23 @@ export function createThreadStore(
         });
       };
 
-      const createUserMessage = (): UserMessage => ({
-        id: uuid(),
-        role: "user",
-        content: [{ type: "text", text: "" }],
-      });
+      const createUserMessage = (): UserMessage => {
+        const settings = normalizeAgentStatusSettings(
+          get().thread.context?.agentStatus
+        );
+        return {
+          id: uuid(),
+          role: "user",
+          content: [{ type: "text", text: "" }],
+          ...(settings.components.includes("timestamps")
+            ? {
+                agentStatus: {
+                  timestamp: wallClock() + settings.simulatedTimeOffsetMs,
+                },
+              }
+            : {}),
+        };
+      };
 
       /** Validate a tool against the schema, toasting the first errors. */
       const validateTool = (tool: Tool): boolean => {
@@ -611,23 +701,23 @@ export function createThreadStore(
           const results = await Promise.all(
             executable.map(async ({ toolCall, tool }) => {
               try {
-                const { content, isError } = await execute(
+                const result = await execute(
                   tool,
                   toolCall.input.arguments,
                   invocationContext
                 );
                 return {
                   id: toolCall.id,
-                  content,
-                  isError,
+                  ...result,
                 };
               } catch (error) {
                 const text =
-                  error instanceof Error ? error.message : "Tool call failed";
+                  error instanceof Error ? error.message : "工具调用失败";
                 return {
                   id: toolCall.id,
                   content: [{ type: "text" as const, text }],
                   isError: true,
+                  error,
                 };
               }
             })
@@ -637,23 +727,10 @@ export function createThreadStore(
           if (signal.aborted) {
             return null;
           }
-          const resultById = new Map(results.map((r) => [r.id, r]));
-          const nextLast: AssistantMessage = {
-            ...last,
-            toolCalls: toolCalls.map((toolCall) => {
-              const result = resultById.get(toolCall.id)!;
-              return {
-                ...toolCall,
-                output: {
-                  content: result.content,
-                  isError: result.isError,
-                },
-              };
-            }),
-          };
-          const next = [...messages.slice(0, -1), nextLast];
-          setMessages(next);
-          return next;
+          for (const result of results) {
+            await get().recordToolCallResult(last.id, result.id, result);
+          }
+          return get().thread.context?.messages ?? messages;
         } finally {
           if (get().activeRunId === runId) {
             set({ executingToolCallIds: [] });
@@ -665,6 +742,9 @@ export function createThreadStore(
 
       return {
         thread: normalizedInitialThread,
+        agentStatusSnapshot: _createAgentStatusSnapshot(
+          normalizedInitialThread
+        ),
         runtimeId: options.runtimeId,
         streamingMessage: null,
         status: "idle",
@@ -723,10 +803,13 @@ export function createThreadStore(
             }
             next.splice(toIndex, 0, moved);
             return next;
-          });
+          }, true);
         },
         removeMessage(id: string) {
-          updateMessages((messages) => messages.filter((m) => m.id !== id));
+          updateMessages(
+            (messages) => messages.filter((m) => m.id !== id),
+            true
+          );
           const { collapsedMessageIds } = get();
           if (collapsedMessageIds.includes(id)) {
             set({
@@ -750,18 +833,29 @@ export function createThreadStore(
         },
         updatePromptVariable(name, variable) {
           const { variables, variableVariants } = getVariableState();
+          const current = variables[name];
           setVariableState(
             { ...variables, [name]: variable },
             variableVariants,
             undefined,
-            [name]
+            [name],
+            variable.type === "workingDirectory" ||
+              current?.type === "workingDirectory"
           );
         },
         removePromptVariable(name) {
           const { variables, variableVariants } = getVariableState();
+          const refreshAgentStatusSnapshot =
+            variables[name]?.type === "workingDirectory";
           const nextVariables = { ...variables };
           delete nextVariables[name];
-          setVariableState(nextVariables, variableVariants, undefined, [name]);
+          setVariableState(
+            nextVariables,
+            variableVariants,
+            undefined,
+            [name],
+            refreshAgentStatusSnapshot
+          );
         },
         renamePromptVariable(oldName, newName) {
           if (oldName === newName) {
@@ -782,17 +876,20 @@ export function createThreadStore(
           const nextVariables = { ...variables };
           delete nextVariables[oldName];
           nextVariables[newName] = variable;
-          patchThread({
-            context: replaceThreadPromptVariableReferences(
-              {
-                ...(get().thread.context ?? {}),
-                variables: nextVariables,
-                variableVariants,
-              },
-              oldName,
-              newName
-            ),
-          });
+          patchThread(
+            {
+              context: replaceThreadPromptVariableReferences(
+                {
+                  ...(get().thread.context ?? {}),
+                  variables: nextVariables,
+                  variableVariants,
+                },
+                oldName,
+                newName
+              ),
+            },
+            variable.type === "workingDirectory"
+          );
           return true;
         },
         addCustomVariable(name, value = "") {
@@ -957,6 +1054,9 @@ export function createThreadStore(
           });
         },
         addTool(tool) {
+          if (isAgentStatusTodoTool(tool)) {
+            return false;
+          }
           const { thread } = get();
           const toolKey = getToolKey(tool);
           if (thread.context?.tools?.some((t) => getToolKey(t) === toolKey)) {
@@ -975,6 +1075,12 @@ export function createThreadStore(
           const tools = get().thread.context?.tools ?? [];
           const index = tools.findIndex((t) => getToolKey(t) === name);
           if (index === -1) {
+            return false;
+          }
+          if (
+            isAgentStatusTodoTool(tools[index]) ||
+            isAgentStatusTodoTool(tool)
+          ) {
             return false;
           }
           if (!validateTool(tool)) {
@@ -996,11 +1102,133 @@ export function createThreadStore(
           return true;
         },
         removeTool(name) {
+          const current = get().thread.context?.tools?.find(
+            (tool) => getToolKey(tool) === name
+          );
+          if (current && isAgentStatusTodoTool(current)) {
+            return;
+          }
           patchContext({
             tools: get().thread.context?.tools?.filter(
               (tool) => getToolKey(tool) !== name
             ),
           });
+        },
+        setAgentStatusComponent(component, enabled) {
+          if (get().status !== "idle") {
+            return;
+          }
+          const context = get().thread.context ?? {};
+          const selected = new Set(context.agentStatus?.components ?? []);
+          if (enabled) {
+            selected.add(component);
+          } else {
+            selected.delete(component);
+          }
+          const next = applyAgentStatusConfiguration(get().thread, {
+            ...context.agentStatus,
+            components: [...selected],
+          });
+          if (next === get().thread) {
+            return;
+          }
+          patchThread(next, true);
+        },
+        setAgentStatusTimeOffset(offsetMs) {
+          if (get().status !== "idle" || !Number.isFinite(offsetMs)) {
+            return;
+          }
+          const context = get().thread.context ?? {};
+          const next = applyAgentStatusConfiguration(get().thread, {
+            ...context.agentStatus,
+            components: context.agentStatus?.components ?? [],
+            simulatedTimeOffsetMs: offsetMs,
+          });
+          if (next === get().thread) {
+            return;
+          }
+          patchThread(next, true);
+        },
+        recordToolCallResult(messageId, toolCallId, result) {
+          const _commit = async (): Promise<ToolCallOutput | undefined> => {
+            const context = get().thread.context ?? {};
+            const message = context.messages?.find(
+              (candidate) =>
+                candidate.id === messageId && candidate.role === "assistant"
+            );
+            if (message?.role !== "assistant") {
+              return undefined;
+            }
+            const toolCall = message.toolCalls?.find(
+              (candidate) => candidate.id === toolCallId
+            );
+            if (!toolCall) {
+              return undefined;
+            }
+
+            const output: ToolCallOutput = {
+              content: result.content,
+              isError: result.isError,
+            };
+            const runtime = createAgentStatusRuntime({ now: wallClock });
+            const completed = await runtime.completeToolCall({
+              context,
+              toolName: toolCall.input.name,
+              arguments: toolCall.input.arguments,
+              outcome: result.isError
+                ? {
+                    ok: false,
+                    error:
+                      result.error ??
+                      new Error(getToolResultText(result.content)),
+                  }
+                : {
+                    ok: true,
+                    output,
+                    ...(result.effects?.length
+                      ? {
+                          effects: result.effects.map((effect) => ({
+                            ...effect,
+                          })),
+                        }
+                      : {}),
+                  },
+            });
+            setToolCallOutput(messageId, toolCallId, () => completed);
+
+            const workingDirectory = completed.agentStatus?.effects
+              ?.filter((effect) => effect.type === "working-directory")
+              .at(-1)?.workingDirectory;
+            if (workingDirectory) {
+              const nextContext = get().thread.context ?? {};
+              patchContext({
+                variables: {
+                  ...nextContext.variables,
+                  current_working_directory: {
+                    type: "workingDirectory",
+                    value: workingDirectory,
+                  },
+                },
+                snapshot: removePromptVariableSnapshotNames(
+                  nextContext.snapshot,
+                  ["current_working_directory"]
+                ),
+              });
+            }
+            set({
+              agentStatusSnapshot: _createAgentStatusSnapshot(
+                get().thread,
+                get().agentStatusEnvironment
+              ),
+            });
+            return completed;
+          };
+          const queued = agentStatusCommitQueue.then(_commit, _commit);
+          agentStatusCommitQueue = queued.then(
+            () => undefined,
+            () => undefined
+          );
+          return queued;
         },
         updateToolCallOutputTextContent(messageId, toolCallId, text, isError) {
           setToolCallOutput(messageId, toolCallId, (toolCall) => {
@@ -1020,6 +1248,9 @@ export function createThreadStore(
                 ) ?? []),
               ],
               isError: nextIsError,
+              ...(toolCall.output?.agentStatus
+                ? { agentStatus: toolCall.output.agentStatus }
+                : {}),
             };
           });
         },
@@ -1032,7 +1263,13 @@ export function createThreadStore(
             ) {
               return undefined;
             }
-            return { content, isError: nextIsError };
+            return {
+              content,
+              isError: nextIsError,
+              ...(toolCall.output?.agentStatus
+                ? { agentStatus: toolCall.output.agentStatus }
+                : {}),
+            };
           });
         },
         toggleMessageRole(id: string) {
@@ -1042,7 +1279,8 @@ export function createThreadStore(
               ({
                 ...message,
                 role: message.role === "user" ? "assistant" : "user",
-              }) as Message
+              }) as Message,
+            true
           );
         },
         toggleMessageCollapsed(id: string) {
@@ -1141,8 +1379,7 @@ export function createThreadStore(
           if (!isPreparingRun()) return;
           const abortController = new AbortController();
           let finalizing = false;
-          const isActiveRun = () =>
-            !finalizing && get().activeRunId === runId;
+          const isActiveRun = () => !finalizing && get().activeRunId === runId;
           set({
             status: "running",
             abortController,
@@ -1274,6 +1511,10 @@ export function createThreadStore(
                 abortController: null,
                 activeRunId: null,
                 executingToolCallIds: [],
+                agentStatusSnapshot: _createAgentStatusSnapshot(
+                  get().thread,
+                  get().agentStatusEnvironment
+                ),
               });
               stopActiveRun = null;
             })();
@@ -1345,6 +1586,17 @@ export function createThreadStore(
                   return "aborted";
                 }
                 const receivedAt = now();
+                if (chunk.type === "agent_status_environment") {
+                  set({
+                    agentStatusEnvironment: chunk.environment,
+                    agentStatusSnapshot: _createAgentStatusSnapshot(
+                      get().thread,
+                      chunk.environment
+                    ),
+                  });
+                  sawEvent = true;
+                  continue;
+                }
                 if (firstTokenAt === null && _isNonEmptyAssistantDelta(chunk)) {
                   firstTokenAt = receivedAt;
                 }
@@ -1480,6 +1732,10 @@ export function createThreadStore(
           });
           set({
             thread,
+            agentStatusSnapshot: _createAgentStatusSnapshot(
+              thread,
+              get().agentStatusEnvironment
+            ),
             runValidationIssue: null,
             changeHistory: {
               ...result.history,
@@ -1504,6 +1760,10 @@ export function createThreadStore(
           });
           set({
             thread,
+            agentStatusSnapshot: _createAgentStatusSnapshot(
+              thread,
+              get().agentStatusEnvironment
+            ),
             runValidationIssue: null,
             changeHistory: {
               ...result.history,
@@ -1517,7 +1777,14 @@ export function createThreadStore(
           if (get().status !== "idle") {
             return;
           }
-          const next = withRunMetadata(thread, {
+          const normalized = normalizeAgentStatusThread(thread);
+          const observed = backfillAgentStatusUserTimestamps(
+            normalized,
+            () =>
+              wallClock() +
+              (normalized.context?.agentStatus?.simulatedTimeOffsetMs ?? 0)
+          );
+          const next = withRunMetadata(observed, {
             runHistory: get().runHistory,
             evaluations: get().evaluations,
             evaluationRubrics: get().evaluationRubrics,
@@ -1528,6 +1795,10 @@ export function createThreadStore(
           // Replace the whole thread; recorded as a single undoable step.
           set({
             thread: next,
+            agentStatusSnapshot: _createAgentStatusSnapshot(
+              next,
+              get().agentStatusEnvironment
+            ),
             runValidationIssue: null,
             changeHistory: recordSnapshot(get().changeHistory, next),
           });
@@ -1720,15 +1991,25 @@ export function createThreadStore(
   if (options.resolvePath) {
     const initialVariables = normalizedInitialThread.context?.variables ?? {};
     const workingDirectories = Object.entries(initialVariables).filter(
-      (entry): entry is [string, Extract<ThreadVariable, { type: "workingDirectory" }>] =>
+      (
+        entry
+      ): entry is [
+        string,
+        Extract<ThreadVariable, { type: "workingDirectory" }>,
+      ] =>
         entry[1].type === "workingDirectory" && entry[1].value.trim().length > 0
     );
     void Promise.all(
-      workingDirectories.map(async ([name, variable]) => [
-        name,
-        variable.value,
-        await options.resolvePath!(variable.value).catch(() => variable.value),
-      ] as const)
+      workingDirectories.map(
+        async ([name, variable]) =>
+          [
+            name,
+            variable.value,
+            await options.resolvePath!(variable.value).catch(
+              () => variable.value
+            ),
+          ] as const
+      )
     ).then((resolved) => {
       const current = store.getState();
       const variables = current.thread.context?.variables;
@@ -1760,7 +2041,14 @@ export function createThreadStore(
           ),
         },
       };
-      store.setState({ thread, changeHistory: createInitialHistory(thread) });
+      store.setState({
+        thread,
+        agentStatusSnapshot: _createAgentStatusSnapshot(
+          thread,
+          current.agentStatusEnvironment
+        ),
+        changeHistory: createInitialHistory(thread),
+      });
     });
   }
 
@@ -1837,6 +2125,9 @@ const selectActions = (s: ThreadState) => ({
   addTool: s.addTool,
   updateTool: s.updateTool,
   removeTool: s.removeTool,
+  setAgentStatusComponent: s.setAgentStatusComponent,
+  setAgentStatusTimeOffset: s.setAgentStatusTimeOffset,
+  recordToolCallResult: s.recordToolCallResult,
   toggleMessageRole: s.toggleMessageRole,
   toggleMessageCollapsed: s.toggleMessageCollapsed,
 });

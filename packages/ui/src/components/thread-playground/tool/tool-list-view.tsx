@@ -38,6 +38,7 @@ import { PluginToolImportDialog } from "./plugin-tool-import-dialog";
 import { ProviderHostedToolEditorDialog } from "./provider-hosted-tool-editor-dialog";
 import { ToolEditorDialog } from "./tool-editor-dialog";
 import { ToolListItem } from "./tool-list-item";
+import { getUserConfigurableTools } from "./tool-visibility";
 
 export function ToolListView({
   className,
@@ -71,6 +72,10 @@ export function ToolListView({
   const [editingTool, setEditingTool] = useState<FunctionTool | null>(null);
   const [editingProviderHostedTool, setEditingProviderHostedTool] =
     useState<ProviderHostedTool | null>(null);
+  const configurableTools = useMemo(
+    () => getUserConfigurableTools(tools ?? []),
+    [tools]
+  );
   const existingToolNames = useMemo(
     () =>
       new Set(
@@ -141,7 +146,7 @@ export function ToolListView({
         ref={animationContainerRef}
         className={cn("group flex min-w-0 grow flex-wrap gap-2.5", className)}
       >
-        {tools?.map((t) => (
+        {configurableTools.map((t) => (
           <ToolListItem
             key={getToolKey(t)}
             tool={t}

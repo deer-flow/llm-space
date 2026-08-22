@@ -48,6 +48,7 @@ import {
   toolProfileSelectionScope,
 } from "./tool-executor";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
+import { getUserConfigurableTools } from "./tool-visibility";
 
 type BuiltInToolCategoryId = "fileSystem" | "web" | "media" | "misc";
 
@@ -115,7 +116,9 @@ function _BuiltInToolImportDialog({
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
-  const generateImageTool = tools.find((tool) => tool.name === "generate_image");
+  const generateImageTool = tools.find(
+    (tool) => tool.name === "generate_image"
+  );
   const imageProviderId = generateImageTool
     ? getToolConnectionProviderId(generateImageTool)
     : undefined;
@@ -136,7 +139,9 @@ function _BuiltInToolImportDialog({
 
   const loadTools = useCallback(async () => {
     try {
-      setTools(await builtinTools.list({ runtimeId }));
+      setTools(
+        getUserConfigurableTools(await builtinTools.list({ runtimeId }))
+      );
     } catch (error) {
       toast.error("Failed to load built-in tools", {
         description:
@@ -482,9 +487,7 @@ function _GenerateImageConfigFields({
           >
             <SelectValue placeholder="Choose model" />
           </SelectTrigger>
-          <SelectContent
-            onPointerDownOutside={(e) => e.preventDefault()}
-          >
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {enabledModels.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.name}

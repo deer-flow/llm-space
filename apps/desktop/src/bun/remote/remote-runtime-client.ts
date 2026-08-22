@@ -1,6 +1,6 @@
 import type {
   ArkImageGenerationConfig,
-  AgentEvent,
+  AgentStreamEvent,
   BuiltinTool,
   CustomModel,
   FileNode,
@@ -219,7 +219,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
           return;
         }
         const event = JSON.parse(value) as
-          AgentEvent | { type: "error"; message: string };
+          AgentStreamEvent | { type: "error"; message: string };
         if (event.type === "error") {
           send({
             streamId: payload.streamId,

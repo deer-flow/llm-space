@@ -11,6 +11,7 @@ import {
   FolderTreeIcon,
   GlobeIcon,
   ImageIcon,
+  ListChecksIcon,
   ListTodoIcon,
   ListTreeIcon,
   PackageCheckIcon,
@@ -38,6 +39,7 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
   "cloud-sun": CloudSunIcon,
   files: FilesIcon,
   "list-todo": ListTodoIcon,
+  "list-checks": ListChecksIcon,
   image: ImageIcon,
 };
 
@@ -58,6 +60,8 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   weather_report: "cloud-sun",
   present_files: "files",
   todo_write: "list-todo",
+  rewrite_todo_list: "list-checks",
+  update_todo_status: "list-checks",
   ask_user_question: "circle-help",
   generate_image: "image",
 };

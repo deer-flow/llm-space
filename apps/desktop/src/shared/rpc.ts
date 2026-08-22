@@ -1,6 +1,6 @@
 import type {
   ArkImageGenerationConfig,
-  AgentEvent,
+  AgentStreamEvent,
   AgentStreamRequest,
   BuiltinTool,
   BuiltinToolCallResponse,
@@ -72,7 +72,7 @@ export interface StreamThreadRequestPayload extends RuntimeScopedParams {
 
 /** A bun→webview chunk of a streaming agent run, keyed by `streamId`. */
 export type StreamThreadResponsePayload =
-  | { streamId: string; type: "event"; event: AgentEvent }
+  | { streamId: string; type: "event"; event: AgentStreamEvent }
   | { streamId: string; type: "done" }
   | { streamId: string; type: "error"; message: string };
 

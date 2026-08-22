@@ -1,5 +1,7 @@
 import type * as pi from "@earendil-works/pi-ai";
 
+import { resolveAgentStatusWorkingDirectory } from "../agent-status/thread";
+import type { PiAgentStatusContext } from "../agent-status/types";
 import type { PiThreadContext } from "../types/agent";
 import type { Message, ModelUsage } from "../types/messages";
 import type { ThreadContext } from "../types/threads";
@@ -12,6 +14,7 @@ import {
 export function convertToPiContext(context: ThreadContext): PiThreadContext {
   const tools = context.tools ?? [];
   const providerHostedTools = tools.filter(isProviderHostedTool);
+  const agentStatus = _convertAgentStatus(context);
   const result: PiThreadContext = {
     systemPrompt: context.systemPrompt,
     messages: context.messages ? _convertToPiMessages(context.messages) : [],
@@ -24,6 +27,7 @@ export function convertToPiContext(context: ThreadContext): PiThreadContext {
     responseApiNativeTools: providerHostedTools.map((tool) => ({
       ...tool.config,
     })),
+    ...(agentStatus ? { agentStatus } : {}),
   };
   return result;
 }
@@ -37,7 +41,7 @@ function _convertToPiMessages(messages: Message[]) {
         content: _convertMessageContents(message) as (
           pi.TextContent | pi.ImageContent
         )[],
-        timestamp: Date.now(),
+        timestamp: message.agentStatus?.timestamp ?? 0,
       };
       result.push(piMessage);
     } else if (message.role === "assistant") {
@@ -50,7 +54,7 @@ function _convertToPiMessages(messages: Message[]) {
         model: "",
         provider: "",
         stopReason: "stop",
-        timestamp: Date.now(),
+        timestamp: 0,
         usage: _convertUsage(message.usage),
         ...(message.providerHostedToolActivities
           ? { nativeToolActivities: message.providerHostedToolActivities }
@@ -69,12 +73,43 @@ function _convertToPiMessages(messages: Message[]) {
           toolName: toolCall.input.name,
           content: toolCall.output?.content ?? [{ type: "text", text: "" }],
           isError: toolCall.output?.isError ?? false,
-          timestamp: Date.now(),
+          timestamp: toolCall.output?.agentStatus?.timestamp ?? 0,
         });
       }
     }
   }
   return result;
+}
+
+function _convertAgentStatus(
+  context: ThreadContext
+): PiAgentStatusContext | undefined {
+  const workingDirectory = resolveAgentStatusWorkingDirectory(context);
+  const toolCallMetadata = Object.create(null) as NonNullable<
+    PiAgentStatusContext["toolCallMetadata"]
+  >;
+  for (const message of context.messages ?? []) {
+    if (message.role !== "assistant") continue;
+    for (const toolCall of message.toolCalls ?? []) {
+      if (toolCall.output?.agentStatus) {
+        toolCallMetadata[toolCall.id] = toolCall.output.agentStatus;
+      }
+    }
+  }
+
+  const sidecar: PiAgentStatusContext = {
+    ...(context.agentStatus?.components
+      ? { components: [...context.agentStatus.components] }
+      : {}),
+    ...(context.agentStatus?.simulatedTimeOffsetMs === undefined
+      ? {}
+      : {
+          simulatedTimeOffsetMs: context.agentStatus.simulatedTimeOffsetMs,
+        }),
+    ...(workingDirectory ? { workingDirectory } : {}),
+    ...(Object.keys(toolCallMetadata).length > 0 ? { toolCallMetadata } : {}),
+  };
+  return Object.keys(sidecar).length > 0 ? sidecar : undefined;
 }
 
 /** Preserve provider usage when replaying saved assistant messages to pi. */

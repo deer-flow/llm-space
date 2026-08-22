@@ -1,5 +1,7 @@
 import { Type, type Static } from "typebox";
 
+import { AgentStatusToolCallMetadata } from "../../agent-status/types";
+
 import { ImageContent, TextContent } from "./contents";
 
 /**
@@ -30,6 +32,11 @@ export const ToolCallOutput = Type.Object({
    * model providers that distinguish failed tool results from observations.
    */
   isError: Type.Optional(Type.Boolean()),
+
+  /**
+   * 工具状态计数、TODO、错误与运行时 effect 的可重建元数据。
+   */
+  agentStatus: Type.Optional(AgentStatusToolCallMetadata),
 });
 export type ToolCallOutput = Static<typeof ToolCallOutput>;
 

@@ -1,5 +1,5 @@
 import type {
-  AgentEvent,
+  AgentStreamEvent,
   AgentStreamRequest,
   ArkImageGenerationConfig,
   BuiltinTool,
@@ -81,7 +81,7 @@ export interface RuntimeAbortStreamPayload extends RuntimeScopedParams {
 }
 
 export type RuntimeStreamResponsePayload =
-  | { streamId: string; type: "event"; event: AgentEvent }
+  | { streamId: string; type: "event"; event: AgentStreamEvent }
   | { streamId: string; type: "done" }
   | { streamId: string; type: "error"; message: string };
 
@@ -159,10 +159,7 @@ export interface RuntimeClient {
     path: string,
     run: ThreadRunSnapshot & { id: string }
   ): Promise<ThreadRunReference>;
-  fsReadRunSnapshot(
-    path: string,
-    snapshotRef: string
-  ): Promise<ThreadSnapshot>;
+  fsReadRunSnapshot(path: string, snapshotRef: string): Promise<ThreadSnapshot>;
   fsRealpath(path: string): Promise<string>;
   /** Read arbitrary prompt text (`~` expands on this runtime). */
   readTextFile(path: string): Promise<string>;

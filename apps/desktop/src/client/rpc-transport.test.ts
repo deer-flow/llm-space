@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { AgentEvent, AgentStreamRequest } from "@llm-space/core";
+import type {
+  AgentEvent,
+  AgentStreamEvent,
+  AgentStreamRequest,
+} from "@llm-space/core";
 
 import type {
   AbortStreamThreadPayload,
@@ -71,6 +75,17 @@ const REQUEST: AgentStreamRequest = {
 };
 const START: AgentEvent = { type: "agent_start" };
 const TURN: AgentEvent = { type: "turn_start" };
+const ENVIRONMENT: AgentStreamEvent = {
+  type: "agent_status_environment",
+  environment: {
+    currentTime: "2026-08-19T06:10:20.123Z",
+    workingDirectory: "C:\\repo",
+    platform: "win32",
+    arch: "x64",
+    shell: "PowerShell 7",
+    pythonVersion: "Python 3.12.4",
+  },
+};
 
 function _startIterator(signal?: AbortSignal, profileId?: string) {
   const iterator = createRpcTransport()(REQUEST, {
@@ -110,6 +125,18 @@ describe("createRpcTransport", () => {
 
     expect(await next).toEqual({ value: START, done: false });
     expect(await iterator.next()).toEqual({ value: TURN, done: false });
+    expect(await iterator.next()).toEqual({ value: undefined, done: true });
+    expect(RPC.listenerCount).toBe(0);
+    expect(RPC.aborts).toEqual([]);
+  });
+
+  test("完整透传 runtime 的 Agent Status 环境快照", async () => {
+    const { iterator, next, streamId } = _startIterator();
+
+    RPC.emit({ streamId, type: "event", event: ENVIRONMENT });
+    RPC.emit({ streamId, type: "done" });
+
+    expect(await next).toEqual({ value: ENVIRONMENT, done: false });
     expect(await iterator.next()).toEqual({ value: undefined, done: true });
     expect(RPC.listenerCount).toBe(0);
     expect(RPC.aborts).toEqual([]);
@@ -196,7 +223,9 @@ describe("createRpcTransport", () => {
     }
     RPC.emit({ streamId, type: "done" });
 
-    const received: AgentEvent[] = [(await next).value as AgentEvent];
+    const received: AgentStreamEvent[] = [
+      (await next).value as AgentStreamEvent,
+    ];
     while (true) {
       const result = await iterator.next();
       if (result.done) break;

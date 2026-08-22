@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { Api, Message, Model, Models, Tool } from "@earendil-works/pi-ai";
 
+import { moveAgentStatusMessageToEnd } from "../../agent-status/runtime";
 import { RUN_LAST_MESSAGE_ERROR } from "../../client/run-eligibility";
 import type { AgentStreamRequest } from "../../types/agent";
 
@@ -103,6 +104,9 @@ export async function* streamAgent(
     },
     {
       model,
+      // Harness 状态只在每次模型调用的临时上下文末尾出现，不写回轨迹。
+      transformContext: (messages) =>
+        Promise.resolve(moveAgentStatusMessageToEnd(messages)),
       convertToLlm: _convertToLlm,
       getApiKey,
       maxTokens: request.config?.model?.maxTokens,

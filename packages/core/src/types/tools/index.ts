@@ -1,5 +1,6 @@
 import { Type, type Static } from "typebox";
 
+import type { AgentStatusEffect } from "../../agent-status/types";
 import type { ToolCallOutput } from "../messages";
 import { JSONSchema, JsonValue } from "../shared";
 
@@ -111,6 +112,8 @@ export type PluginTool = Static<typeof PluginTool>;
 export interface BuiltinToolCallResponse {
   /** Structured content persisted in the thread and forwarded to the model. */
   content: ToolCallOutput["content"];
+  /** 由可信运行时返回、供 Agent 状态层应用的结构化 effect。 */
+  effects?: AgentStatusEffect[];
 }
 
 export const ProviderHostedToolConfig = Type.Intersect([
@@ -122,9 +125,7 @@ export const ProviderHostedToolConfig = Type.Intersect([
   }),
   Type.Record(Type.String(), JsonValue),
 ]);
-export type ProviderHostedToolConfig = Static<
-  typeof ProviderHostedToolConfig
-> &
+export type ProviderHostedToolConfig = Static<typeof ProviderHostedToolConfig> &
   Record<string, JsonValue>;
 
 export const ProviderHostedTool = Type.Object({
@@ -170,11 +171,7 @@ export const Tool = Type.Union([
   ProviderHostedTool,
 ]);
 export type Tool =
-  | FunctionTool
-  | McpTool
-  | BuiltinTool
-  | PluginTool
-  | ProviderHostedTool;
+  FunctionTool | McpTool | BuiltinTool | PluginTool | ProviderHostedTool;
 
 export type LegacyTool = Omit<FunctionTool, "type"> & {
   type?: "function";
@@ -257,9 +254,7 @@ export function isExecutableTool(
   );
 }
 
-export function isProviderHostedTool(
-  tool: Tool
-): tool is ProviderHostedTool {
+export function isProviderHostedTool(tool: Tool): tool is ProviderHostedTool {
   return tool.type === "provider-hosted";
 }
 

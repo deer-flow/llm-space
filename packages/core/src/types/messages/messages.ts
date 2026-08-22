@@ -1,5 +1,7 @@
 import { Type, type Static } from "typebox";
 
+import { AgentStatusMessageMetadata } from "../../agent-status/types";
+
 import { ImageContent, TextContent } from "./contents";
 import {
   ProviderHostedToolActivity,
@@ -45,6 +47,11 @@ export const UserMessage = Type.Object({
    * The content of the message.
    */
   content: Type.Array(UserMessageContent),
+
+  /**
+   * Agent 状态栏用于稳定重建时序的持久化元数据。
+   */
+  agentStatus: Type.Optional(AgentStatusMessageMetadata),
 });
 export type UserMessage = Static<typeof UserMessage>;
 

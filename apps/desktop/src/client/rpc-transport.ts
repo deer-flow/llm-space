@@ -1,4 +1,8 @@
-import { uuid, type AgentEvent, type AgentTransport } from "@llm-space/core";
+import {
+  uuid,
+  type AgentStreamEvent,
+  type AgentTransport,
+} from "@llm-space/core";
 
 import { electrobun } from "@/lib/electrobun";
 import type { StreamThreadResponsePayload } from "@/shared/rpc";
@@ -23,7 +27,7 @@ export function createRpcTransport(runtimeId?: RuntimeId): AgentTransport {
     }
 
     const streamId = uuid();
-    let events: (AgentEvent | undefined)[] = [];
+    let events: (AgentStreamEvent | undefined)[] = [];
     let eventHead = 0;
     let wake: (() => void) | null = null;
     let finished = false;

@@ -1,5 +1,7 @@
 import type * as pi from "@earendil-works/pi-ai";
 
+import type { PiAgentStatusContext } from "../agent-status/types";
+
 import type { ModelConfigParams } from "./models";
 import type { ProviderHostedToolConfig } from "./tools";
 
@@ -12,6 +14,10 @@ export interface PiThreadContext {
   messages: pi.Message[];
   tools: pi.Tool[];
   responseApiNativeTools: ProviderHostedToolConfig[];
+  /**
+   * 仅随模型上下文传输的 Agent 状态 sidecar，不写入系统提示词。
+   */
+  agentStatus?: PiAgentStatusContext;
 }
 
 /**

@@ -1,6 +1,11 @@
 import type { CustomModel } from "@llm-space/core";
 import { streamAgent } from "@llm-space/core/server";
 
+import {
+  createNodeAgentEnvironmentProbe,
+  type AgentEnvironmentProbe,
+  prepareAgentStatusRun,
+} from "../agent-status";
 import type { ModelManager } from "../models";
 import type {
   RuntimeAbortStreamPayload,
@@ -16,7 +21,8 @@ export class StreamThreadController {
     private readonly _modelManager: ModelManager,
     private readonly _analytics?: {
       capture(event: "thread_run", properties: Record<string, unknown>): void;
-    }
+    },
+    private readonly _agentEnvironmentProbe: AgentEnvironmentProbe = createNodeAgentEnvironmentProbe()
   ) {}
 
   /** Run an agent stream and push each event back through the caller's sender. */
@@ -38,10 +44,26 @@ export class StreamThreadController {
           `Model ${request.model.provider}/${request.model.id} cannot use provider connection ${connectionRef.providerId}.`
         );
       }
-      const connection = await this._modelManager.resolveConnection(
-        connectionRef
-      );
-      for await (const event of streamAgent(request, {
+      const connection =
+        await this._modelManager.resolveConnection(connectionRef);
+      const preparedAgentStatus = await prepareAgentStatusRun(request.context, {
+        probe: this._agentEnvironmentProbe,
+        workingDirectory:
+          request.context.agentStatus?.workingDirectory ?? process.cwd(),
+      });
+      send({
+        streamId,
+        type: "event",
+        event: {
+          type: "agent_status_environment",
+          environment: preparedAgentStatus.environment,
+        },
+      });
+      const preparedRequest = {
+        ...request,
+        context: preparedAgentStatus.context,
+      };
+      for await (const event of streamAgent(preparedRequest, {
         models: await this._modelManager.getAvailableModels(),
         getApiKey: () => connection.apiKey,
         getBaseUrl: () => connection.baseUrl,
