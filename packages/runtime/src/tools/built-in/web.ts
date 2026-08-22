@@ -345,6 +345,75 @@ class BraveSearchProvider implements SearchProvider {
   }
 }
 
+interface SearxngSearchResponse {
+  results?: {
+    title?: string;
+    url?: string;
+    content?: string;
+  }[];
+}
+
+/**
+ * SearXNG-backed web search. SearXNG is a self-hosted meta search engine whose
+ * JSON API returns ranked results with summaries; it has no page-extraction
+ * endpoint, so `web_fetch` delegates to Firecrawl (same arrangement as Brave).
+ */
+class SearxngSearchProvider implements SearchProvider {
+  constructor(
+    private readonly _baseUrl: string,
+    private readonly _fetchProvider: SearchProvider
+  ) {
+    if (!_baseUrl.trim()) {
+      throw new Error(
+        "SearXNG service URL is not configured. Add one in Settings → Search."
+      );
+    }
+  }
+
+  fetch(url: string): Promise<WebFetchResult> {
+    return this._fetchProvider.fetch(url);
+  }
+
+  async search(
+    query: string,
+    limit: number,
+    includeContent: boolean
+  ): Promise<WebSearchResult[]> {
+    const baseUrl = this._baseUrl.trim().replace(/\/+$/, "");
+    const url = new URL(`${baseUrl}/search`);
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "json");
+    url.searchParams.set("language", "auto");
+    url.searchParams.set("pageno", "1");
+    url.searchParams.set("limit", String(limit));
+
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        // SearXNG botdetection rejects requests without a client IP; the
+        // instance must trust this proxy (server.trust_x_forwarded_for).
+        "X-Forwarded-For": "127.0.0.1",
+        "X-Real-IP": "127.0.0.1",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`web_search failed: ${res.status}`);
+    }
+
+    const json = (await res.json()) as SearxngSearchResponse;
+    return (json.results ?? []).map((item) => ({
+      title: item.title ?? "Untitled",
+      url: item.url ?? "",
+      snippet: item.content,
+      content:
+        includeContent && item.content
+          ? _truncateText(item.content, 2_000)
+          : undefined,
+    }));
+  }
+}
+
 /** Build the provider selected in `settings/search.json` with its resolved key. */
 function _getSearchProvider({
   env,
@@ -359,6 +428,12 @@ function _getSearchProvider({
   }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
+  }
+  if (settings.provider === "searxng") {
+    return new SearxngSearchProvider(
+      settings.searxngBaseUrl,
+      new FirecrawlSearchProvider(_resolveApiKey(settings.firecrawlApiKey, env))
+    );
   }
   return new FirecrawlSearchProvider(
     _resolveApiKey(settings.firecrawlApiKey, env)
