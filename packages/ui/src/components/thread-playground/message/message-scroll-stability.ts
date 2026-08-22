@@ -1,4 +1,9 @@
 type FrameScheduler = (callback: FrameRequestCallback) => number;
+type FrameCanceler = (frameId: number) => void;
+
+type ResizeObserverFactory = (
+  callback: ResizeObserverCallback
+) => Pick<ResizeObserver, "disconnect" | "observe">;
 
 interface ScrollViewport {
   scrollTop: number;
@@ -15,6 +20,71 @@ interface ScrollStabilizationSession {
 
 const sessions = new WeakMap<HTMLElement, ScrollStabilizationSession>();
 const STABILIZATION_TIMEOUT_MS = 10_000;
+const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48;
+
+/**
+ * Follow layout growth at the bottom of an active run without subscribing the
+ * full message list to every streaming update. Scrolling upward opts out until
+ * the viewport reaches the bottom again.
+ */
+export function followMessageViewportBottom(
+  viewport: HTMLElement,
+  content: HTMLElement,
+  options: {
+    cancelFrame?: FrameCanceler;
+    createResizeObserver?: ResizeObserverFactory;
+    scheduleFrame?: FrameScheduler;
+  } = {}
+) {
+  const scheduleFrame = options.scheduleFrame ?? requestAnimationFrame;
+  const cancelFrame = options.cancelFrame ?? cancelAnimationFrame;
+  let following = true;
+  let frameId: number | null = null;
+  let previousScrollTop = viewport.scrollTop;
+
+  const isNearBottom = () =>
+    viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <=
+    AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
+  const scrollToBottom = () => {
+    frameId = null;
+    if (!following) {
+      return;
+    }
+    viewport.scrollTop = viewport.scrollHeight;
+    previousScrollTop = viewport.scrollTop;
+  };
+  const scheduleScrollToBottom = () => {
+    if (following && frameId === null) {
+      frameId = scheduleFrame(scrollToBottom);
+    }
+  };
+  const handleScroll = () => {
+    const scrollTop = viewport.scrollTop;
+    if (isNearBottom()) {
+      following = true;
+    } else if (scrollTop < previousScrollTop - 1) {
+      following = false;
+    }
+    previousScrollTop = scrollTop;
+  };
+
+  const observer = (
+    options.createResizeObserver ??
+    ((callback: ResizeObserverCallback) => new ResizeObserver(callback))
+  )(scheduleScrollToBottom);
+  viewport.addEventListener("scroll", handleScroll, { passive: true });
+  observer.observe(content);
+  viewport.scrollTop = viewport.scrollHeight;
+  previousScrollTop = viewport.scrollTop;
+
+  return () => {
+    observer.disconnect();
+    viewport.removeEventListener("scroll", handleScroll);
+    if (frameId !== null) {
+      cancelFrame(frameId);
+    }
+  };
+}
 
 /**
  * Keep the message viewport at the same offset while React and the virtualizer
