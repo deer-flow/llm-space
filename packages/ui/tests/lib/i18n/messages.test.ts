@@ -25,6 +25,38 @@ describe("MESSAGES", () => {
   test("LANGUAGES has exactly en and zh", () => {
     expect(LANGUAGES.map((l) => l.code)).toEqual(["en", "zh"]);
   });
+
+  test("plural shapes resolve real one/other branches with formatting", () => {
+    // The house pattern selects the branch at the call site:
+    // `n === 1 ? t.x.one : t.x.other`, then `formatString` fills `{n}`.
+    const enCount = (n: number) =>
+      formatString(
+        n === 1
+          ? MESSAGES.en.desktop.startFromExample.templateCount.one
+          : MESSAGES.en.desktop.startFromExample.templateCount.other,
+        { n }
+      );
+    expect(enCount(1)).toBe("1 template");
+    expect(enCount(2)).toBe("2 templates");
+    expect(enCount(0)).toBe("0 templates");
+    // Zero is plural in English; the `other` branch carries the {n} placeholder.
+    expect(MESSAGES.en.desktop.startFromExample.templateCount.one).not.toContain(
+      "{n}"
+    );
+    expect(
+      MESSAGES.en.desktop.startFromExample.templateCount.other
+    ).toContain("{n}");
+
+    const zhCount = (n: number) =>
+      formatString(
+        n === 1
+          ? MESSAGES.zh.desktop.startFromExample.templateCount.one
+          : MESSAGES.zh.desktop.startFromExample.templateCount.other,
+        { n }
+      );
+    expect(zhCount(1)).toBe("1 个模板");
+    expect(zhCount(3)).toBe("3 个模板");
+  });
 });
 
 describe("formatString", () => {

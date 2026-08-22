@@ -1,9 +1,10 @@
 /**
  * Native-menu labels (macOS menu bar only). Several items deliberately differ
  * from the command-palette copy in `t.commands` — e.g. the menu's plural
- * "Reopen Closed Tabs" vs the palette's "Reopen Closed Tab". Role items (the
- * Edit submenu, Window minimize/bringAllToFront/toggleFullScreen) are
- * OS-localized and have no labels here.
+ * "Reopen Closed Tabs" vs the palette's "Reopen Closed Tab". Role items carry
+ * explicit labels too: Electrobun supplies fixed English labels for roles, so
+ * leaving them label-less would mix languages in the zh menu. The `role` still
+ * wires the OS behavior; the label only overrides the display text.
  */
 export const menu = {
   app: {
@@ -11,6 +12,9 @@ export const menu = {
     checkUpdates: "Check for Updates…",
     restartToUpdate: "Restart to Update",
     settings: "Settings…",
+    hide: "Hide LLM Space",
+    hideOthers: "Hide Others",
+    showAll: "Show All",
     quit: "Quit LLM Space",
   },
   file: {
@@ -30,6 +34,14 @@ export const menu = {
   },
   edit: {
     label: "Edit",
+    undo: "Undo",
+    redo: "Redo",
+    cut: "Cut",
+    copy: "Copy",
+    paste: "Paste",
+    pasteAndMatchStyle: "Paste and Match Style",
+    delete: "Delete",
+    selectAll: "Select All",
   },
   view: {
     label: "View",
@@ -42,6 +54,9 @@ export const menu = {
   },
   window: {
     label: "Window",
+    minimize: "Minimize",
+    bringAllToFront: "Bring All to Front",
+    toggleFullScreen: "Toggle Full Screen",
     selectPrevious: "Select Previous Tab",
     selectNext: "Select Next Tab",
   },

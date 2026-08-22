@@ -36,6 +36,7 @@ export const commands = {
   runThread: "Run Thread",
   shareThread: "Share…",
   openVariables: "Variables",
+  setLanguage: "Set Language",
   zoomIn: "Zoom In",
   zoomOut: "Zoom Out",
   resetZoom: "Reset Zoom",

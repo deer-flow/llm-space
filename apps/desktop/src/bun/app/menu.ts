@@ -40,9 +40,17 @@ function _appSubmenu(
         accelerator: "CommandOrControl+,",
       },
       { type: "divider" },
-      { role: "hide", accelerator: "CommandOrControl+H" },
-      { role: "hideOthers", accelerator: "CommandOrControl+Shift+H" },
-      { role: "showAll" },
+      {
+        label: t.menu.app.hide,
+        role: "hide",
+        accelerator: "CommandOrControl+H",
+      },
+      {
+        label: t.menu.app.hideOthers,
+        role: "hideOthers",
+        accelerator: "CommandOrControl+Shift+H",
+      },
+      { label: t.menu.app.showAll, role: "showAll" },
       { type: "divider" },
       {
         label: t.menu.app.quit,
@@ -92,17 +100,17 @@ function _fileSubmenu(t: Messages): ApplicationMenuItemConfig[] {
   ];
 }
 
-function _editSubmenu(): ApplicationMenuItemConfig[] {
+function _editSubmenu(t: Messages): ApplicationMenuItemConfig[] {
   return [
-    { role: "undo" },
-    { role: "redo" },
+    { label: t.menu.edit.undo, role: "undo" },
+    { label: t.menu.edit.redo, role: "redo" },
     { type: "divider" },
-    { role: "cut" },
-    { role: "copy" },
-    { role: "paste" },
-    { role: "pasteAndMatchStyle" },
-    { role: "delete" },
-    { role: "selectAll" },
+    { label: t.menu.edit.cut, role: "cut" },
+    { label: t.menu.edit.copy, role: "copy" },
+    { label: t.menu.edit.paste, role: "paste" },
+    { label: t.menu.edit.pasteAndMatchStyle, role: "pasteAndMatchStyle" },
+    { label: t.menu.edit.delete, role: "delete" },
+    { label: t.menu.edit.selectAll, role: "selectAll" },
   ];
 }
 
@@ -146,8 +154,8 @@ function _viewSubmenu(t: Messages): ApplicationMenuItemConfig[] {
 
 function _windowSubmenu(t: Messages): ApplicationMenuItemConfig[] {
   return [
-    { role: "minimize" },
-    { role: "bringAllToFront" },
+    { label: t.menu.window.minimize, role: "minimize" },
+    { label: t.menu.window.bringAllToFront, role: "bringAllToFront" },
     { type: "divider" },
     {
       label: t.menu.window.selectPrevious,
@@ -160,7 +168,11 @@ function _windowSubmenu(t: Messages): ApplicationMenuItemConfig[] {
       accelerator: "CommandOrControl+Option+Right",
     },
     { type: "divider" },
-    { role: "toggleFullScreen", accelerator: "CommandOrControl+Shift+F" },
+    {
+      label: t.menu.window.toggleFullScreen,
+      role: "toggleFullScreen",
+      accelerator: "CommandOrControl+Shift+F",
+    },
   ];
 }
 
@@ -182,7 +194,9 @@ function _helpSubmenu(t: Messages): ApplicationMenuItemConfig[] {
 /**
  * The native application menu is a macOS convention: the menu bar leads with
  * the app submenu. Windows (and Linux, when it ships) deliberately have no
- * native menu — the in-app UI owns the commands.
+ * native menu — the in-app UI owns the commands. Role items carry explicit
+ * translated labels (Electrobun's fixed English role labels would leave the
+ * menu mixed-language); the `role` still wires the OS behavior.
  */
 function _buildMenu(
   updateReady: boolean,
@@ -191,7 +205,7 @@ function _buildMenu(
   return [
     _appSubmenu(updateReady, t),
     { label: t.menu.file.label, submenu: _fileSubmenu(t) },
-    { label: t.menu.edit.label, submenu: _editSubmenu() },
+    { label: t.menu.edit.label, submenu: _editSubmenu(t) },
     { label: t.menu.view.label, submenu: _viewSubmenu(t) },
     { label: t.menu.window.label, role: "window", submenu: _windowSubmenu(t) },
     { label: t.menu.help.label, submenu: _helpSubmenu(t) },
@@ -220,6 +234,16 @@ export function setMenuLanguage(lang: "en" | "zh") {
   if (_menuLang === lang) return;
   _menuLang = lang;
   _rebuildMenu();
+}
+
+/**
+ * Record the menu language without rebuilding — the startup path, before the
+ * window exists. `registerMenuActions` builds the menu from `_menuLang` once
+ * the window is up, so a persisted-language restore only needs to set it.
+ */
+export function preselectMenuLanguage(lang: "en" | "zh") {
+  if (_menuLang === lang) return;
+  _menuLang = lang;
 }
 
 /**

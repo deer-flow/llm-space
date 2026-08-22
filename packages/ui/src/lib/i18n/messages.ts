@@ -1,7 +1,19 @@
 import { en } from "./messages/index";
 import { zh } from "./zh";
 
-/** The languages the app ships in. English is the default. */
+/**
+ * The languages the app ships in. English is the default. This table is the
+ * single source for the language set — but adding a locale is **not** just a
+ * new dictionary file. The registry that must grow together:
+ *
+ * - this `LANGUAGES` table (picker label + `Lang` union),
+ * - a `zh`-style dictionary with the full tree mirrored from `en`,
+ * - `isZhLocale` / `resolveInitialLang` (locale-tag detection),
+ * - `langToTimeago` (timeago.js locale id),
+ * - the desktop native menu's locale mapping (`bun/app/menu.ts`) and
+ *   `isAppLang` in `bun/app/locales.ts` (startup restore),
+ * - `document.documentElement.lang` in `I18nProvider`.
+ */
 export const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "zh", label: "简体中文" },
@@ -9,7 +21,12 @@ export const LANGUAGES = [
 
 export type Lang = (typeof LANGUAGES)[number]["code"];
 
-/** Whether a locale tag is any Chinese variant (zh, zh-CN, zh-TW, …). */
+/**
+ * Whether a locale tag is any Chinese variant (zh, zh-CN, zh-TW, zh-Hans, …).
+ * Deliberate: every Chinese variant resolves to the single `zh` locale, whose
+ * text is Simplified Chinese — including zh-TW, until a Traditional-Chinese
+ * locale ships. The browser then lays text out with its own script fallback.
+ */
 export function isZhLocale(locale: string): boolean {
   return locale.toLowerCase().startsWith("zh");
 }

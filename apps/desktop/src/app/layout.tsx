@@ -23,7 +23,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         return result?.locale ?? "";
       }}
       onLanguageChanged={(lang) => {
-        electrobun.rpc?.send("languageChanged", { lang });
+        electrobun.rpc?.send("executeCommand", {
+          type: "setLanguage",
+          args: { lang },
+        });
       }}
     >
       <ThemeProvider>

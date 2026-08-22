@@ -799,9 +799,6 @@ export interface DesktopRPCType {
       // A unified command dispatched from the webview to run in the bun process
       // (e.g. window zoom / reload). See `shared/commands.ts`.
       executeCommand: Command;
-      // The user changed the UI language; bun rebuilds the native menu and
-      // switches its error-copy locale.
-      languageChanged: { lang: "en" | "zh" };
       // Fire-and-forget: a renderer-only, anonymous analytics event. The bun
       // side is the single network egress for telemetry. See `shared/analytics.ts`.
       captureAnalyticsEvent: AnalyticsEvent;

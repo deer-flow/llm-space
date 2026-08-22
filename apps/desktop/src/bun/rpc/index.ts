@@ -12,8 +12,7 @@ import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
 import type { Analytics } from "../analytics";
-import { getOsLocale, setAppLocale } from "../app/locales";
-import { setMenuLanguage } from "../app/menu";
+import { getOsLocale } from "../app/locales";
 import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
@@ -569,10 +568,6 @@ export function createMainWindowRPC({
         captureAnalyticsEvent: ({ event, properties }) =>
           analytics.capture(event, properties),
         executeCommand: (command) => executeCommand(command),
-        languageChanged: ({ lang }: { lang: "en" | "zh" }) => {
-          setAppLocale(lang);
-          setMenuLanguage(lang);
-        },
         cancelSharedImport: () => onCancelSharedImport(),
         deepLinkReady: () => onDeepLinkReady(),
       },

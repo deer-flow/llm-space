@@ -6,6 +6,7 @@ import { menu } from "./menu";
 import { playground } from "./playground";
 import { reminders } from "./reminders";
 import { settings } from "./settings";
+import { viewer } from "./viewer";
 
 /** The canonical English tree — the schema every locale must mirror. */
 export const en = {
@@ -17,4 +18,5 @@ export const en = {
   errors,
   playground,
   desktop,
+  viewer,
 };

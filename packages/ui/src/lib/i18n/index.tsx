@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { register } from "timeago.js";
 import zh_CN from "timeago.js/lib/lang/zh_CN";
@@ -28,6 +36,16 @@ if (typeof document !== "undefined") {
 
 export type { Lang, Messages };
 export { LANGUAGES, formatString, langToTimeago };
+
+/**
+ * The message tree for the persisted language — for non-React consumers
+ * (stores, imperative toasts) that can't use `useI18n`. Reads the persisted
+ * choice at call time so a language switch is picked up by the next call.
+ */
+export function getMessages(): Messages {
+  const stored = readLocalStorage(LOCAL_STORAGE_KEYS.appLanguage);
+  return MESSAGES[stored === "zh" ? "zh" : "en"];
+}
 
 interface I18nValue {
   lang: Lang;
@@ -79,18 +97,24 @@ export function I18nProvider({
     document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
   }, [lang]);
 
-  const setLang = (next: Lang) => {
-    resolvedRef.current = true;
-    setLangState(next);
-    writeLocalStorage(LOCAL_STORAGE_KEYS.appLanguage, next);
-    onLanguageChanged?.(next);
-  };
-
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t: MESSAGES[lang] }}>
-      {children}
-    </I18nContext.Provider>
+  const setLang = useCallback(
+    (next: Lang) => {
+      resolvedRef.current = true;
+      setLangState(next);
+      writeLocalStorage(LOCAL_STORAGE_KEYS.appLanguage, next);
+      onLanguageChanged?.(next);
+    },
+    [onLanguageChanged]
   );
+
+  // Memoize so consumers re-render only when the language actually changes,
+  // not on every provider re-render.
+  const value = useMemo(
+    () => ({ lang, setLang, t: MESSAGES[lang] }),
+    [lang, setLang]
+  );
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18nValue {

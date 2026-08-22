@@ -182,6 +182,7 @@ export function Page() {
 // Commands that need context the palette can't supply (a file path / URL) or
 // that make no sense to invoke from the palette itself.
 const COMMAND_PALETTE_BLACKLIST = [
+  "setLanguage",
   "renameFile",
   "duplicateFile",
   "deleteFile",

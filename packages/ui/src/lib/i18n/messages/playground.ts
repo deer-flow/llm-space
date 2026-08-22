@@ -366,6 +366,7 @@ export const playground = {
   },
   tools: {
     error: "Error",
+    toolAlreadyExists: 'Tool "{name}" already exists',
     invalidJson: "Invalid JSON",
     add: "Add",
     addTool: "Add {name}",
@@ -728,6 +729,18 @@ export const playground = {
       "Write your model and search-engine API keys — resolving values from your environment variables — into the project's .env so it's ready to run. You can also do this yourself later.",
     noThanks: "No thanks",
     yesCreateEnv: "Yes, create .env",
+  },
+  run: {
+    variableNameExists: "Variable name already exists",
+    variableNameExistsDescription:
+      '"{name}" is already used by another variable.',
+    invalidTool: "Invalid tool",
+    unableToResolveModel: "Unable to resolve a model",
+    selectModelToRun: "Select a model to run",
+    unableToRenderPromptVariables: "Unable to render prompt variables",
+    checkPromptVariables: "Please check the system prompt variables.",
+    failedToArchiveSnapshot: "Failed to archive run snapshot",
+    archiveSnapshotDeferred: "The snapshot will be archived on the next save.",
   },
   evaluation: {
     unableToSaveRubric: "Unable to save rubric",

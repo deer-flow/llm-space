@@ -39,9 +39,23 @@ if (import.meta.env.DEV) {
 function SharedThreadRoute() {
   const { connectorId, threadId } = useParams();
   const connector = connectorId ? CONNECTORS[connectorId] : undefined;
-  if (!connector || !threadId) return <NotFound />;
+  if (!connector || !threadId) return <SharedNotFoundRoute />;
   return (
     <SharedThreadViewer connector={connector} threadId={threadId} />
+  );
+}
+
+/**
+ * The not-found page renders with the same shared `I18nProvider` as the viewer
+ * (its copy lives in the shared messages tree), seeded from the landing
+ * provider's resolved language.
+ */
+function SharedNotFoundRoute() {
+  const { lang } = useLandingI18n();
+  return (
+    <I18nProvider initialLang={lang}>
+      <NotFound />
+    </I18nProvider>
   );
 }
 
@@ -80,7 +94,7 @@ export function App() {
                   path="/shared/:connectorId/threads/:threadId"
                   element={<SharedThreadRoute />}
                 />
-                <Route path="/shared/*" element={<NotFound />} />
+                <Route path="/shared/*" element={<SharedNotFoundRoute />} />
                 <Route path="*" element={<Landing />} />
               </Routes>
             </LandingI18nProvider>

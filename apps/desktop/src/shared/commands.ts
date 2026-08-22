@@ -256,6 +256,19 @@ export interface OpenVariablesCommand extends GenericCommand<
   { variableName?: string }
 > {}
 
+// --- Language (bun-side) ---------------------------------------------------
+
+/**
+ * Switch the app UI language. Runs in the bun process: the renderer already
+ * persisted + applied its own choice, and this applies it to the bun-side
+ * surfaces (native menu, locale-dependent copy). Modeled as a command so the
+ * switch travels the same pipeline as every other cross-boundary action.
+ */
+export interface SetLanguageCommand extends GenericCommand<
+  "setLanguage",
+  { lang: "en" | "zh" }
+> {}
+
 // --- Window (bun-side) -----------------------------------------------------
 
 /** Zoom the page in one step. */
@@ -345,6 +358,7 @@ export type Command =
   | RunThreadCommand
   | ShareThreadCommand
   | OpenVariablesCommand
+  | SetLanguageCommand
   | ZoomInCommand
   | ZoomOutCommand
   | ResetZoomCommand
@@ -407,6 +421,7 @@ export const COMMAND_META: Record<CommandType, { target: "webview" | "bun" }> = 
   runThread: { target: "webview" },
   shareThread: { target: "webview" },
   openVariables: { target: "webview" },
+  setLanguage: { target: "bun" },
   zoomIn: { target: "bun" },
   zoomOut: { target: "bun" },
   resetZoom: { target: "bun" },

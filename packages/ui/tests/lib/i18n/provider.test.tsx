@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { act } from "react";
 import type { ReactNode } from "react";
@@ -11,7 +11,10 @@ import { I18nProvider, useI18n } from "../../../src/lib/i18n";
 // Bun's test runner ships no DOM, and this repository deliberately has no
 // jsdom-style dependency — so install the repo's hand-rolled host adapter
 // (the one the desktop renderer tests use) to get `document`/`localStorage`.
-installReactTestDom();
+// The returned `restore()` must run after the tests: the adapter swaps global
+// `document`/`Event`, and leaking the fakes breaks other suites that dispatch
+// real events (see the message-scroll regression test).
+const TEST_DOM = installReactTestDom();
 // The adapter exposes storage on `window` only; mirror it as a global so the
 // tests below can call `localStorage` directly.
 globalThis.localStorage = window.localStorage;
@@ -38,6 +41,10 @@ afterEach(() => {
   hostEl?.remove();
   hostEl = null;
   document.documentElement.lang = "";
+});
+
+afterAll(() => {
+  TEST_DOM.restore();
 });
 
 function mount(node: ReactNode) {
