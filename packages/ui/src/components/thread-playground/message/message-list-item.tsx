@@ -19,6 +19,7 @@ import { openFirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-lim
 import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { CollapsibleContent } from "@llm-space/ui/ui/collapsible-content";
@@ -68,6 +69,7 @@ function _MessageListItem({
   dragHandleProps?: MessageDragHandleProps;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
   const { fidelity } = useRenderingFidelity();
   const variableExtension = usePromptVariableExtensionForContext(
     createMessagePromptVariablePlaceKey(message.id),
@@ -220,12 +222,12 @@ function _MessageListItem({
         )}
       >
         <div className="insert-line absolute top-1.5 right-2 left-0 border-b border-dashed opacity-0 transition-[opacity,border-color,border-style] group-hover:opacity-100"></div>
-        <Tooltip content="Insert Message Here">
+        <Tooltip content={t.playground.message.insertMessageHere}>
           <Button
             className="text-muted-foreground hover:border-primary hover:bg-primary! hover:text-primary-foreground absolute -top-0.5 -right-3 z-10 size-4 rounded-full opacity-0 transition-[opacity,background-color,color,border-color] group-hover:opacity-100"
             variant="outline"
             size="icon-xs"
-            aria-label="Insert message before this message"
+            aria-label={t.playground.message.insertMessageBefore}
             onClick={() => insertMessageBefore(message.id)}
           >
             <PlusIcon className="size-3" />
@@ -285,7 +287,9 @@ function _MessageListItem({
                 plain={fidelity === "lite"}
                 placeholder={
                   placeholder ??
-                  `Enter ${message.role === "user" ? "user" : "assistant"} message here`
+                  (message.role === "user"
+                    ? t.playground.message.enterUserMessagePlaceholder
+                    : t.playground.message.enterAssistantMessagePlaceholder)
                 }
                 streaming={streaming}
                 readonly={readonly}
@@ -360,6 +364,7 @@ function _ToolStepContinuation({
   const status = useThreadStore((state) => state.status);
   const { run } = useThreadStoreActions();
   const { presentational } = useHostServices();
+  const { t } = useI18n();
   const { resolveTool, runToolCall } = useToolCallRunner(messageId);
   const callableToolCalls = useMemo(
     () =>
@@ -414,16 +419,19 @@ function _ToolStepContinuation({
       // Suppress the generic toast when the only failures are the Firecrawl
       // limit, since the dialog already explains them.
       if (errorCount > firecrawlLimitCount) {
-        toast.error("Some tool calls failed", {
-          description: `${errorCount}/${outcomes.length} tool call${
-            outcomes.length === 1 ? "" : "s"
-          } failed.`,
+        toast.error(t.playground.message.someToolCallsFailed, {
+          description: formatString(
+            outcomes.length === 1
+              ? t.playground.message.toolCallFailureCount.one
+              : t.playground.message.toolCallFailureCount.other,
+            { failed: errorCount, total: outcomes.length }
+          ),
         });
       }
     } finally {
       setCallingTools(false);
     }
-  }, [callableToolCalls, canCallTools, runToolCall]);
+  }, [callableToolCalls, canCallTools, runToolCall, t]);
 
   // The web shared viewer hides the whole run-continuation block.
   if (presentational) {
@@ -434,7 +442,11 @@ function _ToolStepContinuation({
     <div className="bg-foreground/4 flex min-w-0 items-center justify-between gap-3 rounded-md px-3 py-1">
       <Marker role="status" className="min-w-0">
         <MarkerContent className="truncate text-xs">
-          {toolCalls.length} tool call{toolCalls.length === 1 ? "" : "s"}
+          {toolCalls.length === 1
+            ? t.playground.message.toolCallCount.one
+            : formatString(t.playground.message.toolCallCount.other, {
+                n: toolCalls.length,
+              })}
         </MarkerContent>
       </Marker>
       <div className="flex shrink-0 items-center gap-2">
@@ -444,22 +456,22 @@ function _ToolStepContinuation({
             size="sm"
             variant="outline"
             disabled={!canCallTools}
-            aria-label="Call available tools"
+            aria-label={t.playground.message.callAvailableTools}
             onClick={() => void handleCallTools()}
           >
-            Call tools
+            {t.playground.message.callTools}
           </Button>
         ) : null}
-        <Tooltip content="Run from this message">
+        <Tooltip content={t.playground.message.runFromThisMessage}>
           <Button
             className="invisible shrink-0 group-hover/message:visible"
             size="sm"
             variant="default"
             disabled={!canContinue}
-            aria-label="Run from this message"
+            aria-label={t.playground.message.runFromThisMessage}
             onClick={() => void handleContinue()}
           >
-            Continue
+            {t.playground.message.continue}
           </Button>
         </Tooltip>
       </div>

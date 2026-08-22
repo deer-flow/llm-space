@@ -12,12 +12,15 @@ import {
   HostServicesProvider,
   type HostServices,
 } from "../../../../src/host";
+import { I18nProvider } from "../../../../src/lib/i18n";
 
 function _render(input: ToolCallInput, streaming: boolean): string {
   return renderToStaticMarkup(
-    <HostServicesProvider value={{} as HostServices}>
-      <ToolCallInputView input={input} streaming={streaming} />
-    </HostServicesProvider>
+    <I18nProvider initialLang="en">
+      <HostServicesProvider value={{} as HostServices}>
+        <ToolCallInputView input={input} streaming={streaming} />
+      </HostServicesProvider>
+    </I18nProvider>
   );
 }
 

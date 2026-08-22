@@ -5,6 +5,7 @@ import { memo } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
 import { docsUrl } from "@llm-space/ui/lib/docs-url";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -34,6 +35,7 @@ function _PromptVariablesDialog({
   onOpenChange,
 }: PromptVariablesDialogProps) {
   const { actions } = useHostServices();
+  const { t } = useI18n();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,11 +45,9 @@ function _PromptVariablesDialog({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="shrink-0 border-b px-4 py-3">
-          <DialogTitle>Variables</DialogTitle>
+          <DialogTitle>{t.playground.variable.variables}</DialogTitle>
           <DialogDescription>
-            Use `{"{{variable_name}}"}` as placeholder in your prompt, messages
-            and tool results to reference the variable. e.g. `
-            {"{{current_date}}"}` will be replaced with the current date.
+            {t.playground.variable.variablesDescription}
           </DialogDescription>
         </DialogHeader>
         <PromptVariablesPanel
@@ -63,7 +63,7 @@ function _PromptVariablesDialog({
             }
           >
             <CircleHelpIcon className="size-4" />
-            Help
+            {t.playground.variable.help}
           </Button>
         </DialogFooter>
       </DialogContent>

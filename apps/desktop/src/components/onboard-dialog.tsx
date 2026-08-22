@@ -7,6 +7,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogClose, DialogContent } from "@llm-space/ui/ui/dialog";
@@ -38,6 +39,7 @@ export function OnboardDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   const models = useModels();
   const { executeCommand } = useCommands();
   const fetchBuiltinProviders = useFetchBuiltinProviders();
@@ -68,14 +70,14 @@ export function OnboardDialog({
         if (cancelled) {
           return;
         }
-        setLoadError(PROVIDER_DISCOVERY_ERROR_MESSAGE);
+        setLoadError(t.desktop.onboard.providerCheckFailed);
         setBuiltinProviders([]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [fetchBuiltinProviders, models.length, open]);
+  }, [fetchBuiltinProviders, models.length, open, t]);
 
   const detectedProviders = useMemo(() => {
     return (builtinProviders ?? [])
@@ -119,16 +121,20 @@ export function OnboardDialog({
       try {
         await addProvider(provider.id);
         setAddedProviderName(provider.name);
-        toast.success(`${provider.name} is ready`);
+        toast.success(
+          formatString(t.desktop.onboard.providerReady, {
+            name: provider.name,
+          })
+        );
       } catch {
-        toast.error("Could not add provider", {
-          description: ADD_PROVIDER_ERROR_MESSAGE,
+        toast.error(t.desktop.onboard.couldNotAddProvider, {
+          description: t.desktop.onboard.addProviderFailed,
         });
       } finally {
         setAddingProviderId(null);
       }
     },
-    [addProvider]
+    [addProvider, t]
   );
 
   const handleReady = useCallback(() => {
@@ -167,7 +173,7 @@ export function OnboardDialog({
               className="onboard-close-enter absolute top-4 right-4 z-20 rounded-full border border-white/10 bg-black/35! text-white/70 backdrop-blur-md hover:bg-white/10! hover:text-white"
               variant="ghost"
               size="icon-sm"
-              aria-label="Close onboarding"
+              aria-label={t.desktop.onboard.closeAria}
             >
               <XIcon className="size-3" />
             </Button>
@@ -176,18 +182,18 @@ export function OnboardDialog({
           <header className="absolute top-[8%] right-[5%] left-[5%] z-10">
             <div className="onboard-copy-enter onboard-copy-enter-1 mb-5 flex items-center gap-3 text-[0.625rem] font-medium tracking-[0.28em] text-cyan-100/60 uppercase">
               <span className="h-px w-8 bg-cyan-200/55" />
-              Agent workbench
+              {t.desktop.onboard.agentWorkbench}
             </div>
             <h1 className="font-heading tracking-[-0.055em] text-balance">
               <span className="onboard-copy-enter onboard-copy-enter-2 block text-[clamp(2.1rem,4.1vw,3.25rem)] leading-none font-thin text-white/72">
-                Welcome to
+                {t.desktop.onboard.welcomeTo}
               </span>
               <span className="onboard-copy-enter onboard-copy-enter-3 mt-1 block w-fit bg-[linear-gradient(103deg,#f2fbf9_4%,#83e5e5_56%,#ff9b86_108%)] bg-clip-text pr-[0.12em] text-[clamp(4.25rem,7.7vw,6.1rem)] leading-[0.9] font-normal tracking-[-0.075em] text-transparent">
                 LLM Space
               </span>
             </h1>
             <p className="onboard-copy-enter onboard-copy-enter-4 mt-5 max-w-md text-sm/6 font-normal tracking-[0.01em] text-white/58">
-              A better way to build, trace, debug, and evaluate agents.
+              {t.desktop.onboard.tagline}
             </p>
           </header>
 
@@ -201,7 +207,7 @@ export function OnboardDialog({
                     onClick={handleConfigureModels}
                   >
                     <SettingsIcon className="size-3" />
-                    Configure models
+                    {t.desktop.onboard.configureModels}
                   </Button>
                 ) : (
                   <DialogClose asChild>
@@ -209,7 +215,7 @@ export function OnboardDialog({
                       className="onboard-action-enter onboard-action-enter-1 h-10 rounded-full border border-cyan-100/35 bg-cyan-100! px-5 text-[#071011] shadow-[0_12px_38px_rgba(67,220,223,0.18)] hover:bg-white!"
                       size="lg"
                     >
-                      Get started
+                      {t.desktop.onboard.getStarted}
                       <ArrowRightIcon className="size-3.5" />
                     </Button>
                   </DialogClose>
@@ -220,17 +226,17 @@ export function OnboardDialog({
                   size="lg"
                   onClick={handleLearnMore}
                 >
-                  Learn more
+                  {t.common.learnMore}
                 </Button>
               </div>
               <div className="onboard-action-enter onboard-action-enter-3 text-[0.6875rem] text-white/42">
-                We collect anonymous usage data to improve the app.{" "}
+                {t.desktop.onboard.usagePrefix}
                 <button
                   type="button"
                   className="underline decoration-white/25 underline-offset-2 transition-colors hover:text-white/85"
                   onClick={handleOpenAnalyticsSettings}
                 >
-                  Manage in settings
+                  {t.desktop.onboard.manageInSettings}
                 </button>
               </div>
             </div>
@@ -269,11 +275,6 @@ const ONBOARDING_RECOMMENDED_PROVIDER_IDS = new Set([
   "google",
 ]);
 
-const PROVIDER_DISCOVERY_ERROR_MESSAGE =
-  "Provider check did not finish. Open model settings to continue.";
-
-const ADD_PROVIDER_ERROR_MESSAGE = "Open model settings and try again.";
-
 /** Sort discovered providers so the lowest-friction local options appear first. */
 function _sortProviderForOnboarding(
   a: ModelProviderGroup,
@@ -311,6 +312,7 @@ function _OnboardSetupPanel({
   onConfigureModels: () => void;
   onReady: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className={cn(
@@ -324,7 +326,7 @@ function _OnboardSetupPanel({
         <_LoadingSetupState />
       ) : loadError ? (
         <_ManualSetupState
-          title="Provider check failed"
+          title={t.desktop.onboard.providerCheckFailedTitle}
           description={loadError}
           recommendedProviders={[]}
           onConfigureModels={onConfigureModels}
@@ -337,8 +339,8 @@ function _OnboardSetupPanel({
         />
       ) : (
         <_ManualSetupState
-          title="No local provider found"
-          description="Add a provider in settings to choose a model."
+          title={t.desktop.onboard.noProviderFound}
+          description={t.desktop.onboard.addProviderHint}
           recommendedProviders={recommendedProviders}
           onConfigureModels={onConfigureModels}
         />
@@ -348,13 +350,16 @@ function _OnboardSetupPanel({
 }
 
 function _LoadingSetupState() {
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-3">
       <Spinner className="size-4 text-white/80" />
       <div className="min-w-0">
-        <div className="text-sm font-medium">Checking local providers</div>
+        <div className="text-sm font-medium">
+          {t.desktop.onboard.checkingProviders}
+        </div>
         <div className="text-xs text-white/65">
-          Looking for credentials already available on this computer.
+          {t.desktop.onboard.checkingProvidersHint}
         </div>
       </div>
     </div>
@@ -368,17 +373,22 @@ function _ReadySetupState({
   providerName: string | null;
   onReady?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex cursor-pointer items-start gap-3" onClick={onReady}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/18 text-emerald-200">
         <CheckIcon className="size-4" />
       </div>
       <div className="min-w-0 grow">
-        <div className="text-sm font-medium">Ready to run</div>
+        <div className="text-sm font-medium">
+          {t.desktop.onboard.readyToRun}
+        </div>
         <div className="text-xs text-white/65">
           {providerName
-            ? `${providerName} is configured for this workspace.`
-            : "A provider is configured for this workspace."}
+            ? formatString(t.desktop.onboard.providerConfigured, {
+                name: providerName,
+              })
+            : t.desktop.onboard.aProviderConfigured}
         </div>
       </div>
     </div>
@@ -394,16 +404,19 @@ function _DetectedSetupState({
   addingProviderId: string | null;
   onAddProvider: (provider: ModelProviderGroup) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3">
       <div>
         <div className="text-sm font-medium">
-          {providers.length === 1 ? "Provider detected" : "Providers detected"}
+          {providers.length === 1
+            ? t.desktop.onboard.providerDetected.one
+            : t.desktop.onboard.providerDetected.other}
         </div>
         <div className="text-xs text-white/65">
           {providers.length === 1
-            ? "Add a detected provider from the list to get started."
-            : "Add detected providers from the list to get started."}
+            ? t.desktop.onboard.providerDetectedDescription.one
+            : t.desktop.onboard.providerDetectedDescription.other}
         </div>
       </div>
       <div className="flex flex-col gap-2">
@@ -415,7 +428,9 @@ function _DetectedSetupState({
               type="button"
               className="flex w-full items-center gap-3 rounded-xl border border-white/12 bg-white/[0.055] p-2.5 text-left transition-colors hover:border-cyan-100/25 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-100/45 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
               disabled={Boolean(addingProviderId)}
-              aria-label={`Add detected provider ${provider.name}`}
+              aria-label={formatString(t.desktop.onboard.addDetectedProvider, {
+                name: provider.name,
+              })}
               onClick={() => onAddProvider(provider)}
             >
               <ProviderAvatar
@@ -429,7 +444,7 @@ function _DetectedSetupState({
                   {provider.name}
                 </span>
                 <span className="block text-xs text-white/60">
-                  Detected locally
+                  {t.desktop.onboard.detectedLocally}
                 </span>
               </span>
               {adding ? (
@@ -456,6 +471,7 @@ function _ManualSetupState({
   recommendedProviders: ModelProviderGroup[];
   onConfigureModels: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
@@ -470,14 +486,17 @@ function _ManualSetupState({
       {recommendedProviders.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="text-xs font-medium text-white/80">
-            Recommended setup
+            {t.desktop.onboard.recommendedSetup}
           </div>
           {recommendedProviders.map((provider) => (
             <button
               key={provider.id}
               type="button"
               className="flex w-full items-center gap-3 rounded-xl border border-white/12 bg-white/[0.055] p-2.5 text-left transition-colors hover:border-cyan-100/25 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-100/45 focus-visible:outline-none"
-              aria-label={`Open model settings to configure ${provider.name}`}
+              aria-label={formatString(
+                t.desktop.onboard.openModelSettingsFor,
+                { name: provider.name }
+              )}
               onClick={onConfigureModels}
             >
               <ProviderAvatar
@@ -491,7 +510,7 @@ function _ManualSetupState({
                   {provider.name}
                 </span>
                 <span className="block text-xs text-white/60">
-                  Set up in model settings
+                  {t.desktop.onboard.setUpInSettings}
                 </span>
               </span>
               <ArrowRightIcon className="size-3.5 shrink-0 text-white/70" />
@@ -505,7 +524,7 @@ function _ManualSetupState({
         onClick={onConfigureModels}
       >
         <SettingsIcon className="size-3.5" />
-        Open model settings
+        {t.desktop.onboard.openModelSettings}
       </Button>
     </div>
   );

@@ -1,12 +1,11 @@
 "use client";
 
 import { Link } from "@llm-space/ui/components/link";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Input } from "@llm-space/ui/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
-
-
 
 /**
  * A labelled secret-input row: a password input with a show/hide eye toggle, an
@@ -28,6 +27,7 @@ export function ApiKeyField({
   /** Helper text rendered under the input. */
   description?: ReactNode;
 } & ComponentProps<typeof Input>) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   return (
     <div className="flex flex-col gap-2">
@@ -38,7 +38,7 @@ export function ApiKeyField({
             href={getKeyUrl}
             className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
           >
-            Get API key
+            {t.settings.apiKeyField.getApiKey}
           </Link>
         ) : null}
       </div>
@@ -53,7 +53,11 @@ export function ApiKeyField({
           type="button"
           onClick={() => setVisible((v) => !v)}
           className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 transition-colors"
-          aria-label={visible ? `Hide ${label}` : `Show ${label}`}
+          aria-label={
+            visible
+              ? formatString(t.settings.apiKeyField.hideAria, { label })
+              : formatString(t.settings.apiKeyField.showAria, { label })
+          }
         >
           {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>

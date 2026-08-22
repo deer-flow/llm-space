@@ -5,6 +5,7 @@ import path from "node:path";
 import { getLlmSpaceHomePath } from "@llm-space/core/server";
 import { GistThreadReader, GistThreadWriter } from "@llm-space/core/storage";
 import { PluginManager } from "@llm-space/runtime/plugins";
+import { LOCAL_STORAGE_KEYS } from "@llm-space/ui/lib/local-storage";
 import Electrobun, {
   app,
   type BrowserWindow,
@@ -46,6 +47,8 @@ import { createBuiltInToolsModule } from "../tools/built-in";
 import { TraceManager } from "../traces";
 import { UpdaterService } from "../updates";
 
+import { isAppLang, restoreAppLocale } from "./locales";
+import { preselectMenuLanguage } from "./menu";
 import { createShutdownCoordinator } from "./shutdown-coordinator";
 import { createMainWindow } from "./window";
 import { flushWindowState } from "./window-state";
@@ -60,6 +63,16 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   const workspacePath = path.join(homePath, "workspace");
   const analytics = new Analytics();
   const localStorageManager = new LocalStorageManager();
+  // Restore the persisted UI language before the native menu or any
+  // locale-dependent code is read. The renderer applies its own persisted
+  // choice; without this, bun-side surfaces (menu, error copy, links) would
+  // come back in the OS locale until the user switches the language again.
+  const persistedLang =
+    localStorageManager.snapshot().values[LOCAL_STORAGE_KEYS.appLanguage];
+  if (isAppLang(persistedLang)) {
+    restoreAppLocale(persistedLang);
+    preselectMenuLanguage(persistedLang);
+  }
   // Apply the configured proxy to `process.env` before anything spawns a
   // subprocess (MCP) or makes a request, so egress is routed from the start.
   const networkSettings = new NetworkSettingsManager();

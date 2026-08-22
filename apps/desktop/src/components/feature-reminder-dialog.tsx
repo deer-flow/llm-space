@@ -1,4 +1,5 @@
 import { useModels } from "@llm-space/ui/components/model-provider";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogClose, DialogContent } from "@llm-space/ui/ui/dialog";
 import { ArrowUpRightIcon, XIcon } from "lucide-react";
@@ -29,6 +30,7 @@ export function FeatureReminderDialog() {
   const models = useModels();
   const hasModels = models.length > 0;
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   const [reminder, setReminder] = useState<FeatureReminder | null>(null);
   const [open, setOpen] = useState(false);
   // Providers load asynchronously, so `hasModels` flips from false→true after
@@ -80,6 +82,11 @@ export function FeatureReminderDialog() {
 
   if (!reminder) return null;
 
+  // The message tree is keyed directly by reminder id, so resolve the copy
+  // subtree by the id itself.
+  const reminderCopy = t.reminders[reminder.id as keyof typeof t.reminders];
+  if (!reminderCopy) return null;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
@@ -89,7 +96,7 @@ export function FeatureReminderDialog() {
         <div className="relative min-h-0 shrink overflow-hidden">
           <img
             src={reminder.imageUrl}
-            alt={reminder.title}
+            alt={reminderCopy.title}
             className="bg-muted block aspect-video w-full object-cover"
           />
           <DialogClose asChild>
@@ -97,27 +104,27 @@ export function FeatureReminderDialog() {
               className="bg-muted/75 hover:bg-muted/85! text-foreground/80 absolute top-2 right-2 rounded-full"
               variant="ghost"
               size="icon-sm"
-              aria-label="Dismiss"
+              aria-label={t.common.dismiss}
             >
               <XIcon className="size-3" />
             </Button>
           </DialogClose>
         </div>
         <div className="flex shrink-0 flex-col gap-2 p-6">
-          {reminder.eyebrow && (
+          {reminderCopy.eyebrow && (
             <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              {reminder.eyebrow}
+              {reminderCopy.eyebrow}
             </div>
           )}
           <h2 className="font-heading text-lg font-semibold">
-            {reminder.title}
+            {reminderCopy.title}
           </h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            {reminder.description}
+            {reminderCopy.description}
           </p>
           <div className="mt-3 flex justify-end">
             <Button variant="outline" size="sm" onClick={handleLearnMore}>
-              Learn more
+              {t.common.learnMore}
               <ArrowUpRightIcon className="size-3.5" />
             </Button>
           </div>

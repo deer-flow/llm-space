@@ -1,3 +1,4 @@
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { DropdownMenuItem } from "@llm-space/ui/ui/dropdown-menu";
 import { Share2 } from "lucide-react";
 
@@ -15,12 +16,13 @@ export function ShareThreadMenuItem({
   runtimeId: RuntimeId;
   executeCommand: (command: Command) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenuItem
       onSelect={() => executeCommand(buildShareThreadCommand(path, runtimeId))}
     >
       <Share2 />
-      Share...
+      {t.desktop.shareThreadMenu.share}
     </DropdownMenuItem>
   );
 }

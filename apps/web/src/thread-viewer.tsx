@@ -7,6 +7,7 @@ import type {
 import { readLatestThread } from "@llm-space/core/storage";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import { Skeleton } from "@llm-space/ui/ui/skeleton";
 import {
@@ -97,6 +98,7 @@ export function ThreadViewer({
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [fullscreen, setFullscreen] = useState(false);
   const navigate = useNavigate();
+  const { t } = useI18n();
   // Decide embedded/compact rendering once, at open — kept in state so later
   // resizes don't reflow (and don't flash thumbnails in) after the thread loads.
   // Embedded (strips the site chrome + collapses images) when the URL opts in
@@ -123,25 +125,26 @@ export function ThreadViewer({
           setState({
             status: "error",
             message:
-              error instanceof Error ? error.message : "Failed to load.",
+              error instanceof Error ? error.message : t.viewer.failedToLoad,
           });
         }
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a language switch must not refetch the thread
   }, [connector, threadId]);
 
   // Reflect the thread title in the tab/window title while it's open.
   useEffect(() => {
     if (state.status !== "ready") return;
-    const title = state.shared.meta.title ?? "Untitled thread";
+    const title = state.shared.meta.title ?? t.viewer.untitledThread;
     const previous = document.title;
     document.title = `${title} - LLM Space`;
     return () => {
       document.title = previous;
     };
-  }, [state]);
+  }, [state, t]);
 
   // Let Escape leave full screen.
   useEffect(() => {
@@ -162,8 +165,8 @@ export function ThreadViewer({
     const rateLimited = /rate limit/i.test(state.message);
     return (
       <NotFound
-        eyebrow={rateLimited ? "Rate limited" : "Unavailable"}
-        title="We couldn't load this shared thread"
+        eyebrow={rateLimited ? t.viewer.rateLimited : t.viewer.unavailable}
+        title={t.viewer.couldNotLoad}
         message={state.message}
       />
     );
@@ -175,17 +178,21 @@ export function ThreadViewer({
       {/* Embedded has no meta block, so keep the "Open" affordance in-header. */}
       {fullscreen || embedded ? (
         <Button size="sm" onClick={openApp}>
-          Open in LLM Space
+          {t.viewer.openInApp}
           <ExternalLinkIcon className="size-3.5" />
         </Button>
       ) : null}
       {/* Full-screen toggle is redundant when already embedded/full-bleed. */}
       {embedded ? null : (
-        <Tooltip content={fullscreen ? "Exit full screen" : "Full screen"}>
+        <Tooltip
+          content={fullscreen ? t.viewer.exitFullscreen : t.viewer.fullscreen}
+        >
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label={fullscreen ? "Exit full screen" : "Enter full screen"}
+            aria-label={
+              fullscreen ? t.viewer.exitFullscreen : t.viewer.enterFullscreen
+            }
             aria-pressed={fullscreen}
             onClick={() => setFullscreen((value) => !value)}
           >
@@ -288,14 +295,15 @@ function SharedThreadMetaBlock({
   meta: SharedThreadMeta;
   onOpenApp: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <section className="flex shrink-0 flex-col gap-6 py-5 sm:flex-row sm:items-start sm:justify-between">
       <div className="space-y-2">
         <div className="text-xs font-medium tracking-widest text-neutral-500 uppercase">
-          Shared thread
+          {t.viewer.sharedThread}
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-white">
-          {meta.title ?? "Untitled thread"}
+          {meta.title ?? t.viewer.untitledThread}
         </h1>
         {meta.description ? (
           <p className="max-w-2xl text-sm text-neutral-400">
@@ -327,12 +335,16 @@ function SharedThreadMetaBlock({
           <Tooltip
             content={
               meta.createdAt
-                ? `Created ${formatDateTime(meta.createdAt)}`
+                ? formatString(t.viewer.created, {
+                    date: formatDateTime(meta.createdAt),
+                  })
                 : undefined
             }
           >
             <span className="text-xs text-neutral-500">
-              Last updated {formatDate(meta.updatedAt)}
+              {formatString(t.viewer.lastUpdated, {
+                date: formatDate(meta.updatedAt),
+              })}
             </span>
           </Tooltip>
         ) : null}
@@ -351,13 +363,13 @@ function SharedThreadMetaBlock({
               />
             ) : null}
             <span>
-              Shared by{" "}
+              {t.viewer.sharedBy}{" "}
               <span className="font-medium text-white">{meta.author.name}</span>
             </span>
           </a>
         ) : null}
         <Button size="lg" onClick={onOpenApp}>
-          Open in LLM Space
+          {t.viewer.openInApp}
           <ExternalLinkIcon className="size-4" />
         </Button>
       </div>

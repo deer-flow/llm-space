@@ -1,5 +1,6 @@
 "use client";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import { CheckIcon, Loader2Icon, XIcon } from "lucide-react";
 import {
@@ -52,6 +53,7 @@ function _UpdateReadyCard({
   onRestart: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
   const restartButtonRef = _useNativeClick(onRestart);
   const dismissButtonRef = _useNativeClick(onDismiss);
   return (
@@ -60,19 +62,19 @@ function _UpdateReadyCard({
         <CheckIcon className="size-4" />
       </div>
       <div className="min-w-0 grow">
-        <div className="text-sm font-medium">Update ready</div>
+        <div className="text-sm font-medium">{t.desktop.updateCards.readyTitle}</div>
         <div className="truncate text-xs text-white/65">
-          v{version} is ready to install.
+          {formatString(t.desktop.updateCards.readyDescription, { version })}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button ref={restartButtonRef} size="sm">
-          Restart
+          {t.common.restart}
         </Button>
         <button
           ref={dismissButtonRef}
           type="button"
-          aria-label="Dismiss"
+          aria-label={t.common.dismiss}
           className="flex size-6 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -95,9 +97,11 @@ function _UpdateDownloadingCard({
   status: Extract<UpdateStatus, { state: "downloading" }>;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
   const dismissButtonRef = _useNativeClick(onDismiss);
   const { version, progress, bytesDownloaded, totalBytes } = status;
   const progressLabel = _formatDownloadProgress(
+    t,
     progress,
     bytesDownloaded,
     totalBytes
@@ -109,15 +113,20 @@ function _UpdateDownloadingCard({
           <Loader2Icon className="size-4 animate-spin" />
         </div>
         <div className="min-w-0 grow">
-          <div className="text-sm font-medium">Downloading update</div>
+          <div className="text-sm font-medium">
+            {t.desktop.updateCards.downloadingTitle}
+          </div>
           <div className="truncate text-xs text-white/65">
-            v{version} — {progressLabel}
+            {formatString(t.desktop.updateCards.downloadingDescription, {
+              version,
+              progressLabel,
+            })}
           </div>
         </div>
         <button
           ref={dismissButtonRef}
           type="button"
-          aria-label="Dismiss"
+          aria-label={t.common.dismiss}
           className="flex size-6 shrink-0 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -141,13 +150,14 @@ function _UpdateDownloadingCard({
 }
 
 function _formatDownloadProgress(
+  t: ReturnType<typeof useI18n>["t"],
   progress?: number,
   bytesDownloaded?: number,
   totalBytes?: number
 ): string {
   const percent = progress === undefined ? null : `${Math.round(progress)}%`;
   if (bytesDownloaded === undefined) {
-    return percent ?? "this continues in the background.";
+    return percent ?? t.desktop.updateCards.backgroundNote;
   }
 
   const downloaded = _formatBytes(bytesDownloaded);
@@ -192,6 +202,7 @@ const UpdateStatusContext = createContext<UpdateStatusValue | null>(null);
  */
 export function UpdateStatusProvider({ children }: { children: ReactNode }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   const [readyVersion, setReadyVersion] = useState<string | null>(null);
   const lastNotifiedVersion = useRef<string | null>(null);
   // Manual "Check for Updates" flow.
@@ -302,9 +313,9 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void rpc.request.pendingInstalledVersion({}).then((version) => {
       if (cancelled || !version) return;
-      toast.success(`Updated to v${version}`, {
+      toast.success(formatString(t.desktop.updateCards.updated, { version }), {
         action: {
-          label: "Release notes",
+          label: t.desktop.updateCards.releaseNotes,
           onClick: () =>
             executeCommand({
               type: "openLink",
@@ -316,7 +327,7 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [executeCommand]);
+  }, [executeCommand, t]);
 
   return (
     <UpdateStatusContext.Provider value={{ readyVersion }}>

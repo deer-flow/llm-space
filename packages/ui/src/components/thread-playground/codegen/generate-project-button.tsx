@@ -49,6 +49,7 @@ import { Spinner } from "@llm-space/ui/ui/spinner";
 import { Switch } from "@llm-space/ui/ui/switch";
 
 import { docsUrl } from "../../../lib/docs-url";
+import { formatString, useI18n } from "../../../lib/i18n";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../../ui/button";
 import {
@@ -88,8 +89,6 @@ const FRAMEWORKS = [
     id: "langgraph",
     name: "LangGraph",
     stack: "Python",
-    description:
-      "Scaffolds a uv-managed Python project with a runnable LangGraph agent — ships with a local web UI and step debugger (LangGraph Studio) out of the box.",
     available: true,
   },
 ] as const;
@@ -126,6 +125,7 @@ export function GenerateProjectButton({
     actions,
     presentational,
   } = useHostServices();
+  const { t } = useI18n();
   const store = useThreadStoreApi();
   const context = useThreadStore((s) => s.thread.context);
   const runtimeId = useThreadStore((s) => s.runtimeId);
@@ -341,7 +341,7 @@ export function GenerateProjectButton({
       return;
     }
     if (!model) {
-      toast.error("No model available for code generation.");
+      toast.error(t.playground.codegen.noModelAvailable);
       return;
     }
     setPreparing(true);
@@ -368,7 +368,7 @@ export function GenerateProjectButton({
     } finally {
       setPreparing(false);
     }
-  }, [generator, model, parentDir, projectName, runGeneration]);
+  }, [generator, model, parentDir, projectName, runGeneration, t]);
 
   // Abort an in-progress run and close the wizard.
   const cancelRun = useCallback(() => {
@@ -394,12 +394,14 @@ export function GenerateProjectButton({
     try {
       await builtinTools.fsReveal(result.dir);
     } catch (error) {
-      toast.error("Failed to open generated project", {
+      toast.error(t.playground.codegen.failedToOpenGeneratedProject, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error
+            ? error.message
+            : t.playground.message.pleaseTryAgain,
       });
     }
-  }, [builtinTools, result]);
+  }, [builtinTools, result, t]);
 
   const skipEnvFile = useCallback(() => {
     void openGeneratedProject();
@@ -461,10 +463,10 @@ export function GenerateProjectButton({
         mcpEnvEntries(lastMcpServers)
       );
       await generator.writeFile(result.dir, ".env", contents);
-      toast.success(".env created with your keys.");
+      toast.success(t.playground.codegen.envCreatedWithKeys);
       envCreated = true;
     } catch (e) {
-      toast.error("Couldn't create .env", {
+      toast.error(t.playground.codegen.couldNotCreateEnv, {
         description: e instanceof Error ? e.message : String(e),
       });
     }
@@ -476,7 +478,7 @@ export function GenerateProjectButton({
         await openGeneratedProject();
       }
     } catch (e) {
-      toast.error("Couldn't start the development server", {
+      toast.error(t.playground.codegen.couldNotStartDevServer, {
         description: e instanceof Error ? e.message : String(e),
       });
       await openGeneratedProject();
@@ -496,6 +498,7 @@ export function GenerateProjectButton({
     lastMcpServers,
     openGeneratedProject,
     setDialogOpen,
+    t,
   ]);
 
   if (presentational || !generator || !runtimeId) {
@@ -510,7 +513,7 @@ export function GenerateProjectButton({
         <Tooltip
           content={
             <span className="flex items-center gap-1.5">
-              Generate a runnable agent for this thread
+              {t.playground.codegen.generateRunnableAgentForThread}
               <BetaBadge />
             </span>
           }
@@ -518,7 +521,7 @@ export function GenerateProjectButton({
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label="Generate a runnable agent (Beta)"
+            aria-label={t.playground.codegen.generateRunnableAgentBeta}
             disabled={disabled || running || !model}
             onClick={() => setDialogOpen(true)}
           >
@@ -534,19 +537,19 @@ export function GenerateProjectButton({
               <SparklesIcon className="size-4" />
             </span>
             <DialogTitle className="col-start-2 flex items-center gap-2">
-              Generate a runnable agent
+              {t.playground.codegen.generateRunnableAgent}
               <BetaBadge />
             </DialogTitle>
             <DialogDescription className="col-start-2">
               {step === "framework"
-                ? "Turn this thread into a real codebase—prompt, tools, variables, messages, and a plan to finish it."
+                ? t.playground.codegen.descriptionFramework
                 : step === "target"
-                  ? "Name the project, choose its home, and preview what will be created."
+                  ? t.playground.codegen.descriptionTarget
                   : uvMissing
-                    ? "uv is needed to scaffold the project."
+                    ? t.playground.codegen.descriptionUvMissing
                     : result
-                      ? "The thread is now a runnable agent project."
-                      : "Compiling thread context into a runnable project."}
+                      ? t.playground.codegen.descriptionResult
+                      : t.playground.codegen.descriptionRunning}
             </DialogDescription>
           </DialogHeader>
 
@@ -612,16 +615,16 @@ export function GenerateProjectButton({
               onClick={() => actions.openLink(docsUrl("generating-projects"))}
             >
               <CircleHelpIcon className="size-4" />
-              Help
+              {t.playground.codegen.help}
             </Button>
             <div className="flex items-center justify-end gap-2">
               {step === "framework" ? (
               <>
                 <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-                  Cancel
+                  {t.playground.codegen.cancel}
                 </Button>
                 <Button onClick={() => setStep("target")}>
-                  Next
+                  {t.playground.codegen.next}
                 </Button>
               </>
               ) : null}
@@ -633,14 +636,16 @@ export function GenerateProjectButton({
                   disabled={preparing}
                   onClick={() => setStep("framework")}
                 >
-                  Back
+                  {t.playground.codegen.back}
                 </Button>
                 <Button
                   disabled={preparing || !projectName.trim()}
                   onClick={prepareAndRun}
                 >
                   {preparing ? <Spinner className="size-3" /> : null}
-                  {preparing ? "Checking…" : "Generate"}
+                  {preparing
+                    ? t.playground.codegen.checking
+                    : t.playground.codegen.generate}
                 </Button>
               </>
               ) : null}
@@ -654,11 +659,11 @@ export function GenerateProjectButton({
                     setStep("target");
                   }}
                 >
-                  Back
+                  {t.playground.codegen.back}
                 </Button>
                 <Button onClick={() => actions.openLink(UV_INSTALL_URL)}>
                   <ExternalLinkIcon className="size-4" />
-                  Install uv
+                  {t.playground.codegen.installUv}
                 </Button>
               </>
               ) : null}
@@ -671,12 +676,12 @@ export function GenerateProjectButton({
                     onClick={() => void openGeneratedProject()}
                   >
                     <FolderOpenIcon className="size-4" />
-                    Open folder
+                    {t.playground.codegen.openFolder}
                   </Button>
                 ) : null}
                 {running ? (
                   <Button variant="ghost" onClick={cancelRun}>
-                    Cancel
+                    {t.playground.codegen.cancel}
                   </Button>
                 ) : null}
                 <Button
@@ -687,7 +692,9 @@ export function GenerateProjectButton({
                   }
                 >
                   {running ? <Spinner className="size-3" /> : null}
-                  {running ? "Generating…" : "Done"}
+                  {running
+                    ? t.playground.codegen.generating
+                    : t.playground.codegen.done}
                 </Button>
               </>
               ) : null}
@@ -705,10 +712,10 @@ export function GenerateProjectButton({
             setDialogOpen(false);
           }
         }}
-        title="Create a .env file for you?"
-        description="Write your model and search-engine API keys — resolving values from your environment variables — into the project's .env so it's ready to run. You can also do this yourself later."
-        cancelLabel="No thanks"
-        confirmLabel="Yes, create .env"
+        title={t.playground.codegen.createEnvTitle}
+        description={t.playground.codegen.createEnvDescription}
+        cancelLabel={t.playground.codegen.noThanks}
+        confirmLabel={t.playground.codegen.yesCreateEnv}
         confirmVariant="default"
         dimBackground={false}
         onCancel={skipEnvFile}
@@ -720,19 +727,16 @@ export function GenerateProjectButton({
 
 /** A small "Beta" pill marking this as an experimental feature. */
 function BetaBadge() {
+  const { t } = useI18n();
   return (
     <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-      Beta
+      {t.playground.header.beta}
     </span>
   );
 }
 
 /** Ordered wizard steps with their stepper titles. */
-const STEPS: { id: WizardStep; title: string }[] = [
-  { id: "framework", title: "Introduction" },
-  { id: "target", title: "Destination" },
-  { id: "run", title: "Build" },
-];
+const STEPS: WizardStep[] = ["framework", "target", "run"];
 
 /**
  * Horizontal numbered stepper (reui-style): each step is an indicator circle +
@@ -740,7 +744,13 @@ const STEPS: { id: WizardStep; title: string }[] = [
  * steps show a checkmark, the active step is highlighted, pending steps muted.
  */
 function StepIndicator({ step }: { step: WizardStep }) {
-  const activeIndex = STEPS.findIndex((s) => s.id === step);
+  const { t } = useI18n();
+  const stepTitles: Record<WizardStep, string> = {
+    framework: t.playground.codegen.stepIntroduction,
+    target: t.playground.codegen.stepDestination,
+    run: t.playground.codegen.stepBuild,
+  };
+  const activeIndex = STEPS.findIndex((s) => s === step);
   return (
     <div className="mx-auto flex max-w-2xl items-center">
       {STEPS.map((s, index) => {
@@ -752,7 +762,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
               : "pending";
         return (
           <div
-            key={s.id}
+            key={s}
             className={cn(
               "flex items-center",
               index === 0 ? "" : "flex-1"
@@ -792,7 +802,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
                     : "text-foreground"
                 )}
               >
-                {s.title}
+                {stepTitles[s]}
               </span>
             </div>
           </div>
@@ -810,13 +820,14 @@ function FrameworkStep({
   selected: string;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3.5">
       <div className="bg-card group relative min-h-52 overflow-hidden rounded-2xl border shadow-sm">
         <div className="absolute inset-y-0 right-0 w-[52%] overflow-hidden">
           <img
             src="/images/codegen/thread-to-agent.jpg"
-            alt="An abstract Liuli flow passing through a portal and becoming a structured agent"
+            alt={t.playground.codegen.frameworkAlt}
             className="size-full object-cover opacity-80 transition-transform duration-1000 ease-out group-hover:scale-[1.025] dark:opacity-65"
           />
           <div className="from-card absolute inset-0 bg-gradient-to-r from-0% via-transparent via-52% to-transparent" />
@@ -826,25 +837,24 @@ function FrameworkStep({
         <div className="relative flex min-h-52 w-[62%] flex-col justify-center p-6">
           <div className="text-primary mb-3 flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] uppercase">
             <WorkflowIcon className="size-3.5" />
-            Playground → code
+            {t.playground.codegen.playgroundToCode}
           </div>
           <h3 className="max-w-md text-2xl font-semibold tracking-tight text-balance">
-            Take the agent out of the playground.
+            {t.playground.codegen.takeAgentOutOfPlayground}
           </h3>
           <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
-            Export the intelligence already assembled here into a project you
-            can inspect, version, and run.
+            {t.playground.codegen.exportIntelligence}
           </p>
 
           <div className="mt-5 flex items-center gap-2 text-[0.6875rem] font-medium">
             <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
               <BotIcon className="text-muted-foreground size-3.5" />
-              Playground context
+              {t.playground.codegen.playgroundContext}
             </span>
             <ArrowRightIcon className="text-muted-foreground size-3.5" />
             <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
               <PackageIcon className="text-muted-foreground size-3.5" />
-              Runnable project
+              {t.playground.codegen.runnableProject}
             </span>
           </div>
         </div>
@@ -852,13 +862,15 @@ function FrameworkStep({
 
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium">Export format</p>
+          <p className="text-sm font-medium">
+            {t.playground.codegen.exportFormat}
+          </p>
           <p className="text-muted-foreground text-xs">
-            Choose the runtime that will receive this thread.
+            {t.playground.codegen.chooseRuntime}
           </p>
         </div>
         <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
-          1 available
+          {t.playground.codegen.countAvailable}
         </span>
       </div>
 
@@ -890,7 +902,7 @@ function FrameworkStep({
                 </span>
               </span>
               <span className="text-muted-foreground line-clamp-2 text-xs/relaxed">
-                {fw.description}
+                {t.playground.codegen.frameworkLanggraphDescription}
               </span>
             </span>
             <span
@@ -938,20 +950,21 @@ function TargetStep({
   onUseMetaUserPromptChange: (next: boolean) => void;
   onBrowse: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h3 className="text-lg font-semibold tracking-tight">
-          Give your agent a home
+          {t.playground.codegen.giveAgentHome}
         </h3>
         <p className="text-muted-foreground mt-1 text-xs">
-          Choose where the editable project will live.
+          {t.playground.codegen.chooseProjectHome}
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
         <div className="border-border/60 bg-muted/10 flex flex-col gap-3.5 rounded-2xl border p-4">
-          <Field label="Parent directory">
+          <Field label={t.playground.codegen.parentDirectory}>
             <div className="flex items-center gap-2">
               <Input
                 value={parentDir}
@@ -969,24 +982,26 @@ function TargetStep({
                 className="cursor-pointer"
               >
                 <FolderIcon className="size-4" />
-                Browse
+                {t.playground.codegen.browse}
               </Button>
             </div>
           </Field>
 
-          <Field label="Project name">
+          <Field label={t.playground.codegen.projectName}>
             <Input
               value={projectName}
               disabled={disabled}
               spellCheck={false}
               className="font-mono"
               onChange={(e) => onNameChange(e.target.value)}
-              placeholder="my-agent"
+              placeholder={t.playground.codegen.projectNamePlaceholder}
             />
           </Field>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">Project path</span>
+            <span className="text-xs font-medium">
+              {t.playground.codegen.projectPath}
+            </span>
             <div className="border-border/60 bg-background/70 text-muted-foreground truncate rounded-lg border px-3 py-2 font-mono text-xs shadow-sm">
               {targetPreview}
             </div>
@@ -1001,14 +1016,20 @@ function TargetStep({
                 <FolderTreeIcon className="size-4" />
               </span>
               <div>
-                <p className="text-xs font-semibold">Project blueprint</p>
+                <p className="text-xs font-semibold">
+                  {t.playground.codegen.projectBlueprint}
+                </p>
                 <p className="text-muted-foreground text-[0.6875rem]">
-                  A real, editable Python project
+                  {t.playground.codegen.editablePythonProject}
                 </p>
               </div>
             </div>
             <div className="text-muted-foreground flex flex-1 flex-col gap-1.5 font-mono text-[0.6875rem]">
-              <ProjectTreeLine icon={FolderIcon} label={`${projectName || "my-agent"}/`} strong />
+              <ProjectTreeLine
+                icon={FolderIcon}
+                label={`${projectName || t.playground.codegen.projectNamePlaceholder}/`}
+                strong
+              />
               <ProjectTreeLine icon={BotIcon} label="agent.py" nested />
               <ProjectTreeLine icon={WorkflowIcon} label="langgraph.json" nested />
               <ProjectTreeLine icon={PackageIcon} label="pyproject.toml" nested />
@@ -1016,7 +1037,7 @@ function TargetStep({
               <ProjectTreeLine icon={FolderIcon} label="references/" nested />
             </div>
             <div className="border-border/60 text-muted-foreground mt-3 border-t pt-2.5 text-[0.6875rem]">
-              Thread context and PLAN.md included.
+              {t.playground.codegen.threadContextAndPlanIncluded}
             </div>
           </div>
         </div>
@@ -1029,7 +1050,7 @@ function TargetStep({
               htmlFor="use-meta-user-prompt"
               className="text-xs font-medium"
             >
-              Use meta user prompt
+              {t.playground.codegen.useMetaUserPrompt}
             </label>
             <span
               className={cn(
@@ -1040,16 +1061,16 @@ function TargetStep({
               )}
             >
               {!hasFirstUserMessage
-                ? "Unavailable"
+                ? t.playground.codegen.unavailable
                 : metaUserPromptSuggested
-                  ? "Suggested on"
-                  : "Suggested off"}
+                  ? t.playground.codegen.suggestedOn
+                  : t.playground.codegen.suggestedOff}
             </span>
           </div>
           <p className="text-muted-foreground max-w-2xl text-xs">
             {hasFirstUserMessage
-              ? "Reuse the first message as runtime context before every model call."
-              : "This thread has no first user message to use as runtime context."}
+              ? t.playground.codegen.reuseFirstMessage
+              : t.playground.codegen.noFirstUserMessage}
           </p>
         </div>
         <Switch
@@ -1058,7 +1079,7 @@ function TargetStep({
           checked={useMetaUserPrompt}
           disabled={disabled || !hasFirstUserMessage}
           onCheckedChange={onUseMetaUserPromptChange}
-          aria-label="Use meta user prompt in the generated agent"
+          aria-label={t.playground.codegen.useMetaUserPromptAria}
         />
       </div>
 
@@ -1117,6 +1138,7 @@ function Field({
  * the Python project, so we stop here and point the user at Astral's installer.
  */
 function UvMissingStep() {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-3">
       <div className="flex flex-col items-center text-center">
@@ -1124,14 +1146,13 @@ function UvMissingStep() {
           <TerminalIcon className="size-6" />
         </div>
         <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
-          One requirement
+          {t.playground.codegen.oneRequirement}
         </span>
         <h3 className="mt-2 text-xl font-semibold tracking-tight">
-          Install uv to build the project
+          {t.playground.codegen.installUvToBuild}
         </h3>
         <p className="text-muted-foreground mt-2 max-w-lg text-sm/relaxed">
-          uv is Astral&apos;s fast Python package manager. The generator uses it
-          to scaffold the environment and lock every dependency.
+          {t.playground.codegen.uvDescription}
         </p>
       </div>
 
@@ -1140,7 +1161,9 @@ function UvMissingStep() {
           <span className="bg-background flex size-6 items-center justify-center rounded-full border text-[0.6875rem] font-semibold">
             1
           </span>
-          <span className="text-sm font-medium">Install uv in Terminal</span>
+          <span className="text-sm font-medium">
+            {t.playground.codegen.installUvInTerminal}
+          </span>
         </div>
         <div className="bg-neutral-950 px-4 py-4 font-mono text-xs text-neutral-200">
           <span className="mr-2 text-emerald-400">$</span>
@@ -1151,12 +1174,12 @@ function UvMissingStep() {
             2
           </span>
           <span className="text-sm font-medium">
-            Return here and generate again
+            {t.playground.codegen.returnAndGenerateAgain}
           </span>
         </div>
       </div>
       <p className="text-muted-foreground text-center text-xs">
-        “Install uv” opens Astral&apos;s official installation guide.
+        {t.playground.codegen.installUvOpensGuide}
       </p>
     </div>
   );
@@ -1172,6 +1195,7 @@ function RunStep({
   error: string | null;
   running: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="grid h-full min-h-80 gap-4 md:grid-cols-[0.8fr_1.2fr]">
       <div className="relative min-h-56 overflow-hidden rounded-2xl border bg-neutral-950 text-white">
@@ -1184,18 +1208,21 @@ function RunStep({
         <div className="relative flex h-full flex-col justify-between p-5">
           <div className="flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] text-white/65 uppercase">
             {running ? <Spinner className="size-3" /> : <PackageIcon className="size-3.5" />}
-            {running ? "Building" : error ? "Build stopped" : "Build complete"}
+            {running
+              ? t.playground.codegen.building
+              : error
+                ? t.playground.codegen.buildStopped
+                : t.playground.codegen.buildComplete}
           </div>
           <div>
             <div className="mb-4 flex size-11 items-center justify-center rounded-xl border border-white/15 bg-black/25 backdrop-blur-xl">
               <RocketIcon className="size-5" />
             </div>
             <h3 className="text-xl font-semibold tracking-tight">
-              Turning context into code
+              {t.playground.codegen.turningContextIntoCode}
             </h3>
             <p className="mt-1.5 text-xs/relaxed text-white/65">
-              Scaffolding the runtime, exporting references, and writing a plan
-              your coding agent can finish.
+              {t.playground.codegen.scaffoldingCopy}
             </p>
           </div>
         </div>
@@ -1205,17 +1232,24 @@ function RunStep({
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <TerminalIcon className="text-muted-foreground size-3.5" />
-            <span className="text-xs font-semibold">Build activity</span>
+            <span className="text-xs font-semibold">
+              {t.playground.codegen.buildActivity}
+            </span>
           </div>
           <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
-            {events.length} events
+            {formatString(
+              events.length === 1
+                ? t.playground.codegen.eventCount.one
+                : t.playground.codegen.eventCount.other,
+              { n: events.length }
+            )}
           </span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 font-mono text-xs">
           {events.length === 0 && !error ? (
             <div className="text-muted-foreground flex items-center gap-2">
               <Spinner className="size-3" />
-              Preparing the build…
+              {t.playground.codegen.preparingBuild}
             </div>
           ) : null}
           {events.map((event, index) => (
@@ -1229,7 +1263,7 @@ function RunStep({
         </div>
         {running ? (
           <div className="text-muted-foreground border-t px-4 py-3 text-[0.6875rem]">
-            Dependencies may take a moment to install on the first build.
+            {t.playground.codegen.depsFirstBuildNote}
           </div>
         ) : null}
       </div>
@@ -1253,28 +1287,28 @@ function SuccessStep({
   depsInstall: DepsInstallStatus;
   hasFunctionTools: boolean;
 }) {
+  const { t } = useI18n();
   const steps: { title: string; body: React.ReactNode }[] = [];
 
   // Dependencies weren't installed during generation (usually a slow uv
   // download hit the timeout) — walk the user through finishing it by hand.
   if (depsInstall !== "installed") {
     steps.push({
-      title: "Install dependencies",
+      title: t.playground.codegen.installDependencies,
       body: (
         <>
           <p className="text-muted-foreground text-xs/relaxed">
             {depsInstall === "timeout"
-              ? "Installing took too long and was stopped — uv was probably still downloading. Finish it in this folder:"
+              ? t.playground.codegen.depsTimeoutMessage
               : depsInstall === "skipped"
-                ? "uv wasn't available, so dependencies weren't installed. In this folder, run:"
-                : "Installing didn't finish. In this folder, run:"}
+                ? t.playground.codegen.depsSkippedMessage
+                : t.playground.codegen.depsDidNotFinish}
           </p>
           <CommandBlock command={`cd ${_shellQuote(dir)} && uv sync`} />
           <p className="text-muted-foreground text-xs/relaxed">
-            uv downloads the project&apos;s Python packages; the first run can
-            take a few minutes. On a slow connection, uncomment a mirror in{" "}
-            <code className="text-foreground font-mono">pyproject.toml</code> to
-            speed it up.
+            {t.playground.codegen.depsSlowMirrorPrefix}{" "}
+            <code className="text-foreground font-mono">pyproject.toml</code>{" "}
+            {t.playground.codegen.depsSlowMirrorSuffix}
           </p>
         </>
       ),
@@ -1282,52 +1316,48 @@ function SuccessStep({
   }
 
   steps.push({
-    title: "Set up your environment",
+    title: t.playground.codegen.setUpEnvironment,
     body: envWritten ? (
       <p className="text-muted-foreground text-xs/relaxed">
-        Your API keys were written to{" "}
-        <code className="text-foreground font-mono">.env</code> — open it to
-        review and fill in anything still blank.
+        {t.playground.codegen.envWrittenMessagePrefix}{" "}
+        <code className="text-foreground font-mono">.env</code>{" "}
+        {t.playground.codegen.envWrittenMessageSuffix}
       </p>
     ) : (
       <>
         <CommandBlock command="cp .env.example .env" />
         <p className="text-muted-foreground text-xs/relaxed">
-          Then add your API keys.
+          {t.playground.codegen.thenAddApiKeys}
         </p>
       </>
     ),
   });
 
   steps.push({
-    title: "Finish it in your coding agent",
+    title: t.playground.codegen.finishInCodingAgent,
     body: (
       <p className="text-muted-foreground text-xs/relaxed">
-        Open <code className="text-foreground font-mono">PLAN.md</code> in your
-        coding agent (Claude Code, Cursor, Codex…) and follow it
+        {t.playground.codegen.finishPlanBeforeFile}{" "}
+        <code className="text-foreground font-mono">PLAN.md</code>{" "}
+        {t.playground.codegen.finishPlanAfterFile}
         {hasFunctionTools ? (
-          <>
-            {" "}
-            to implement your custom function tools — the agent won&apos;t run
-            until they&apos;re filled in.
-          </>
+          <>{t.playground.codegen.finishPlanWithTools}</>
         ) : (
-          " to review the project and finish any remaining steps."
+          t.playground.codegen.finishPlanReview
         )}
       </p>
     ),
   });
 
   steps.push({
-    title: "Launch & explore",
+    title: t.playground.codegen.launchExplore,
     body: (
       <>
         <CommandBlock
           command={`cd ${_shellQuote(dir)} && uv run langgraph dev`}
         />
         <p className="text-muted-foreground text-xs/relaxed">
-          Then open LangGraph Studio in your browser to inspect, trace, and run
-          your agent.
+          {t.playground.codegen.openLanggraphStudio}
         </p>
       </>
     ),
@@ -1348,10 +1378,10 @@ function SuccessStep({
           </div>
           <div className="min-w-0">
             <span className="text-[0.625rem] font-semibold tracking-[0.18em] text-emerald-300/80 uppercase">
-              Build complete
+              {t.playground.codegen.buildComplete}
             </span>
             <h3 className="mt-1 text-2xl font-semibold tracking-tight">
-              Your agent is ready
+              {t.playground.codegen.yourAgentIsReady}
             </h3>
             <p className="mt-1 max-w-xl truncate font-mono text-xs text-white/60">
               {dir}
@@ -1362,7 +1392,7 @@ function SuccessStep({
 
       <div className="border-border/60 bg-muted/10 flex flex-col gap-4 rounded-2xl border p-5">
         <span className="text-muted-foreground text-[0.6875rem] font-medium tracking-wider uppercase">
-          Next steps
+          {t.playground.codegen.nextSteps}
         </span>
         {steps.map((s, index) => (
           <div key={s.title} className="flex gap-3">
@@ -1382,6 +1412,7 @@ function SuccessStep({
 
 /** A copyable monospace command chip. */
 function CommandBlock({ command }: { command: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => {
     navigator.clipboard
@@ -1407,7 +1438,7 @@ function CommandBlock({ command }: { command: string }) {
       <button
         type="button"
         onClick={copy}
-        aria-label="Copy command"
+        aria-label={t.playground.codegen.copyCommand}
         className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
       >
         {copied ? (

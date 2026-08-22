@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { useModels } from "@llm-space/ui/components/model-provider";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
   Dialog,
@@ -53,15 +54,14 @@ type BuiltInToolCategoryId = "fileSystem" | "web" | "media" | "misc";
 
 interface BuiltInToolCategory {
   id: BuiltInToolCategoryId;
-  label: string;
   icon: LucideIcon;
 }
 
 const BUILT_IN_TOOL_CATEGORIES: BuiltInToolCategory[] = [
-  { id: "fileSystem", label: "File system", icon: FilesIcon },
-  { id: "web", label: "Web", icon: GlobeIcon },
-  { id: "media", label: "Media", icon: ImageIcon },
-  { id: "misc", label: "Misc", icon: CloudSunIcon },
+  { id: "fileSystem", icon: FilesIcon },
+  { id: "web", icon: GlobeIcon },
+  { id: "media", icon: ImageIcon },
+  { id: "misc", icon: CloudSunIcon },
 ];
 
 const FILE_SYSTEM_TOOL_NAMES = new Set([
@@ -113,6 +113,7 @@ function _BuiltInToolImportDialog({
   const [generateImageConfig, setGenerateImageConfig] =
     useState<GenerateImageToolConfig | null>(null);
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
+  const { t } = useI18n();
   const { builtinTools } = useHostServices();
   const providers = useModels();
   const generateImageTool = tools.find((tool) => tool.name === "generate_image");
@@ -138,12 +139,14 @@ function _BuiltInToolImportDialog({
     try {
       setTools(await builtinTools.list({ runtimeId }));
     } catch (error) {
-      toast.error("Failed to load built-in tools", {
+      toast.error(t.playground.tools.failedToLoadBuiltInTools, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error
+            ? error.message
+            : t.playground.message.pleaseTryAgain,
       });
     }
-  }, [builtinTools, runtimeId]);
+  }, [builtinTools, runtimeId, t]);
 
   useEffect(() => {
     if (!open) {
@@ -220,9 +223,8 @@ function _BuiltInToolImportDialog({
       (candidate) => candidate.id === generateImageConfig?.model
     );
     if (!model || !generateImageConfig) {
-      toast.error("Choose an enabled image model", {
-        description:
-          "Enable an Ark image model in Settings, then select it here.",
+      toast.error(t.playground.tools.chooseEnabledImageModel, {
+        description: t.playground.tools.enableArkImageModelHint,
       });
       return;
     }
@@ -272,9 +274,9 @@ function _BuiltInToolImportDialog({
         }}
       >
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add built-in tools</DialogTitle>
+          <DialogTitle>{t.playground.tools.addBuiltInTools}</DialogTitle>
           <DialogDescription>
-            Choose built-in tools to make available in this thread.
+            {t.playground.tools.addBuiltInToolsDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -284,8 +286,8 @@ function _BuiltInToolImportDialog({
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools"
-                aria-label="Search tools"
+                placeholder={t.playground.tools.searchTools}
+                aria-label={t.playground.tools.searchTools}
                 className="h-8 pl-7 text-xs"
               />
             </div>
@@ -294,6 +296,7 @@ function _BuiltInToolImportDialog({
                 const CategoryIcon = category.icon;
                 const categoryTools = toolsByCategory.get(category.id) ?? [];
                 const selected = category.id === selectedCategoryId;
+                const categoryLabel = t.playground.tools.category[category.id];
                 return (
                   <div
                     key={category.id}
@@ -306,13 +309,13 @@ function _BuiltInToolImportDialog({
                   >
                     <button
                       type="button"
-                      aria-label={category.label}
+                      aria-label={categoryLabel}
                       className="focus-visible:ring-ring/30 absolute inset-0 rounded-md outline-none focus-visible:ring-2"
                       onClick={() => setSelectedCategoryId(category.id)}
                     />
                     <CategoryIcon className="size-3.5 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">
-                      {category.label}
+                      {categoryLabel}
                     </span>
                     <ToolImportSidebarActions
                       count={categoryTools.length}
@@ -341,8 +344,8 @@ function _BuiltInToolImportDialog({
               {selectedTools.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-center text-sm">
                   {query.trim()
-                    ? "No tools match your search."
-                    : "No built-in tools in this category."}
+                    ? t.playground.tools.noToolsMatchSearch
+                    : t.playground.tools.noBuiltInToolsInCategory}
                 </div>
               ) : (
                 selectedTools.map((tool) => {
@@ -409,7 +412,12 @@ function _BuiltInToolImportDialog({
                         className="mt-0.5"
                         checked={exists}
                         disabled={!exists && !canAdd}
-                        aria-label={`${exists ? "Remove" : "Add"} ${tool.name}`}
+                        aria-label={formatString(
+                          exists
+                            ? t.playground.tools.removeTool
+                            : t.playground.tools.addTool,
+                          { name: tool.name }
+                        )}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
                         }
@@ -444,6 +452,7 @@ function _GenerateImageConfigFields({
   selectedModel?: SeedreamImageModelDefinition;
   onChange: (config: GenerateImageToolConfig) => void;
 }) {
+  const { t } = useI18n();
   const handleModelChange = (modelId: string) => {
     const model = enabledModels.find((candidate) => candidate.id === modelId);
     if (!model) {
@@ -469,7 +478,9 @@ function _GenerateImageConfigFields({
       )}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Model</span>
+        <span className="text-muted-foreground text-xs">
+          {t.playground.tools.model}
+        </span>
         <Select
           value={selectedModel?.id}
           disabled={enabledModels.length === 0}
@@ -478,9 +489,9 @@ function _GenerateImageConfigFields({
           <SelectTrigger
             className="w-full"
             size="sm"
-            aria-label="Generate image model"
+            aria-label={t.playground.tools.generateImageModel}
           >
-            <SelectValue placeholder="Choose model" />
+            <SelectValue placeholder={t.playground.tools.chooseModel} />
           </SelectTrigger>
           <SelectContent
             onPointerDownOutside={(e) => e.preventDefault()}
@@ -496,7 +507,9 @@ function _GenerateImageConfigFields({
 
       {showProfileSelector && providerId ? (
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-muted-foreground text-xs">Profile</span>
+          <span className="text-muted-foreground text-xs">
+            {t.playground.tools.profile}
+          </span>
           <ProviderProfileSelector
             providerId={providerId}
             className="max-w-none"
@@ -506,7 +519,9 @@ function _GenerateImageConfigFields({
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Default size</span>
+        <span className="text-muted-foreground text-xs">
+          {t.playground.tools.defaultSize}
+        </span>
         <Select
           value={selectedModel ? config?.size : undefined}
           disabled={!selectedModel}
@@ -516,8 +531,11 @@ function _GenerateImageConfigFields({
             }
           }}
         >
-          <SelectTrigger size="sm" aria-label="Default image size">
-            <SelectValue placeholder="Size" />
+          <SelectTrigger
+            size="sm"
+            aria-label={t.playground.tools.defaultImageSize}
+          >
+            <SelectValue placeholder={t.playground.tools.size} />
           </SelectTrigger>
           <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {selectedModel?.supportedSizes.map((size) => (
@@ -530,13 +548,15 @@ function _GenerateImageConfigFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Watermark</span>
+        <span className="text-muted-foreground text-xs">
+          {t.playground.tools.watermark}
+        </span>
         <div className="flex h-7 items-center justify-between gap-2">
           <Switch
             size="sm"
             checked={config?.watermark ?? true}
             disabled={!selectedModel || !config}
-            aria-label="Add AI-generated watermark"
+            aria-label={t.playground.tools.addAiWatermark}
             onCheckedChange={(watermark) => {
               if (config) {
                 onChange({ ...config, watermark });
@@ -548,11 +568,11 @@ function _GenerateImageConfigFields({
 
       {enabledModels.length === 0 ? (
         <p className="text-destructive col-span-full text-xs">
-          Enable an Ark image model in Settings before adding this tool.
+          {t.playground.tools.enableArkImageModelBeforeAdding}
         </p>
       ) : !config || !selectedModel ? (
         <p className="text-destructive col-span-full text-xs">
-          Choose an enabled image model for this tool.
+          {t.playground.tools.chooseEnabledImageModelForTool}
         </p>
       ) : null}
     </div>

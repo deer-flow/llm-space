@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { SkillListItem } from "@llm-space/ui/components/skill-list-item";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ function _SkillSelectionDialog({
   onApply,
 }: SkillSelectionDialogProps) {
   const { actions } = useHostServices();
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [draftSkillNames, setDraftSkillNames] = useState(selectedSkillNames);
   const [draftIncludesAll, setDraftIncludesAll] = useState(includeAllSkills);
@@ -117,10 +119,9 @@ function _SkillSelectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[560px] max-h-[calc(100vh-4rem)] w-[min(720px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Select skills</DialogTitle>
+          <DialogTitle>{t.playground.variable.selectSkillsTitle}</DialogTitle>
           <DialogDescription>
-            All enabled skills are included by default. Pick specific skills to
-            narrow it to only those.
+            {t.playground.variable.skillSelectionDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 grow flex-col gap-3 p-4">
@@ -130,15 +131,17 @@ function _SkillSelectionDialog({
               className="h-8 pl-7"
               value={query}
               disabled={disabled}
-              placeholder="Search skills"
+              placeholder={t.playground.variable.searchSkills}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground text-xs">
               {draftIncludesAll
-                ? "All skills (default)"
-                : `Selected ${draftSkillNames.length}`}
+                ? t.playground.variable.allSkillsDefault
+                : formatString(t.playground.variable.selectedN, {
+                    n: draftSkillNames.length,
+                  })}
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -150,7 +153,7 @@ function _SkillSelectionDialog({
                   setDraftIncludesAll(true);
                 }}
               >
-                Select all
+                {t.playground.variable.selectAll}
               </Button>
               <Button
                 size="xs"
@@ -164,7 +167,7 @@ function _SkillSelectionDialog({
                   setDraftIncludesAll(false);
                 }}
               >
-                Select none
+                {t.playground.variable.selectNone}
               </Button>
             </div>
           </div>
@@ -172,7 +175,7 @@ function _SkillSelectionDialog({
             <div className="flex flex-col gap-1.5 p-2">
               {loading ? (
                 <div className="text-muted-foreground px-2 py-3 text-xs">
-                  Loading skills...
+                  {t.playground.variable.loadingSkills}
                 </div>
               ) : error ? (
                 <div className="text-destructive px-2 py-3 text-xs">
@@ -180,7 +183,7 @@ function _SkillSelectionDialog({
                 </div>
               ) : filteredSkills.length === 0 ? (
                 <div className="text-muted-foreground px-2 py-3 text-xs">
-                  No matching skills.
+                  {t.playground.variable.noMatchingSkills}
                 </div>
               ) : (
                 filteredSkills.map((skill) => (
@@ -205,17 +208,17 @@ function _SkillSelectionDialog({
             onClick={manageSkills}
           >
             <Settings2Icon className="size-3.5" />
-            Manage skill folders
+            {t.playground.variable.manageSkillFolders}
           </Button>
           <Button
             variant="outline"
             disabled={disabled}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t.playground.variable.cancel}
           </Button>
           <Button disabled={disabled} onClick={apply}>
-            Done
+            {t.playground.variable.done}
           </Button>
         </DialogFooter>
       </DialogContent>

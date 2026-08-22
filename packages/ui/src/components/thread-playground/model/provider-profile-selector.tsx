@@ -3,6 +3,7 @@
 import { formatProviderProfileLabel } from "@llm-space/core";
 import { CableIcon } from "lucide-react";
 
+import { formatString, useI18n } from "../../../lib/i18n";
 import { cn } from "../../../lib/utils";
 import {
   Select,
@@ -30,6 +31,7 @@ export function ProviderProfileSelector({
   variant?: "default" | "compact";
 }) {
   const provider = useModels().find((candidate) => candidate.id === providerId);
+  const { t } = useI18n();
   const { selectedProfileId, selectProfile } = useProviderProfileSelection(
     providerId,
     selectionScope
@@ -63,9 +65,14 @@ export function ProviderProfileSelector({
         )}
         size="sm"
         noIcon={variant === "compact"}
-        aria-label={`${provider?.name ?? providerId} connection profile: ${
-          selectedProfile?.name ?? "Default"
-        }`}
+        aria-label={formatString(
+          t.playground.model.connectionProfile,
+          {
+            provider: provider?.name ?? providerId,
+            profile:
+              selectedProfile?.name ?? t.playground.model.defaultProfile,
+          }
+        )}
       >
         {variant === "compact" ? (
           <SelectValue>

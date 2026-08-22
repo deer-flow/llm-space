@@ -11,6 +11,7 @@ import { Edit3Icon, PlusIcon } from "lucide-react";
 import { useMemo, type KeyboardEvent } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import { ButtonGroup } from "@llm-space/ui/ui/button-group";
 import {
@@ -98,14 +99,15 @@ export function RunEvaluationScorecard({
         );
       }, 0)
     : 0;
+  const { t } = useI18n();
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-medium">Rubric</div>
+          <div className="text-xs font-medium">{t.playground.eval.rubric}</div>
           <div className="text-muted-foreground text-[0.625rem]">
-            Score each run consistently, or keep the legacy verdict-only flow.
+            {t.playground.eval.scoreEachRunConsistently}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -127,14 +129,22 @@ export function RunEvaluationScorecard({
               );
             }}
           >
-            <SelectTrigger className="w-52" aria-label="Evaluation rubric">
+            <SelectTrigger
+              className="w-52"
+              aria-label={t.playground.eval.evaluationRubric}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_RUBRIC}>No rubric</SelectItem>
+              <SelectItem value={NO_RUBRIC}>
+                {t.playground.eval.noRubric}
+              </SelectItem>
               {showSavedRubric && savedRubric && (
                 <SelectItem value={SAVED_RUBRIC}>
-                  {savedRubric.name} (saved v{savedRubric.revision})
+                  {formatString(t.playground.eval.savedRubricOption, {
+                    name: savedRubric.name,
+                    revision: savedRubric.revision,
+                  })}
                 </SelectItem>
               )}
               {rubrics
@@ -145,7 +155,10 @@ export function RunEvaluationScorecard({
                     key={definition.id}
                     value={`${DEFINITION_PREFIX}${definition.id}`}
                   >
-                    {definition.name} · v{definition.revision}
+                    {formatString(t.playground.eval.rubricOption, {
+                      name: definition.name,
+                      revision: definition.revision,
+                    })}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -158,15 +171,19 @@ export function RunEvaluationScorecard({
                 onRubricChange(snapshotEvaluationRubric(currentDefinition))
               }
             >
-              Use current v{currentDefinition.revision}
+              {formatString(t.playground.eval.useCurrentRevision, {
+                revision: currentDefinition.revision,
+              })}
             </Button>
           )}
           {currentDefinition && (
-            <Tooltip content="Edit rubric">
+            <Tooltip content={t.playground.eval.editRubric}>
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label={`Edit rubric ${currentDefinition.name}`}
+                aria-label={formatString(t.playground.eval.editRubricNamed, {
+                  name: currentDefinition.name,
+                })}
                 onClick={() => onEditRubric(currentDefinition)}
               >
                 <Edit3Icon className="size-3" />
@@ -176,8 +193,10 @@ export function RunEvaluationScorecard({
           <Tooltip
             content={
               rubrics.length >= MAX_EVALUATION_RUBRICS
-                ? `Maximum ${MAX_EVALUATION_RUBRICS} rubrics per thread`
-                : "Create rubric"
+                ? formatString(t.playground.eval.maxRubrics, {
+                    n: MAX_EVALUATION_RUBRICS,
+                  })
+                : t.playground.eval.createRubric
             }
           >
             <span
@@ -187,14 +206,16 @@ export function RunEvaluationScorecard({
               }
               aria-label={
                 rubrics.length >= MAX_EVALUATION_RUBRICS
-                  ? `Maximum ${MAX_EVALUATION_RUBRICS} rubrics per thread`
+                  ? formatString(t.playground.eval.maxRubrics, {
+                      n: MAX_EVALUATION_RUBRICS,
+                    })
                   : undefined
               }
             >
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Create rubric"
+                aria-label={t.playground.eval.createRubric}
                 disabled={rubrics.length >= MAX_EVALUATION_RUBRICS}
                 onClick={onCreateRubric}
               >
@@ -208,9 +229,9 @@ export function RunEvaluationScorecard({
       {rubric && (
         <>
           <div className="bg-muted/20 hidden grid-cols-[minmax(12rem,1fr)_minmax(13rem,auto)_minmax(13rem,auto)] items-center gap-3 rounded-md px-3 py-2 text-[0.625rem] font-medium md:grid">
-            <span>Criterion</span>
-            <span className="text-center">Run A</span>
-            <span className="text-center">Run B</span>
+            <span>{t.playground.eval.criterion}</span>
+            <span className="text-center">{t.playground.eval.runA}</span>
+            <span className="text-center">{t.playground.eval.runB}</span>
           </div>
           <div className="flex flex-col gap-2">
             {rubric.criteria.map((criterion) => (
@@ -229,7 +250,7 @@ export function RunEvaluationScorecard({
                   )}
                 </div>
                 <_ScoreButtons
-                  label="Run A"
+                  label={t.playground.eval.runA}
                   criterionName={criterion.name}
                   value={scoreDraft[leftRunId]?.[criterion.id]}
                   onChange={(score) =>
@@ -237,7 +258,7 @@ export function RunEvaluationScorecard({
                   }
                 />
                 <_ScoreButtons
-                  label="Run B"
+                  label={t.playground.eval.runB}
                   criterionName={criterion.name}
                   value={scoreDraft[rightRunId]?.[criterion.id]}
                   onChange={(score) =>
@@ -249,17 +270,24 @@ export function RunEvaluationScorecard({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
             <span className="text-muted-foreground">
-              1 = poor · 5 = excellent
+              {t.playground.eval.poorToExcellent}
             </span>
             {delta === null ? (
               <span className="text-muted-foreground">
-                {missingCount} score{missingCount === 1 ? "" : "s"} remaining
+                {missingCount === 1
+                  ? t.playground.eval.scoresRemaining.one
+                  : formatString(t.playground.eval.scoresRemaining.other, {
+                      n: missingCount,
+                    })}
               </span>
             ) : (
               <span className="font-mono tabular-nums">
-                A {leftAverage!.toFixed(1)} · B {rightAverage!.toFixed(1)} · B −
-                A {delta >= 0 ? "+" : ""}
-                {delta.toFixed(1)}
+                {formatString(t.playground.eval.averageSummary, {
+                  a: leftAverage!.toFixed(1),
+                  b: rightAverage!.toFixed(1),
+                  sign: delta >= 0 ? "+" : "",
+                  delta: delta.toFixed(1),
+                })}
               </span>
             )}
           </div>
@@ -280,10 +308,17 @@ function _ScoreButtons({
   value: number | undefined;
   onChange: (score: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-muted-foreground text-[0.625rem]">{label}</span>
-      <ButtonGroup role="radiogroup" aria-label={`${label}, ${criterionName}`}>
+      <ButtonGroup
+        role="radiogroup"
+        aria-label={formatString(t.playground.eval.scoreGroupLabel, {
+          label,
+          name: criterionName,
+        })}
+      >
         {[1, 2, 3, 4, 5].map((score) => (
           <Button
             key={score}
@@ -291,7 +326,11 @@ function _ScoreButtons({
             size="icon-sm"
             variant={value === score ? "default" : "outline"}
             role="radio"
-            aria-label={`${label}, ${criterionName}, score ${score} of 5`}
+            aria-label={formatString(t.playground.eval.scoreButtonLabel, {
+              label,
+              name: criterionName,
+              score,
+            })}
             aria-checked={value === score}
             data-score={score}
             tabIndex={

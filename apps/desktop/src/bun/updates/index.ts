@@ -1,6 +1,8 @@
+import { MESSAGES } from "@llm-space/ui/lib/i18n/messages";
 import { Updater, type UpdateStatusEntry } from "electrobun/bun";
 
 import type { UpdateMode, UpdateStatus } from "../../shared/updates";
+import { isChineseLocale } from "../app/locales";
 import { setUpdateReadyInMenu } from "../app/menu";
 
 import {
@@ -13,6 +15,9 @@ import {
 const INITIAL_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60_000;
 const APPLY_GRACE_MS = 5_000;
+
+/** The current locale's error templates (`t.errors`), resolved per call. */
+const _errors = () => MESSAGES[isChineseLocale() ? "zh" : "en"].errors;
 
 export interface UpdateStatusMessage {
   status: UpdateStatus;
@@ -74,7 +79,7 @@ export class UpdaterService {
       }
       if (!Updater.updateInfo()?.updateReady) {
         const message =
-          Updater.updateInfo()?.error || "download did not complete";
+          Updater.updateInfo()?.error || _errors().updatesDownloadIncomplete;
         this._sendStatus({ state: "error", message });
         return;
       }

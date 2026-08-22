@@ -14,13 +14,12 @@ export const DEFAULT_CUSTOM_PROVIDER_API: CustomProviderApi =
   "openai-completions";
 
 /** Selectable API types, ordered by preference (most common first). */
-export const CUSTOM_PROVIDER_API_TYPES: {
+export const CUSTOM_PROVIDER_API_TYPES: readonly {
   value: CustomProviderApi;
-  label: string;
 }[] = [
-  { value: "openai-completions", label: "OpenAI Completions" },
-  { value: "openai-responses", label: "OpenAI Responses" },
-  { value: "anthropic-messages", label: "Anthropic Messages" },
+  { value: "openai-completions" },
+  { value: "openai-responses" },
+  { value: "anthropic-messages" },
 ];
 
 /** Whether `api` is one of the known custom-provider API types. */

@@ -2,6 +2,7 @@
 
 import type { Thread } from "@llm-space/core";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import {
   nextCompactedThreadPath,
   normalizeThreadForPath,
@@ -69,6 +70,7 @@ function _ThreadTabPane({
   consumeDiscardedPane,
   onThreadStateChange,
 }: ThreadTabPaneProps) {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const fs = useMemo(() => createFileSystemClient(runtimeId), [runtimeId]);
   const rpcTransport = useMemo(
@@ -117,12 +119,14 @@ function _ThreadTabPane({
   // file surfaces here instead: report it and close the tab it was given.
   useEffect(() => {
     if (!loadError) return;
-    toast.error("Error", {
+    toast.error(t.common.error, {
       description:
-        error instanceof Error ? error.message : `File not found: ${path}`,
+        error instanceof Error
+          ? error.message
+          : formatString(t.desktop.threadTabPane.fileNotFound, { path }),
     });
     onClose(tabId);
-  }, [loadError, error, onClose, path, tabId]);
+  }, [loadError, error, onClose, path, t, tabId]);
 
   // Persist edits back to the same path, debounced so we don't write per keystroke.
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,16 +152,16 @@ function _ThreadTabPane({
               pathRef.current
             ),
           onWriteError: (writeError) => {
-            toast.error("Failed to save thread; retrying", {
+            toast.error(t.desktop.threadTabPane.saveRetrying, {
               description:
                 writeError instanceof Error
                   ? writeError.message
-                  : "Storage is temporarily unavailable.",
+                  : t.desktop.threadTabPane.storageUnavailable,
             });
           },
         }
       ),
-    [fs, lifecycleHost, paneId, persistenceOwner, runtimeId]
+    [fs, lifecycleHost, paneId, persistenceOwner, runtimeId, t]
   );
 
   const flushPending = useCallback(async () => {
@@ -211,13 +215,13 @@ function _ThreadTabPane({
       void settleStreamingPane(flushPending, () => {
         lifecycleHost.onRunSettled(paneId, runId);
       }).catch((error) => {
-        toast.error("Failed to save completed run", {
+        toast.error(t.desktop.threadTabPane.saveRunFailed, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       });
     },
-    [flushPending, lifecycleHost, paneId]
+    [flushPending, lifecycleHost, paneId, t]
   );
   const archiveRunSnapshot = useCallback(
     (run: Parameters<typeof fs.archiveRun>[1]) =>
@@ -283,9 +287,9 @@ function _ThreadTabPane({
         markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
-        toast.error("Error", {
+        toast.error(t.common.error, {
           description:
-            error instanceof Error ? error.message : "Failed to refresh",
+            error instanceof Error ? error.message : t.desktop.threadTabPane.refreshFailed,
         });
         settleWithoutCommit();
       }
@@ -298,6 +302,7 @@ function _ThreadTabPane({
     qc,
     runtimeId,
     settleWithoutCommit,
+    t,
     tabId,
   ]);
 
@@ -370,10 +375,10 @@ function _ThreadTabPane({
         },
       });
       if (!created) {
-        throw new Error("The compacted thread could not be created.");
+        throw new Error(t.desktop.threadTabPane.compactFailed);
       }
     },
-    [fs, lifecycleHost, onOpen, qc, runtimeId]
+    [fs, lifecycleHost, onOpen, qc, runtimeId, t]
   );
 
   const mutationReserved = useMemo(() => {
@@ -389,7 +394,7 @@ function _ThreadTabPane({
           !active && "hidden"
         )}
       >
-        Failed to load thread.
+        {t.desktop.threadTabPane.loadFailed}
       </div>
     ) : null;
   }

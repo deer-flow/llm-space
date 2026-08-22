@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect } from "react";
 
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { useHostServices } from "@llm-space/ui/host";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 
 
@@ -33,6 +34,7 @@ function _SystemPromptEditor({
   const tools = useThreadStore((s) => s.thread.context?.tools);
   const threadModel = useThreadStore((s) => s.thread.model);
   const seedHost = useHostServices();
+  const { t } = useI18n();
   const { presentational } = seedHost;
   const { updateSystemPrompt } = useThreadStoreActions();
   const variableExtension = usePromptVariableExtension(SYSTEM_PROMPT_PLACE_KEY);
@@ -115,11 +117,13 @@ function _SystemPromptEditor({
   return (
     <div className={cn("flex size-full flex-col", className)}>
       <div className="flex shrink-0 items-center justify-between py-2">
-        <div className="text-muted-foreground text-sm">System prompt</div>
+        <div className="text-muted-foreground text-sm">
+          {t.playground.prompt.systemPrompt}
+        </div>
         {!presentational && (
           <div className="flex items-center gap-2">
             <GeneratePopoverButton
-              placeholder="Describe the assistant you want (its role, tone, and rules), and we'll generate a system prompt."
+              placeholder={t.playground.prompt.generateSystemPromptPlaceholder}
               onGenerate={handleGenerate}
             />
             <ExamplesMenu
@@ -138,7 +142,7 @@ function _SystemPromptEditor({
         value={systemPrompt ?? ""}
         language="markdown"
         readonly={readonly || streaming}
-        placeholder="Enter system prompt here"
+        placeholder={t.playground.prompt.enterSystemPromptPlaceholder}
         extraExtensions={variableExtension}
         onChange={handleChange}
       />

@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { CollapsibleContent } from "@llm-space/ui/ui/collapsible-content";
 
@@ -14,6 +15,7 @@ function _ThinkingView({
   thinking: string;
 }) {
   const [collapsed, setCollapsed] = useState(true);
+  const { t } = useI18n();
   const handleToggleCollapsed = useCallback(() => {
     setCollapsed((collapsed) => !collapsed);
   }, []);
@@ -33,7 +35,10 @@ function _ThinkingView({
               collapsed && "-rotate-90"
             )}
           />
-          <div className="font-semibold">Thinking{collapsed ? ":" : ""}</div>
+          <div className="font-semibold">
+            {t.playground.message.thinking}
+            {collapsed ? ":" : ""}
+          </div>
           {collapsed && (
             <div className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {thinking}

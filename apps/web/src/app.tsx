@@ -3,12 +3,16 @@ import { createGistConnector, GIST_CONNECTOR_ID } from "@llm-space/core/storage"
 import { ModelProvider } from "@llm-space/ui/components/model-provider";
 import { ThemeProvider } from "@llm-space/ui/components/theme-provider";
 import { HostServicesProvider } from "@llm-space/ui/host";
+import { I18nProvider } from "@llm-space/ui/lib/i18n";
 import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 import { Route, Routes, useParams } from "react-router-dom";
 
 import { webHost, webModelClient } from "@/host/web-host";
 import { App as Landing } from "@/landing/app";
-import { I18nProvider } from "@/landing/lib/i18n";
+import {
+  I18nProvider as LandingI18nProvider,
+  useI18n as useLandingI18n,
+} from "@/landing/lib/i18n";
 import { NotFound } from "@/not-found";
 import { ThreadViewer } from "@/thread-viewer";
 
@@ -35,8 +39,47 @@ if (import.meta.env.DEV) {
 function SharedThreadRoute() {
   const { connectorId, threadId } = useParams();
   const connector = connectorId ? CONNECTORS[connectorId] : undefined;
-  if (!connector || !threadId) return <NotFound />;
-  return <ThreadViewer connector={connector} threadId={threadId} />;
+  if (!connector || !threadId) return <SharedNotFoundRoute />;
+  return (
+    <SharedThreadViewer connector={connector} threadId={threadId} />
+  );
+}
+
+/**
+ * The not-found page renders with the same shared `I18nProvider` as the viewer
+ * (its copy lives in the shared messages tree), seeded from the landing
+ * provider's resolved language.
+ */
+function SharedNotFoundRoute() {
+  const { lang } = useLandingI18n();
+  return (
+    <I18nProvider initialLang={lang}>
+      <NotFound />
+    </I18nProvider>
+  );
+}
+
+/**
+ * The playground's copy comes from the shared `@llm-space/ui` messages, so the
+ * viewer needs the shared provider — the landing has its own. `initialLang` is
+ * seeded from the landing provider's already-resolved language (that
+ * resolution covers the landingLanguage-then-navigator priority). The viewer
+ * stays display-only: no switcher, no persistence writes — `initialLang` makes
+ * the provider's async path unnecessary.
+ */
+function SharedThreadViewer({
+  connector,
+  threadId,
+}: {
+  connector: ThreadConnector;
+  threadId: string;
+}) {
+  const { lang } = useLandingI18n();
+  return (
+    <I18nProvider initialLang={lang}>
+      <ThreadViewer connector={connector} threadId={threadId} />
+    </I18nProvider>
+  );
 }
 
 export function App() {
@@ -45,16 +88,16 @@ export function App() {
       <ModelProvider client={webModelClient}>
         <HostServicesProvider value={webHost}>
           <TooltipProvider delayDuration={800}>
-            <I18nProvider>
+            <LandingI18nProvider>
               <Routes>
                 <Route
                   path="/shared/:connectorId/threads/:threadId"
                   element={<SharedThreadRoute />}
                 />
-                <Route path="/shared/*" element={<NotFound />} />
+                <Route path="/shared/*" element={<SharedNotFoundRoute />} />
                 <Route path="*" element={<Landing />} />
               </Routes>
-            </I18nProvider>
+            </LandingI18nProvider>
           </TooltipProvider>
         </HostServicesProvider>
       </ModelProvider>

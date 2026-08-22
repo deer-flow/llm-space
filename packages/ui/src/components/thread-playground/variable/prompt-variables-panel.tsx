@@ -45,6 +45,7 @@ import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, type Messages, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -104,6 +105,7 @@ function _PromptVariablesPanel({
   initialSelection,
 }: PromptVariablesPanelProps) {
   const { skills: skillsHost } = useHostServices();
+  const { t } = useI18n();
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
     (s) => s.thread.context?.variableVariants
@@ -187,7 +189,7 @@ function _PromptVariablesPanel({
           kind: "builtIn",
           name,
           variable,
-          status: variable.value.trim() || "(empty)",
+          status: variable.value.trim() || t.playground.variable.empty,
         });
         continue;
       }
@@ -196,7 +198,7 @@ function _PromptVariablesPanel({
           kind: "builtIn",
           name,
           variable,
-          status: _jsonStatus(variable.value),
+          status: _jsonStatus(variable.value, t),
         });
         continue;
       }
@@ -205,7 +207,7 @@ function _PromptVariablesPanel({
           kind: "builtIn",
           name,
           variable,
-          status: variable.value.trim() || "(no file)",
+          status: variable.value.trim() || t.playground.variable.noFile,
         });
         continue;
       }
@@ -218,12 +220,16 @@ function _PromptVariablesPanel({
         name,
         variable,
         status: includesAllSkills(variable)
-          ? "All skills"
+          ? t.playground.variable.allSkills
           : selectedCount === 0
-            ? "None selected"
+            ? t.playground.variable.noneSelected
             : missingCount > 0
-              ? `${missingCount} missing`
-              : `${selectedCount} selected`,
+              ? formatString(t.playground.variable.missingCount, {
+                  n: missingCount,
+                })
+              : formatString(t.playground.variable.selectedCount, {
+                  n: selectedCount,
+                }),
         warning: missingCount > 0 || Boolean(skillsError),
       });
     }
@@ -232,11 +238,11 @@ function _PromptVariablesPanel({
         kind: "custom",
         name,
         value,
-        status: value.trim() ? value : "(empty)",
+        status: value.trim() ? value : t.playground.variable.empty,
       })
     );
     return { builtInItems, typedItems, customItems: custom };
-  }, [customValues, skillsByName, skillsError, variables]);
+  }, [customValues, skillsByName, skillsError, t, variables]);
 
   // Apply a chip-open target once, then let in-dialog selection stay user-owned
   // across variable edits.
@@ -286,7 +292,9 @@ function _PromptVariablesPanel({
         if (!cancelled) {
           setSkills([]);
           setSkillsError(
-            error instanceof Error ? error.message : "Failed to load skills."
+            error instanceof Error
+              ? error.message
+              : t.playground.variable.failedToLoadSkills
           );
         }
       })
@@ -298,7 +306,7 @@ function _PromptVariablesPanel({
     return () => {
       cancelled = true;
     };
-  }, [skillsHost]);
+  }, [skillsHost, t]);
 
   const addCustom = useCallback(() => {
     const used = new Set([...Object.keys(variables), ...customNames]);
@@ -363,7 +371,7 @@ function _PromptVariablesPanel({
         <aside className="flex w-64 shrink-0 flex-col border-r px-2 py-3">
           <ScrollArea className="min-h-0 grow">
             <div className="grid gap-3">
-              <VariableListGroup title="Built-in">
+              <VariableListGroup title={t.playground.variable.builtIn}>
                 {builtInItems.map((item) => (
                   <VariableListRow
                     key={`${item.kind}:${item.name}`}
@@ -380,7 +388,7 @@ function _PromptVariablesPanel({
                 ))}
               </VariableListGroup>
               <VariableListGroup
-                title="Custom"
+                title={t.playground.variable.custom}
                 action={
                   <AddVariableMenu
                     disabled={disabled}
@@ -394,7 +402,7 @@ function _PromptVariablesPanel({
                       size="icon-sm"
                       className="text-muted-foreground hover:text-foreground size-6"
                       disabled={disabled}
-                      aria-label="Add custom variable"
+                      aria-label={t.playground.variable.addCustomVariable}
                     >
                       <PlusIcon className="size-3.5" />
                     </Button>
@@ -423,7 +431,7 @@ function _PromptVariablesPanel({
                   ))
                 ) : (
                   <div className="text-muted-foreground px-2 py-1 text-xs">
-                    No custom variables.{" "}
+                    {t.playground.variable.noCustomVariables}{" "}
                     <AddVariableMenu
                       disabled={disabled}
                       onAddText={addCustom}
@@ -435,7 +443,7 @@ function _PromptVariablesPanel({
                         className="text-muted-foreground hover:text-foreground focus-visible:text-foreground underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
                         disabled={disabled}
                       >
-                        Add variable
+                        {t.playground.variable.addVariable}
                       </button>
                     </AddVariableMenu>
                     .
@@ -458,7 +466,7 @@ function _PromptVariablesPanel({
               disabled={disabled}
             >
               <PlusIcon className="size-3.5" />
-              Add custom variable
+              {t.playground.variable.addCustomVariable}
             </Button>
           </AddVariableMenu>
         </aside>
@@ -505,15 +513,21 @@ function _PromptVariablesPanel({
             setPendingRemove(null);
           }
         }}
-        title="Delete variable?"
+        title={t.playground.variable.deleteVariableTitle}
         description={
           pendingRemove
             ? pendingRemove.hasReferences
-              ? `This thread references "{{${pendingRemove.name}}}". Deleting this variable will leave unresolved placeholders.`
-              : `This removes "{{${pendingRemove.name}}}" and its value from this thread.`
+              ? formatString(
+                  t.playground.variable.deleteReferencedVariableDescription,
+                  { name: `{{${pendingRemove.name}}}` }
+                )
+              : formatString(
+                  t.playground.variable.deleteVariableDescription,
+                  { name: `{{${pendingRemove.name}}}` }
+                )
             : undefined
         }
-        confirmLabel="Delete variable"
+        confirmLabel={t.playground.variable.deleteVariable}
         onConfirm={() => {
           pendingRemove?.onConfirm();
           setPendingRemove(null);
@@ -558,6 +572,7 @@ function AddVariableMenu({
   side?: "top" | "bottom";
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={disabled}>
@@ -566,15 +581,15 @@ function AddVariableMenu({
       <DropdownMenuContent align="start" side={side} sideOffset={4}>
         <DropdownMenuItem onSelect={onAddText}>
           <TypeIcon className="size-3.5" />
-          Text
+          {t.playground.variable.text}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onAddJson}>
           <BracesIcon className="size-3.5" />
-          JSON
+          {t.playground.variable.json}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onAddFile}>
           <FileTextIcon className="size-3.5" />
-          File content
+          {t.playground.variable.fileContent}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -594,6 +609,7 @@ function VariableListRow({
   onSelect: () => void;
   onRemove?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className={cn(
@@ -619,11 +635,14 @@ function VariableListRow({
         <span className="min-w-0 grow truncate font-mono">{item.name}</span>
       </button>
       {onRemove ? (
-        <Tooltip content="Delete variable">
+        <Tooltip content={t.playground.variable.deleteVariable}>
           <button
             type="button"
             className="text-muted-foreground hover:bg-muted hover:text-destructive focus-visible:ring-ring/30 absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded opacity-0 transition-opacity outline-none group-hover/variable-row:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
-            aria-label={`Delete ${item.name}`}
+            aria-label={formatString(
+              t.playground.variable.deleteVariableNamed,
+              { name: item.name }
+            )}
             disabled={disabled}
             onClick={onRemove}
           >
@@ -664,10 +683,11 @@ function VariableDetail({
   onRenameCustom: (oldName: string, newName: string) => boolean;
   onUpdateCustom: (name: string, value: string) => void;
 }) {
+  const { t } = useI18n();
   if (!selection) {
     return (
       <div className="text-muted-foreground p-3 text-xs">
-        Add a custom variable to provide a reusable value.
+        {t.playground.variable.addCustomVariableToProvideValue}
       </div>
     );
   }
@@ -677,7 +697,7 @@ function VariableDetail({
     if (value === undefined) {
       return (
         <div className="text-muted-foreground p-3 text-xs">
-          Select a variable to edit.
+          {t.playground.variable.selectVariableToEdit}
         </div>
       );
     }
@@ -698,7 +718,7 @@ function VariableDetail({
   if (!variable) {
     return (
       <div className="text-muted-foreground p-3 text-xs">
-        Select a variable to edit.
+        {t.playground.variable.selectVariableToEdit}
       </div>
     );
   }
@@ -793,14 +813,15 @@ function CurrentDateVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadCurrentDateVariable) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DetailShell
       icon={<CalendarDaysIcon className="text-muted-foreground size-4" />}
-      title="Current date"
+      title={t.playground.variable.currentDate}
       disabled={disabled}
     >
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
-        <Field label="Name">
+        <Field label={t.playground.variable.name}>
           <VariableNameInput
             name={name}
             disabled={disabled}
@@ -810,7 +831,7 @@ function CurrentDateVariableDetail({
             onCommit={(next) => onRename(name, next)}
           />
         </Field>
-        <Field label="Format">
+        <Field label={t.playground.variable.format}>
           <Select
             value={variable.format}
             disabled={disabled}
@@ -818,7 +839,10 @@ function CurrentDateVariableDetail({
               onUpdate(name, { ...variable, format })
             }
           >
-            <SelectTrigger className="w-full" aria-label="Current date format">
+            <SelectTrigger
+              className="w-full"
+              aria-label={t.playground.variable.currentDateFormat}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -831,7 +855,7 @@ function CurrentDateVariableDetail({
           </Select>
         </Field>
       </div>
-      <Field label="Value">
+      <Field label={t.playground.variable.value}>
         <PreviewBlock value={formatCurrentDateVariable(variable.format)} />
       </Field>
     </DetailShell>
@@ -856,6 +880,7 @@ function WorkingDirectoryVariableDetail({
   onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
 }) {
   const { builtinTools, files } = useHostServices();
+  const { t } = useI18n();
   const [draftPath, setDraftPath] = useState(variable.value);
   const [directoryExists, setDirectoryExists] = useState<boolean | null>(null);
   const directoryCheckIdRef = useRef(0);
@@ -935,20 +960,22 @@ function WorkingDirectoryVariableDetail({
     try {
       await builtinTools.fsReveal(variable.value);
     } catch (error) {
-      toast.error("Failed to reveal folder", {
+      toast.error(t.playground.variable.failedToRevealFolder, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error
+            ? error.message
+            : t.playground.message.pleaseTryAgain,
       });
     }
-  }, [builtinTools, variable.value]);
+  }, [builtinTools, t, variable.value]);
 
   return (
     <DetailShell
       icon={<FolderOpenIcon className="text-muted-foreground size-4" />}
-      title="Current working directory"
+      title={t.playground.variable.currentWorkingDirectory}
       disabled={disabled}
     >
-      <Field label="Name">
+      <Field label={t.playground.variable.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -958,7 +985,7 @@ function WorkingDirectoryVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Directory">
+      <Field label={t.playground.variable.directory}>
         <div className="flex items-center gap-2">
           <Input
             className="h-7 font-mono text-xs"
@@ -976,7 +1003,7 @@ function WorkingDirectoryVariableDetail({
             onClick={() => void browse()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Browse…
+            {t.playground.variable.browse}
           </Button>
         </div>
         {directoryExists === true && (
@@ -989,7 +1016,7 @@ function WorkingDirectoryVariableDetail({
             onClick={() => void reveal()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Reveal in Finder
+            {t.playground.variable.revealInFinder}
           </Button>
         )}
       </Field>
@@ -1002,8 +1029,7 @@ function WorkingDirectoryVariableDetail({
             className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
             aria-hidden="true"
           />
-          This folder hasn&apos;t been created yet, but it doesn&apos;t need to
-          exist before you continue.
+          {t.playground.variable.folderNotCreatedYet}
         </p>
       )}
     </DetailShell>
@@ -1050,6 +1076,7 @@ function SkillsVariableDetail({
   onUpdate: (name: string, variable: ThreadSkillsVariable) => void;
 }) {
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
+  const { t } = useI18n();
   const selectedSkills = variable.skillNames.flatMap((skillName) => {
     const skill = skillsByName.get(skillName);
     return skill ? [skill] : [];
@@ -1061,7 +1088,7 @@ function SkillsVariableDetail({
   const preview =
     skillsError ??
     (someMissing
-      ? "Some selected skills are no longer enabled."
+      ? t.playground.variable.someSkillsNoLongerEnabled
       : formatSkillsVariable(
           usingAllSkills ? skills : selectedSkills,
           variable
@@ -1074,7 +1101,7 @@ function SkillsVariableDetail({
   return (
     <DetailShell
       icon={<SparklesIcon className="text-muted-foreground size-4" />}
-      title="Available skills"
+      title={t.playground.variable.availableSkills}
       disabled={disabled}
       action={
         <Button
@@ -1085,14 +1112,14 @@ function SkillsVariableDetail({
           onClick={() => setSkillsDialogOpen(true)}
         >
           <ListFilterIcon className="size-3.5" />
-          Select skills
+          {t.playground.variable.selectSkills}
         </Button>
       }
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
-        <Field label="Name">
+        <Field label={t.playground.variable.name}>
           <VariableNameInput
             name={name}
             disabled={disabled}
@@ -1102,7 +1129,7 @@ function SkillsVariableDetail({
             onCommit={(next) => onRename(name, next)}
           />
         </Field>
-        <Field label="Format">
+        <Field label={t.playground.variable.format}>
           <Select
             value={variable.format}
             disabled={disabled}
@@ -1110,7 +1137,10 @@ function SkillsVariableDetail({
               update({ format })
             }
           >
-            <SelectTrigger className="w-full" aria-label="Skills format">
+            <SelectTrigger
+              className="w-full"
+              aria-label={t.playground.variable.skillsFormat}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1122,26 +1152,33 @@ function SkillsVariableDetail({
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Indent">
+        <Field label={t.playground.variable.skillsIndentation}>
           <Select
             value={String(variable.indent)}
             disabled={disabled}
             onValueChange={(indent) => update({ indent: Number(indent) })}
           >
-            <SelectTrigger className="w-full" aria-label="Skills indentation">
+            <SelectTrigger
+              className="w-full"
+              aria-label={t.playground.variable.skillsIndentation}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {PROMPT_SKILLS_INDENTS.map((indent) => (
                 <SelectItem key={indent} value={String(indent)}>
-                  {indent === 0 ? "Default" : `${indent} spaces`}
+                  {indent === 0
+                    ? t.playground.variable.default
+                    : formatString(t.playground.variable.indentSpaces, {
+                        n: indent,
+                      })}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
       </div>
-      <Field label="Value" className="flex min-h-0 grow flex-col">
+      <Field label={t.playground.variable.value} className="flex min-h-0 grow flex-col">
         <CodeEditor
           className={cn(
             "min-h-32 grow",
@@ -1150,7 +1187,7 @@ function SkillsVariableDetail({
           )}
           language="markdown"
           readonly
-          value={skillsLoading ? "Loading skills..." : preview}
+          value={skillsLoading ? t.playground.variable.loadingSkills : preview}
         />
       </Field>
       <SkillSelectionDialog
@@ -1185,15 +1222,16 @@ function CustomVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, value: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DetailShell
       icon={<TypeIcon className="text-muted-foreground size-4" />}
-      title="User defined variable"
+      title={t.playground.variable.userDefinedVariable}
       disabled={disabled}
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
-      <Field label="Name">
+      <Field label={t.playground.variable.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1203,13 +1241,13 @@ function CustomVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Value" className="flex min-h-0 grow flex-col">
+      <Field label={t.playground.variable.value} className="flex min-h-0 grow flex-col">
         <CodeEditor
           className="min-h-32 grow"
           language="markdown"
           value={value}
           readonly={disabled}
-          placeholder="Variable value"
+          placeholder={t.playground.variable.variableValue}
           onChange={(next) => onUpdate(name, next)}
         />
       </Field>
@@ -1234,16 +1272,17 @@ function JsonVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadVariable) => void;
 }) {
-  const error = _jsonError(variable.value);
+  const { t } = useI18n();
+  const error = _jsonError(variable.value, t);
   return (
     <DetailShell
       icon={<BracesIcon className="text-muted-foreground size-4" />}
-      title="JSON variable"
+      title={t.playground.variable.jsonVariable}
       disabled={disabled}
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
-      <Field label="Name">
+      <Field label={t.playground.variable.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1253,7 +1292,10 @@ function JsonVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Value (JSON)" className="flex min-h-0 grow flex-col">
+      <Field
+        label={t.playground.variable.valueJsonLabel}
+        className="flex min-h-0 grow flex-col"
+      >
         <CodeEditor
           language="json"
           value={variable.value}
@@ -1267,8 +1309,7 @@ function JsonVariableDetail({
         <p className="text-destructive text-xs">{error}</p>
       ) : (
         <p className="text-muted-foreground text-xs">
-          Use it in templates, e.g. {"{% if data.enabled %}"},{" "}
-          {"{% for x in data.items %}"}, {"{{ data.name }}"}.
+          {t.playground.variable.jsonTemplateHint}
         </p>
       )}
     </DetailShell>
@@ -1293,6 +1334,7 @@ function FileVariableDetail({
   onUpdate: (name: string, variable: ThreadVariable) => void;
 }) {
   const { files } = useHostServices();
+  const { t } = useI18n();
   const browse = useCallback(async () => {
     const path = await files.pickFile();
     if (path) {
@@ -1303,10 +1345,10 @@ function FileVariableDetail({
   return (
     <DetailShell
       icon={<FileTextIcon className="text-muted-foreground size-4" />}
-      title="File content variable"
+      title={t.playground.variable.fileContentVariable}
       disabled={disabled}
     >
-      <Field label="Name">
+      <Field label={t.playground.variable.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1316,7 +1358,7 @@ function FileVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="File path">
+      <Field label={t.playground.variable.filePath}>
         <div className="flex items-center gap-2">
           <Input
             className="h-7 font-mono text-xs"
@@ -1335,13 +1377,12 @@ function FileVariableDetail({
             onClick={() => void browse()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Browse…
+            {t.playground.variable.browse}
           </Button>
         </div>
       </Field>
       <p className="text-muted-foreground text-xs">
-        Inlines the file contents at run time (a missing file → empty). For
-        recursive rendering, use {'{{@include("...")}}'} instead.
+        {t.playground.variable.fileContentHint}
       </p>
     </DetailShell>
   );
@@ -1433,6 +1474,7 @@ function VariableNameInput({
   isAvailable: (name: string) => boolean;
   onCommit: (name: string) => boolean;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(name);
   useEffect(() => {
     setDraft(name);
@@ -1480,11 +1522,12 @@ function VariableNameInput({
       />
       {showFeedback && !valid ? (
         <div className="text-destructive text-xs">
-          Use letters, numbers, and underscores; start with a letter or
-          underscore.
+          {t.playground.variable.variableNameRules}
         </div>
       ) : showFeedback && !available ? (
-        <div className="text-destructive text-xs">Name already exists.</div>
+        <div className="text-destructive text-xs">
+          {t.playground.variable.nameAlreadyExists}
+        </div>
       ) : null}
     </div>
   );
@@ -1516,7 +1559,7 @@ function _dateFormatLabel(value: ThreadCurrentDateVariable["format"]): string {
 }
 
 /** A JSON parse error message for the editor, or `null` when valid/empty. */
-function _jsonError(value: string): string | null {
+function _jsonError(value: string, t: Messages): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return null;
@@ -1525,17 +1568,21 @@ function _jsonError(value: string): string | null {
     JSON.parse(trimmed);
     return null;
   } catch (error) {
-    return error instanceof Error ? error.message : "Invalid JSON.";
+    return error instanceof Error
+      ? error.message
+      : t.playground.variable.invalidJsonPeriod;
   }
 }
 
 /** The list-row status line for a JSON variable. */
-function _jsonStatus(value: string): string {
+function _jsonStatus(value: string, t: Messages): string {
   const trimmed = value.trim();
   if (!trimmed) {
-    return "(empty)";
+    return t.playground.variable.empty;
   }
-  return _jsonError(trimmed) ? "Invalid JSON" : trimmed.replace(/\s+/g, " ");
+  return _jsonError(trimmed, t)
+    ? t.playground.variable.invalidJson
+    : trimmed.replace(/\s+/g, " ");
 }
 
 function _selectionExists(

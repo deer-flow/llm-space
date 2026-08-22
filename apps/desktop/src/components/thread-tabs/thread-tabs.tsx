@@ -3,6 +3,7 @@
 import type { Thread } from "@llm-space/core";
 import { useTheme } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -39,11 +40,6 @@ import { tabLabel, type AppTab } from "./use-thread-tabs";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
-
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-const MOVE_TO_TRASH_LABEL = _isWindows
-  ? "Move to Recycle Bin"
-  : "Move to Trash";
 
 function _getPaneKey(tab: AppTab): string {
   return tab.type === "thread" ? tab.paneId : tab.id;
@@ -129,6 +125,7 @@ export function ThreadTabs({
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
+  const { t } = useI18n();
   // The chrome-tabs lib renders tab DOM imperatively and exposes no tooltip prop,
   // but it stamps each tab's full path onto `data-tab-id`. Mirror that into the
   // native `title` attribute so hovering a tab reveals its relative path. The
@@ -152,13 +149,19 @@ export function ThreadTabs({
         el.tabIndex = 0;
         el.setAttribute("role", "tab");
         el.setAttribute("aria-selected", String(id === activeId));
-        el.setAttribute("aria-label", `Open ${label}`);
+        el.setAttribute(
+          "aria-label",
+          formatString(t.desktop.threadTabs.openTab, { label })
+        );
         const closeButton = el.querySelector<HTMLElement>(".chrome-tab-close");
         closeButton?.setAttribute("role", "button");
         closeButton?.setAttribute("tabindex", "0");
-        closeButton?.setAttribute("aria-label", `Close ${label}`);
+        closeButton?.setAttribute(
+          "aria-label",
+          formatString(t.desktop.threadTabs.closeTab, { label })
+        );
       });
-  }, [tabs, activeId]);
+  }, [tabs, activeId, t]);
 
   const handleTabsHeaderDoubleClick = useCallback((e: Event) => {
     if (!electrobun.rpc) {
@@ -322,11 +325,21 @@ export function ThreadTabs({
                     : "w-23 pl-18"
               )}
             >
-              <Tooltip content={sidebarOpen ? "Hide sidebar" : "Show sidebar"}>
+              <Tooltip
+                content={
+                  sidebarOpen
+                    ? t.desktop.threadTabs.hideSidebar
+                    : t.desktop.threadTabs.showSidebar
+                }
+              >
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                  aria-label={
+                    sidebarOpen
+                      ? t.desktop.threadTabs.hideSidebar
+                      : t.desktop.threadTabs.showSidebar
+                  }
                   onMouseDown={_preventFocusSteal}
                   onClick={onToggleSidebar}
                 >
@@ -350,12 +363,12 @@ export function ThreadTabs({
               pinnedRight={
                 <div className="flex h-full items-center gap-0.5 pt-0.5 pl-1.5">
                   {toolbarSlot}
-                  <Tooltip content="New blank thread">
+                  <Tooltip content={t.desktop.threadTabs.newBlankThread}>
                     <Button
                       className="hover:bg-primary! rounded-full"
                       size="icon-sm"
                       variant="ghost"
-                      aria-label="New blank thread"
+                      aria-label={t.desktop.threadTabs.newBlankThread}
                       onMouseDown={_preventFocusSteal}
                       onClick={onNewFile}
                     >
@@ -374,21 +387,23 @@ export function ThreadTabs({
           <ContextMenuContent className="w-44">
             <ContextMenuGroup>
               <ContextMenuItem onSelect={() => refresh(contextMenuId)}>
-                Refresh
+                {t.common.refresh}
               </ContextMenuItem>
             </ContextMenuGroup>
             <ContextMenuSeparator />
             <ContextMenuGroup>
               <ContextMenuItem onSelect={() => close(contextMenuId)}>
-                Close
+                {t.common.close}
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={!hasOtherTabs}
                 onSelect={() => closeOthers(contextMenuId)}
               >
-                Close Others
+                {t.desktop.threadTabs.closeOthers}
               </ContextMenuItem>
-              <ContextMenuItem onSelect={closeAll}>Close All</ContextMenuItem>
+              <ContextMenuItem onSelect={closeAll}>
+                {t.desktop.threadTabs.closeAll}
+              </ContextMenuItem>
             </ContextMenuGroup>
             {contextMenuTab?.type === "thread" && (
               <>
@@ -398,7 +413,7 @@ export function ThreadTabs({
                     copyFile(contextMenuTab.path, contextMenuTab.runtimeId)
                   }
                 >
-                  Copy file
+                  {t.desktop.threadTabs.copyFile}
                 </ContextMenuItem>
                 <ContextMenuGroup>
                   <ShareThreadMenuItem
@@ -414,7 +429,9 @@ export function ThreadTabs({
                       reveal(contextMenuTab.path, contextMenuTab.runtimeId)
                     }
                   >
-                    {REVEAL_LABEL}
+                    {_isWindows
+                      ? t.common.revealInExplorer
+                      : t.common.revealInFinder}
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
@@ -422,7 +439,9 @@ export function ThreadTabs({
                       moveToTrash(contextMenuTab.path, contextMenuTab.runtimeId)
                     }
                   >
-                    {MOVE_TO_TRASH_LABEL}
+                    {_isWindows
+                      ? t.desktop.threadTabs.moveToRecycleBin
+                      : t.desktop.threadTabs.moveToTrash}
                   </ContextMenuItem>
                 </ContextMenuGroup>
               </>

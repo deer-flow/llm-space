@@ -19,6 +19,11 @@ import {
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import {
+  formatString,
+  langToTimeago,
+  useI18n,
+} from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -197,6 +202,7 @@ function _canCreateServer(form: ServerForm): boolean {
 }
 
 export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
+  const { t } = useI18n();
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIdBeforeCreate, setSelectedIdBeforeCreate] = useState<
@@ -246,14 +252,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         return next[0]?.id ?? null;
       });
     } catch (error) {
-      toast.error("Failed to load MCP servers", {
+      toast.error(t.settings.mcp.failedToLoadServers, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setLoading(false);
     }
-  }, [creating, runtimeId]);
+  }, [creating, runtimeId, t]);
 
   useEffect(() => {
     void refresh();
@@ -330,13 +336,13 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         }
       } catch (error) {
         setFormError(
-          error instanceof Error ? error.message : "Please try again."
+          error instanceof Error ? error.message : t.common.pleaseTryAgain
         );
       } finally {
         setSaving(false);
       }
     },
-    [runtimeId]
+    [runtimeId, t]
   );
 
   useEffect(() => {
@@ -371,8 +377,13 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
           server.id === response.server.id ? response.server : server
         )
       );
-      toast.success("MCP server connected", {
-        description: `${response.tools.length} tool${response.tools.length === 1 ? "" : "s"} discovered`,
+      toast.success(t.settings.mcp.connected, {
+        description: formatString(
+          response.tools.length === 1
+            ? t.settings.mcp.toolsDiscovered.one
+            : t.settings.mcp.toolsDiscovered.other,
+          { n: response.tools.length }
+        ),
       });
     } catch (error) {
       setTools([]);
@@ -383,9 +394,9 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         return;
       }
       await refresh();
-      toast.error("Failed to connect MCP server", {
+      toast.error(t.settings.mcp.failedToConnect, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       cancelRequestedRef.current = false;
@@ -403,9 +414,9 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
       setTools([]);
     } catch (error) {
       cancelRequestedRef.current = false;
-      toast.error("Failed to cancel MCP test", {
+      toast.error(t.settings.mcp.failedToCancelTest, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setCancellingTest(false);
@@ -421,11 +432,11 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
       const next = await disconnectMcpServer(selectedServer.id, runtimeId);
       setServers(next);
       setTools([]);
-      toast.success("MCP server disconnected");
+      toast.success(t.settings.mcp.disconnected);
     } catch (error) {
-      toast.error("Failed to disconnect MCP server", {
+      toast.error(t.settings.mcp.failedToDisconnect, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setDisconnecting(false);
@@ -446,24 +457,24 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
           ? current
           : (next[0]?.id ?? null)
       );
-      toast.success("MCP server removed");
+      toast.success(t.settings.mcp.removed);
     } catch (error) {
-      toast.error("Failed to remove MCP server", {
+      toast.error(t.settings.mcp.failedToRemove, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     }
   };
 
   return (
     <SettingsPage
-      title="MCP"
-      description="Connect a server to expose its tools, which you can then add to a thread's tools."
+      title={t.settings.mcp.title}
+      description={t.settings.mcp.description}
     >
       {loading && servers.length === 0 && !creating ? (
         <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading MCP servers
+          {t.settings.mcp.loading}
         </div>
       ) : servers.length === 0 && !creating ? (
         <McpEmptyState onAdd={createServer} />
@@ -472,13 +483,13 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
           <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                SERVERS
+                {t.settings.mcp.serversHeading}
               </span>
               <div className="flex items-center gap-1">
-                <Tooltip content="Refresh servers">
+                <Tooltip content={t.settings.mcp.refreshServers}>
                   <button
                     type="button"
-                    aria-label="Refresh MCP servers"
+                    aria-label={t.settings.mcp.refreshServersAria}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                     onClick={() => void refresh()}
                   >
@@ -489,10 +500,10 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     )}
                   </button>
                 </Tooltip>
-                <Tooltip content="Add MCP server">
+                <Tooltip content={t.settings.mcp.addServer}>
                   <button
                     type="button"
-                    aria-label="Add MCP server"
+                    aria-label={t.settings.mcp.addServer}
                     disabled={saving || dirty || testingServerId !== null}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
                     onClick={createServer}
@@ -530,14 +541,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     className="bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left"
                   >
                     <span className="truncate text-sm font-medium">
-                      Unsaved server
+                      {t.settings.mcp.unsavedServer}
                     </span>
                   </button>
                 ) : null}
                 {pluginServers.length > 0 ? (
                   <>
                     <div className="text-muted-foreground mt-5 px-2 text-xs font-medium tracking-wide uppercase">
-                      MCPs in Plugins
+                      {t.settings.mcp.pluginsHeading}
                     </div>
                     {pluginServers.map((server) => (
                       <button
@@ -564,7 +575,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                           {server.transport}
                         </span>
                         <span className="text-muted-foreground truncate pl-4 text-xs">
-                          {_sidebarReadiness(server)}
+                          {_sidebarReadiness(server, t)}
                         </span>
                       </button>
                     ))}
@@ -601,7 +612,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               />
             ) : (
               <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Select or add an MCP server
+                {t.settings.mcp.selectOrAdd}
               </div>
             )}
           </main>
@@ -612,13 +623,15 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         onOpenChange={(open) => {
           if (!open) setRemoveServerId(null);
         }}
-        title="Remove MCP Server"
+        title={t.settings.mcp.removeServerTitle}
         description={
           serverPendingRemoval
-            ? `Remove ${serverPendingRemoval.name} from local MCP settings?`
+            ? formatString(t.settings.mcp.removeServerDescription, {
+                name: serverPendingRemoval.name,
+              })
             : undefined
         }
-        confirmLabel="Remove"
+        confirmLabel={t.common.remove}
         dimBackground={false}
         onConfirm={() => void confirmRemove()}
       />
@@ -641,13 +654,16 @@ function McpServerListItem({
   onTest: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div
       role="button"
       tabIndex={disabled ? -1 : 0}
-      aria-label={`Select MCP server ${server.name}`}
+      aria-label={formatString(t.settings.mcp.selectServer, {
+        name: server.name,
+      })}
       aria-disabled={disabled}
       className={cn(
         "group relative flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors",
@@ -675,7 +691,7 @@ function McpServerListItem({
         {server.transport}
       </span>
       <span className="text-muted-foreground truncate pr-6 pl-4 text-xs">
-        {_sidebarReadiness(server)}
+        {_sidebarReadiness(server, t)}
       </span>
 
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -683,8 +699,12 @@ function McpServerListItem({
           <span
             role="button"
             tabIndex={0}
-            aria-label={`${server.name} MCP server actions`}
-            title={`${server.name} MCP server actions`}
+            aria-label={formatString(t.settings.mcp.serverActions, {
+              name: server.name,
+            })}
+            title={formatString(t.settings.mcp.serverActions, {
+              name: server.name,
+            })}
             className={cn(
               "text-muted-foreground hover:bg-accent hover:text-foreground absolute top-2 right-2 inline-flex size-5 items-center justify-center rounded",
               menuOpen
@@ -703,12 +723,14 @@ function McpServerListItem({
         >
           <DropdownMenuItem onSelect={onTest}>
             <RefreshCw />
-            {server.connected ? "Retest" : "Connect & Test"}
+            {server.connected
+              ? t.settings.mcp.retest
+              : t.settings.mcp.connectAndTest}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={onRemove}>
             <Trash2 />
-            Remove
+            {t.common.remove}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -717,33 +739,34 @@ function McpServerListItem({
 }
 
 function McpEmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
     <SettingsEmptyState
       icon={ServerCog}
       wallIcons={MCP_WALL_ICONS}
-      title="Connect tools through MCP"
-      description="Add a local command or remote endpoint, discover its tools, and make those capabilities available to your threads."
+      title={t.settings.mcp.emptyTitle}
+      description={t.settings.mcp.emptyDescription}
       actions={
         <Button onClick={onAdd}>
           <Plus className="size-4" />
-          Add MCP server
+          {t.settings.mcp.addServer}
         </Button>
       }
       capabilities={[
         {
           icon: ServerCog,
-          title: "Local or remote",
-          description: "Connect with stdio, HTTP, or SSE transports.",
+          title: t.settings.mcp.capabilities.localOrRemote.title,
+          description: t.settings.mcp.capabilities.localOrRemote.description,
         },
         {
           icon: Sparkles,
-          title: "Discover tools",
-          description: "Test the connection and inspect exposed capabilities.",
+          title: t.settings.mcp.capabilities.discoverTools.title,
+          description: t.settings.mcp.capabilities.discoverTools.description,
         },
         {
           icon: Waypoints,
-          title: "Use in threads",
-          description: "Choose the tools each thread can call.",
+          title: t.settings.mcp.capabilities.useInThreads.title,
+          description: t.settings.mcp.capabilities.useInThreads.description,
         },
       ]}
     />
@@ -801,6 +824,7 @@ function ServerEditor({
   onDisconnect: () => void;
   onCancel: () => void;
 }) {
+  const { t, lang } = useI18n();
   const patch = (partial: Partial<ServerForm>) =>
     onFormChange({ ...form, ...partial });
   const savedToolItems: McpToolSummary[] =
@@ -816,9 +840,11 @@ function ServerEditor({
   }));
   const toolsLabel =
     tools.length > 0
-      ? "Current test"
+      ? t.settings.mcp.currentTest
       : server?.readiness?.testedAt
-        ? `Last test ${format(server.readiness.testedAt)}`
+        ? formatString(t.settings.mcp.lastTest, {
+            time: format(server.readiness.testedAt, langToTimeago(lang)),
+          })
         : null;
   return (
     <ScrollArea className="h-full">
@@ -827,11 +853,11 @@ function ServerEditor({
           <div className="min-w-0 grow">
             <div className="flex min-w-0 items-center gap-2">
               <h3 className="font-heading truncate text-lg font-medium">
-                {form.name || "MCP Server"}
+                {form.name || t.settings.mcp.serverNameFallback}
               </h3>
               {readOnly ? (
                 <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase">
-                  Plugin · Read only
+                  {t.settings.mcp.pluginReadOnly}
                 </span>
               ) : null}
             </div>
@@ -842,7 +868,7 @@ function ServerEditor({
             ) : null}
             {!form.useOriginalToolNames ? (
               <div className="text-muted-foreground mt-1 font-mono text-xs">
-                <span>Tool names: </span>
+                <span>{t.settings.mcp.toolNamesPrefix}</span>
                 {normalizedName
                   ? `mcp__${normalizedName}__tool`
                   : "mcp__server__tool"}
@@ -856,7 +882,7 @@ function ServerEditor({
               onClick={onCancel}
               disabled={saving}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
           ) : null}
           {server ? (
@@ -877,10 +903,10 @@ function ServerEditor({
                   <RefreshCw />
                 )}
                 {testing
-                  ? "Cancel"
+                  ? t.common.cancel
                   : server.connected
-                    ? "Retest"
-                    : "Connect & Test"}
+                    ? t.settings.mcp.retest
+                    : t.settings.mcp.connectAndTest}
               </Button>
               {server.connected ? (
                 <Button
@@ -894,7 +920,7 @@ function ServerEditor({
                   ) : (
                     <Unplug />
                   )}
-                  Disconnect
+                  {t.settings.mcp.disconnect}
                 </Button>
               ) : null}
             </>
@@ -909,13 +935,18 @@ function ServerEditor({
         ) : null}
 
         {server ? (
-          <ReadinessPanel server={server} liveToolsLoaded={tools.length > 0} />
+          <ReadinessPanel
+            server={server}
+            liveToolsLoaded={tools.length > 0}
+            t={t}
+            lang={lang}
+          />
         ) : null}
 
-        <Field label="Name">
+        <Field label={t.settings.mcp.nameLabel}>
           <Input
             value={form.name}
-            aria-label="MCP server name"
+            aria-label={t.settings.mcp.nameAria}
             readOnly={readOnly}
             onChange={(event) => patch({ name: event.target.value })}
           />
@@ -923,14 +954,16 @@ function ServerEditor({
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-sm font-medium">Use original tool names</span>
+            <span className="text-sm font-medium">
+              {t.settings.mcp.useOriginalToolNames}
+            </span>
             <span className="text-muted-foreground text-xs">
-              Expose tools without the MCP server prefix, for example web_fetch.
+              {t.settings.mcp.useOriginalToolNamesHint}
             </span>
           </div>
           <Switch
             checked={form.useOriginalToolNames}
-            aria-label="Use original MCP tool names without a prefix"
+            aria-label={t.settings.mcp.useOriginalToolNamesAria}
             disabled={readOnly}
             onCheckedChange={(useOriginalToolNames) =>
               patch({ useOriginalToolNames })
@@ -938,7 +971,7 @@ function ServerEditor({
           />
         </div>
 
-        <Field label="Transport">
+        <Field label={t.settings.mcp.transportLabel}>
           <Select
             value={form.transport}
             disabled={readOnly}
@@ -946,7 +979,7 @@ function ServerEditor({
               patch({ transport: value as McpTransportType })
             }
           >
-            <SelectTrigger className="w-full" aria-label="MCP transport">
+            <SelectTrigger className="w-full" aria-label={t.settings.mcp.transportAria}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -959,35 +992,35 @@ function ServerEditor({
 
         {form.transport === "stdio" ? (
           <>
-            <Field label="Command">
+            <Field label={t.settings.mcp.commandLabel}>
               <Input
                 value={form.command}
-                aria-label="MCP stdio command"
+                aria-label={t.settings.mcp.commandAria}
                 placeholder="npx"
                 readOnly={readOnly}
                 onChange={(event) => patch({ command: event.target.value })}
               />
             </Field>
-            <Field label="Args">
+            <Field label={t.settings.mcp.argsLabel}>
               <Textarea
                 className="min-h-18"
                 value={form.argsText}
-                aria-label="MCP stdio args"
+                aria-label={t.settings.mcp.argsAria}
                 placeholder={"-y\n@modelcontextprotocol/server-filesystem"}
                 readOnly={readOnly}
                 onChange={(event) => patch({ argsText: event.target.value })}
               />
             </Field>
-            <Field label="Working directory">
+            <Field label={t.settings.mcp.workingDirectory}>
               <Input
                 value={form.cwd}
-                aria-label="MCP stdio working directory"
+                aria-label={t.settings.mcp.workingDirectoryAria}
                 readOnly={readOnly}
                 onChange={(event) => patch({ cwd: event.target.value })}
               />
             </Field>
             <KeyValueRows
-              label="Environment"
+              label={t.settings.mcp.environmentLabel}
               rows={form.env}
               valueType="password"
               revealValue
@@ -999,17 +1032,17 @@ function ServerEditor({
           </>
         ) : (
           <>
-            <Field label="URL">
+            <Field label={t.settings.mcp.urlLabel}>
               <Input
                 value={form.url}
-                aria-label="MCP remote URL"
+                aria-label={t.settings.mcp.urlAria}
                 placeholder="https://example.com/mcp"
                 readOnly={readOnly}
                 onChange={(event) => patch({ url: event.target.value })}
               />
             </Field>
             <KeyValueRows
-              label="Headers"
+              label={t.settings.mcp.headersLabel}
               rows={form.headers}
               valueType="password"
               revealValue
@@ -1024,7 +1057,7 @@ function ServerEditor({
         {server ? (
           <div className="flex flex-col gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="text-sm font-medium">Tools</span>
+              <span className="text-sm font-medium">{t.settings.mcp.toolsLabel}</span>
               {server.toolCount !== null ? (
                 <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                   {server.toolCount}
@@ -1039,7 +1072,7 @@ function ServerEditor({
             <div className="flex flex-col gap-1.5">
               {toolItems.length === 0 ? (
                 <div className="text-muted-foreground px-1 py-2 text-xs">
-                  No tools loaded.
+                  {t.settings.mcp.noToolsLoaded}
                 </div>
               ) : (
                 toolItems.map((tool) => (
@@ -1060,9 +1093,13 @@ function ServerEditor({
 function ReadinessPanel({
   server,
   liveToolsLoaded,
+  t,
+  lang,
 }: {
   server: McpServerView;
   liveToolsLoaded: boolean;
+  t: ReturnType<typeof useI18n>["t"];
+  lang: ReturnType<typeof useI18n>["lang"];
 }) {
   const readiness = server.readiness ?? _emptyReadiness();
   const label = getMcpReadinessLabel(readiness);
@@ -1074,7 +1111,7 @@ function ReadinessPanel({
         : readiness.status === "stale"
           ? "text-amber-400"
           : "text-muted-foreground";
-  const detail = _readinessDetail(readiness, liveToolsLoaded);
+  const detail = _readinessDetail(readiness, liveToolsLoaded, t, lang);
   const diagnostic = readiness.diagnostic;
 
   return (
@@ -1092,28 +1129,28 @@ function ReadinessPanel({
       ) : null}
       {server.connected ? (
         <div className="text-muted-foreground text-xs">
-          Connected now in this app session.
+          {t.settings.mcp.connectedNow}
         </div>
       ) : readiness.status === "ready" || readiness.status === "stale" ? (
         <div className="text-muted-foreground text-xs">
-          Not connected. This is the last saved test result.
+          {t.settings.mcp.notConnected}
         </div>
       ) : null}
       {diagnostic ? (
         <div className="border-border/70 mt-1 flex flex-col gap-2 border-t pt-2">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-xs font-medium">Diagnostics</div>
+              <div className="text-xs font-medium">{t.settings.mcp.diagnostics}</div>
               <div className="text-muted-foreground truncate text-xs">
                 {diagnostic.headline}
               </div>
             </div>
-            <Tooltip content="Copy diagnostic summary">
+            <Tooltip content={t.settings.mcp.copyDiagnostics}>
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Copy diagnostic summary"
-                onClick={() => void _copyDiagnosticSummary(diagnostic.summary)}
+                aria-label={t.settings.mcp.copyDiagnosticsAria}
+                onClick={() => void _copyDiagnosticSummary(diagnostic.summary, t)}
               >
                 <Copy className="size-3.5" />
               </Button>
@@ -1178,13 +1215,17 @@ function DiagnosticStepRow({ step }: { step: McpDiagnosticStep }) {
  * Copies the redacted diagnostic summary for support/debugging. It has no app
  * state side effects beyond a toast because the summary is already persisted.
  */
-async function _copyDiagnosticSummary(summary: string): Promise<void> {
+async function _copyDiagnosticSummary(
+  summary: string,
+  t: ReturnType<typeof useI18n>["t"]
+): Promise<void> {
   try {
     await navigator.clipboard.writeText(summary);
-    toast.success("Diagnostic copied");
+    toast.success(t.settings.mcp.diagnosticCopied);
   } catch (error) {
-    toast.error("Failed to copy diagnostic", {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(t.settings.mcp.failedToCopyDiagnostic, {
+      description:
+        error instanceof Error ? error.message : t.common.pleaseTryAgain,
     });
   }
 }
@@ -1261,6 +1302,7 @@ function KeyValueRows({
   readOnly?: boolean;
   onChange: (rows: Row[]) => void;
 }) {
+  const { t } = useI18n();
   const setRow = (index: number, row: Row) =>
     onChange(rows.map((item, itemIndex) => (itemIndex === index ? row : item)));
   const removeRow = (index: number) =>
@@ -1274,7 +1316,10 @@ function KeyValueRows({
           <Input
             value={row.key}
             placeholder={namePlaceholder}
-            aria-label={`${label} ${index + 1} name`}
+            aria-label={formatString(t.settings.mcp.rowNameAria, {
+              label,
+              n: index + 1,
+            })}
             readOnly={readOnly}
             onChange={(event) =>
               setRow(index, { ...row, key: event.target.value })
@@ -1285,15 +1330,25 @@ function KeyValueRows({
             revealable={revealValue}
             value={row.value}
             placeholder={valuePlaceholder}
-            aria-label={`${label} ${index + 1} value`}
+            aria-label={formatString(t.settings.mcp.rowValueAria, {
+              label,
+              n: index + 1,
+            })}
             readOnly={readOnly}
             onChange={(value) => setRow(index, { ...row, value })}
           />
           {!readOnly ? (
-            <Tooltip content={`Remove ${label.toLowerCase()} row`}>
+            <Tooltip
+              content={formatString(t.settings.mcp.removeRow, {
+                label: label.toLowerCase(),
+              })}
+            >
               <button
                 type="button"
-                aria-label={`Remove ${label} row ${index + 1}`}
+                aria-label={formatString(t.settings.mcp.removeRowAria, {
+                  label,
+                  n: index + 1,
+                })}
                 className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
                 onClick={() => removeRow(index)}
               >
@@ -1311,7 +1366,7 @@ function KeyValueRows({
           className="self-start"
           onClick={() => onChange([...rows, _createRow()])}
         >
-          <Plus /> Add {label.toLowerCase()}
+          <Plus /> {formatString(t.settings.mcp.addRow, { label })}
         </Button>
       ) : null}
     </div>
@@ -1335,6 +1390,7 @@ function SecretValueInput({
   readOnly?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative w-full">
@@ -1348,10 +1404,15 @@ function SecretValueInput({
         onChange={(event) => onChange(event.target.value)}
       />
       {revealable ? (
-        <Tooltip content={visible ? "Hide value" : "Show value"}>
+        <Tooltip
+          content={visible ? t.settings.mcp.hideValue : t.settings.mcp.showValue}
+        >
           <button
             type="button"
-            aria-label={`${visible ? "Hide" : "Show"} ${ariaLabel}`}
+            aria-label={formatString(
+              visible ? t.settings.mcp.hideAria : t.settings.mcp.showAria,
+              { label: ariaLabel }
+            )}
             aria-pressed={visible}
             className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded transition-colors"
             onClick={() => setVisible((current) => !current)}
@@ -1388,33 +1449,49 @@ function _emptyReadiness(): McpServerReadiness {
 
 function _readinessDetail(
   readiness: McpServerReadiness,
-  liveToolsLoaded: boolean
+  liveToolsLoaded: boolean,
+  t: ReturnType<typeof useI18n>["t"],
+  lang: ReturnType<typeof useI18n>["lang"]
 ): string {
   const parts: string[] = [];
   if (readiness.toolCount !== null) {
     parts.push(
-      `${readiness.toolCount} tool${readiness.toolCount === 1 ? "" : "s"}`
+      formatString(
+        readiness.toolCount === 1
+          ? t.settings.mcp.toolCount.one
+          : t.settings.mcp.toolCount.other,
+        { n: readiness.toolCount }
+      )
     );
   }
   if (readiness.testedAt) {
     parts.push(
-      `${liveToolsLoaded ? "tested" : "last tested"} ${format(readiness.testedAt)}`
+      formatString(
+        liveToolsLoaded ? t.settings.mcp.testedAt : t.settings.mcp.lastTestedAt,
+        { time: format(readiness.testedAt, langToTimeago(lang)) }
+      )
     );
   }
-  return parts.join(" · ") || "Run Test to discover tools";
+  return parts.join(" · ") || t.settings.mcp.runTestToDiscover;
 }
 
 function _joinOrNone(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
-function _sidebarReadiness(server: McpServerView): string {
+function _sidebarReadiness(
+  server: McpServerView,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   const readiness = server.readiness ?? _emptyReadiness();
   const label = getMcpReadinessLabel(readiness);
   if (readiness.toolCount === null) {
     return label;
   }
-  return `${label} · ${readiness.toolCount} tool${
-    readiness.toolCount === 1 ? "" : "s"
-  }`;
+  return `${label} · ${formatString(
+    readiness.toolCount === 1
+      ? t.settings.mcp.toolCount.one
+      : t.settings.mcp.toolCount.other,
+    { n: readiness.toolCount }
+  )}`;
 }

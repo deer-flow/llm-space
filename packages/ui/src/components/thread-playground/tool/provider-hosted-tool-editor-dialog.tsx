@@ -12,6 +12,7 @@ import {
   CodeEditor,
   type CodeEditorHandle,
 } from "@llm-space/ui/components/code-editor";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -40,6 +41,7 @@ export function ProviderHostedToolEditorDialog({
   tool: ProviderHostedTool | null;
 }) {
   const { addTool, updateTool } = useThreadStoreActions();
+  const { t } = useI18n();
   const editorRef = useRef<CodeEditorHandle>(null);
   const [text, setText] = useState("");
   const [originalKey, setOriginalKey] = useState<string | null>(null);
@@ -68,9 +70,11 @@ export function ProviderHostedToolEditorDialog({
         editorRef.current?.getValue() ?? text
       );
     } catch (error) {
-      toast.error("Invalid provider-hosted tool configuration", {
+      toast.error(t.playground.tools.invalidProviderHostedConfig, {
         description:
-          error instanceof Error ? error.message : "Invalid configuration.",
+          error instanceof Error
+            ? error.message
+            : t.playground.tools.invalidConfiguration,
       });
       return;
     }
@@ -96,19 +100,17 @@ export function ProviderHostedToolEditorDialog({
         <DialogHeader className="shrink-0">
           <DialogTitle>
             {tool
-              ? "Edit provider-hosted tool"
-              : "Add provider-hosted tool"}
+              ? t.playground.tools.editProviderHostedTool
+              : t.playground.tools.addProviderHostedTool}
           </DialogTitle>
           <DialogDescription>
-            This JSON is passed directly to the selected model service. Fields
-            beyond type are preserved unchanged. LLM Space does not verify
-            whether the selected provider or model supports the tool or its
-            parameters. Provider-hosted tools run inside the model request and
-            are not controlled by Auto run tools.
+            {t.playground.tools.providerHostedDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="text-sm font-medium">Configuration</div>
+          <div className="text-sm font-medium">
+            {t.playground.tools.configuration}
+          </div>
           <CodeEditor
             ref={editorRef}
             className="min-h-0 flex-1 font-mono text-sm"
@@ -120,9 +122,11 @@ export function ProviderHostedToolEditorDialog({
         </div>
         <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.playground.tools.cancel}
           </Button>
-          <Button onClick={handleSave}>{tool ? "Save" : "Create"}</Button>
+          <Button onClick={handleSave}>
+            {tool ? t.playground.tools.save : t.playground.tools.create}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

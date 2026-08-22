@@ -13,6 +13,7 @@ import {
 import { useFirstAvailableModel } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -44,13 +45,13 @@ import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 import { DEFAULT_JSON_SCHEMA, JsonSchemaDialog } from "./json-schema-dialog";
 import { ModelCard } from "./model-card";
 
-const REASONING_LEVELS: { value: ReasoningLevel; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "minimal", label: "Minimal" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "xhigh", label: "X-High" },
+const REASONING_LEVELS: ReasoningLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
 ];
 
 const DEFAULT_TEMPERATURE = 1;
@@ -73,6 +74,7 @@ function ParamField({
   onEnabledChange: (enabled: boolean) => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className={cn("border-t pt-3", className)}>
       <div className="flex items-center justify-between gap-2">
@@ -81,7 +83,12 @@ function ParamField({
         </span>
         <Switch
           size="sm"
-          aria-label={`${enabled ? "Disable" : "Enable"} ${label}`}
+          aria-label={formatString(
+            enabled
+              ? t.playground.model.disableParam
+              : t.playground.model.enableParam,
+            { label }
+          )}
           checked={enabled}
           disabled={readonly}
           onCheckedChange={onEnabledChange}
@@ -105,6 +112,7 @@ export function ModelParamsPopover({
   const fallbackModel = useFirstAvailableModel();
   const model = savedModel ?? fallbackModel;
   const { updateModelParams } = useThreadStoreActions();
+  const { t } = useI18n();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -165,7 +173,7 @@ export function ModelParamsPopover({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="Show model details"
+            aria-label={t.playground.model.showModelDetails}
             disabled={!model}
           >
             <InfoIcon className="size-4" />
@@ -176,13 +184,13 @@ export function ModelParamsPopover({
         </HoverCardContent>
       </HoverCard>
       <Popover onOpenChange={handleOpenChange}>
-        <Tooltip content="Configure model settings">
+        <Tooltip content={t.playground.model.configureModelSettings}>
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
               disabled={readonly || !model}
               size="icon-xs"
-              aria-label="Configure model parameters"
+              aria-label={t.playground.model.configureModelParameters}
               aria-expanded={popoverOpen}
             >
               <SlidersHorizontal className="size-4" />
@@ -192,13 +200,13 @@ export function ModelParamsPopover({
         <PopoverContent align="end" className="flex w-72 flex-col p-4">
           <PopoverHeader>
             <PopoverTitle className="flex items-center justify-between">
-              <div>Model settings</div>
+              <div>{t.playground.model.modelSettings}</div>
               <div>
-                <Tooltip content="Configure model settings">
+                <Tooltip content={t.playground.model.configureModelSettings}>
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Open model provider settings"
+                    aria-label={t.playground.model.openModelProviderSettings}
                     onClick={handleConfigModelSettings}
                   >
                     <SettingsIcon className="size-3.5" />
@@ -208,7 +216,7 @@ export function ModelParamsPopover({
             </PopoverTitle>
           </PopoverHeader>
           <ParamField
-            label="Temperature"
+            label={t.playground.model.temperature}
             enabled={hasTemperature}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -224,7 +232,7 @@ export function ModelParamsPopover({
                 </span>
               </div>
               <Slider
-                aria-label="Temperature"
+                aria-label={t.playground.model.temperature}
                 min={0}
                 max={2}
                 step={0.1}
@@ -240,7 +248,7 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Max tokens"
+            label={t.playground.model.maxTokens}
             enabled={hasMaxTokens}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -252,7 +260,7 @@ export function ModelParamsPopover({
             <Input
               className="mt-2 w-full font-mono"
               type="number"
-              aria-label="Max tokens"
+              aria-label={t.playground.model.maxTokens}
               min={1}
               max={maxTokensFromProps}
               value={draftMaxTokens}
@@ -276,7 +284,7 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Thinking effort"
+            label={t.playground.model.thinkingEffort}
             enabled={hasReasoning}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -295,14 +303,14 @@ export function ModelParamsPopover({
               <SelectTrigger
                 size="sm"
                 className="mt-2 w-full"
-                aria-label="Thinking effort"
+                aria-label={t.playground.model.thinkingEffort}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="font-mono">
-                {REASONING_LEVELS.map(({ value, label }) => (
+                {REASONING_LEVELS.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {label}
+                    {t.playground.model.reasoningLevel[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -310,7 +318,7 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Response format"
+            label={t.playground.model.responseFormat}
             enabled={hasResponseFormat}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -337,13 +345,17 @@ export function ModelParamsPopover({
               <SelectTrigger
                 size="sm"
                 className="mt-2 w-full"
-                aria-label="Response format"
+                aria-label={t.playground.model.responseFormat}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="font-mono">
-                <SelectItem value="json_object">JSON object</SelectItem>
-                <SelectItem value="json_schema">JSON schema</SelectItem>
+                <SelectItem value="json_object">
+                  {t.playground.model.jsonObject}
+                </SelectItem>
+                <SelectItem value="json_schema">
+                  {t.playground.model.jsonSchema}
+                </SelectItem>
               </SelectContent>
             </Select>
             {responseFormat === "json_schema" ? (
@@ -354,7 +366,7 @@ export function ModelParamsPopover({
                 disabled={readonly}
                 onClick={() => setSchemaDialogOpen(true)}
               >
-                Edit schema
+                {t.playground.model.editSchema}
               </Button>
             ) : null}
           </ParamField>

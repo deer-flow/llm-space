@@ -5,6 +5,7 @@ import { SettingsIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
   Combobox,
@@ -52,6 +53,7 @@ export function ModelSelector({
   const providers = useModels();
   const refreshModels = useRefreshModels();
   const { updateModel } = useThreadStoreActions();
+  const { t } = useI18n();
   const { actions } = useHostServices();
   const [open, setOpen] = useState(false);
 
@@ -129,8 +131,8 @@ export function ModelSelector({
     const trigger = inputRef.current
       ?.closest<HTMLElement>('[data-slot="input-group"]')
       ?.querySelector<HTMLElement>('[data-slot="input-group-button"]');
-    trigger?.setAttribute("aria-label", "Open model selector");
-  }, []);
+    trigger?.setAttribute("aria-label", t.playground.model.openModelSelector);
+  }, [t]);
 
   return (
     <Combobox
@@ -156,18 +158,18 @@ export function ModelSelector({
     >
       <ComboboxInput
         ref={inputRef}
-        aria-label="Model selector"
+        aria-label={t.playground.model.modelSelector}
         className={cn(
           "hover:bg-secondary! group/model-select h-6! w-full max-w-75 min-w-0 border-0 bg-transparent! font-mono",
           !readonly && "cursor:pointer hover:bg-secondary"
         )}
         triggerClassName="opacity-0! group-hover/model-select:opacity-100"
-        placeholder="(No model selected)"
+        placeholder={t.playground.model.noModelSelected}
         disabled={readonly}
         onFocus={handleInputFocus}
       />
       <ComboboxContent className="w-96">
-        <ComboboxEmpty>No models found.</ComboboxEmpty>
+        <ComboboxEmpty>{t.playground.model.noModelsFound}</ComboboxEmpty>
         <ComboboxList>
           {(provider: {
             id: string;
@@ -221,7 +223,7 @@ export function ModelSelector({
             className="hover:bg-accent hover:text-accent-foreground text-muted-foreground flex min-h-7 w-full cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5"
           >
             <SettingsIcon />
-            Configure models...
+            {t.playground.model.configureModels}
           </button>
         </div>
       </ComboboxContent>

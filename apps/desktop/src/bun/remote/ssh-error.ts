@@ -1,3 +1,7 @@
+import { formatString, MESSAGES } from "@llm-space/ui/lib/i18n/messages";
+
+import { isChineseLocale } from "../app/locales";
+
 export type SshBootstrapStage =
   | "platform-detect"
   | "server-install"
@@ -25,6 +29,11 @@ export interface RemotePortInUseFailure {
 
 const MAX_GENERIC_OUTPUT_LENGTH = 1200;
 
+/** The current locale's error templates (`t.errors`), resolved per call. */
+const _errors = () => MESSAGES[isChineseLocale() ? "zh" : "en"].errors;
+
+type ErrorTemplates = ReturnType<typeof _errors>;
+
 export function formatSshBootstrapFailure({
   stage,
   label,
@@ -45,7 +54,7 @@ export function formatSshBootstrapFailure({
 
   const details = output.trim();
   return [
-    `SSH remote runtime bootstrap failed during ${stage}: ${label} exited early.`,
+    formatString(_errors().sshBootstrapGeneric, { stage, label }),
     details ? _truncate(details, MAX_GENERIC_OUTPUT_LENGTH) : null,
   ]
     .filter(Boolean)
@@ -55,10 +64,40 @@ export function formatSshBootstrapFailure({
 function _formatRemotePortInUse(output: string): string | null {
   const failure = parseRemotePortInUseFailure(output);
   if (!failure) return null;
-  return [
-    `Remote runtime port ${failure.port} is already in use.`,
-    "LLM Space will retry with a different per-connection port without stopping the existing listener.",
-  ].join(" ");
+  return formatString(_errors().sshPortInUse, { port: failure.port });
+}
+
+/**
+ * Format the error thrown when the remote runtime reports a port in use that
+ * differs from the one this connection attempted.
+ */
+export function formatRemotePortMismatch(
+  port: number,
+  attemptedPort: number
+): string {
+  return formatString(_errors().remotePortReportedInUse, {
+    port,
+    attemptedPort,
+  });
+}
+
+/**
+ * Format the error thrown when no per-connection remote port was available
+ * after `attempts` tries.
+ */
+export function formatRemotePortsExhausted(attempts: number): string {
+  return formatString(_errors().remotePortsExhausted, { attempts });
+}
+
+/**
+ * Format the health-check timeout error, embedding the last failure `message`
+ * and the expected protocol `version`.
+ */
+export function formatHealthCheckTimeout(
+  message: string,
+  version: string | number
+): string {
+  return formatString(_errors().sshHealthCheckTimeout, { message, version });
 }
 
 export function parseRemotePortInUseFailure(
@@ -97,13 +136,11 @@ function _parsePortInUsePort(output: string): number | null {
 function _formatMissingRuntimeBinary(output: string): string | null {
   const failure = parseMissingRuntimeBinaryFailure(output);
   if (!failure) return null;
-  return [
+  const template =
     failure.reason === "missing"
-      ? "Remote runtime binary is missing."
-      : "Remote runtime binary is not executable.",
-    `${failure.path} does not exist or is not executable on the SSH server.`,
-    "Check the remote install directory, permissions, and whether the runtime package was installed under a literal '~' directory.",
-  ].join(" ");
+      ? _errors().sshMissingBinary
+      : _errors().sshNotExecutableBinary;
+  return formatString(template, { path: failure.path });
 }
 
 export function parseMissingRuntimeBinaryFailure(
@@ -127,11 +164,12 @@ function _formatAuthenticationFailure(
 ): string | null {
   if (!_isAuthenticationFailure(output)) return null;
 
-  const targetText = target ? ` for ${target}` : "";
+  const errors = _errors();
   return [
-    `SSH authentication failed${targetText}.`,
-    "OpenSSH could not authenticate with the configured keys, password, or passphrase.",
-    "Check ~/.ssh/config, ssh-agent, and any system password or passphrase prompt, then try again.",
+    target
+      ? formatString(errors.sshAuthFailedFor, { target })
+      : errors.sshAuthFailed,
+    errors.sshAuthGuidance,
   ].join(" ");
 }
 
@@ -153,44 +191,41 @@ function _formatHostKeyFailure(
 ): string | null {
   if (!_isHostKeyFailure(output)) return null;
 
+  const errors = _errors();
   const offending = /Offending \S+ key in ([^:\n]+):(\d+)/i.exec(output);
   const knownHosts = offending?.[1];
   const line = offending?.[2];
   const location = knownHosts
-    ? `${knownHosts}${line ? ` line ${line}` : ""}`
-    : "your SSH known_hosts file";
-  const targetText = target ? ` for ${target}` : "";
+    ? line
+      ? formatString(errors.sshKnownHostsLine, { knownHosts, line })
+      : knownHosts
+    : errors.sshKnownHostsFallback;
 
   return [
-    `SSH host key verification failed${targetText}.`,
-    _hostKeyImpact(stage),
-    `Confirm the host identity first, then update ${location}.`,
-    _knownHostsAction(knownHosts, line, target),
+    target
+      ? formatString(errors.sshHostKeyFailedFor, { target })
+      : errors.sshHostKeyFailed,
+    _hostKeyImpact(stage, errors),
+    formatString(errors.sshHostKeyLocation, { location }),
+    _knownHostsAction(knownHosts, line, target, errors),
   ].join(" ");
 }
 
 function _knownHostsAction(
   knownHosts: string | undefined,
   line: string | undefined,
-  target: string | undefined
+  target: string | undefined,
+  errors: ErrorTemplates
 ): string {
-  if (knownHosts && line) {
-    return `After confirming it is safe, remove that stale known_hosts entry and reconnect.`;
-  }
-  if (target) {
-    return `If this is a first-time connection, use the LLM Space host identity prompt or run ssh ${target} once in Terminal to review and trust the host key, then reconnect.`;
-  }
-  return "If this is a first-time connection, use the LLM Space host identity prompt or run ssh in Terminal once to review and trust the host key, then reconnect.";
+  if (knownHosts && line) return errors.sshRemoveStaleEntry;
+  if (target) return formatString(errors.sshFirstConnectionFor, { target });
+  return errors.sshFirstConnection;
 }
 
-function _hostKeyImpact(stage: SshBootstrapStage): string {
-  if (stage === "server-start") {
-    return "OpenSSH reports that this host key changed or is not trusted, so the remote runtime command was not started.";
-  }
-  if (stage === "tunnel-start") {
-    return "OpenSSH reports that this host key changed or is not trusted, so port forwarding was disabled and LLM Space did not start the remote runtime.";
-  }
-  return "OpenSSH reports that this host key changed or is not trusted, so the SSH connection closed before LLM Space could verify the remote runtime.";
+function _hostKeyImpact(stage: SshBootstrapStage, errors: ErrorTemplates): string {
+  if (stage === "server-start") return errors.sshHostKeyImpactServerStart;
+  if (stage === "tunnel-start") return errors.sshHostKeyImpactTunnelStart;
+  return errors.sshHostKeyImpactOther;
 }
 
 function _isHostKeyFailure(output: string): boolean {

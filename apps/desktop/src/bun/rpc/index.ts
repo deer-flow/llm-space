@@ -12,6 +12,7 @@ import { BrowserView, Utils, type BrowserWindow } from "electrobun/bun";
 import type { Command } from "../../shared/commands";
 import type { DesktopRPCType } from "../../shared/rpc";
 import type { Analytics } from "../analytics";
+import { getOsLocale } from "../app/locales";
 import type { GitHubAuthManager } from "../auth";
 import {
   checkUv,
@@ -544,6 +545,7 @@ export function createMainWindowRPC({
           await dismissGithubStarReminder();
           return null;
         },
+        getOsLocale: () => ({ locale: getOsLocale() }),
         featureReminderNext: () => getNextFeatureReminder(),
         featureReminderMarkSeen: async ({ id }) => {
           await markFeatureReminderSeen(id);

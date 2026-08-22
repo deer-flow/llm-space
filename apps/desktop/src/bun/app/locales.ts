@@ -36,7 +36,35 @@ export function getOsLocale() {
   }
 }
 
-/** Whether the OS display language is Chinese. */
+let _currentLocale: string | null = null;
+
+/** The effective locale — the OS display language until the user overrides it. */
+function _effectiveLocale(): string {
+  if (_currentLocale === null) _currentLocale = getOsLocale();
+  return _currentLocale;
+}
+
+/** Override the process locale when the user switches the UI language. */
+export function setAppLocale(lang: "en" | "zh") {
+  _currentLocale = lang === "zh" ? "zh-cn" : "en";
+}
+
+/** Whether a value is one of the app's two shipped languages. */
+export function isAppLang(value: string | null | undefined): value is "en" | "zh" {
+  return value === "en" || value === "zh";
+}
+
+/**
+ * Restore a persisted app-language choice at startup, before any locale state
+ * is read. The renderer applies its own persisted choice; bun-side surfaces
+ * (the native menu, error copy, locale-dependent links) must come back in the
+ * same language across restarts instead of re-deriving from the OS locale.
+ */
+export function restoreAppLocale(lang: string | null | undefined) {
+  if (isAppLang(lang)) setAppLocale(lang);
+}
+
+/** Whether the effective UI locale is Chinese. */
 export function isChineseLocale() {
-  return getOsLocale().startsWith("zh");
+  return _effectiveLocale().startsWith("zh");
 }

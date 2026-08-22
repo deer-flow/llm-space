@@ -7,6 +7,7 @@ import {
   resolveSeed,
 } from "@llm-space/ui/components/thread-playground/examples/prompts";
 import { useHostServices } from "@llm-space/ui/host";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import {
   basename,
   parentOf,
@@ -49,11 +50,9 @@ import type { AcquireFileMutation } from "./file-mutation-guard";
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
 
-/** What the OS calls its trash, for the delete-confirmation copy. */
-const TRASH_NAME =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
-    ? "Recycle Bin"
-    : "Trash";
+/** Whether the OS is Windows, for the trash/Reveal copy (macOS + Linux = Finder/Trash). */
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
 
 /** The special workspace folder that deep-link shared-thread imports land in. */
 const SHARED_DIR = "shared";
@@ -100,6 +99,11 @@ function _FileSystemTreeView({
 }) {
   const fullScreen = useFullScreen();
   const seedHost = useHostServices();
+  const { t } = useI18n();
+  // The OS-specific trash label, resolved once per render for the dialogs.
+  const trash = _isWindows
+    ? t.desktop.fileTree.recycleBinName
+    : t.desktop.fileTree.trashName;
   const mutationReconciliation = useMemo(
     () => ({ onMove, onRemove }),
     [onMove, onRemove]
@@ -521,9 +525,9 @@ function _FileSystemTreeView({
         ) : data.length === 0 ? (
           <Empty className="h-full">
             <EmptyHeader>
-              <EmptyTitle>No Threads Yet</EmptyTitle>
+              <EmptyTitle>{t.desktop.fileTree.emptyTitle}</EmptyTitle>
               <EmptyDescription>
-                Create a thread to get started.
+                {t.desktop.fileTree.emptyDescription}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -546,15 +550,18 @@ function _FileSystemTreeView({
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        title={
-          <>
-            Move &ldquo;
-            {deleting ? basename(deleting).replace(/\.json$/, "") : ""}
-            &rdquo; to the {TRASH_NAME}?
-          </>
+        title={formatString(t.desktop.fileTree.moveToTrashTitle, {
+          name: deleting ? basename(deleting).replace(/\.json$/, "") : "",
+          trash,
+        })}
+        description={formatString(t.desktop.fileTree.restoreFromTrash, {
+          trash,
+        })}
+        confirmLabel={
+          _isWindows
+            ? t.desktop.threadTabs.moveToRecycleBin
+            : t.desktop.threadTabs.moveToTrash
         }
-        description={`You can restore it from the ${TRASH_NAME} later.`}
-        confirmLabel={`Move to ${TRASH_NAME}`}
         onConfirm={() => {
           const path = deleting;
           setDeleting(null);
@@ -573,25 +580,24 @@ function _FileSystemTreeView({
             setOverwriteConflict(null);
           }
         }}
-        title={
-          <>
-            Replace &ldquo;
-            {overwriteConflict
-              ? overwriteConflict.isDir
-                ? overwriteConflict.name
-                : overwriteConflict.name.replace(/\.json$/, "")
-              : ""}
-            &rdquo;?
-          </>
-        }
+        title={formatString(t.desktop.fileTree.replaceTitle, {
+          name: overwriteConflict
+            ? overwriteConflict.isDir
+              ? overwriteConflict.name
+              : overwriteConflict.name.replace(/\.json$/, "")
+            : "",
+        })}
         description={
           overwriteConflict
-            ? `${overwriteConflict.isDir ? "A folder" : "A thread"} with this name already exists here. Replacing it moves the existing ${
-                overwriteConflict.isDir ? "folder" : "thread"
-              } to the ${TRASH_NAME}.`
+            ? formatString(
+                overwriteConflict.isDir
+                  ? t.desktop.fileTree.replaceDescriptionFolder
+                  : t.desktop.fileTree.replaceDescriptionThread,
+                { trash }
+              )
             : undefined
         }
-        confirmLabel="Replace"
+        confirmLabel={t.common.replace}
         onConfirm={() => {
           overwriteConflict?.resolve(true);
           setOverwriteConflict(null);

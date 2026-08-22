@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { BotIcon, ImageIcon, UserIcon, WrenchIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
   HoverCard,
@@ -25,6 +26,7 @@ function _MessageNavigator({
   onJump: (index: number) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const getItemKey = useCallback(
     (index: number) => messages[index]?.id ?? index,
@@ -49,7 +51,7 @@ function _MessageNavigator({
 
   return (
     <nav
-      aria-label="Message navigation"
+      aria-label={t.playground.message.messageNavigation}
       className="pointer-events-none absolute top-1/2 -left-2 z-50 -translate-y-1/2"
     >
       <div
@@ -114,7 +116,11 @@ function _MessageAnchor({
   ).length;
   const toolCount =
     message.role === "assistant" ? (message.toolCalls?.length ?? 0) : 0;
-  const roleLabel = message.role === "user" ? "User" : "Assistant";
+  const { t } = useI18n();
+  const roleLabel =
+    message.role === "user"
+      ? t.playground.message.roleUser
+      : t.playground.message.roleAssistant;
   const hoverDistance =
     hoveredIndex === null ? Number.POSITIVE_INFINITY : Math.abs(index - hoveredIndex);
   const scaleClass =
@@ -131,7 +137,11 @@ function _MessageAnchor({
       <HoverCardTrigger asChild>
         <button
           aria-current={active ? "location" : undefined}
-          aria-label={`Jump to ${roleLabel.toLowerCase()} message ${index + 1} of ${total}`}
+          aria-label={formatString(t.playground.message.jumpToRoleMessage, {
+            role: roleLabel.toLowerCase(),
+            current: index + 1,
+            total,
+          })}
           className="group/anchor flex h-3 w-5 shrink-0 cursor-pointer items-center rounded-sm outline-none"
           type="button"
           onClick={() => onJump(index)}
@@ -166,9 +176,16 @@ function _MessageAnchor({
             )}
           </div>
           <div className="min-w-0">
-            <div className="font-medium">{roleLabel} message</div>
+            <div className="font-medium">
+              {formatString(t.playground.message.roleMessage, {
+                role: roleLabel,
+              })}
+            </div>
             <div className="text-muted-foreground text-[0.625rem]">
-              {index + 1} of {total}
+              {formatString(t.playground.message.indexOfTotal, {
+                current: index + 1,
+                total,
+              })}
             </div>
           </div>
         </div>
@@ -180,13 +197,21 @@ function _MessageAnchor({
             {imageCount > 0 ? (
               <span className="flex items-center gap-1">
                 <ImageIcon className="size-3" />
-                {imageCount} image{imageCount === 1 ? "" : "s"}
+                {imageCount === 1
+                  ? t.playground.message.imageCount.one
+                  : formatString(t.playground.message.imageCount.other, {
+                      n: imageCount,
+                    })}
               </span>
             ) : null}
             {toolCount > 0 ? (
               <span className="flex items-center gap-1">
                 <WrenchIcon className="size-3" />
-                {toolCount} tool call{toolCount === 1 ? "" : "s"}
+                {toolCount === 1
+                  ? t.playground.message.toolCallCount.one
+                  : formatString(t.playground.message.toolCallCount.other, {
+                      n: toolCount,
+                    })}
               </span>
             ) : null}
           </div>

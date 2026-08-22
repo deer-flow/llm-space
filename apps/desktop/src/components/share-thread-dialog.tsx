@@ -2,6 +2,7 @@
 
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { docsUrl } from "@llm-space/ui/lib/docs-url";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -70,6 +71,7 @@ export function ShareThreadDialog({
 }) {
   const { state: authState, signIn } = useGithubAuth();
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -145,13 +147,13 @@ export function ShareThreadDialog({
             setStatus("success");
           },
           onError: (error) => {
-            setErrorMessage(_friendlyError(error));
+            setErrorMessage(_friendlyError(error, t));
             setStatus("error");
           },
         }
       );
     },
-    [flow]
+    [flow, t]
   );
 
   const handleGenerate = useCallback(() => {
@@ -251,17 +253,19 @@ export function ShareThreadDialog({
             <div className="relative grid items-center gap-5 px-6 pt-6 pb-4 md:grid-cols-[1fr_1.05fr]">
               <div>
                 <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
-                  {status === "success" ? "Published" : "Read-only web share"}
+                  {status === "success"
+                    ? t.desktop.shareThread.published
+                    : t.desktop.shareThread.readOnlyWebShare}
                 </span>
                 <DialogTitle className="mt-1.5 text-xl font-semibold tracking-tight">
                   {status === "success"
-                    ? "Your thread is ready to travel."
-                    : "Share the thread—not a screenshot."}
+                    ? t.desktop.shareThread.readyToTravel
+                    : t.desktop.shareThread.shareNotScreenshot}
                 </DialogTitle>
                 <DialogDescription className="mt-1.5 max-w-sm">
                   {status === "success"
-                    ? "Send this link to anyone. They can explore the full read-only thread without a GitHub account."
-                    : "Others can open it in LLM Space or explore it read-only on the web."}
+                    ? t.desktop.shareThread.successDescription
+                    : t.desktop.shareThread.normalDescription}
                 </DialogDescription>
               </div>
               <SharePreview />
@@ -282,13 +286,13 @@ export function ShareThreadDialog({
               <div className="flex h-72 flex-col gap-4 p-6">
                 <div className="space-y-2.5">
                   <label htmlFor="share-title" className="text-xs font-medium">
-                    Title
+                    {t.desktop.shareThread.title}
                   </label>
                   <Input
                     id="share-title"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    placeholder="Untitled thread"
+                    placeholder={t.desktop.shareThread.untitled}
                     disabled={busy}
                   />
                 </div>
@@ -298,13 +302,13 @@ export function ShareThreadDialog({
                     htmlFor="share-description"
                     className="text-xs font-medium"
                   >
-                    Description
+                    {t.desktop.shareThread.description}
                   </label>
                   <Textarea
                     id="share-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Add a short note for the people opening this link…"
+                    placeholder={t.desktop.shareThread.notePlaceholder}
                     disabled={busy}
                     rows={3}
                     className="min-h-28 flex-1 resize-none"
@@ -330,25 +334,27 @@ export function ShareThreadDialog({
               }
             >
               <CircleHelpIcon className="size-4" />
-              Help
+              {t.desktop.shareThread.help}
             </Button>
             <div className="flex items-center justify-end gap-2">
               {status === "success" ? (
-                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+                <Button onClick={() => handleOpenChange(false)}>
+                  {t.common.done}
+                </Button>
               ) : (
                 <>
                   <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                    Cancel
+                    {t.common.cancel}
                   </Button>
                   <Button onClick={handleGenerate} disabled={busy}>
                     {busy ? <Loader2Icon className="animate-spin" /> : null}
                     {status === "awaitingAuth"
-                      ? "Waiting for GitHub sign-in…"
+                      ? t.desktop.shareThread.waitingForSignIn
                       : status === "generating"
-                        ? "Creating link…"
+                        ? t.desktop.shareThread.creatingLink
                         : status === "error"
-                          ? "Try again"
-                          : "Generate link"}
+                          ? t.common.tryAgain
+                          : t.desktop.shareThread.generateLink}
                     {!busy ? <SendIcon className="size-3.5" /> : null}
                   </Button>
                 </>
@@ -362,9 +368,9 @@ export function ShareThreadDialog({
         open={confirmSignInOpen}
         onOpenChange={handleConfirmSignInOpenChange}
         dimBackground={false}
-        title="Sign in to GitHub?"
-        description="Sharing publishes this thread as a secret GitHub Gist, so you need to sign in to GitHub first. Continue?"
-        confirmLabel="Sign in and continue"
+        title={t.desktop.shareThread.signInTitle}
+        description={t.desktop.shareThread.signInDescription}
+        confirmLabel={t.desktop.shareThread.signInAndContinue}
         confirmVariant="default"
         onConfirm={handleConfirmSignIn}
       />
@@ -425,6 +431,7 @@ function ShareSuccess({
   onCopy: () => void;
   onOpen: () => void;
 }) {
+  const { t } = useI18n();
   const displayUrl = shareUrl.replace(/^https:\/\//, "");
   const urlInputRef = useRef<HTMLInputElement>(null);
   const [hasHiddenUrlTail, setHasHiddenUrlTail] = useState(false);
@@ -490,7 +497,7 @@ function ShareSuccess({
             ) : (
               <CopyIcon />
             )}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t.common.copied : t.common.copy}
           </Button>
         </div>
         <Button
@@ -498,7 +505,7 @@ function ShareSuccess({
           size="icon"
           onClick={onOpen}
           className="shrink-0 cursor-pointer"
-          aria-label="Open in browser"
+          aria-label={t.desktop.shareThread.openInBrowserAria}
         >
           <ExternalLinkIcon />
         </Button>
@@ -506,20 +513,23 @@ function ShareSuccess({
 
       <div className="text-muted-foreground mt-5 flex items-center gap-2 text-[0.6875rem]">
         <ShieldCheckIcon className="size-3.5" />
-        Nothing is published again unless you choose to share.
+        {t.desktop.shareThread.nothingPublished}
       </div>
     </div>
   );
 }
 
 /** Map a share failure to a short, human message for the dialog. */
-function _friendlyError(error: unknown): string {
+function _friendlyError(
+  error: unknown,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   const message = error instanceof Error ? error.message : "";
   if (/sign-in required/i.test(message)) {
-    return "GitHub sign-in is required to share. Please sign in and try again.";
+    return t.desktop.shareThread.signInRequired;
   }
   if (/rate limit/i.test(message)) {
-    return "GitHub rate limit reached. Please wait a moment and try again.";
+    return t.desktop.shareThread.rateLimit;
   }
-  return message || "Couldn't create the share link. Please try again.";
+  return message || t.desktop.shareThread.genericError;
 }

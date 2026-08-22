@@ -1,6 +1,7 @@
 import type { ModelConfig } from "@llm-space/core";
 import type { ReactNode } from "react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 
 
@@ -37,9 +38,10 @@ function ModelCardField({
 }
 
 function BoolValue({ value }: { value: boolean }) {
+  const { t } = useI18n();
   return (
     <span className={value ? "" : "text-muted-foreground"}>
-      {value ? "Supported" : "Not supported"}
+      {value ? t.playground.model.supported : t.playground.model.notSupported}
     </span>
   );
 }
@@ -52,6 +54,7 @@ export function ModelCard({
   className?: string;
 }) {
   const providers = useModels();
+  const { t } = useI18n();
   const resolvedModel = useModel({
     id: model?.id ?? "",
     provider: model?.provider ?? "",
@@ -66,37 +69,37 @@ export function ModelCard({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <main className="flex flex-col">
-        <ModelCardField label="Model" value={resolvedModel.id} />
-        <ModelCardField label="Provider" value={providerName} />
-        <ModelCardField label="API type" value={resolvedModel?.api} />
+        <ModelCardField label={t.playground.model.model} value={resolvedModel.id} />
+        <ModelCardField label={t.playground.model.provider} value={providerName} />
+        <ModelCardField label={t.playground.model.apiType} value={resolvedModel?.api} />
         <ModelCardField
-          label="Base URL"
+          label={t.playground.model.baseUrl}
           value={
             <span className="text-left break-all">{resolvedModel.baseUrl}</span>
           }
         />
         <ModelCardField
-          label="Context window"
+          label={t.playground.model.contextWindow}
           value={formatTokenCount(resolvedModel.contextWindow)}
         />
         <ModelCardField
-          label="Max tokens"
+          label={t.playground.model.maxTokens}
           value={formatTokenCount(resolvedModel.maxTokens)}
         />
         <ModelCardField
-          label="Reasoning"
+          label={t.playground.model.reasoning}
           value={<BoolValue value={resolvedModel.reasoning} />}
         />
         <ModelCardField
-          label="Image input"
+          label={t.playground.model.imageInput}
           value={<BoolValue value={supportsImageInput} />}
         />
         <ModelCardField
-          label="Input cost"
+          label={t.playground.model.inputCost}
           value={formatCostPerMillion(resolvedModel.cost.input)}
         />
         <ModelCardField
-          label="Output cost"
+          label={t.playground.model.outputCost}
           value={formatCostPerMillion(resolvedModel.cost.output)}
         />
       </main>

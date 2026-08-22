@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -44,6 +45,7 @@ export function JsonSchemaDialog({
   onSave: (schema: object) => void;
 }) {
   const [text, setText] = useState("");
+  const { t } = useI18n();
   // Reinitialize the editor when the dialog opens (adjust during render, not in
   // an effect, to avoid a stale frame). See ToolEditorDialog for the pattern.
   const [prevOpen, setPrevOpen] = useState(false);
@@ -59,11 +61,15 @@ export function JsonSchemaDialog({
     try {
       parsed = JSON.parse(text);
     } catch {
-      toast.error("Error", { description: "Invalid JSON" });
+      toast.error(t.playground.model.error, {
+        description: t.playground.model.invalidJson,
+      });
       return;
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      toast.error("Error", { description: "Schema must be a JSON object" });
+      toast.error(t.playground.model.error, {
+        description: t.playground.model.schemaMustBeJsonObject,
+      });
       return;
     }
     onSave(parsed);
@@ -78,10 +84,9 @@ export function JsonSchemaDialog({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle>Edit response schema</DialogTitle>
+          <DialogTitle>{t.playground.model.editResponseSchema}</DialogTitle>
           <DialogDescription>
-            The model constrains its response to this JSON Schema. Support and
-            strictness vary by provider.
+            {t.playground.model.jsonSchemaDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -97,9 +102,9 @@ export function JsonSchemaDialog({
 
         <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.playground.model.cancel}
           </Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave}>{t.playground.model.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

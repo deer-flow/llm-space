@@ -1,5 +1,6 @@
 "use client";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -100,6 +101,7 @@ export function RemoteServersPage({
   onConnected?: (runtimeId: RuntimeId) => void;
   onDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [servers, setServers] = useState<RemoteServerView[]>([]);
   const serversRef = useRef<RemoteServerView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -135,12 +137,12 @@ export function RemoteServersPage({
 
   useEffect(() => {
     void refresh().catch((error) =>
-      toast.error("Failed to load remote servers", {
+      toast.error(t.settings.remoteServers.failedToLoad, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       })
     );
-  }, [refresh]);
+  }, [refresh, t]);
 
   useEffect(
     () =>
@@ -170,12 +172,12 @@ export function RemoteServersPage({
         const nextId = form.id ?? next.at(-1)?.id ?? null;
         setSelectedId(nextId);
         setForm(null);
-        toast.success("Remote server saved");
+        toast.success(t.settings.remoteServers.saved);
         return true;
       } catch (error) {
-        toast.error("Failed to save remote server", {
+        toast.error(t.settings.remoteServers.failedToSave, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
         return false;
       }
@@ -237,8 +239,9 @@ export function RemoteServersPage({
 
   const reportRunError = (id: string, error: unknown) => {
     const failed = serversRef.current.find((server) => server.id === id);
-    toast.error(_failureTitle(failed), {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(_failureTitle(failed, t), {
+      description:
+        error instanceof Error ? error.message : t.common.pleaseTryAgain,
     });
   };
 
@@ -262,9 +265,9 @@ export function RemoteServersPage({
             onConnected?.(connected.runtimeId);
           }
         } catch (error) {
-          toast.error("Failed to trust SSH host", {
+          toast.error(t.settings.remoteServers.failedToTrustHost, {
             description:
-              error instanceof Error ? error.message : "Please try again.",
+              error instanceof Error ? error.message : t.common.pleaseTryAgain,
           });
         } finally {
           setTrustBusy(false);
@@ -285,9 +288,9 @@ export function RemoteServersPage({
       );
       updateServers(next);
     } catch (error) {
-      toast.error("Failed to cancel SSH host trust", {
+      toast.error(t.settings.remoteServers.failedToCancelHostTrust, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setTrustBusy(false);
@@ -306,14 +309,14 @@ export function RemoteServersPage({
 
   return (
     <SettingsPage
-      title="Remote Servers"
-      description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
+      title={t.settings.dialog.tabs.remoteServers}
+      description={t.settings.remoteServers.description}
       className={servers.length === 0 && !form ? undefined : "p-0"}
     >
       {loading && servers.length === 0 && !form ? (
         <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading remote servers
+          {t.settings.remoteServers.loading}
         </div>
       ) : servers.length === 0 && !form ? (
         <RemoteServersEmptyState onAdd={startAdd} />
@@ -322,13 +325,13 @@ export function RemoteServersPage({
         <aside className="bg-muted/20 flex min-h-0 flex-col border-r">
           <div className="flex h-11 items-center justify-between px-3">
             <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              SERVERS
+              {t.settings.remoteServers.serversHeading}
             </span>
             <div className="flex gap-1">
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Refresh remote servers"
+                aria-label={t.settings.remoteServers.refreshAria}
                 onClick={() => void refresh()}
               >
                 <RefreshCw className="size-4" />
@@ -336,7 +339,7 @@ export function RemoteServersPage({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Add remote server"
+                aria-label={t.settings.remoteServers.addServer}
                 onClick={startAdd}
               >
                 <Plus className="size-4" />
@@ -450,7 +453,7 @@ export function RemoteServersPage({
             />
           ) : (
             <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-              Select a server or click + to add one.
+              {t.settings.remoteServers.selectServer}
             </div>
           )}
           </section>
@@ -461,40 +464,48 @@ export function RemoteServersPage({
 }
 
 function RemoteServersEmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
     <SettingsEmptyState
       icon={Server}
       wallIcons={REMOTE_SERVER_WALL_ICONS}
-      label="No remote servers"
-      title="Bring another workspace within reach"
-      description="Connect over SSH to open a remote LLM Space workspace—threads, settings, and skills included."
+      label={t.settings.remoteServers.noServers}
+      title={t.settings.remoteServers.emptyTitle}
+      description={t.settings.remoteServers.emptyDescription}
       actions={
         <>
           <Button onClick={onAdd}>
             <Plus className="size-4" />
-            Add remote server
+            {t.settings.remoteServers.addServer}
           </Button>
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-            Passwords and passphrases are never stored.
+            {t.settings.remoteServers.passwordsNeverStored}
           </p>
         </>
       }
       capabilities={[
         {
           icon: FolderSync,
-          title: "Your workspace, anywhere",
-          description: "Open remote threads, settings, and skills in place.",
+          title: t.settings.remoteServers.capabilities.yourWorkspaceAnywhere
+            .title,
+          description:
+            t.settings.remoteServers.capabilities.yourWorkspaceAnywhere
+              .description,
         },
         {
           icon: Network,
-          title: "SSH-native",
-          description: "Use the secure connection already trusted by your team.",
+          title: t.settings.remoteServers.capabilities.sshNative.title,
+          description: t.settings.remoteServers.capabilities.sshNative
+            .description,
         },
         {
           icon: ShieldCheck,
-          title: "Credentials stay yours",
-          description: "Sensitive passwords and passphrases are not persisted.",
+          title: t.settings.remoteServers.capabilities.credentialsStayYours
+            .title,
+          description:
+            t.settings.remoteServers.capabilities.credentialsStayYours
+              .description,
         },
       ]}
     />
@@ -531,6 +542,7 @@ function RemoteServerDetails({
   onRejectHostKey: (request: RemoteHostKeyTrustRequest) => void;
   trustBusy: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
@@ -543,9 +555,18 @@ function RemoteServerDetails({
         </div>
       </div>
       <div className="grid gap-2 rounded-lg border p-3 text-sm">
-        <Info label="Status" value={server.status} />
-        <Info label="Runtime" value={server.runtimeId} />
-        <Info label="Workspace" value={_remoteWorkspacePath(server)} />
+        <Info
+          label={t.settings.remoteServers.details.status}
+          value={server.status}
+        />
+        <Info
+          label={t.settings.remoteServers.details.runtime}
+          value={server.runtimeId}
+        />
+        <Info
+          label={t.settings.remoteServers.details.workspace}
+          value={_remoteWorkspacePath(server)}
+        />
       </div>
       <ConnectionFlow server={server} />
       {server.error ? (
@@ -559,7 +580,7 @@ function RemoteServerDetails({
             disabled={busy}
             onClick={onDisconnect}
           >
-            Disconnect
+            {t.settings.remoteServers.disconnect}
           </Button>
         ) : (
           <Button
@@ -570,7 +591,9 @@ function RemoteServerDetails({
             {server.status === "connecting" ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : null}
-            {server.status === "connecting" ? "Connecting" : "Connect"}
+            {server.status === "connecting"
+              ? t.settings.remoteServers.connecting
+              : t.settings.remoteServers.connect}
           </Button>
         )}
         <Button
@@ -579,7 +602,7 @@ function RemoteServerDetails({
           disabled={!canEditRemoteServer(server, busy)}
           onClick={onEdit}
         >
-          Edit
+          {t.settings.remoteServers.edit}
         </Button>
         <Button
           size="sm"
@@ -588,7 +611,7 @@ function RemoteServerDetails({
           onClick={onRemove}
         >
           <Trash2 className="size-4" />
-          Remove
+          {t.common.remove}
         </Button>
       </div>
       {server.trustRequest ? (
@@ -604,11 +627,14 @@ function RemoteServerDetails({
 }
 
 function ConnectionFlow({ server }: { server: RemoteServerView }) {
+  const { t } = useI18n();
   const steps = remoteConnectionFlow(server);
   if (steps.length === 0) return null;
   return (
     <div className="rounded-lg border p-3">
-      <div className="mb-2 text-sm font-medium">Connection flow</div>
+      <div className="mb-2 text-sm font-medium">
+        {t.settings.remoteServers.connectionFlow}
+      </div>
       <div className="grid gap-2">
         {steps.map((step) => (
           <div key={step.stage} className="grid gap-1 text-sm">
@@ -662,6 +688,7 @@ function SshHostKeyDialog({
   onTrust: () => void;
   onReject: () => void;
 }) {
+  const { t } = useI18n();
   const [verified, setVerified] = useState(false);
   const changed = request.kind === "changed";
 
@@ -677,30 +704,55 @@ function SshHostKeyDialog({
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {changed ? "SSH host key changed" : "Trust this SSH host?"}
+            {changed
+              ? t.settings.remoteServers.hostKey.title
+              : t.settings.remoteServers.hostKey.trustTitle}
           </DialogTitle>
           <DialogDescription>
             {changed
-              ? "OpenSSH reports this host key changed. Continue only after you have verified this is the expected server."
-              : "LLM Space has not connected to this SSH host before. Confirm the fingerprint before continuing."}
+              ? t.settings.remoteServers.hostKey.changedDescription
+              : t.settings.remoteServers.hostKey.description}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 shrink flex-col gap-4 overflow-y-auto">
           <div className="grid gap-2 rounded-lg border p-3 text-sm">
-            <Info label="Host" value={request.host} />
-            <Info label="Target" value={request.target} />
+            <Info
+              label={t.settings.remoteServers.hostKey.infoHost}
+              value={request.host}
+            />
+            <Info
+              label={t.settings.remoteServers.hostKey.infoTarget}
+              value={request.target}
+            />
             {request.resolvedHost ? (
-              <Info label="Resolved" value={_endpoint(request)} />
+              <Info
+                label={t.settings.remoteServers.hostKey.infoResolved}
+                value={_endpoint(request)}
+              />
             ) : null}
-            {request.user ? <Info label="User" value={request.user} /> : null}
-            <Info label="Key type" value={request.keyType} />
-            <Info label="Fingerprint" value={request.fingerprint} />
+            {request.user ? (
+              <Info
+                label={t.settings.remoteServers.hostKey.infoUser}
+                value={request.user}
+              />
+            ) : null}
+            <Info
+              label={t.settings.remoteServers.hostKey.infoKeyType}
+              value={request.keyType}
+            />
+            <Info
+              label={t.settings.remoteServers.hostKey.infoFingerprint}
+              value={request.fingerprint}
+            />
             {request.knownHostsFile ? (
-              <Info label="known_hosts" value={request.knownHostsFile} />
+              <Info
+                label={t.settings.remoteServers.hostKey.infoKnownHosts}
+                value={request.knownHostsFile}
+              />
             ) : null}
             {request.knownHostsLine ? (
               <Info
-                label="Offending line"
+                label={t.settings.remoteServers.hostKey.infoOffendingLine}
                 value={String(request.knownHostsLine)}
               />
             ) : null}
@@ -713,23 +765,22 @@ function SshHostKeyDialog({
                 checked={verified}
                 onChange={(event) => setVerified(event.target.checked)}
               />
-              <span>
-                I verified this host identity with the administrator or server
-                console.
-              </span>
+              <span>{t.settings.remoteServers.hostKey.verified}</span>
             </label>
           ) : null}
         </div>
         <DialogFooter className="shrink-0">
           <Button variant="ghost" disabled={busy} onClick={onReject}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             variant={changed ? "destructive" : "default"}
             disabled={busy || (changed && !verified)}
             onClick={onTrust}
           >
-            {changed ? "Replace key and continue" : "Trust and continue"}
+            {changed
+              ? t.settings.remoteServers.hostKey.replaceAndContinue
+              : t.settings.remoteServers.hostKey.trustAndContinue}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -748,40 +799,44 @@ function RemoteServerForm({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <div>
         <h3 className="text-base font-medium">
-          {form.id ? "Edit server" : "Add server"}
+          {form.id
+            ? t.settings.remoteServers.form.editTitle
+            : t.settings.remoteServers.form.addTitle}
         </h3>
         <p className="text-muted-foreground text-sm">
-          Configure SSH details such as port, identity file, and jump host in
-          your system ~/.ssh/config.
+          {t.settings.remoteServers.form.hint}
         </p>
       </div>
       <div className="grid gap-3 rounded-lg border p-3">
         <Field
-          label="Name"
+          label={t.settings.remoteServers.form.name}
           value={form.name}
           onChange={(name) => onChange({ ...form, name })}
         />
         <Field
-          label="Host"
+          label={t.settings.remoteServers.form.host}
           value={form.host}
           onChange={(host) => onChange({ ...form, host })}
         />
         <Field
-          label="User"
+          label={t.settings.remoteServers.form.user}
           value={form.user}
           onChange={(user) => onChange({ ...form, user })}
         />
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={onSave}>
-          {form.id ? "Update" : "Add"}
+          {form.id
+            ? t.settings.remoteServers.form.update
+            : t.settings.remoteServers.form.add}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t.common.cancel}
         </Button>
       </div>
     </div>
@@ -845,11 +900,16 @@ function _remoteWorkspacePath(server: RemoteServerView): string {
   return `${server.remoteHome.replace(/\/+$/, "")}/workspace`;
 }
 
-function _failureTitle(server: RemoteServerView | undefined): string {
+function _failureTitle(
+  server: RemoteServerView | undefined,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   if (!server?.stageLabel || server.stage === "error") {
-    return "Remote server action failed";
+    return t.settings.remoteServers.actionFailed;
   }
-  return `${server.stageLabel} failed`;
+  return formatString(t.settings.remoteServers.stageFailed, {
+    stage: server.stageLabel,
+  });
 }
 
 function _endpoint(request: RemoteHostKeyTrustRequest): string {
