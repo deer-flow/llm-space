@@ -45,6 +45,7 @@ function createRuntime(): RuntimeClient {
       braveApiKey: "",
       firecrawlApiKey: "",
       tavilyApiKey: "",
+      searxngBaseUrl: "http://localhost:8080",
     }),
     getNetworkSettings: () => ({
       enabled: false,
