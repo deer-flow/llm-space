@@ -8,8 +8,6 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { register } from "timeago.js";
-import zh_CN from "timeago.js/lib/lang/zh_CN";
 
 import {
   LOCAL_STORAGE_KEYS,
@@ -27,12 +25,16 @@ import {
   type Messages,
 } from "./messages";
 
-// timeago.js's `register` is idempotent and `timeago.js/lib/lang/zh_CN` is its
-// documented locale path. Register the Simplified-Chinese locale client-side
-// only — server/bun contexts have no document and no timeago use.
-if (typeof document !== "undefined") {
-  register("zh_CN", zh_CN);
-}
+// No manual timeago locale registration here: importing `timeago.js` (which
+// every `format(ts, langToTimeago(lang))` call site does) evaluates the
+// package's own barrel, which registers both locales we map to — `en_US` and
+// `zh_CN` — as real ESM functions. Re-registering `zh_CN` from the CJS deep
+// path (`timeago.js/lib/lang/zh_CN`) is redundant and actively dangerous:
+// under Vite's CJS interop that import yields the `{ __esModule, default }`
+// exports object instead of the formatter function, poisoning the registry
+// so every Chinese-locale relative-time render throws
+// "TypeError: localeFunc is not a function" — with no error boundary above
+// it, that unmounts the whole app (the deep-research white screen).
 
 export type { Lang, Messages };
 export { LANGUAGES, formatString, langToTimeago };
