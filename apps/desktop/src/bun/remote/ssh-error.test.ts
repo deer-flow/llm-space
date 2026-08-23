@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
+import { setAppLocale } from "../app/locales";
+
 import {
   formatSshBootstrapFailure,
   parseMissingRuntimeBinaryFailure,
   parseRemotePortInUseFailure,
 } from "./ssh-error";
+
+// The formatters resolve the current locale at call time; pin English so the
+// assertions below are deterministic regardless of the OS display language.
+setAppLocale("en");
 
 describe("formatSshBootstrapFailure", () => {
   test("classifies OpenSSH host key failures", () => {

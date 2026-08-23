@@ -19,6 +19,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 
 import { useHostServices } from "@llm-space/ui/host";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -49,6 +50,7 @@ export function ToolListView({
   const tools = useThreadStore((s) => s.thread.context?.tools);
   const runtimeId = useThreadStore((s) => s.runtimeId);
   const { addTool, removeTool, updateTool } = useThreadStoreActions();
+  const { t } = useI18n();
   const { presentational } = useHostServices();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [providerHostedDialogOpen, setProviderHostedDialogOpen] =
@@ -163,7 +165,7 @@ export function ToolListView({
                 disabled={readonly}
               >
                 <PlusIcon className="size-3" />
-                Add
+                {t.playground.tools.add}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -174,7 +176,7 @@ export function ToolListView({
                 }}
               >
                 <PackageCheckIcon />
-                Add Built-in Tools
+                {t.playground.tools.addBuiltInToolsMenuItem}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
@@ -183,7 +185,7 @@ export function ToolListView({
                 }}
               >
                 <PackageCheckIcon />
-                Add Plugin Tools
+                {t.playground.tools.addPluginToolsMenuItem}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
@@ -193,16 +195,16 @@ export function ToolListView({
                 }}
               >
                 <CableIcon />
-                Add MCP Tools
+                {t.playground.tools.addMcpToolsMenuItem}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={openAddProviderHostedDialog}>
                 <CloudIcon />
-                Add Provider-Hosted Tool
+                {t.playground.tools.addProviderHostedToolMenuItem}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={openAddDialog}>
                 <FunctionSquareIcon />
-                Add Custom Function Tool
+                {t.playground.tools.addCustomFunctionTool}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

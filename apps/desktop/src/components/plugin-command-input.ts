@@ -1,9 +1,13 @@
 import type { PluginCommandView } from "@llm-space/core";
+import { formatString, type Messages } from "@llm-space/ui/lib/i18n/messages";
 
 type CommandIdentity = Pick<PluginCommandView, "id" | "displayName">;
 
 /** Parse a shell-like argument string with whitespace, quotes, and escapes. */
-export function parsePluginCommandArguments(input: string): string[] {
+export function parsePluginCommandArguments(
+  input: string,
+  t: Messages
+): string[] {
   const args: string[] = [];
   let token = "";
   let tokenStarted = false;
@@ -21,7 +25,7 @@ export function parsePluginCommandArguments(input: string): string[] {
     if (char === "\\" && quote !== "'") {
       const next = input[index + 1];
       if (next === undefined)
-        throw new Error("Trailing escape in command arguments.");
+        throw new Error(t.desktop.pluginCommandInput.trailingEscape);
       token += next;
       tokenStarted = true;
       index += 1;
@@ -43,7 +47,11 @@ export function parsePluginCommandArguments(input: string): string[] {
   }
 
   if (quote !== null)
-    throw new Error(`Unclosed ${quote} quote in command arguments.`);
+    throw new Error(
+      formatString(t.desktop.pluginCommandInput.unclosedQuote, {
+        quote,
+      })
+    );
   push();
   return args;
 }
@@ -54,7 +62,8 @@ export function parsePluginCommandArguments(input: string): string[] {
  */
 export function parsePluginCommandInvocation(
   input: string,
-  command: CommandIdentity
+  command: CommandIdentity,
+  t: Messages
 ): string[] | null {
   const trimmed = input.trimStart();
   if (!trimmed) return [];
@@ -63,7 +72,7 @@ export function parsePluginCommandInvocation(
     if (!lower.startsWith(alias.toLocaleLowerCase())) continue;
     const boundary = trimmed[alias.length];
     if (boundary !== undefined && !/\s/.test(boundary)) continue;
-    return parsePluginCommandArguments(trimmed.slice(alias.length));
+    return parsePluginCommandArguments(trimmed.slice(alias.length), t);
   }
   return null;
 }

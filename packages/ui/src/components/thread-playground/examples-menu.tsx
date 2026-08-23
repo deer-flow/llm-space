@@ -1,6 +1,7 @@
 
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   DropdownMenu,
@@ -31,11 +32,12 @@ export function ExamplesMenu<T extends ExampleItem>({
   onSelect: (item: T) => void;
   align?: "start" | "end";
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm">
-          Examples
+          {t.playground.examples.menuLabel}
           <ChevronDown data-icon="inline-end" />
         </Button>
       </DropdownMenuTrigger>

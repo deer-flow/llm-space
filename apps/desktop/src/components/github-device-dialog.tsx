@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   Dialog,
@@ -22,6 +23,7 @@ import { GitHubIcon } from "@/components/github-icon";
  * pre-signed-in GitHub page, and pastes it — then we poll and close on success.
  */
 export function GithubDeviceDialog() {
+  const { t } = useI18n();
   const { state, signOut } = useGithubAuth();
   const { executeCommand } = useCommands();
   const [copied, setCopied] = useState(false);
@@ -59,10 +61,9 @@ export function GithubDeviceDialog() {
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : signOut())}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Sign in with GitHub</DialogTitle>
+          <DialogTitle>{t.desktop.githubDevice.title}</DialogTitle>
           <DialogDescription>
-            Copy this code, then authorize on the GitHub page we open. Paste the
-            code there and confirm.
+            {t.desktop.githubDevice.instructions}
           </DialogDescription>
         </DialogHeader>
 
@@ -71,7 +72,7 @@ export function GithubDeviceDialog() {
             type="button"
             onClick={handleCopyAndOpen}
             className="bg-muted/50 hover:bg-muted group flex items-center justify-center gap-3 rounded-lg border py-4 transition-colors"
-            aria-label="Copy code"
+            aria-label={t.desktop.githubDevice.copyCodeAria}
           >
             <span className="font-mono text-2xl font-semibold tracking-[0.3em]">
               {userCode}
@@ -85,24 +86,26 @@ export function GithubDeviceDialog() {
         ) : (
           <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-sm">
             <Loader2Icon className="size-4 animate-spin" />
-            Requesting a code from GitHub…
+            {t.desktop.githubDevice.requesting}
           </div>
         )}
 
         {opened ? (
           <p className="text-muted-foreground flex items-center justify-center gap-2 text-xs">
             <Loader2Icon className="size-3.5 animate-spin" />
-            Waiting for you to authorize on GitHub…
+            {t.desktop.githubDevice.waiting}
           </p>
         ) : null}
 
         <DialogFooter>
           <Button variant="ghost" onClick={signOut}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button onClick={handleCopyAndOpen} disabled={!userCode}>
             <GitHubIcon />
-            {opened ? "Open GitHub again" : "Copy code & open GitHub"}
+            {opened
+              ? t.desktop.githubDevice.openAgain
+              : t.desktop.githubDevice.copyAndOpen}
           </Button>
         </DialogFooter>
       </DialogContent>

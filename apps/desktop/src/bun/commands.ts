@@ -5,7 +5,8 @@ import { Utils, type BrowserWindow } from "electrobun/bun";
 
 import { COMMAND_META, type Command } from "../shared/commands";
 
-import { isChineseLocale } from "./app/locales";
+import { isChineseLocale, setAppLocale } from "./app/locales";
+import { setMenuLanguage } from "./app/menu";
 import { saveZoom } from "./app/window-state";
 import type { GitHubAuthManager } from "./auth";
 import {
@@ -66,6 +67,14 @@ export function executeCommandInBun(
     return;
   }
   switch (command.type) {
+    case "setLanguage": {
+      // The renderer persisted its own choice; mirror it to the bun-side
+      // surfaces. `setMenuLanguage` rebuilds the native menu in the new
+      // language.
+      setAppLocale(command.args.lang);
+      setMenuLanguage(command.args.lang);
+      return;
+    }
     case "zoomIn": {
       const zoom = clampZoom(window.getPageZoom() + ZOOM_STEP);
       window.setPageZoom(zoom);

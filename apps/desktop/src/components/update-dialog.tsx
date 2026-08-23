@@ -1,5 +1,6 @@
 "use client";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -82,7 +83,8 @@ function UpdateDialogBody({
   onRetry: () => void;
   onClose: () => void;
 }) {
-  const view = viewFor(status, { onRestart, onRetry, onClose });
+  const { t } = useI18n();
+  const view = viewFor(status, { onRestart, onRetry, onClose }, t);
   return (
     <div className="flex flex-col items-center px-6 pt-8 pb-6 text-center">
       <IconBadge tone={view.tone} icon={view.icon} spin={view.spin} />
@@ -114,7 +116,8 @@ function viewFor(
     onRestart,
     onRetry,
     onClose,
-  }: { onRestart: () => void; onRetry: () => void; onClose: () => void }
+  }: { onRestart: () => void; onRetry: () => void; onClose: () => void },
+  t: ReturnType<typeof useI18n>["t"]
 ): View {
   switch (status.state) {
     case "checking":
@@ -123,8 +126,8 @@ function viewFor(
         icon: Loader2Icon,
         spin: true,
         progress: true,
-        title: "Checking for updates",
-        description: "Contacting the update server…",
+        title: t.desktop.updateDialog.checkingTitle,
+        description: t.desktop.updateDialog.checkingDescription,
         actions: null,
       };
     case "downloading":
@@ -134,14 +137,21 @@ function viewFor(
         spin: true,
         progress: true,
         progressValue: status.progress,
-        title: "Downloading update",
+        title: t.desktop.updateDialog.downloadingTitle,
         description:
           status.progress === undefined
-            ? `Getting version ${status.version} ready to install…`
-            : `Getting version ${status.version} ready to install… ${Math.round(status.progress)}%`,
+            ? formatString(t.desktop.updateDialog.gettingReady, {
+                version: status.version,
+              })
+            : formatString(t.desktop.updateDialog.gettingReady, {
+                version: status.version,
+              }) +
+              formatString(t.desktop.updateDialog.progress, {
+                progress: Math.round(status.progress),
+              }),
         actions: (
           <Button size="sm" variant="outline" onClick={onClose}>
-            Continue in background
+            {t.desktop.updateDialog.continueInBackground}
           </Button>
         ),
       };
@@ -149,11 +159,14 @@ function viewFor(
       return {
         tone: "success",
         icon: CheckIcon,
-        title: "You're all set!",
-        description: `You're already running the latest version — v${status.version}.`,
+        title: t.desktop.updateDialog.upToDateTitle,
+        description: formatString(
+          t.desktop.updateDialog.upToDateDescription,
+          { version: status.version }
+        ),
         actions: (
           <Button size="sm" onClick={onClose}>
-            Gotcha
+            {t.desktop.updateDialog.gotcha}
           </Button>
         ),
       };
@@ -161,15 +174,17 @@ function viewFor(
       return {
         tone: "primary",
         icon: DownloadIcon,
-        title: "Update ready",
-        description: `Version ${status.version} has been downloaded and is ready to install. Restarting takes just a moment.`,
+        title: t.desktop.updateDialog.readyTitle,
+        description: formatString(t.desktop.updateDialog.readyDescription, {
+          version: status.version,
+        }),
         actions: (
           <>
             <Button size="sm" variant="outline" onClick={onClose}>
-              Later
+              {t.common.later}
             </Button>
             <Button size="sm" onClick={onRestart}>
-              Restart now
+              {t.desktop.updateDialog.restartNow}
             </Button>
           </>
         ),
@@ -178,15 +193,15 @@ function viewFor(
       return {
         tone: "danger",
         icon: TriangleAlertIcon,
-        title: "Update check failed",
+        title: t.desktop.updateDialog.checkFailedTitle,
         description: status.message,
         actions: (
           <>
             <Button size="sm" variant="outline" onClick={onClose}>
-              Close
+              {t.common.close}
             </Button>
             <Button size="sm" onClick={onRetry}>
-              Try again
+              {t.common.tryAgain}
             </Button>
           </>
         ),

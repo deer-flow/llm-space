@@ -3,6 +3,7 @@
 import { MoreHorizontal } from "lucide-react";
 import { memo, useState } from "react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ function _ToolImportSidebarActions({
   onDisableAll: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <>
@@ -40,7 +42,7 @@ function _ToolImportSidebarActions({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Tool actions"
+            aria-label={t.playground.tools.toolActions}
             className={cn(
               "hover:bg-accent-foreground/10 text-muted-foreground hover:text-foreground relative z-10 hidden size-5 shrink-0 items-center justify-center rounded outline-none group-hover/row:flex data-[state=open]:flex",
               open && "text-foreground flex"
@@ -52,10 +54,10 @@ function _ToolImportSidebarActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
           <DropdownMenuItem onSelect={onEnableAll}>
-            Enable all tools
+            {t.playground.tools.enableAllTools}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onDisableAll}>
-            Disable all tools
+            {t.playground.tools.disableAllTools}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

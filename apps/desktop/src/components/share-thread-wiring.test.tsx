@@ -1,11 +1,16 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, mock, test } from "bun:test";
 
-import { isValidElement } from "react";
+import { I18nProvider } from "@llm-space/ui/lib/i18n";
+import { act } from "react";
+import type { ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+
 
 import { createDesktopShareThreadAction } from "@/host/share-thread-action";
 import type { Command } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 import { buildShareThreadCommand } from "@/shared/share";
+import { installReactTestDom } from "@/test/react-test-dom";
 
 import { ShareThreadMenuItem as FileTreeShareThreadMenuItem } from "./file-system-tree-view/share-thread-menu-item";
 import { createShareThreadCommandHandler } from "./share-thread-command-handler";
@@ -16,12 +21,29 @@ import {
 } from "./share-thread-dialog-flow";
 import { ShareThreadMenuItem as ThreadTabShareThreadMenuItem } from "./thread-tabs/share-thread-menu-item";
 
-function _select(element: unknown): void {
-  if (!isValidElement<{ onSelect: () => void }>(element)) {
-    throw new Error("Expected a share menu item element");
-  }
-  element.props.onSelect();
+const TEST_DOM = installReactTestDom();
+
+// The share menu items render shadcn dropdown/context primitives, which need a
+// real DOM; map them to plain buttons so this wiring test can click them.
+function _MenuItem({
+  children,
+  onSelect,
+}: {
+  children?: ReactNode;
+  onSelect?: () => void;
+}) {
+  return (
+    <button type="button" role="menuitem" onClick={() => onSelect?.()}>
+      {children}
+    </button>
+  );
 }
+await mock.module("@llm-space/ui/ui/dropdown-menu", () => ({
+  DropdownMenuItem: _MenuItem,
+}));
+await mock.module("@llm-space/ui/ui/context-menu", () => ({
+  ContextMenuItem: _MenuItem,
+}));
 
 function _wiringHarness(input?: {
   workspaceRuntimeId?: RuntimeId;
@@ -53,6 +75,27 @@ function _wiringHarness(input?: {
   return { flow, opened, transactions, pageHandler, executeCommand };
 }
 
+async function _clickShareItem(
+  render: (executeCommand: (command: Command) => void) => ReactNode,
+  executeCommand: (command: Command) => void
+): Promise<void> {
+  const container = TEST_DOM.document.createElement("div");
+  TEST_DOM.document.body.appendChild(container);
+  const root: Root = createRoot(container as unknown as Element);
+  await act(async () => {
+    root.render(
+      <I18nProvider initialLang="en">{render(executeCommand)}</I18nProvider>
+    );
+  });
+  const item = TEST_DOM.document.body
+    .querySelectorAll("[role=menuitem]")
+    .find((candidate) => candidate.textContent?.includes("Share"));
+  if (!item) throw new Error("Expected a share menu item element");
+  await act(async () => item.click());
+  root.unmount();
+  container.remove();
+}
+
 describe("real share consumer wiring", () => {
   test("DesktopHost action reaches Page and snapshots the same Dialog target", () => {
     const harness = _wiringHarness({
@@ -81,24 +124,31 @@ describe("real share consumer wiring", () => {
     });
   });
 
-  test("file-tree and tab specific consumers preserve their remote owners", () => {
+  test("file-tree and tab specific consumers preserve their remote owners", async () => {
     const treeHarness = _wiringHarness();
-    _select(
-      FileTreeShareThreadMenuItem({
-        path: "threads/tree.json",
-        runtimeId: "remote:tree",
-        executeCommand: treeHarness.executeCommand,
-      })
+    await _clickShareItem(
+      (executeCommand) => (
+        <FileTreeShareThreadMenuItem
+          path="threads/tree.json"
+          runtimeId="remote:tree"
+          executeCommand={executeCommand}
+        />
+      ),
+      treeHarness.executeCommand
     );
 
     const tabHarness = _wiringHarness();
-    _select(
-      ThreadTabShareThreadMenuItem({
-        path: "threads/tab.json",
-        runtimeId: "remote:tab",
-        onShare: (path, runtimeId) =>
-          tabHarness.executeCommand(buildShareThreadCommand(path, runtimeId)),
-      })
+    await _clickShareItem(
+      (executeCommand) => (
+        <ThreadTabShareThreadMenuItem
+          path="threads/tab.json"
+          runtimeId="remote:tab"
+          onShare={(path, runtimeId) =>
+            executeCommand(buildShareThreadCommand(path, runtimeId))
+          }
+        />
+      ),
+      tabHarness.executeCommand
     );
 
     expect(treeHarness.transactions[0]).toMatchObject({
@@ -148,4 +198,10 @@ describe("real share consumer wiring", () => {
       runtimeId: "remote:workspace",
     });
   });
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  TEST_DOM.restore();
+  mock.restore();
 });

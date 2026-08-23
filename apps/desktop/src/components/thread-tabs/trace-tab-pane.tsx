@@ -3,6 +3,7 @@
 import type { Thread } from "@llm-space/core";
 import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -49,6 +50,7 @@ function _TraceTabPane({
   onClose,
   onRenameTitle,
 }: TraceTabPaneProps) {
+  const { t } = useI18n();
   const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
   const rpcTransport = createRpcTransport(runtimeId);
   const qc = useQueryClient();
@@ -65,12 +67,14 @@ function _TraceTabPane({
     if (!isError) {
       return;
     }
-    toast.error("Error", {
+    toast.error(t.common.error, {
       description:
-        error instanceof Error ? error.message : "Trace workbench not found",
+        error instanceof Error
+          ? error.message
+          : t.desktop.traceTabPane.notFound,
     });
     onClose?.(tabId);
-  }, [error, isError, onClose, tabId]);
+  }, [error, isError, onClose, t, tabId]);
 
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [persistenceOwner] = useState<object>(() => ({}));
@@ -88,16 +92,24 @@ function _TraceTabPane({
               busy
             ),
           onWriteError: (writeError) => {
-            toast.error("Failed to save trace workbench; retrying", {
+            toast.error(t.desktop.traceTabPane.saveRetrying, {
               description:
                 writeError instanceof Error
                   ? writeError.message
-                  : "Storage is temporarily unavailable.",
+                  : t.desktop.traceTabPane.storageUnavailable,
             });
           },
         }
       ),
-    [lifecycleHost, persistenceOwner, projectId, runtimeId, tabId, traceKey]
+    [
+      lifecycleHost,
+      persistenceOwner,
+      projectId,
+      runtimeId,
+      t,
+      tabId,
+      traceKey,
+    ]
   );
 
   const flushPending = useCallback(async () => {
@@ -135,13 +147,13 @@ function _TraceTabPane({
       void settleStreamingPane(flushPending, () => {
         lifecycleHost.onRunSettled(tabId, runId);
       }).catch((error) => {
-        toast.error("Failed to save completed run", {
+        toast.error(t.desktop.traceTabPane.saveRunFailed, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       });
     },
-    [flushPending, lifecycleHost, tabId]
+    [flushPending, lifecycleHost, t, tabId]
   );
 
   const handleRenameTitle = useCallback(
@@ -200,9 +212,11 @@ function _TraceTabPane({
         markCommitPending();
         setReloadKey((key) => key + 1);
       } catch (error) {
-        toast.error("Error", {
+        toast.error(t.common.error, {
           description:
-            error instanceof Error ? error.message : "Failed to refresh trace",
+            error instanceof Error
+              ? error.message
+              : t.desktop.traceTabPane.refreshFailed,
         });
         settleWithoutCommit();
       }
@@ -215,6 +229,7 @@ function _TraceTabPane({
     refreshNonce,
     runtimeId,
     settleWithoutCommit,
+    t,
     traceKey,
   ]);
 
@@ -245,7 +260,7 @@ function _TraceTabPane({
       onStreamingStart={handleStreamingStart}
       onStreamingEnd={handleStreamingEnd}
       onRenameTitle={handleRenameTitle}
-      validateTitle={_validateTraceTitle}
+      validateTitle={(value) => _validateTraceTitle(value, t)}
     />
   );
 }
@@ -253,15 +268,16 @@ function _TraceTabPane({
 export const TraceTabPane = memo(_TraceTabPane);
 
 function _TraceHeaderDetails({ trace }: { trace: TraceRecord }) {
+  const { t } = useI18n();
   const traceId = trace.source.traceId;
   const copyTraceId = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(traceId);
-      toast.success("Trace ID copied");
+      toast.success(t.desktop.traceTabPane.idCopied);
     } catch {
-      toast.error("Could not copy trace ID");
+      toast.error(t.desktop.traceTabPane.copyFailed);
     }
-  }, [traceId]);
+  }, [t, traceId]);
   return (
     <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[0.6875rem]">
       <span className="border-border bg-muted/60 text-foreground max-w-72 min-w-0 truncate rounded-full border px-2 py-0.5 font-mono text-[0.625rem]">
@@ -278,11 +294,11 @@ function _TraceHeaderDetails({ trace }: { trace: TraceRecord }) {
       >
         {traceId}
       </span>
-      <Tooltip content="Copy Trace ID">
+      <Tooltip content={t.desktop.traceTabPane.copyId}>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label="Copy trace ID"
+          aria-label={t.desktop.traceTabPane.copyId}
           onClick={copyTraceId}
         >
           <CopyIcon className="size-3" />
@@ -294,16 +310,23 @@ function _TraceHeaderDetails({ trace }: { trace: TraceRecord }) {
 
 const TraceHeaderDetails = memo(_TraceHeaderDetails);
 
-function _validateTraceTitle(value: string) {
+function _validateTraceTitle(
+  value: string,
+  t: ReturnType<typeof useI18n>["t"]
+) {
   const title = value.trim();
   if (!title) {
-    return { valid: false, value: title, error: "Trace title is required." };
+    return {
+      valid: false,
+      value: title,
+      error: t.desktop.traceTabPane.titleRequired,
+    };
   }
   if ([...title].some((char) => char.charCodeAt(0) < 32)) {
     return {
       valid: false,
       value: title,
-      error: "Trace title contains a control character.",
+      error: t.desktop.traceTabPane.titleControlCharacter,
     };
   }
   return { valid: true, value: title };

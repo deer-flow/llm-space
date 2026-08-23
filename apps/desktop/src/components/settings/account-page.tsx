@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   ArrowRightIcon,
@@ -28,12 +29,13 @@ import type { GithubUser } from "@/shared/auth";
 import { SettingsPage } from "./settings-page";
 
 export function AccountPage() {
+  const { t } = useI18n();
   const { state, signIn, signOut } = useGithubAuth();
 
   return (
     <SettingsPage
-      title="Account"
-      description="Publish polished, shareable versions of your threads with GitHub."
+      title={t.settings.account.title}
+      description={t.settings.account.description}
       className="overflow-y-auto"
     >
       {state.status === "signedIn" ? (
@@ -46,14 +48,14 @@ export function AccountPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <h3 className="font-heading text-base font-medium">
-                Waiting for GitHub
+                {t.settings.account.waitingForGithub}
               </h3>
               <p className="text-muted-foreground text-sm">
-                Finish authorization in your browser to connect LLM Space.
+                {t.settings.account.finishAuthorization}
               </p>
             </div>
             <Button variant="outline" onClick={signOut}>
-              Cancel sign-in
+              {t.settings.account.cancelSignIn}
             </Button>
           </div>
         </div>
@@ -73,6 +75,7 @@ function _AccountOverview({
   onSignIn?: () => void;
   onSignOut?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-4 pb-2">
       <section className="bg-card relative isolate overflow-hidden rounded-2xl border px-7 py-7 shadow-sm">
@@ -96,16 +99,17 @@ function _AccountOverview({
               ) : (
                 <GitHubIcon className="size-3.5" />
               )}
-              {user ? "Connected with GitHub" : "Publish with GitHub"}
+              {user
+                ? t.settings.account.connectedWithGithub
+                : t.settings.account.publishWithGithub}
             </div>
             <h3 className="font-heading max-w-lg text-3xl leading-[1.08] font-medium tracking-tight text-balance">
-              Share the thread,
+              {t.settings.account.shareTheThread}
               <br />
-              not a screenshot.
+              {t.settings.account.notAScreenshot}
             </h3>
             <p className="text-muted-foreground mt-4 max-w-lg text-sm leading-relaxed text-balance">
-              Turn any LLM Space thread into a read-only web page your team can
-              open, review, and bring back into their own workspace.
+              {t.settings.account.webPageDescription}
             </p>
             {user ? (
               <>
@@ -127,12 +131,12 @@ function _AccountOverview({
                     onClick={onSignOut}
                   >
                     <LogOut />
-                    Sign out
+                    {t.common.signOut}
                   </Button>
                 </div>
                 <p className="text-muted-foreground mt-2.5 flex items-center gap-1.5 text-[11px]">
                   <CheckCircle2Icon className="size-3 text-emerald-500" />
-                  Ready to share from any thread.
+                  {t.settings.account.readyToShare}
                 </p>
               </>
             ) : (
@@ -143,11 +147,11 @@ function _AccountOverview({
                   onClick={onSignIn}
                 >
                   <GitHubIcon />
-                  Sign in with GitHub
+                  {t.settings.account.signInWithGithub}
                   <ArrowRightIcon />
                 </Button>
                 <p className="text-muted-foreground mt-2.5 text-[11px]">
-                  Secure device sign-in. LLM Space never sees your password.
+                  {t.settings.account.secureSignIn}
                 </p>
               </>
             )}
@@ -160,18 +164,20 @@ function _AccountOverview({
       <div className="grid gap-3 sm:grid-cols-3">
         <_Benefit
           icon={Globe2Icon}
-          title="Open anywhere"
-          description="Recipients only need the link—no GitHub account required."
+          title={t.settings.account.benefits.openAnywhere.title}
+          description={t.settings.account.benefits.openAnywhere.description}
         />
         <_Benefit
           icon={ImportIcon}
-          title="Bring it back"
-          description="Import the full thread into LLM Space with one click."
+          title={t.settings.account.benefits.bringItBack.title}
+          description={t.settings.account.benefits.bringItBack.description}
         />
         <_Benefit
           icon={LockKeyholeIcon}
-          title="Unlisted by default"
-          description="Shared as a secret Gist, outside public search."
+          title={t.settings.account.benefits.unlistedByDefault.title}
+          description={
+            t.settings.account.benefits.unlistedByDefault.description
+          }
         />
       </div>
 
@@ -179,10 +185,9 @@ function _AccountOverview({
         <ShieldCheckIcon className="text-foreground mt-0.5 size-4 shrink-0" />
         <p>
           <span className="text-foreground font-medium">
-            You decide what leaves your machine.
+            {t.settings.account.youDecide}
           </span>{" "}
-          Nothing is published until you choose Share. Secret links are
-          unlisted, not private—avoid sharing sensitive threads.
+          {t.settings.account.youDecideHint}
         </p>
       </div>
     </div>
@@ -190,6 +195,7 @@ function _AccountOverview({
 }
 
 function _ShareActionPreview() {
+  const { t } = useI18n();
   return (
     <div className="relative mx-auto w-full max-w-60 pt-14 pb-3">
       <div className="bg-background relative rounded-xl border shadow-xl shadow-black/15">
@@ -203,7 +209,7 @@ function _ShareActionPreview() {
             </div>
             <div className="bg-accent text-foreground ring-primary/40 relative flex size-9 scale-110 items-center justify-center rounded-lg shadow-md ring-1">
               <div className="bg-popover text-popover-foreground absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-medium shadow-lg">
-                Share thread
+                {t.settings.account.shareThreadChip}
                 <span className="bg-popover absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 border-r border-b" />
               </div>
               <span className="bg-primary/20 absolute inset-0 animate-pulse rounded-lg" />
@@ -215,14 +221,14 @@ function _ShareActionPreview() {
           </div>
           <div className="bg-primary text-primary-foreground flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm">
             <PlayIcon className="size-3.5 fill-current" />
-            Run
+            {t.settings.account.runChip}
             <ChevronDownIcon className="size-3.5" />
           </div>
         </div>
       </div>
 
       <p className="text-muted-foreground mt-3 text-center text-[10px]">
-        Look in the top-right corner of any thread.
+        {t.settings.account.lookInTopRight}
       </p>
     </div>
   );

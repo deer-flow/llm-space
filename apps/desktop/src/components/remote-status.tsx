@@ -1,5 +1,6 @@
 "use client";
 
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { Button } from "@llm-space/ui/ui/button";
 import { Server, Unplug } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -28,6 +29,7 @@ export function RemoteStatus({
   onDisconnecting?: (runtimeId: RuntimeId) => void;
   onDisconnected: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [server, setServer] = useState<RemoteServerView | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -84,9 +86,11 @@ export function RemoteStatus({
       },
       afterAction: () => onDisconnected(runtimeId),
       onError: (error) =>
-        toast.error("Failed to disconnect remote", {
+        toast.error(t.desktop.remoteStatus.failedToDisconnect, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error
+              ? error.message
+              : t.common.pleaseTryAgain,
         }),
     });
   };
@@ -98,7 +102,9 @@ export function RemoteStatus({
           <Server className="text-primary size-4 shrink-0" />
           <div className="min-w-0 grow">
             <div className="truncate text-sm font-medium">
-              Remote: {server.name}
+              {formatString(t.desktop.remoteStatus.label, {
+                name: server.name,
+              })}
             </div>
             <div className="text-muted-foreground truncate text-xs">
               {server.user ? `${server.user}@` : ""}
@@ -114,7 +120,7 @@ export function RemoteStatus({
           onClick={() => void disconnect()}
         >
           <Unplug className="size-3.5" />
-          Disconnect
+          {t.desktop.remoteStatus.disconnect}
         </Button>
       </div>
     </div>

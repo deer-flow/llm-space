@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
+import { I18nProvider } from "@llm-space/ui/lib/i18n";
 import {
   act,
   forwardRef,
@@ -11,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
+
 
 import type { CommandHandlers } from "@/commands";
 import type { RuntimeId } from "@/shared/runtime";
@@ -373,9 +375,11 @@ function _CommandShareTrigger({
 
 function _Providers({ children }: { children: ReactElement }) {
   return (
-    <ThemeProvider>
-      <TooltipProvider>{children}</TooltipProvider>
-    </ThemeProvider>
+    <I18nProvider initialLang="en">
+      <ThemeProvider>
+        <TooltipProvider>{children}</TooltipProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }
 
@@ -436,11 +440,13 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     }
 
     const tree = await _mount(
-      <CommandProvider>
-        <GithubAuthProvider>
-          <SpeculativeDialogHarness />
-        </GithubAuthProvider>
-      </CommandProvider>
+      <I18nProvider initialLang="en">
+        <CommandProvider>
+          <GithubAuthProvider>
+            <SpeculativeDialogHarness />
+          </GithubAuthProvider>
+        </CommandProvider>
+      </I18nProvider>
     );
     const generate = await _findButtonByText("Generate link");
     await act(async () => generate.click());
@@ -481,19 +487,21 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
   test("NodeActions sends the selected file runtime through CommandProvider", async () => {
     const received: unknown[] = [];
     const tree = await _mount(
-      <CommandProvider>
-        <_ShareCommandRegistrar
-          onShare={(args) => {
-            received.push(args);
-          }}
-        />
-        <NodeActions
-          node={{ name: "tree.json", path: "threads/tree.json", type: "file" }}
-          runtimeId="remote:tree"
-          menuOpen
-          onMenuOpenChange={() => undefined}
-        />
-      </CommandProvider>
+      <I18nProvider initialLang="en">
+        <CommandProvider>
+          <_ShareCommandRegistrar
+            onShare={(args) => {
+              received.push(args);
+            }}
+          />
+          <NodeActions
+            node={{ name: "tree.json", path: "threads/tree.json", type: "file" }}
+            runtimeId="remote:tree"
+            menuOpen
+            onMenuOpenChange={() => undefined}
+          />
+        </CommandProvider>
+      </I18nProvider>
     );
 
     await act(async () => _findByText("Share...").click());

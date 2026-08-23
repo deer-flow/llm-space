@@ -3,6 +3,7 @@ import { PencilIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import {
   validateThreadFileStem,
   type FileStemValidationResult,
@@ -26,6 +27,7 @@ function _TitleEditor({
   onRename?: (title: string) => Promise<boolean>;
   validateTitle?: TitleValidator;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ function _TitleEditor({
   const commitEditing = useCallback(async () => {
     const result = validateTitle(draftTitle);
     if (!result.valid) {
-      setError(result.error ?? "Invalid file name.");
+      setError(result.error ?? t.playground.misc.invalidFileName);
       focusInput();
       return;
     }
@@ -72,7 +74,7 @@ function _TitleEditor({
     } finally {
       setCommitting(false);
     }
-  }, [draftTitle, focusInput, onRename, title, validateTitle]);
+  }, [draftTitle, focusInput, onRename, t, title, validateTitle]);
 
   const cancelEditing = useCallback(() => {
     cancelledRef.current = true;
@@ -101,13 +103,13 @@ function _TitleEditor({
         <Input
           ref={inputRef}
           autoFocus
-          aria-label="Thread title"
+          aria-label={t.playground.misc.threadTitle}
           aria-invalid={!validation.valid || !!error}
           aria-describedby="thread-title-error"
           className="h-8 border-transparent bg-transparent! text-sm font-medium shadow-none focus-visible:ring-0"
           readOnly={committing}
           value={draftTitle}
-          placeholder="untitled"
+          placeholder={t.playground.misc.untitled}
           onBlur={handleBlur}
           onChange={(event) => {
             setDraftTitle(event.target.value);
@@ -145,7 +147,7 @@ function _TitleEditor({
         className="min-w-0 truncate text-sm font-medium"
         role="button"
         tabIndex={0}
-        aria-label="Edit thread title"
+        aria-label={t.playground.misc.editThreadTitle}
         onClick={startEditing}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -154,20 +156,22 @@ function _TitleEditor({
           }
         }}
       >
-        <Tooltip content="Click to edit title">
+        <Tooltip content={t.playground.misc.clickToEditTitle}>
           {title ? (
             <span>{title}</span>
           ) : (
-            <span className="text-muted-foreground">untitled</span>
+            <span className="text-muted-foreground">
+              {t.playground.misc.untitled}
+            </span>
           )}
         </Tooltip>
       </div>
       <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
-        <Tooltip content="Edit title">
+        <Tooltip content={t.playground.misc.editTitle}>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="Edit thread title"
+            aria-label={t.playground.misc.editThreadTitle}
             onClick={startEditing}
           >
             <PencilIcon className="size-3" />

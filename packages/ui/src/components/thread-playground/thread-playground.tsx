@@ -41,6 +41,7 @@ import {
   createShareThreadAction,
   useHostServices,
 } from "@llm-space/ui/host";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -266,6 +267,7 @@ function ThreadPlaygroundContent({
   "initialValue" | "onChange" | "onStreamingStart" | "onStreamingEnd"
 >) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
   const status = useThreadStore((s) => s.status);
   const savedModel = useThreadStore((s) => s.thread.model);
   const fallbackModel = useFirstAvailableModel();
@@ -371,22 +373,22 @@ function ThreadPlaygroundContent({
                 readonlyFromProps && "hidden"
               )}
             >
-              <Tooltip content="Undo last edit">
+              <Tooltip content={t.playground.header.undoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Undo last edit"
+                  aria-label={t.playground.header.undoLastEdit}
                   disabled={readonly || !undoable}
                   onClick={undo}
                 >
                   <Undo2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Redo last edit">
+              <Tooltip content={t.playground.header.redoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Redo last edit"
+                  aria-label={t.playground.header.redoLastEdit}
                   disabled={readonly || !redoable}
                   onClick={redo}
                 >
@@ -394,12 +396,12 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
               <DropdownMenu>
-                <Tooltip content="More actions">
+                <Tooltip content={t.playground.header.moreActions}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label="More actions"
+                      aria-label={t.playground.header.moreActions}
                     >
                       <EllipsisIcon className="size-4" />
                     </Button>
@@ -411,23 +413,27 @@ function ThreadPlaygroundContent({
                     onSelect={toggleHistory}
                   >
                     <HistoryIcon />
-                    {historyOpen ? "Hide Run History" : "View Run History"}
+                    {historyOpen
+                      ? t.playground.header.hideRunHistory
+                      : t.playground.header.viewRunHistory}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !canCompact}
                     onSelect={() => setCompactDialogOpen(true)}
                   >
                     <FileArchiveIcon />
-                    Compact Conversation
+                    {t.playground.header.compactConversation}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !hasModel || !generator}
                     onSelect={() => setGenerateProjectOpen(true)}
                   >
                     <SparklesIcon />
-                    <span className="flex-1">Generate Project</span>
+                    <span className="flex-1">
+                      {t.playground.header.generateProject}
+                    </span>
                     <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-                      Beta
+                      {t.playground.header.beta}
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -440,7 +446,7 @@ function ThreadPlaygroundContent({
                     }
                   >
                     <Share2Icon />
-                    Share Thread
+                    {t.playground.header.shareThread}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -469,10 +475,10 @@ function ThreadPlaygroundContent({
                   content={
                     <div>
                       {status === "running"
-                        ? "Stop running"
+                        ? t.playground.header.stopRunning
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run this thread"}
+                          ? t.playground.header.preparingThread
+                          : t.playground.header.runThisThread}
                     </div>
                   }
                 >
@@ -480,10 +486,10 @@ function ThreadPlaygroundContent({
                     className="border-r-primary border-none pr-1 pl-4 active:translate-y-0!"
                     aria-label={
                       status === "running"
-                        ? "Stop running thread"
+                        ? t.playground.header.stopRunningThread
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run thread"
+                          ? t.playground.header.preparingThread
+                          : t.playground.header.runThread
                     }
                     disabled={
                       readonlyFromProps ||
@@ -498,10 +504,10 @@ function ThreadPlaygroundContent({
                       <PlayIcon className="size-3" />
                     )}
                     {status === "running"
-                      ? "Stop"
+                      ? t.playground.header.stop
                       : status === "preparing"
-                        ? "Preparing"
-                        : "Run"}
+                        ? t.playground.header.preparing
+                        : t.playground.header.run}
                   </Button>
                 </Tooltip>
                 <DropdownMenu>
@@ -511,7 +517,7 @@ function ThreadPlaygroundContent({
                         "border-none pr-1.5 pl-0.5 active:translate-y-0!",
                         status === "running" && "disabled:opacity-100"
                       )}
-                      aria-label="Run settings"
+                      aria-label={t.playground.header.runSettings}
                       disabled={
                         readonlyFromProps || status !== "idle" || !hasModel
                       }
@@ -520,7 +526,9 @@ function ThreadPlaygroundContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-56">
-                    <DropdownMenuLabel>Run settings</DropdownMenuLabel>
+                    <DropdownMenuLabel>
+                      {t.playground.header.runSettings}
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -529,7 +537,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Enable ReAct loop
+                      {t.playground.header.enableReactLoop}
                       <Switch
                         size="sm"
                         checked={reactLoop}
@@ -547,7 +555,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Auto run tools
+                      {t.playground.header.autoRunTools}
                       <Switch
                         size="sm"
                         checked={effectiveAutoRunTools}
@@ -570,7 +578,7 @@ function ThreadPlaygroundContent({
                 <div className="px-3">
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Models
+                      {t.playground.header.sidebar.models}
                     </div>
                     <div className="flex grow items-center">
                       <ModelConfigEditor readonly={readonly} />
@@ -578,7 +586,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Tools
+                      {t.playground.header.sidebar.tools}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">
@@ -587,7 +595,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Variables
+                      {t.playground.header.sidebar.variables}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">

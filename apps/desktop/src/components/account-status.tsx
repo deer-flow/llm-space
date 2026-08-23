@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,28 +35,30 @@ export function AccountStatus() {
 }
 
 function SignedOut({ onSignIn }: { onSignIn: () => void }) {
+  const { t } = useI18n();
   return (
-    <Tooltip content="Sign in to share your threads on the web via GitHub Gist.">
+    <Tooltip content={t.desktop.accountStatus.signInTooltip}>
       <button
         type="button"
         onClick={onSignIn}
         className="hover:bg-accent hover:text-accent-foreground text-muted-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
       >
         <GitHubIcon className="size-4 shrink-0" />
-        <span className="truncate">Sign in to GitHub</span>
+        <span className="truncate">{t.desktop.accountStatus.signIn}</span>
       </button>
     </Tooltip>
   );
 }
 
 function SigningIn({ onCancel }: { onCancel: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="text-muted-foreground flex w-full items-center gap-2 px-2 py-1.5 text-sm">
       <Loader2Icon className="size-4 shrink-0 animate-spin" />
-      <span className="truncate">Signing in…</span>
+      <span className="truncate">{t.desktop.accountStatus.signingIn}</span>
       <button
         type="button"
-        aria-label="Cancel sign-in"
+        aria-label={t.desktop.accountStatus.cancelSignInAria}
         onClick={onCancel}
         className="hover:bg-accent hover:text-foreground ml-auto flex size-6 shrink-0 items-center justify-center rounded-md transition-colors"
       >
@@ -73,6 +76,7 @@ function SignedIn({
   onSignOut: () => void;
 }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -92,12 +96,12 @@ function SignedIn({
           }
         >
           <GitHubIcon />
-          Open GitHub Profile
+          {t.desktop.accountStatus.openProfile}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={onSignOut}>
           <LogOut />
-          Sign out
+          {t.common.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

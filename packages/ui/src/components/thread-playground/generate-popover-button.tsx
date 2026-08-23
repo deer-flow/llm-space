@@ -5,6 +5,7 @@ import { SparklesIcon, WandSparkles } from "lucide-react";
 import { type KeyboardEvent, memo, useCallback, useState } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@llm-space/ui/ui/popover";
@@ -20,9 +21,10 @@ interface GeneratePopoverButtonProps {
 function _GeneratePopoverButton({
   className,
   iconOnly = false,
-  placeholder = "Describe what your function does (or paste your code), and we'll generate a definition.",
+  placeholder,
   onGenerate,
 }: GeneratePopoverButtonProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
 
@@ -53,18 +55,18 @@ function _GeneratePopoverButton({
       className={className}
       variant="ghost"
       size={iconOnly ? "icon" : "sm"}
-      aria-label="Generate"
+      aria-label={t.playground.codegen.generate}
       aria-expanded={open}
     >
       <WandSparkles data-icon={iconOnly ? undefined : "inline-start"} />
-      {iconOnly ? null : "Generate"}
+      {iconOnly ? null : t.playground.codegen.generate}
     </Button>
   );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       {iconOnly ? (
-        <Tooltip content="Generate">
+        <Tooltip content={t.playground.codegen.generate}>
           <PopoverTrigger asChild>{button}</PopoverTrigger>
         </Tooltip>
       ) : (
@@ -81,7 +83,9 @@ function _GeneratePopoverButton({
         <Textarea
           className="min-h-0 flex-1 border-0! bg-transparent! font-mono text-sm leading-relaxed shadow-none focus-visible:ring-0 md:text-base"
           value={prompt}
-          placeholder={placeholder}
+          placeholder={
+            placeholder ?? t.playground.codegen.generateDefaultPlaceholder
+          }
           autoFocus
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -93,7 +97,7 @@ function _GeneratePopoverButton({
             onClick={handleGenerate}
           >
             <SparklesIcon />
-            Generate
+            {t.playground.codegen.generate}
           </Button>
         </div>
       </PopoverContent>

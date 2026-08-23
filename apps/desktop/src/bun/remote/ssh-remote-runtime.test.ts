@@ -2,10 +2,16 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import { REMOTE_RUNTIME_PROTOCOL_VERSION } from "@llm-space/runtime/remote-protocol";
 
+import { setAppLocale } from "../app/locales";
+
 import type { ManagedProcess } from "./process-utils";
 import { currentDesktopVersion } from "./server-package";
 import type { SshRemoteRuntimeConfig } from "./ssh-bootstrap-config";
 import { startSshRemoteRuntime } from "./ssh-remote-runtime";
+
+// Bootstrap-error assertions below assume English; pin the locale so the tests
+// are deterministic regardless of the OS display language.
+setAppLocale("en");
 
 let scenario:
   "missing-runtime-binary" | "non-runtime-failure" | "port-in-use" | "success";

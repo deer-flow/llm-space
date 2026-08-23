@@ -1,9 +1,17 @@
-import { describe, expect, mock, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 const NATIVE_OPENED_URLS: string[] = [];
 
+/** Menus rebuilt by `setMenuLanguage` (via `ApplicationMenu.setApplicationMenu`). */
+const MENU_REBUILD_COUNT = { count: 0 };
+
 await mock.module("electrobun/bun", () => ({
   app: { on: () => undefined },
+  ApplicationMenu: {
+    setApplicationMenu: () => {
+      MENU_REBUILD_COUNT.count += 1;
+    },
+  },
   Utils: {
     clipboardReadText: () => "",
     openExternal: (url: string) => NATIVE_OPENED_URLS.push(url),
@@ -14,6 +22,8 @@ await mock.module("electrobun/bun", () => ({
 }));
 
 const { executeCommandInBun } = await import("./commands");
+const { isChineseLocale, setAppLocale } = await import("./app/locales");
+const { preselectMenuLanguage } = await import("./app/menu");
 
 function _createDependencies(openedUrls: string[]) {
   return {
@@ -72,5 +82,48 @@ describe("executeCommandInBun openLink", () => {
     } finally {
       error.mockRestore();
     }
+  });
+});
+
+describe("executeCommandInBun setLanguage", () => {
+  beforeEach(() => {
+    // The menu module seeds `_menuLang` from the OS locale at load time, so on
+    // a zh_CN machine it starts as "zh" and `setMenuLanguage("zh")` would
+    // early-return without rebuilding. Reset both pieces of module state so
+    // these tests behave the same on any machine.
+    setAppLocale("en");
+    preselectMenuLanguage("en");
+    MENU_REBUILD_COUNT.count = 0;
+  });
+
+  test("applies the locale and rebuilds the native menu", () => {
+    // `setLanguage` mirrors the renderer's persisted choice to bun-side
+    // surfaces: the effective locale and the native menu.
+    executeCommandInBun(
+      { type: "setLanguage", args: { lang: "zh" } },
+      {} as never,
+      _createDependencies([])
+    );
+
+    expect(isChineseLocale()).toBe(true);
+    expect(MENU_REBUILD_COUNT.count).toBe(1);
+  });
+
+  test("switching back to en clears the Chinese locale", () => {
+    executeCommandInBun(
+      { type: "setLanguage", args: { lang: "zh" } },
+      {} as never,
+      _createDependencies([])
+    );
+    expect(isChineseLocale()).toBe(true);
+    expect(MENU_REBUILD_COUNT.count).toBe(1);
+
+    executeCommandInBun(
+      { type: "setLanguage", args: { lang: "en" } },
+      {} as never,
+      _createDependencies([])
+    );
+    expect(isChineseLocale()).toBe(false);
+    expect(MENU_REBUILD_COUNT.count).toBe(2);
   });
 });

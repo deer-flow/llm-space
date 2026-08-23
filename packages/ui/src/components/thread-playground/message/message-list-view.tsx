@@ -30,6 +30,7 @@ import {
   useState,
 } from "react";
 
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
@@ -123,6 +124,7 @@ export function MessageListView({
   measurementsFrozen?: boolean;
 }) {
   const isSnapshotView = messagesFromProps !== undefined;
+  const { t } = useI18n();
   const status = useThreadStore((state) => state.status);
   const streamingMessageId = useThreadStore(
     (state) => state.streamingMessage?.id ?? null
@@ -532,7 +534,7 @@ export function MessageListView({
                 }
               >
                 <PlusIcon className="size-4" />
-                Add message
+                {t.playground.message.addMessage}
               </Button>
               {addMessageSuggested && !dragging && !readonly ? (
                 <>

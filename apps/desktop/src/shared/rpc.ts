@@ -766,6 +766,12 @@ export interface DesktopRPCType {
         params: Record<string, never>;
         response: null;
       };
+      // The OS display language (lowercase locale tag, e.g. `zh-cn`), for the
+      // renderer's first-run language resolution. Pure read.
+      getOsLocale: {
+        params: Record<string, never>;
+        response: { locale: string };
+      };
       // The next unseen one-time feature reminder (`null` once all are seen).
       // Pure read — recording is deferred to `featureReminderMarkSeen`, so this
       // is idempotent and can't burn a reminder that never actually showed.

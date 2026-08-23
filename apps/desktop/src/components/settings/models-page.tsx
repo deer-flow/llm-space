@@ -29,6 +29,7 @@ import {
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { ProviderAvatar } from "@llm-space/ui/components/thread-playground/provider-avatar";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -107,20 +108,12 @@ import { ImageModelEditorDialog } from "./image-model-editor-dialog";
 import { ModelEditorDialog } from "./model-editor-dialog";
 import { SettingsPage } from "./settings-page";
 
-/**
- * Base-URL guidance for the Anthropic Messages API. Its SDK appends `/v1/...`
- * to the base URL itself, so — unlike the OpenAI-style APIs, whose SDKs expect
- * the `/v1` to be part of the base URL — a `/v1` suffix here would double up
- * into `/v1/v1/...` on every request.
- */
-const ANTHROPIC_BASE_URL_HINT =
-  "The Anthropic SDK adds /v1 to the request path itself, so enter the URL without a /v1 suffix.";
-
 function sortProviders(providers: ModelProviderGroup[]): ModelProviderGroup[] {
   return [...providers].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function ModelsPage() {
+  const { t } = useI18n();
   const providers = useModels();
   const firstProviderId = useMemo(
     () => sortProviders(providers)[0]?.id ?? null,
@@ -166,8 +159,8 @@ export function ModelsPage() {
   return (
     <SettingsPage
       className="flex size-full min-h-0"
-      title="Models"
-      description="LLM Space supports various model providers and their custom models, from OpenAI, Anthropic and Google compatible to Codex."
+      title={t.settings.models.title}
+      description={t.settings.models.description}
     >
       <ProviderList
         providers={providers}
@@ -204,6 +197,7 @@ function ProviderList({
   onSelectProfile: (providerId: string, profileId: string) => void;
   onAdd: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [listRef] = useAutoAnimation<HTMLDivElement>();
 
@@ -218,15 +212,15 @@ function ProviderList({
   return (
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
       <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        PROVIDERS
+        {t.settings.models.providersHeading}
       </span>
 
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
         <Input
           className="h-8 pl-7"
-          aria-label="Search providers"
-          placeholder="Search providers"
+          aria-label={t.settings.models.searchProviders}
+          placeholder={t.settings.models.searchProviders}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -235,12 +229,13 @@ function ProviderList({
       <ScrollArea className="min-h-0 grow">
         {providers.length === 0 ? (
           <div className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">
-            No providers yet. Click the &quot;Add provider&quot; button below to
-            get started.
+            {t.settings.models.noProvidersYet}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">
-            No provider matches &quot;{query.trim()}&quot;.
+            {formatString(t.settings.models.noProviderMatches, {
+              query: query.trim(),
+            })}
           </div>
         ) : (
           <div ref={listRef} className="flex flex-col gap-1 pr-2">
@@ -291,6 +286,7 @@ const RECOMMENDED_PROVIDER_IDS = new Set([
  * checked.
  */
 function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
+  const { t } = useI18n();
   const configured = useModels();
   const addProvider = useAddProvider();
   const addCustomProvider = useAddCustomProvider();
@@ -337,12 +333,15 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
         label: (
           <div className="flex flex-col gap-2">
             <div className="text-foreground text-xs font-medium">
-              Discovered
+              {t.settings.models.addMenu.discovered}
             </div>
             <div className="flex gap-1 pl-1">
-              {discoveredCount}{" "}
-              {discoveredCount === 1 ? "provider" : "providers"} discovered in
-              your environment
+              {formatString(
+                discoveredCount === 1
+                  ? t.settings.models.addMenu.providersDiscovered.one
+                  : t.settings.models.addMenu.providersDiscovered.other,
+                { count: discoveredCount }
+              )}
             </div>
           </div>
         ),
@@ -352,30 +351,34 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
     if (recommended.length > 0) {
       groups.push({
         id: "recommended",
-        label: "Recommended",
+        label: t.settings.models.addMenu.recommended,
         items: recommended,
       });
     }
     if (rest.length > 0) {
-      groups.push({ id: "built-in", label: "Built-in", items: rest });
+      groups.push({
+        id: "built-in",
+        label: t.settings.models.addMenu.builtIn,
+        items: rest,
+      });
     }
     return groups;
-  }, [builtins, configuredIds]);
+  }, [builtins, configuredIds, t]);
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal>
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-full">
           <Plus />
-          Add provider
+          {t.settings.models.addProvider}
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="start" className="w-72 p-0">
         <Command>
-          <CommandInput placeholder="Search providers..." />
+          <CommandInput placeholder={t.settings.models.addMenu.searchPlaceholder} />
           <CommandList className="max-h-72">
-            <CommandEmpty>No providers found.</CommandEmpty>
-            <CommandGroup heading="Customized">
+            <CommandEmpty>{t.settings.models.addMenu.noProvidersFound}</CommandEmpty>
+            <CommandGroup heading={t.settings.models.addMenu.customized}>
               <CommandItem
                 value="Add custom provider"
                 onSelect={() => {
@@ -384,7 +387,9 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
                 }}
               >
                 <ProviderAvatar id="custom-provider" name="Custom provider" />
-                <span className="line-clamp-1 grow">Add custom provider</span>
+                <span className="line-clamp-1 grow">
+                  {t.settings.models.addMenu.addCustomProvider}
+                </span>
               </CommandItem>
             </CommandGroup>
             {groups.map((group) => (
@@ -411,7 +416,10 @@ function AddProviderMenu({ onAdd }: { onAdd: (id: string) => void }) {
                       {provider.websiteURL && (
                         <Link
                           href={provider.websiteURL}
-                          aria-label={`Open ${provider.name} website`}
+                          aria-label={formatString(
+                            t.settings.models.openWebsite,
+                            { name: provider.name }
+                          )}
                           className="text-muted-foreground/80 hover:text-foreground shrink-0"
                           onClick={(event) => event.stopPropagation()}
                           onMouseDown={(event) => event.stopPropagation()}
@@ -445,6 +453,7 @@ function ProviderListItem({
   onSelect: () => void;
   onSelectProfile: (profileId: string) => void;
 }) {
+  const { t } = useI18n();
   const removeProvider = useRemoveProvider();
   const addProviderProfile = useAddProviderProfile();
   const removeProviderProfile = useRemoveProviderProfile();
@@ -464,9 +473,9 @@ function ProviderListItem({
       setExpanded(true);
       onSelectProfile(profileId);
     } catch (error) {
-      toast.error("Failed to add connection profile", {
+      toast.error(t.settings.models.failedToAddProfile, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     }
   };
@@ -478,9 +487,9 @@ function ProviderListItem({
         onSelect();
       }
     } catch (error) {
-      toast.error("Failed to remove connection profile", {
+      toast.error(t.settings.models.failedToRemoveProfile, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     }
   };
@@ -498,7 +507,9 @@ function ProviderListItem({
       <div
         role="button"
         tabIndex={0}
-        aria-label={`Select ${provider.name} provider`}
+        aria-label={formatString(t.settings.models.selectProvider, {
+          name: provider.name,
+        })}
         aria-expanded={
           provider.profiles.length > 1 ? expanded : undefined
         }
@@ -523,7 +534,12 @@ function ProviderListItem({
         {provider.profiles.length > 1 ? (
           <button
             type="button"
-            aria-label={`${expanded ? "Collapse" : "Expand"} ${provider.name} profiles`}
+            aria-label={formatString(
+              expanded
+                ? t.settings.models.collapseProfiles
+                : t.settings.models.expandProfiles,
+              { name: provider.name }
+            )}
             className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded"
             onClick={(event) => {
               event.stopPropagation();
@@ -545,8 +561,12 @@ function ProviderListItem({
               <span
                 role="button"
                 tabIndex={0}
-                aria-label={`${provider.name} provider actions`}
-                title={`${provider.name} provider actions`}
+                aria-label={formatString(t.settings.models.providerActions, {
+                  name: provider.name,
+                })}
+                title={formatString(t.settings.models.providerActions, {
+                  name: provider.name,
+                })}
                 className={cn(
                   "text-muted-foreground hover:bg-accent hover:text-foreground ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded",
                   menuOpen
@@ -564,7 +584,7 @@ function ProviderListItem({
             >
               <DropdownMenuItem onSelect={() => void handleAddProfile()}>
                 <Plus />
-                Add connection profile
+                {t.settings.models.addConnectionProfile}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -572,13 +592,15 @@ function ProviderListItem({
                 onSelect={() => setConfirmOpen(true)}
               >
                 <Trash2 />
-                Remove {provider.name}
+                {formatString(t.settings.models.removeProvider, {
+                  name: provider.name,
+                })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
           <span className="text-muted-foreground ml-auto text-[10px] uppercase">
-            Plugin
+            {t.settings.models.pluginBadge}
           </span>
         )}
       </div>
@@ -612,7 +634,10 @@ function ProviderListItem({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      aria-label={`${profile.name} profile actions`}
+                      aria-label={formatString(
+                        t.settings.models.profileActions,
+                        { name: profile.name }
+                      )}
                       className="text-muted-foreground hover:text-foreground mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded opacity-0 hover:bg-accent group-hover/profile:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
                     >
                       <MoreHorizontal className="size-3.5" />
@@ -624,7 +649,9 @@ function ProviderListItem({
                       onSelect={() => setProfilePendingRemoval(profile)}
                     >
                       <Trash2 />
-                      Remove {profile.name}
+                      {formatString(t.settings.models.removeProvider, {
+                        name: profile.name,
+                      })}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -639,9 +666,14 @@ function ProviderListItem({
           <ConfirmDialog
             open={confirmOpen}
             onOpenChange={setConfirmOpen}
-            title={`Remove ${provider.name}?`}
-            description={`This removes ${provider.name} from your configured providers. You can add it back later.`}
-            confirmLabel="Remove"
+            title={formatString(t.settings.models.removeProviderTitle, {
+              name: provider.name,
+            })}
+            description={formatString(
+              t.settings.models.removeProviderDescription,
+              { name: provider.name }
+            )}
+            confirmLabel={t.common.remove}
             dimBackground={false}
             onConfirm={() => {
               setConfirmOpen(false);
@@ -653,9 +685,11 @@ function ProviderListItem({
             onOpenChange={(open) => {
               if (!open) setProfilePendingRemoval(null);
             }}
-            title={`Remove ${profilePendingRemoval?.name ?? "profile"}?`}
-            description="This removes the connection profile and its credentials. This action cannot be undone."
-            confirmLabel="Remove"
+            title={formatString(t.settings.models.removeProfileTitle, {
+              name: profilePendingRemoval?.name ?? "profile",
+            })}
+            description={t.settings.models.removeProfileDescription}
+            confirmLabel={t.common.remove}
             dimBackground={false}
             onConfirm={() => {
               if (profilePendingRemoval) {
@@ -679,6 +713,7 @@ function ProviderEditor({
   selectedProfileId: string | null;
   onSelectProfile: (profileId: string) => void;
 }) {
+  const { t } = useI18n();
   const updateProvider = useUpdateProvider();
   const addProviderProfile = useAddProviderProfile();
   const setModelEnabled = useSetModelEnabled();
@@ -740,9 +775,9 @@ function ProviderEditor({
     }
     void updateProvider(provider.id, { api }).catch((error) => {
       setApiValue(previous);
-      toast.error("Failed to update API type", {
+      toast.error(t.settings.models.failedToUpdateApiType, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     });
   };
@@ -765,9 +800,9 @@ function ProviderEditor({
       const profileId = await addProviderProfile(provider.id);
       onSelectProfile(profileId);
     } catch (error) {
-      toast.error("Failed to add custom profile", {
+      toast.error(t.settings.models.failedToAddCustomProfile, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setProfileCreating(false);
@@ -777,7 +812,7 @@ function ProviderEditor({
   if (!provider) {
     return (
       <div className="text-muted-foreground flex min-w-0 grow items-center justify-center text-sm">
-        Select or add a provider from the left sidebar
+        {t.settings.models.selectOrAddProvider}
       </div>
     );
   }
@@ -788,7 +823,7 @@ function ProviderEditor({
         <div className="flex items-center gap-2">
           <h3 className="font-heading text-lg font-medium">{provider.name}</h3>
           <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] uppercase">
-            Plugin · Read only
+            {t.settings.models.pluginReadOnly}
           </span>
         </div>
         <p className="text-muted-foreground mt-1 text-xs">{provider.id}</p>
@@ -837,10 +872,16 @@ function ProviderEditor({
         <div className="flex flex-col gap-6 pr-4 pb-px pl-6">
           <div className="flex items-center gap-2">
             {isBuiltin && provider.websiteLink ? (
-              <Tooltip content={`Learn more about ${provider.name}`}>
+              <Tooltip
+                content={formatString(t.settings.models.learnMoreAbout, {
+                  name: provider.name,
+                })}
+              >
                 <Link
                   href={provider.websiteLink}
-                  aria-label={`Open ${provider.name} website`}
+                  aria-label={formatString(t.settings.models.openWebsite, {
+                    name: provider.name,
+                  })}
                   className="group/provider-link text-foreground hover:text-foreground flex items-center gap-2"
                 >
                   <h3 className="font-heading text-lg font-medium">
@@ -859,17 +900,21 @@ function ProviderEditor({
           {!isBuiltin && (
             <>
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Provider name</span>
+                <span className="text-sm font-medium">
+                  {t.settings.models.providerName}
+                </span>
                 <Input
                   defaultValue={provider.name}
-                  placeholder="Custom provider"
-                  aria-label="Custom provider name"
+                  placeholder={t.settings.models.customProviderPlaceholder}
+                  aria-label={t.settings.models.customProviderNameAria}
                   onBlur={handleNameBlur}
                 />
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">API type</span>
+                <span className="text-sm font-medium">
+                  {t.settings.models.apiType}
+                </span>
                 <Select
                   value={apiValue}
                   onValueChange={(value) =>
@@ -878,7 +923,9 @@ function ProviderEditor({
                 >
                   <SelectTrigger
                     className="w-full"
-                    aria-label={`${provider.name} API type`}
+                    aria-label={formatString(t.settings.models.apiTypeAria, {
+                      name: provider.name,
+                    })}
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -886,7 +933,7 @@ function ProviderEditor({
                     <SelectGroup>
                       {CUSTOM_PROVIDER_API_TYPES.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
-                          {type.label}
+                          {t.settings.customProviderApi[type.value]}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -898,7 +945,9 @@ function ProviderEditor({
 
           {!isBuiltin && (
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Icon</span>
+              <span className="text-sm font-medium">
+                {t.settings.models.icon}
+              </span>
               <div className="flex items-center gap-2">
                 <ProviderAvatar
                   id={provider.id}
@@ -907,21 +956,23 @@ function ProviderEditor({
                 />
                 <Input
                   value={iconDraft}
-                  placeholder="Auto (e.g. openai, anthropic, google)"
-                  aria-label={`${provider.name} icon`}
+                  placeholder={t.settings.models.iconPlaceholder}
+                  aria-label={formatString(t.settings.models.iconAria, {
+                    name: provider.name,
+                  })}
                   onChange={(e) => setIconDraft(e.target.value)}
                   onBlur={handleIconBlur}
                 />
               </div>
               <div className="text-muted-foreground text-xs">
-                A{" "}
+                {t.settings.models.iconHintPrefix}{" "}
                 <Link
                   href="https://icons.lobehub.com"
                   className="underline underline-offset-2"
                 >
                   @lobehub/icons
                 </Link>{" "}
-                keyword. Leave blank to auto-resolve from the provider name.
+                {t.settings.models.iconHintSuffix}
               </div>
             </div>
           )}
@@ -930,7 +981,7 @@ function ProviderEditor({
             <CardHeader className="border-b">
               <CardTitle>
                 {isOfficialProfile
-                  ? "Official service"
+                  ? t.settings.models.officialService
                   : formatProviderProfileLabel(
                       selectedProfile,
                       selectedProfileIndex
@@ -938,8 +989,11 @@ function ProviderEditor({
               </CardTitle>
               <CardDescription>
                 {isOfficialProfile
-                  ? `Connect directly to ${provider.name}. The official endpoint is used automatically.`
-                  : "Custom profile for gateways, proxies, and compatible API endpoints."}
+                  ? formatString(
+                      t.settings.models.officialProfileDescription,
+                      { name: provider.name }
+                    )
+                  : t.settings.models.customProfileDescription}
               </CardDescription>
             </CardHeader>
             <CardContent key={selectedProfile.id}>
@@ -953,7 +1007,7 @@ function ProviderEditor({
             {isOfficialProfile ? (
               <CardFooter className="justify-between gap-4 border-t">
                 <p className="text-muted-foreground text-xs">
-                  Need a custom URL or request headers?
+                  {t.settings.models.needCustomUrl}
                 </p>
                 <Button
                   type="button"
@@ -967,7 +1021,7 @@ function ProviderEditor({
                   ) : (
                     <Plus data-icon="inline-start" />
                   )}
-                  Add custom profile
+                  {t.settings.models.addCustomProfile}
                 </Button>
               </CardFooter>
             ) : null}
@@ -977,7 +1031,9 @@ function ProviderEditor({
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">
-                  {provider.id === "ark" ? "Chat models" : "Models"}
+                  {provider.id === "ark"
+                    ? t.settings.models.chatModels
+                    : t.settings.models.modelsHeading}
                 </span>
                 <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                   {enabledModels === totalModels
@@ -985,10 +1041,10 @@ function ProviderEditor({
                     : `${enabledModels}/${totalModels}`}
                 </span>
                 <div className="ml-auto flex items-center gap-1">
-                  <Tooltip content="Add custom model">
+                  <Tooltip content={t.settings.models.addCustomModel}>
                     <button
                       type="button"
-                      aria-label="Add custom model"
+                      aria-label={t.settings.models.addCustomModel}
                       onClick={openCreateModel}
                       className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                     >
@@ -999,7 +1055,10 @@ function ProviderEditor({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        aria-label={`Model list actions for ${provider.name}`}
+                        aria-label={formatString(
+                          t.settings.models.modelListActions,
+                          { name: provider.name }
+                        )}
                         className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                       >
                         <MoreHorizontal className="size-4" />
@@ -1012,7 +1071,7 @@ function ProviderEditor({
                         }
                       >
                         <Ban />
-                        Disable All
+                        {t.settings.models.disableAll}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() =>
@@ -1020,14 +1079,14 @@ function ProviderEditor({
                         }
                       >
                         <CheckCheck />
-                        Enable All
+                        {t.settings.models.enableAll}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {(
                         [
-                          ["enabled", "Show Enabled Only"],
-                          ["disabled", "Show Disabled Only"],
-                          ["all", "Show All"],
+                          ["enabled", t.settings.models.showEnabledOnly],
+                          ["disabled", t.settings.models.showDisabledOnly],
+                          ["all", t.settings.models.showAll],
                         ] as const
                       ).map(([value, label]) => (
                         <DropdownMenuItem
@@ -1050,7 +1109,7 @@ function ProviderEditor({
               <div ref={modelListRef} className="flex flex-col gap-1.5">
                 {visibleModels.length === 0 ? (
                   <div className="text-muted-foreground px-1 py-2 text-xs">
-                    No models to show.
+                    {t.settings.models.noModelsToShow}
                   </div>
                 ) : (
                   visibleModels.map((model) => (
@@ -1102,6 +1161,7 @@ function _ProviderProfileEditor({
   isOfficial: boolean;
   usesAnthropicApi: boolean;
 }) {
+  const { t } = useI18n();
   const updateProviderProfile = useUpdateProviderProfile();
   const baseUrlPlaceholder = usesAnthropicApi
     ? "https://api.example.com"
@@ -1119,9 +1179,9 @@ function _ProviderProfileEditor({
     }
     void update({ name: value }).catch((error) => {
       event.target.value = profile.name;
-      toast.error("Failed to rename connection profile", {
+      toast.error(t.settings.models.failedToRenameProfile, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     });
   };
@@ -1146,11 +1206,15 @@ function _ProviderProfileEditor({
     <div className="flex flex-col gap-6">
       {!isOfficial ? (
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Profile name</span>
+          <span className="text-sm font-medium">
+            {t.settings.models.profileName}
+          </span>
           <Input
             defaultValue={profile.name}
-            placeholder="Profile name"
-            aria-label={`${provider.name} profile name`}
+            placeholder={t.settings.models.profileName}
+            aria-label={formatString(t.settings.models.profileNameAria, {
+              name: provider.name,
+            })}
             onBlur={handleNameBlur}
           />
         </div>
@@ -1158,23 +1222,24 @@ function _ProviderProfileEditor({
 
       {provider.id !== "openai-codex" ? (
         <ApiKeyField
-          label="API key"
+          label={t.settings.models.apiKey}
           getKeyUrl={provider.websiteLink}
           defaultValue={profile.apiKey ?? ""}
-          placeholder={`Input API Key for ${provider.name}.`}
-          aria-label={`${profile.name} API key`}
+          placeholder={formatString(t.settings.models.apiKeyPlaceholder, {
+            name: provider.name,
+          })}
+          aria-label={formatString(t.settings.models.apiKeyAria, {
+            name: profile.name,
+          })}
           onBlur={handleApiKeyBlur}
           description={
             <div className="text-muted-foreground pl-5 text-xs">
-              <div className="list-item">
-                {
-                  'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"'
-                }
-              </div>
+              <div className="list-item">{t.settings.models.envVarHint}</div>
               {isOfficial ? (
                 <div className="list-item">
-                  Leave it blank to use the official {provider.name}{" "}
-                  environment variable
+                  {formatString(t.settings.models.officialEnvHint, {
+                    name: provider.name,
+                  })}
                 </div>
               ) : null}
             </div>
@@ -1182,23 +1247,29 @@ function _ProviderProfileEditor({
         />
       ) : isOfficial ? (
         <p className="text-muted-foreground text-xs">
-          OpenAI Codex uses your signed-in account. No API key is required.
+          {t.settings.models.codexUsesAccount}
         </p>
       ) : null}
 
       {!isOfficial ? (
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Base URL</span>
+          <span className="text-sm font-medium">
+            {t.settings.models.baseUrl}
+          </span>
           <Input
             required
             defaultValue={profile.baseUrl ?? ""}
             placeholder={baseUrlPlaceholder}
-            aria-label={`${profile.name} base URL`}
+            aria-label={formatString(t.settings.models.baseUrlAria, {
+              name: profile.name,
+            })}
             onBlur={handleBaseUrlBlur}
           />
           <div className="text-muted-foreground text-xs">
-            Required for custom profiles.
-            {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
+            {t.settings.models.baseUrlRequired}
+            {usesAnthropicApi
+              ? ` ${t.settings.models.anthropicBaseUrlHint}`
+              : null}
           </div>
         </div>
       ) : null}
@@ -1220,6 +1291,7 @@ function _ArkImageGenerationEditor({
 }: {
   provider: ModelProviderGroup;
 }) {
+  const { t } = useI18n();
   const updateProvider = useUpdateProvider();
   const config = provider.imageGeneration ?? {};
   const models = getArkImageModelDefinitions(config);
@@ -1242,9 +1314,9 @@ function _ArkImageGenerationEditor({
 
   const update = (imageGeneration: ArkImageGenerationConfig) => {
     void updateProvider(provider.id, { imageGeneration }).catch((error) => {
-      toast.error("Failed to update image generation", {
+      toast.error(t.settings.models.failedToUpdateImageGeneration, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     });
   };
@@ -1309,17 +1381,19 @@ function _ArkImageGenerationEditor({
     <>
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Image models</span>
+          <span className="text-sm font-medium">
+            {t.settings.models.imageModels}
+          </span>
           <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
             {enabledModels.length === models.length
               ? models.length
               : `${enabledModels.length}/${models.length}`}
           </span>
           <div className="ml-auto flex items-center gap-1">
-            <Tooltip content="Add custom image model">
+            <Tooltip content={t.settings.models.addCustomImageModel}>
               <button
                 type="button"
-                aria-label="Add custom image model"
+                aria-label={t.settings.models.addCustomImageModel}
                 onClick={() => {
                   setEditingModel(null);
                   setEditorOpen(true);
@@ -1333,7 +1407,10 @@ function _ArkImageGenerationEditor({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label={`Image model list actions for ${provider.name}`}
+                  aria-label={formatString(
+                    t.settings.models.imageModelListActions,
+                    { name: provider.name }
+                  )}
                   className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                 >
                   <MoreHorizontal className="size-4" />
@@ -1344,18 +1421,18 @@ function _ArkImageGenerationEditor({
                   onSelect={() => handleAllModelsEnabled(false)}
                 >
                   <Ban />
-                  Disable All
+                  {t.settings.models.disableAll}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => handleAllModelsEnabled(true)}>
                   <CheckCheck />
-                  Enable All
+                  {t.settings.models.enableAll}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {(
                   [
-                    ["enabled", "Show Enabled Only"],
-                    ["disabled", "Show Disabled Only"],
-                    ["all", "Show All"],
+                    ["enabled", t.settings.models.showEnabledOnly],
+                    ["disabled", t.settings.models.showDisabledOnly],
+                    ["all", t.settings.models.showAll],
                   ] as const
                 ).map(([value, label]) => (
                   <DropdownMenuItem
@@ -1378,7 +1455,7 @@ function _ArkImageGenerationEditor({
         <div ref={modelListRef} className="flex flex-col gap-1.5">
           {visibleModels.length === 0 ? (
             <div className="text-muted-foreground px-1 py-2 text-xs">
-              No image models to show.
+              {t.settings.models.noImageModelsToShow}
             </div>
           ) : (
             visibleModels.map((model) => (
@@ -1429,6 +1506,7 @@ function _ImageModelListItem({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
@@ -1449,7 +1527,9 @@ function _ImageModelListItem({
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
             <button
               type="button"
-              aria-label={`Edit ${model.name}`}
+              aria-label={formatString(t.settings.models.editModel, {
+                name: model.name,
+              })}
               onClick={onEdit}
               className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
             >
@@ -1457,7 +1537,9 @@ function _ImageModelListItem({
             </button>
             <button
               type="button"
-              aria-label={`Delete ${model.name}`}
+              aria-label={formatString(t.settings.models.deleteModel, {
+                name: model.name,
+              })}
               onClick={() => setConfirmOpen(true)}
               className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex size-6 items-center justify-center rounded transition-colors"
             >
@@ -1469,18 +1551,26 @@ function _ImageModelListItem({
           size="sm"
           checked={enabled}
           onCheckedChange={onToggle}
-          aria-label={
-            enabled ? `Disable ${model.name}` : `Enable ${model.name}`
-          }
+          aria-label={formatString(
+            enabled
+              ? t.settings.models.disableModel
+              : t.settings.models.enableModel,
+            { name: model.name }
+          )}
         />
       </ItemActions>
       {isCustom && (
         <ConfirmDialog
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
-          title={`Delete ${model.name}?`}
-          description={`This permanently removes the custom image model "${model.name}" from ${providerName}.`}
-          confirmLabel="Delete"
+          title={formatString(t.settings.models.deleteModelTitle, {
+            name: model.name,
+          })}
+          description={formatString(
+            t.settings.models.deleteImageModelDescription,
+            { name: model.name, provider: providerName }
+          )}
+          confirmLabel={t.common.delete}
           dimBackground={false}
           onConfirm={() => {
             setConfirmOpen(false);
@@ -1506,6 +1596,7 @@ function _ProviderHeadersEditor({
   providerName: string;
   profile: ProviderProfile;
 }) {
+  const { t } = useI18n();
   const updateProviderProfile = useUpdateProviderProfile();
   const [rows, setRows] = useState<{ key: string; value: string }[]>(() =>
     Object.entries(profile.headers ?? {}).map(([key, value]) => ({
@@ -1545,27 +1636,37 @@ function _ProviderHeadersEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">Custom headers</span>
+      <span className="text-sm font-medium">
+        {t.settings.models.customHeaders}
+      </span>
       {rows.map((row, index) => (
         <div key={index} className="flex items-center gap-2">
           <Input
             value={row.key}
             placeholder="X-Header-Name"
-            aria-label={`${providerName} header ${index + 1} name`}
+            aria-label={formatString(t.settings.models.headerNameAria, {
+              name: providerName,
+              n: index + 1,
+            })}
             onChange={(e) => setRow(index, { ...row, key: e.target.value })}
             onBlur={() => persist(rows)}
           />
           <Input
             value={row.value}
-            placeholder="Value"
-            aria-label={`${providerName} header ${index + 1} value`}
+            placeholder={t.settings.models.headerValuePlaceholder}
+            aria-label={formatString(t.settings.models.headerValueAria, {
+              name: providerName,
+              n: index + 1,
+            })}
             onChange={(e) => setRow(index, { ...row, value: e.target.value })}
             onBlur={() => persist(rows)}
           />
-          <Tooltip content="Remove header">
+          <Tooltip content={t.settings.models.removeHeader}>
             <button
               type="button"
-              aria-label={`Remove header ${index + 1}`}
+              aria-label={formatString(t.settings.models.removeHeaderAria, {
+                n: index + 1,
+              })}
               onClick={() => removeRow(index)}
               className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
             >
@@ -1581,10 +1682,10 @@ function _ProviderHeadersEditor({
         className="self-start"
         onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}
       >
-        <Plus /> Add header
+        <Plus /> {t.settings.models.addHeader}
       </Button>
       <div className="text-muted-foreground text-xs">
-        Sent with every request made through this profile.
+        {t.settings.models.headersHint}
       </div>
     </div>
   );
@@ -1614,6 +1715,7 @@ function ModelListItem({
   onToggle: (enabled: boolean) => void;
   onEdit: () => void;
 }) {
+  const { t } = useI18n();
   const removeCustomModel = useRemoveCustomModel();
   const testModelConnection = useTestModelConnection();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1623,13 +1725,13 @@ function ModelListItem({
     setTesting(true);
     try {
       await testModelConnection(providerId, model.id, undefined, profileId);
-      toast.success("Model connected successfully", {
+      toast.success(t.settings.models.connectedSuccessfully, {
         description: model.name,
       });
     } catch (error) {
-      toast.error("Failed to connect to model", {
+      toast.error(t.settings.models.failedToConnect, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setTesting(false);
@@ -1651,10 +1753,12 @@ function ModelListItem({
       </ItemContent>
       <ItemActions>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-          <Tooltip content="Test connection">
+          <Tooltip content={t.settings.models.testConnection}>
             <button
               type="button"
-              aria-label={`Test connection for ${model.name}`}
+              aria-label={formatString(t.settings.models.testConnectionAria, {
+                name: model.name,
+              })}
               disabled={testing}
               onClick={() => void handleTestConnection()}
               className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
@@ -1670,7 +1774,9 @@ function ModelListItem({
             <>
               <button
                 type="button"
-                aria-label={`Edit ${model.name}`}
+                aria-label={formatString(t.settings.models.editModel, {
+                  name: model.name,
+                })}
                 onClick={onEdit}
                 className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
               >
@@ -1678,7 +1784,9 @@ function ModelListItem({
               </button>
               <button
                 type="button"
-                aria-label={`Delete ${model.name}`}
+                aria-label={formatString(t.settings.models.deleteModel, {
+                  name: model.name,
+                })}
                 onClick={() => setConfirmOpen(true)}
                 className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex size-6 items-center justify-center rounded transition-colors"
               >
@@ -1691,18 +1799,26 @@ function ModelListItem({
           size="sm"
           checked={enabled}
           onCheckedChange={onToggle}
-          aria-label={
-            enabled ? `Disable ${model.name}` : `Enable ${model.name}`
-          }
+          aria-label={formatString(
+            enabled
+              ? t.settings.models.disableModel
+              : t.settings.models.enableModel,
+            { name: model.name }
+          )}
         />
       </ItemActions>
       {isCustom ? (
         <ConfirmDialog
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
-          title={`Delete ${model.name}?`}
-          description={`This permanently removes the custom model "${model.name}" from ${providerName}.`}
-          confirmLabel="Delete"
+          title={formatString(t.settings.models.deleteModelTitle, {
+            name: model.name,
+          })}
+          description={formatString(t.settings.models.deleteModelDescription, {
+            name: model.name,
+            provider: providerName,
+          })}
+          confirmLabel={t.common.delete}
           dimBackground={false}
           onConfirm={() => {
             setConfirmOpen(false);

@@ -10,6 +10,7 @@ import { GaugeIcon } from "lucide-react";
 import { memo, useCallback, useMemo, type MouseEvent } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 
 import { useMessageStatsSummaryMode } from "./message-stats-summary-mode";
@@ -19,22 +20,35 @@ const COMPACT_TOKEN_FORMATTER = new Intl.NumberFormat("en", {
   maximumFractionDigits: 1,
 });
 
-function _formatDuration(durationMs: number): string {
+function _formatDuration(
+  durationMs: number,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   if (durationMs < 1000) {
-    return `${Math.round(durationMs)} ms`;
+    return formatString(t.playground.message.stats.durationMs, {
+      n: Math.round(durationMs),
+    });
   }
   if (durationMs < 10_000) {
-    return `${(durationMs / 1000).toFixed(2)} s`;
+    return formatString(t.playground.message.stats.durationSeconds, {
+      n: (durationMs / 1000).toFixed(2),
+    });
   }
   if (durationMs < 60_000) {
-    return `${(durationMs / 1000).toFixed(1)} s`;
+    return formatString(t.playground.message.stats.durationSeconds, {
+      n: (durationMs / 1000).toFixed(1),
+    });
   }
   const minutes = Math.floor(durationMs / 60_000);
   const seconds = Math.round((durationMs % 60_000) / 1000);
-  return `${minutes}m ${seconds}s`;
+  return formatString(t.playground.message.stats.durationMinutes, {
+    m: minutes,
+    s: seconds,
+  });
 }
 
 function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
+  const { t } = useI18n();
   const cached = usage.cacheRead + usage.cacheWrite;
   const total = usage.input + usage.output + cached;
   if (total <= 0) {
@@ -44,7 +58,11 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
   return (
     <div
       role="img"
-      aria-label={`Input ${formatTokens(usage.input)} tokens. Output ${formatTokens(usage.output)} tokens. Cached ${formatTokens(cached)} tokens.`}
+      aria-label={formatString(t.playground.message.stats.tokenUsageBarLabel, {
+        input: formatTokens(usage.input),
+        output: formatTokens(usage.output),
+        cached: formatTokens(cached),
+      })}
       className="mt-2 w-72 max-w-full"
     >
       <div className="bg-foreground/8 flex h-2 overflow-hidden rounded-full">
@@ -78,16 +96,22 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.5625rem]">
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
-          Input {formatTokens(usage.input)}
+          {formatString(t.playground.message.stats.legendInput, {
+            n: formatTokens(usage.input),
+          })}
         </span>
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
-          Output {formatTokens(usage.output)}
+          {formatString(t.playground.message.stats.legendOutput, {
+            n: formatTokens(usage.output),
+          })}
         </span>
         {cached > 0 && (
           <span className="flex items-center gap-1">
             <span className="size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-            Cached {formatTokens(cached)}
+            {formatString(t.playground.message.stats.legendCached, {
+              n: formatTokens(cached),
+            })}
           </span>
         )}
       </div>
@@ -96,6 +120,7 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
 }
 
 function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
+  const { t } = useI18n();
   const firstTokenMs = timing.firstTokenMs;
   const hasFirstToken = firstTokenMs !== undefined;
   const firstTokenPercent =
@@ -106,8 +131,13 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
     ? Math.max(0, timing.durationMs - firstTokenMs)
     : null;
   const ariaLabel = hasFirstToken
-    ? `Request sent. First token after ${_formatDuration(firstTokenMs)}. Completed after ${_formatDuration(timing.durationMs)}.`
-    : `Request sent. Completed after ${_formatDuration(timing.durationMs)}.`;
+    ? formatString(t.playground.message.stats.timelineAriaWithFirstToken, {
+        firstToken: _formatDuration(firstTokenMs, t),
+        total: _formatDuration(timing.durationMs, t),
+      })
+    : formatString(t.playground.message.stats.timelineAria, {
+        total: _formatDuration(timing.durationMs, t),
+      });
 
   return (
     <div role="img" aria-label={ariaLabel} className="mt-1.5 w-72 max-w-full">
@@ -124,7 +154,7 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
             )}
             style={{ left: `${firstTokenPercent}%` }}
           >
-            First token
+            {t.playground.message.stats.firstToken}
           </span>
         )}
         <div className="bg-foreground/8 relative flex h-2 overflow-hidden rounded-full">
@@ -153,22 +183,26 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
           )}
         </div>
         <div className="text-muted-foreground mt-0.5 flex justify-between text-[0.5625rem]">
-          <span>Request sent</span>
-          <span>Complete</span>
+          <span>{t.playground.message.stats.requestSent}</span>
+          <span>{t.playground.message.stats.complete}</span>
         </div>
       </div>
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.5625rem]">
         {hasFirstToken && (
           <span className="flex items-center gap-1">
             <span className="bg-muted-foreground/50 size-1.5 rounded-full" />
-            Waiting {_formatDuration(firstTokenMs)}
+            {formatString(t.playground.message.stats.waiting, {
+              duration: _formatDuration(firstTokenMs, t),
+            })}
           </span>
         )}
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
           {generationMs === null
-            ? "Response"
-            : `Generating ${_formatDuration(generationMs)}`}
+            ? t.playground.message.stats.response
+            : formatString(t.playground.message.stats.generating, {
+                duration: _formatDuration(generationMs, t),
+              })}
         </span>
       </div>
     </div>
@@ -187,6 +221,7 @@ function _MessageStatsSummary({
   variant?: "default" | "header";
 }) {
   const { mode, setMode } = useMessageStatsSummaryMode();
+  const { t } = useI18n();
   const usageRows = useMemo(
     () => (hasModelUsage(usage) ? usageBreakdownRows(usage) : []),
     [usage]
@@ -203,24 +238,32 @@ function _MessageStatsSummary({
     if (!timing) {
       return null;
     }
-    return `${_formatDuration(timing.durationMs)} total`;
-  }, [timing]);
+    return formatString(t.playground.message.stats.durationTotal, {
+      duration: _formatDuration(timing.durationMs, t),
+    });
+  }, [t, timing]);
   const tokenLabel = useMemo(() => {
     if (!hasModelUsage(usage)) {
       return null;
     }
     const cached = usage.cacheRead + usage.cacheWrite;
     return [
-      `${COMPACT_TOKEN_FORMATTER.format(usage.input)} in`,
-      `${COMPACT_TOKEN_FORMATTER.format(usage.output)} out`,
-      `${COMPACT_TOKEN_FORMATTER.format(cached)} cached`,
+      formatString(t.playground.message.stats.tokenCountIn, {
+        n: COMPACT_TOKEN_FORMATTER.format(usage.input),
+      }),
+      formatString(t.playground.message.stats.tokenCountOut, {
+        n: COMPACT_TOKEN_FORMATTER.format(usage.output),
+      }),
+      formatString(t.playground.message.stats.tokenCountCached, {
+        n: COMPACT_TOKEN_FORMATTER.format(cached),
+      }),
     ].join(" / ");
-  }, [usage]);
+  }, [t, usage]);
   const label =
     variant === "header"
       ? mode === "timing"
-        ? (timingLabel ?? "No timing")
-        : (tokenLabel ?? "No token usage")
+        ? (timingLabel ?? t.playground.message.stats.noTiming)
+        : (tokenLabel ?? t.playground.message.stats.noTokenUsage)
       : [usageLabel, timingLabel].filter(Boolean).join(" · ");
   const handleToggleMode = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -262,7 +305,7 @@ function _MessageStatsSummary({
           {usageRows.length > 0 && (
             <section>
               <div className="text-foreground mb-1 font-medium">
-                Token usage
+                {t.playground.message.stats.tokenUsage}
               </div>
               {usage && <_TokenUsageBar usage={usage} />}
               <div className="mt-2 grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
@@ -279,39 +322,44 @@ function _MessageStatsSummary({
           )}
           {timing && (
             <section className={cn(usageRows.length > 0 && "mt-5")}>
-              <div className="text-foreground mb-1 font-medium">Timing</div>
+              <div className="text-foreground mb-1 font-medium">
+                {t.playground.message.stats.timing}
+              </div>
               <_TimingTimeline timing={timing} />
               <div className="mt-1.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 leading-tight">
                 <span className="text-muted-foreground">
-                  Total response time
+                  {t.playground.message.stats.totalResponseTime}
                 </span>
                 <span className="text-right font-mono tabular-nums">
-                  {_formatDuration(timing.durationMs)}
+                  {_formatDuration(timing.durationMs, t)}
                 </span>
                 {timing?.firstTokenMs !== undefined && (
                   <>
                     <span className="text-muted-foreground">
-                      Time to first token (TTFT)
+                      {t.playground.message.stats.timeToFirstToken}
                     </span>
                     <span className="text-right font-mono tabular-nums">
-                      {_formatDuration(timing.firstTokenMs)}
+                      {_formatDuration(timing.firstTokenMs, t)}
                     </span>
                   </>
                 )}
                 {tokensPerSecond !== null && (
                   <>
                     <span className="text-muted-foreground">
-                      Tokens per second (TPS)
+                      {t.playground.message.stats.tokensPerSecond}
                     </span>
                     <span className="text-right font-mono tabular-nums">
-                      {tokensPerSecond.toFixed(1)} tokens/s
+                      {formatString(
+                        t.playground.message.stats.tokensPerSecondValue,
+                        { n: tokensPerSecond.toFixed(1) }
+                      )}
                     </span>
                   </>
                 )}
               </div>
               {timing.firstTokenMs !== undefined && (
                 <p className="text-muted-foreground mt-1.5 text-[0.5625rem] leading-snug">
-                  TPS counts output tokens only during the generating segment.
+                  {t.playground.message.stats.tpsNote}
                 </p>
               )}
             </section>
@@ -322,7 +370,17 @@ function _MessageStatsSummary({
       {variant === "header" ? (
         <button
           type="button"
-          aria-label={`Showing ${mode === "timing" ? "total response time" : "token usage"}: ${label}. Click to show ${mode === "timing" ? "token usage" : "total response time"}.`}
+          aria-label={formatString(t.playground.message.stats.showingStats, {
+            mode:
+              mode === "timing"
+                ? t.playground.message.stats.modeTotalResponseTime
+                : t.playground.message.stats.modeTokenUsage,
+            label,
+            other:
+              mode === "timing"
+                ? t.playground.message.stats.modeTokenUsage
+                : t.playground.message.stats.modeTotalResponseTime,
+          })}
           className={cn(
             summaryClassName,
             "hover:text-foreground focus-visible:ring-ring cursor-pointer border-0 text-left outline-none focus-visible:ring-[3px]"
@@ -333,7 +391,9 @@ function _MessageStatsSummary({
         </button>
       ) : (
         <div
-          aria-label={`Response statistics: ${label}`}
+          aria-label={formatString(t.playground.message.stats.responseStatistics, {
+            label,
+          })}
           className={summaryClassName}
         >
           {summaryContent}

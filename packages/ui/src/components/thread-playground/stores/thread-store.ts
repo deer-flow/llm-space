@@ -76,6 +76,7 @@ import { useShallow } from "zustand/shallow";
 
 import { createFrameThrottle } from "@llm-space/ui/lib/frame-throttle";
 
+import { formatString, getMessages } from "../../../lib/i18n";
 import { PREVIEW_THROTTLE_MS } from "../streaming-preview";
 
 import { getRunValidationIssue } from "./run-validation";
@@ -387,8 +388,11 @@ export function createThreadStore(
       };
 
       const showDuplicateVariableName = (name: string) => {
-        toast.error("Variable name already exists", {
-          description: `"${name}" is already used by another variable.`,
+        const run = getMessages().playground.run;
+        toast.error(run.variableNameExists, {
+          description: formatString(run.variableNameExistsDescription, {
+            name,
+          }),
         });
       };
 
@@ -503,9 +507,11 @@ export function createThreadStore(
       const validateTool = (tool: Tool): boolean => {
         if (!toolValidator.Check(tool)) {
           const errors = [...toolValidator.Errors(tool)];
-          toast.error("Error", {
+          const t = getMessages();
+          toast.error(t.playground.tools.error, {
             description:
-              errors.map((e) => e.message).join(", ") || "Invalid tool",
+              errors.map((e) => e.message).join(", ") ||
+              t.playground.run.invalidTool,
           });
           return false;
         }
@@ -960,8 +966,11 @@ export function createThreadStore(
           const { thread } = get();
           const toolKey = getToolKey(tool);
           if (thread.context?.tools?.some((t) => getToolKey(t) === toolKey)) {
-            toast.error("Error", {
-              description: `Tool "${getToolDisplayName(tool)}" already exists`,
+            const t = getMessages();
+            toast.error(t.playground.tools.error, {
+              description: formatString(t.playground.tools.toolAlreadyExists, {
+                name: getToolDisplayName(tool),
+              }),
             });
             return false;
           }
@@ -985,8 +994,11 @@ export function createThreadStore(
             nextKey !== name &&
             tools.some((t) => getToolKey(t) === nextKey)
           ) {
-            toast.error("Error", {
-              description: `Tool "${getToolDisplayName(tool)}" already exists`,
+            const t = getMessages();
+            toast.error(t.playground.tools.error, {
+              description: formatString(t.playground.tools.toolAlreadyExists, {
+                name: getToolDisplayName(tool),
+              }),
             });
             return false;
           }
@@ -1077,15 +1089,18 @@ export function createThreadStore(
           try {
             model = options.resolveModel?.(get().thread.model) ?? null;
           } catch (error) {
-            toast.error("Unable to resolve a model", {
+            const t = getMessages();
+            toast.error(t.playground.run.unableToResolveModel, {
               description:
-                error instanceof Error ? error.message : "Please try again.",
+                error instanceof Error
+                  ? error.message
+                  : t.playground.message.pleaseTryAgain,
             });
             finishPreparingRun();
             return;
           }
           if (!model) {
-            toast.error("Select a model to run");
+            toast.error(getMessages().playground.run.selectModelToRun);
             finishPreparingRun();
             return;
           }
@@ -1129,11 +1144,12 @@ export function createThreadStore(
             promptSnapshot = rendered.snapshot;
           } catch (error) {
             if (!isPreparingRun()) return;
-            toast.error("Unable to render prompt variables", {
+            const t = getMessages();
+            toast.error(t.playground.run.unableToRenderPromptVariables, {
               description:
                 error instanceof PromptVariableError || error instanceof Error
                   ? error.message
-                  : "Please check the system prompt variables.",
+                  : t.playground.run.checkPromptVariables,
             });
             finishPreparingRun();
             return;
@@ -1237,11 +1253,12 @@ export function createThreadStore(
                       await options.archiveRunSnapshot(newestRun);
                     runHistory = [...runHistory.slice(0, -1), reference];
                   } catch (error) {
-                    toast.error("Failed to archive run snapshot", {
+                    const t = getMessages();
+                    toast.error(t.playground.run.failedToArchiveSnapshot, {
                       description:
                         error instanceof Error
                           ? error.message
-                          : "The snapshot will be archived on the next save.",
+                          : t.playground.run.archiveSnapshotDeferred,
                     });
                   }
                 }
@@ -1419,7 +1436,9 @@ export function createThreadStore(
               failed = true;
               console.error(error);
               if (error instanceof Error) {
-                toast.error("Error", { description: error.message });
+                toast.error(getMessages().playground.tools.error, {
+                  description: error.message,
+                });
               }
               return "failed";
             }

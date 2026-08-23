@@ -34,6 +34,7 @@ import { Markdown } from "@llm-space/ui/components/markdown";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useHostServices } from "@llm-space/ui/host";
 import { docsUrl } from "@llm-space/ui/lib/docs-url";
+import { formatString, useI18n } from "@llm-space/ui/lib/i18n";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -69,10 +70,10 @@ import { listEnabledPromptVariableSkills } from "./variable/prompt-variable-skil
 const DEFAULT_KEEP_TURNS = 3;
 type WizardStep = "introduction" | "configure" | "compact";
 
-const WIZARD_STEPS: { id: WizardStep; title: string }[] = [
-  { id: "introduction", title: "Introduction" },
-  { id: "configure", title: "Configure" },
-  { id: "compact", title: "Compact" },
+const WIZARD_STEPS: { id: WizardStep }[] = [
+  { id: "introduction" },
+  { id: "configure" },
+  { id: "compact" },
 ];
 
 export function ThreadCompactionDialog({
@@ -90,6 +91,7 @@ export function ThreadCompactionDialog({
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
+  const { t } = useI18n();
   const setDialogOpen = useCallback(
     (next: boolean) => {
       if (onOpenChange) onOpenChange(next);
@@ -213,7 +215,7 @@ export function ThreadCompactionDialog({
     persistInstructions(customInstructions);
     setStep("compact");
     if (!runtimeId) {
-      setPreparationError("Thread runtime is not available.");
+      setPreparationError(t.playground.compaction.threadRuntimeNotAvailable);
       return;
     }
 
@@ -255,6 +257,7 @@ export function ThreadCompactionDialog({
     runtimeId,
     skills,
     store,
+    t,
   ]);
 
   const applyPreview = useCallback(async () => {
@@ -277,9 +280,16 @@ export function ThreadCompactionDialog({
       }
       setDialogOpen(false);
       toast.success(
-        onApplyCompaction ? "Compacted thread created" : "Conversation compacted",
+        onApplyCompaction
+          ? t.playground.compaction.compactedThreadCreated
+          : t.playground.compaction.conversationCompacted,
         {
-          description: `${freshPlan.keptTurnCount} recent ${freshPlan.keptTurnCount === 1 ? "turn remains" : "turns remain"} verbatim.`,
+          description: formatString(
+            freshPlan.keptTurnCount === 1
+              ? t.playground.compaction.compactionAppliedDescription.one
+              : t.playground.compaction.compactionAppliedDescription.other,
+            { n: freshPlan.keptTurnCount }
+          ),
         }
       );
     } catch (cause) {
@@ -296,6 +306,7 @@ export function ThreadCompactionDialog({
     restoreThread,
     setDialogOpen,
     store,
+    t,
     text,
   ]);
 
@@ -305,15 +316,15 @@ export function ThreadCompactionDialog({
         <Tooltip
           content={
             canCompact
-              ? "Compact conversation"
-              : "At least two user turns are needed to compact"
+              ? t.playground.compaction.compactConversation
+              : t.playground.compaction.needTwoTurns
           }
         >
           <DialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon-lg"
-              aria-label="Compact conversation"
+              aria-label={t.playground.compaction.compactConversation}
               disabled={disabled || !canCompact}
             >
               <FileArchiveIcon className="size-4" />
@@ -333,17 +344,17 @@ export function ThreadCompactionDialog({
               <FileArchiveIcon className="size-4" />
             </div>
             <DialogTitle className="col-start-2 flex items-center gap-2 text-base">
-              Compact conversation
+              {t.playground.compaction.compactConversation}
               <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-                Preview
+                {t.playground.compaction.preview}
               </span>
             </DialogTitle>
             <DialogDescription className="col-start-2">
               {step === "introduction"
-                ? "See how compaction creates room without losing the thread."
+                ? t.playground.compaction.introDescription
                 : step === "configure"
-                  ? "Choose what stays verbatim and what the checkpoint should emphasize."
-                  : "Review the generated checkpoint before changing the conversation."}
+                  ? t.playground.compaction.configureDescription
+                  : t.playground.compaction.compactDescription}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -390,24 +401,26 @@ export function ThreadCompactionDialog({
             onClick={() => actions.openLink(docsUrl("compaction"))}
           >
             <CircleHelpIcon className="size-4" />
-            Help
+            {t.playground.compaction.help}
           </Button>
           <div className="flex items-center justify-end gap-2">
             {step === "introduction" ? (
               <>
                 <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                  Cancel
+                  {t.playground.compaction.cancel}
                 </Button>
-                <Button onClick={() => setStep("configure")}>Next</Button>
+                <Button onClick={() => setStep("configure")}>
+                  {t.playground.compaction.next}
+                </Button>
               </>
             ) : null}
             {step === "configure" ? (
               <>
                 <Button variant="ghost" onClick={() => setStep("introduction")}>
-                  Back
+                  {t.playground.compaction.back}
                 </Button>
                 <Button onClick={() => void startCompaction()}>
-                  Start compact
+                  {t.playground.compaction.startCompact}
                 </Button>
               </>
             ) : null}
@@ -418,7 +431,7 @@ export function ThreadCompactionDialog({
                   disabled={busy}
                   onClick={() => setStep("configure")}
                 >
-                  Back
+                  {t.playground.compaction.back}
                 </Button>
                 {text.trim() &&
                 !visibleError &&
@@ -429,7 +442,9 @@ export function ThreadCompactionDialog({
                     onClick={() => void applyPreview()}
                   >
                     {applying ? <Spinner className="size-3" /> : null}
-                    {applying ? "Creating copy…" : "Apply compaction"}
+                    {applying
+                      ? t.playground.compaction.creatingCopy
+                      : t.playground.compaction.applyCompaction}
                   </Button>
                 ) : (
                   <Button
@@ -439,9 +454,9 @@ export function ThreadCompactionDialog({
                     {busy ? <Spinner className="size-3" /> : null}
                     {busy
                       ? preparing
-                        ? "Preparing…"
-                        : "Compacting…"
-                      : "Try again"}
+                        ? t.playground.compaction.preparing
+                        : t.playground.compaction.compacting
+                      : t.playground.compaction.tryAgain}
                   </Button>
                 )}
               </>
@@ -469,6 +484,12 @@ function _buildCompactedThread(
 }
 
 function WizardStepIndicator({ step }: { step: WizardStep }) {
+  const { t } = useI18n();
+  const stepTitles: Record<WizardStep, string> = {
+    introduction: t.playground.compaction.wizardIntroduction,
+    configure: t.playground.compaction.wizardConfigure,
+    compact: t.playground.compaction.wizardCompact,
+  };
   const activeIndex = WIZARD_STEPS.findIndex((item) => item.id === step);
   return (
     <div className="relative mx-auto flex max-w-2xl items-center">
@@ -510,7 +531,7 @@ function WizardStepIndicator({ step }: { step: WizardStep }) {
                     : "text-muted-foreground"
                 )}
               >
-                {item.title}
+                {stepTitles[item.id]}
               </span>
             </div>
           </div>
@@ -521,18 +542,18 @@ function WizardStepIndicator({ step }: { step: WizardStep }) {
 }
 
 function IntroductionStep() {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div className="text-center">
         <div className="text-primary mb-2 text-[0.6875rem] font-semibold tracking-widest uppercase">
-          Context housekeeping
+          {t.playground.compaction.contextHousekeeping}
         </div>
         <h2 className="text-xl font-semibold tracking-tight">
-          Make room without losing the plot
+          {t.playground.compaction.makeRoomTitle}
         </h2>
         <p className="text-muted-foreground mx-auto mt-2 max-w-xl text-xs/relaxed">
-          Compaction replaces older turns with one structured checkpoint while
-          leaving your most recent work untouched.
+          {t.playground.compaction.makeRoomCopy}
         </p>
       </div>
 
@@ -544,8 +565,8 @@ function IntroductionStep() {
         <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-5">
           <DiagramCard
             icon={<MessageSquareTextIcon className="size-4" />}
-            eyebrow="Long context"
-            title="Every turn"
+            eyebrow={t.playground.compaction.longContext}
+            title={t.playground.compaction.everyTurn}
           >
             <div className="mt-4 space-y-2">
               <MiniTurn tone="muted" width="w-full" />
@@ -563,8 +584,8 @@ function IntroductionStep() {
 
           <DiagramCard
             icon={<FileArchiveIcon className="size-4" />}
-            eyebrow="Smaller context"
-            title="Checkpoint + recent work"
+            eyebrow={t.playground.compaction.smallerContext}
+            title={t.playground.compaction.checkpointAndRecentWork}
           >
             <div className="mt-4 space-y-2">
               <div className="border-primary/20 bg-primary/8 rounded-md border p-2">
@@ -580,18 +601,18 @@ function IntroductionStep() {
       <div className="grid grid-cols-3 divide-x rounded-xl border bg-background/40">
         <IntroPrinciple
           icon={<ShieldCheckIcon className="size-4" />}
-          title="Preview first"
-          copy="Nothing changes until you apply."
+          title={t.playground.compaction.previewFirst}
+          copy={t.playground.compaction.nothingChangesUntilYouApply}
         />
         <IntroPrinciple
           icon={<MessageSquareTextIcon className="size-4" />}
-          title="Recent turns stay exact"
-          copy="Keep the active part of the conversation verbatim."
+          title={t.playground.compaction.recentTurnsStayExact}
+          copy={t.playground.compaction.keepActivePartVerbatim}
         />
         <IntroPrinciple
           icon={<Layers3Icon className="size-4" />}
-          title="Progressive"
-          copy="Each checkpoint evolves instead of starting over."
+          title={t.playground.compaction.progressive}
+          copy={t.playground.compaction.eachCheckpointEvolves}
         />
       </div>
     </div>
@@ -619,15 +640,16 @@ function ConfigureStep({
   onKeepTurnsChange: (value: string) => void;
   onInstructionsChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="grid gap-6 md:grid-cols-[17rem_minmax(0,1fr)]">
       <div className="space-y-5">
         <div>
           <div className="text-muted-foreground mb-3 text-[0.6875rem] font-semibold tracking-wider uppercase">
-            Retention
+            {t.playground.compaction.retention}
           </div>
           <label className="text-foreground mb-2 block text-xs font-medium">
-            Keep recent turns
+            {t.playground.compaction.keepRecentTurns}
           </label>
           <Select
             value={String(keepTurns)}
@@ -636,21 +658,24 @@ function ConfigureStep({
           >
             <SelectTrigger
               className="w-full bg-background/60"
-              aria-label="Keep recent turns"
+              aria-label={t.playground.compaction.keepRecentTurns}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {keepOptions.map((value) => (
                 <SelectItem key={value} value={String(value)}>
-                  {value} {value === 1 ? "turn" : "turns"}
+                  {value === 1
+                    ? t.playground.compaction.turnCount.one
+                    : formatString(t.playground.compaction.turnCount.other, {
+                        n: value,
+                      })}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-muted-foreground mt-2 text-[0.6875rem]/relaxed">
-            A turn starts with a user message and includes the assistant reply
-            and its tool calls.
+            {t.playground.compaction.turnDefinition}
           </p>
         </div>
 
@@ -659,21 +684,20 @@ function ConfigureStep({
             htmlFor="compaction-instructions"
             className="text-foreground mb-2 block text-xs font-medium"
           >
-            Compaction instructions
+            {t.playground.compaction.compactionInstructions}
             <span className="text-muted-foreground ml-1 font-normal">
-              Optional
+              {t.playground.compaction.optional}
             </span>
           </label>
           <Textarea
             id="compaction-instructions"
             value={instructions}
             onChange={(event) => onInstructionsChange(event.target.value)}
-            placeholder="Focus on decisions, unresolved work, and exact implementation details."
+            placeholder={t.playground.compaction.instructionsPlaceholder}
             className="bg-background/60 min-h-28 resize-y"
           />
           <p className="text-muted-foreground mt-2 text-[0.6875rem]/relaxed">
-            Appended as additional focus for the summarizer and saved with this
-            thread.
+            {t.playground.compaction.instructionsHint}
           </p>
         </div>
       </div>
@@ -696,27 +720,28 @@ function CompactionMap({
   keptTurns: number;
   hasPreviousCheckpoint: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-3">
         <HistoryPanel
-          title="Before"
-          badge={_formatTurns(summarizedTurns + keptTurns)}
+          title={t.playground.compaction.before}
+          badge={_formatTurns(summarizedTurns + keptTurns, t)}
         >
           {hasPreviousCheckpoint ? (
-            <MessageBlock label="Existing checkpoint" />
+            <MessageBlock label={t.playground.compaction.existingCheckpoint} />
           ) : null}
           <div className="border-border/60 bg-muted/15 rounded-lg border border-dashed p-3">
             <div className="text-muted-foreground mb-2 flex items-center justify-between text-[0.625rem] font-medium uppercase">
-              <span>Older work</span>
-              <span>{_formatTurns(summarizedTurns)}</span>
+              <span>{t.playground.compaction.olderWork}</span>
+              <span>{_formatTurns(summarizedTurns, t)}</span>
             </div>
             <TurnStack count={summarizedTurns} tone="muted" />
           </div>
           <div className="border-primary/25 bg-primary/[0.04] rounded-lg border p-3">
             <div className="text-primary mb-2 flex items-center justify-between text-[0.625rem] font-medium uppercase">
-              <span>Keep zone</span>
-              <span>{_formatTurns(keptTurns)}</span>
+              <span>{t.playground.compaction.keepZone}</span>
+              <span>{_formatTurns(keptTurns, t)}</span>
             </div>
             <TurnStack count={keptTurns} tone="primary" />
           </div>
@@ -727,13 +752,15 @@ function CompactionMap({
             <ArrowRightIcon className="size-4" />
           </span>
           <span className="text-[0.5625rem] font-semibold tracking-wider uppercase [writing-mode:vertical-rl]">
-            Compact
+            {t.playground.compaction.compact}
           </span>
         </div>
 
         <HistoryPanel
-          title="After"
-          badge={`checkpoint + ${keptTurns}`}
+          title={t.playground.compaction.after}
+          badge={formatString(t.playground.compaction.checkpointPlus, {
+            n: keptTurns,
+          })}
           accent
         >
           <div className="border-primary/25 bg-primary/[0.07] rounded-lg border p-3 shadow-sm shadow-primary/5">
@@ -752,8 +779,8 @@ function CompactionMap({
           </div>
           <div className="border-primary/25 bg-primary/[0.04] rounded-lg border p-3">
             <div className="text-primary mb-2 flex items-center justify-between text-[0.625rem] font-medium uppercase">
-              <span>Unchanged</span>
-              <span>{_formatTurns(keptTurns)}</span>
+              <span>{t.playground.compaction.unchanged}</span>
+              <span>{_formatTurns(keptTurns, t)}</span>
             </div>
             <TurnStack count={keptTurns} tone="primary" />
           </div>
@@ -766,18 +793,18 @@ function CompactionMap({
             <Layers3Icon className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-medium">Progressive by design</div>
+            <div className="text-xs font-medium">
+              {t.playground.compaction.progressiveByDesign}
+            </div>
             <p className="text-muted-foreground mt-1 text-[0.6875rem]/relaxed">
-              On the next compact, the checkpoint and newly aged-out turns are
-              summarized together. Recent turns keep moving through the keep
-              zone unchanged.
+              {t.playground.compaction.progressiveCopy}
             </p>
             <div className="mt-3 flex items-center gap-2 text-[0.625rem] font-medium">
-              <FlowChip label="Current checkpoint" />
+              <FlowChip label={t.playground.compaction.currentCheckpoint} />
               <span className="text-muted-foreground">+</span>
-              <FlowChip label="Newly aged turns" />
+              <FlowChip label={t.playground.compaction.newlyAgedTurns} />
               <ArrowRightIcon className="text-primary size-3.5 shrink-0" />
-              <FlowChip label="Refined checkpoint" accent />
+              <FlowChip label={t.playground.compaction.refinedCheckpoint} accent />
             </div>
           </div>
         </div>
@@ -803,26 +830,37 @@ function ExecutionStep({
   keptTurns: number;
   onRegenerate: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="mx-auto max-w-3xl overflow-hidden rounded-xl border bg-background/40">
       <div className="flex h-12 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium">Live checkpoint</span>
+          <span className="text-xs font-medium">
+            {t.playground.compaction.liveCheckpoint}
+          </span>
           {busy ? (
             <span className="text-primary flex items-center gap-1.5 text-[0.6875rem]">
               <Spinner className="size-3" />
-              {applying ? "Creating copy" : preparing ? "Preparing" : "Streaming"}
+              {applying
+                ? t.playground.compaction.creatingCopyInline
+                : preparing
+                  ? t.playground.compaction.preparingInline
+                  : t.playground.compaction.streaming}
             </span>
           ) : text && !error ? (
             <span className="text-muted-foreground text-[0.6875rem]">
-              Ready to apply · {keptTurns} recent {keptTurns === 1 ? "turn" : "turns"} kept
+              {keptTurns === 1
+                ? t.playground.compaction.readyToApply.one
+                : formatString(t.playground.compaction.readyToApply.other, {
+                    n: keptTurns,
+                  })}
             </span>
           ) : null}
         </div>
         {text && !busy ? (
           <Button variant="ghost" size="sm" onClick={onRegenerate}>
             <RefreshCwIcon className="size-3.5" />
-            Regenerate
+            {t.playground.compaction.regenerate}
           </Button>
         ) : null}
       </div>
@@ -830,8 +868,8 @@ function ExecutionStep({
         {preparing ? (
           <ExecutionPlaceholder
             icon={<Spinner className="text-primary size-5" />}
-            title="Resolving thread context"
-            copy="Rendering variables, skills, and included files before compaction."
+            title={t.playground.compaction.resolvingThreadContext}
+            copy={t.playground.compaction.resolvingCopy}
           />
         ) : error ? (
           <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-4 text-xs">
@@ -850,8 +888,8 @@ function ExecutionStep({
         ) : (
           <ExecutionPlaceholder
             icon={<SparklesIcon className="text-primary size-5" />}
-            title="Writing checkpoint"
-            copy="The structured checkpoint will stream here as it is generated."
+            title={t.playground.compaction.writingCheckpoint}
+            copy={t.playground.compaction.writingCopy}
           />
         )}
       </div>
@@ -938,6 +976,7 @@ function TurnStack({
   count: number;
   tone: "muted" | "primary";
 }) {
+  const { t } = useI18n();
   const visibleCount = Math.min(3, Math.max(1, count));
   return (
     <div className="space-y-1.5">
@@ -950,7 +989,9 @@ function TurnStack({
       ))}
       {count > visibleCount ? (
         <div className="text-muted-foreground pt-0.5 text-center text-[0.5625rem]">
-          +{count - visibleCount} more
+          {formatString(t.playground.compaction.moreTurns, {
+            n: count - visibleCount,
+          })}
         </div>
       ) : null}
     </div>
@@ -1037,6 +1078,11 @@ function ExecutionPlaceholder({
   );
 }
 
-function _formatTurns(count: number): string {
-  return `${count} ${count === 1 ? "turn" : "turns"}`;
+function _formatTurns(
+  count: number,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
+  return count === 1
+    ? t.playground.compaction.turnCount.one
+    : formatString(t.playground.compaction.turnCount.other, { n: count });
 }

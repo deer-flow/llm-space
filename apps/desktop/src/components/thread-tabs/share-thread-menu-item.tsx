@@ -1,3 +1,4 @@
+import { useI18n } from "@llm-space/ui/lib/i18n";
 import { ContextMenuItem } from "@llm-space/ui/ui/context-menu";
 
 import type { RuntimeId } from "@/shared/runtime";
@@ -12,9 +13,10 @@ export function ShareThreadMenuItem({
   runtimeId: RuntimeId;
   onShare: (path: string, runtimeId: RuntimeId) => void;
 }) {
+  const { t } = useI18n();
   return (
     <ContextMenuItem onSelect={() => onShare(path, runtimeId)}>
-      Share...
+      {t.desktop.shareThreadMenu.share}
     </ContextMenuItem>
   );
 }
