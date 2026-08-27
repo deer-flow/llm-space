@@ -1,4 +1,7 @@
-import { type WindowStateStore } from "@llm-space/core/server";
+import {
+  isValidWindowFrame,
+  type WindowStateStore,
+} from "@llm-space/core/server";
 import { type BrowserWindow } from "electrobun/bun";
 
 const SAVE_DEBOUNCE_MS = 300;
@@ -17,8 +20,15 @@ function persistWindowState(win: BrowserWindow): Promise<void> {
   } else if (win.isMaximized()) {
     return store.update({ isMaximized: true, isFullScreen: false });
   }
+  const frame = win.getFrame();
+  // On Windows a minimized window reports the off-screen minimized-rect frame
+  // (-32000, ...); never persist it (or any other invalid frame), so the last
+  // good frame stays in the file and the window restores on-screen.
+  if (win.isMinimized() || !isValidWindowFrame(frame)) {
+    return Promise.resolve();
+  }
   return store.update({
-    frame: win.getFrame(),
+    frame,
     isMaximized: false,
     isFullScreen: false,
   });

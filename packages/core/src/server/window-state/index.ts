@@ -39,6 +39,39 @@ export const DEFAULT_WINDOW_FRAME: WindowFrame = {
   height: 800,
 };
 
+/**
+ * Lowest sane window position. Windows' off-screen/minimized-rect convention is
+ * -32000; no real multi-monitor layout needs coordinates below this bound.
+ */
+export const WINDOW_FRAME_MIN_POSITION = -20000;
+
+/** Smallest sane window edge length, in pixels. */
+export const WINDOW_FRAME_MIN_SIZE = 100;
+
+/**
+ * A frame is valid when it is not the Windows minimized-rect convention or any
+ * other off-screen/tiny frame: position within `WINDOW_FRAME_MIN_POSITION` and
+ * size at least `WINDOW_FRAME_MIN_SIZE` on both axes.
+ */
+export function isValidWindowFrame(frame: WindowFrame): boolean {
+  return (
+    frame.x >= WINDOW_FRAME_MIN_POSITION &&
+    frame.y >= WINDOW_FRAME_MIN_POSITION &&
+    frame.width >= WINDOW_FRAME_MIN_SIZE &&
+    frame.height >= WINDOW_FRAME_MIN_SIZE
+  );
+}
+
+/**
+ * The frame to restore the window with: the persisted frame when it is valid,
+ * else the default. Never restores a poisoned frame verbatim (e.g. Windows'
+ * minimized-rect -32000 frame, which would create an off-screen tiny window).
+ */
+export function resolveWindowFrame(state: WindowState): WindowFrame {
+  const frame = getWindowFrame(state);
+  return frame && isValidWindowFrame(frame) ? frame : DEFAULT_WINDOW_FRAME;
+}
+
 export function getWindowFrame(state: WindowState): WindowFrame | undefined {
   return state.frame;
 }

@@ -31,14 +31,19 @@ function capture(url: string): void {
   else pending.push(url);
 }
 
-openLaunchUrlInbox(process.env.LLM_SPACE_LAUNCH_URL_FILE, capture);
+// macOS-only sources: the bundle launcher's URL inbox and Electrobun's
+// `open-url` event (Apple Events). Windows deep links are out of scope for
+// now; the queue and handler seam stay for a future Windows registration.
+if (process.platform === "darwin") {
+  openLaunchUrlInbox(process.env.LLM_SPACE_LAUNCH_URL_FILE, capture);
 
-Electrobun.events.on(
-  "open-url",
-  (event: ElectrobunEvent<{ url: string }, void>) => {
-    capture(event.data.url);
-  }
-);
+  Electrobun.events.on(
+    "open-url",
+    (event: ElectrobunEvent<{ url: string }, void>) => {
+      capture(event.data.url);
+    }
+  );
+}
 
 /** Wire the deep-link importer and flush any URLs buffered during launch. */
 export function setDeepLinkHandler(next: (url: string) => void): void {
