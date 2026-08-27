@@ -74,3 +74,65 @@ describe("executeCommandInBun openLink", () => {
     }
   });
 });
+
+describe("executeCommandInBun page zoom", () => {
+  test("uses a compensated root transform for the CEF Performance edition", () => {
+    const scripts: string[] = [];
+    const window = {
+      getPageZoom: () => {
+        throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
+      },
+      setPageZoom: () => {
+        throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
+      },
+      webview: {
+        renderer: "cef",
+        executeJavascript: (script: string) => scripts.push(script),
+      },
+    };
+
+    executeCommandInBun(
+      { type: "resetZoom", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+    executeCommandInBun(
+      { type: "zoomIn", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+
+    expect(scripts).toHaveLength(2);
+    expect(scripts[1]).toContain("const zoom = 1.1");
+    expect(scripts[1]).toContain(
+      'style.setProperty("transform", `scale(${zoom})`)'
+    );
+    expect(scripts[1]).toContain(
+      'style.setProperty("width", `${100 / zoom}vw`)'
+    );
+    expect(scripts[1]).toContain(
+      'style.setProperty("height", `${100 / zoom}vh`)'
+    );
+  });
+
+  test("keeps using native page zoom for the WebKit edition", () => {
+    const zooms: number[] = [];
+    const window = {
+      setPageZoom: (zoom: number) => zooms.push(zoom),
+      webview: { renderer: "native" },
+    };
+
+    executeCommandInBun(
+      { type: "resetZoom", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+    executeCommandInBun(
+      { type: "zoomOut", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+
+    expect(zooms).toEqual([1, 0.9]);
+  });
+});

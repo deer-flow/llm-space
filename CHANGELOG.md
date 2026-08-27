@@ -4,6 +4,19 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.0] - 2026-08-27
+
+### Changed
+
+- The Performance edition now supports persistent View menu zoom with
+  viewport-compensated Chromium rendering. Zoom In uses the easier `Command+=`
+  shortcut on macOS, alongside the existing Zoom Out and Reset Zoom actions.
+
+### Fixed
+
+- Leaving fullscreen restores the last normal or maximized window state instead
+  of persisting transient macOS transition bounds.
+
 ## [4.14.2] - 2026-08-27
 
 ### Changed

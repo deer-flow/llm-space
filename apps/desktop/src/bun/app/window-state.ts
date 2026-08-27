@@ -193,23 +193,57 @@ function attachFullScreenSync(
 
 // --- page zoom -------------------------------------------------------------
 
+const ZOOM_STEP = 0.1;
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 3;
+
 /** The zoom level we want applied; kept in sync by {@link saveZoom}. */
 let desiredZoom = 1;
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 
+function clampZoom(zoom: number): number {
+  const rounded = Math.round(zoom * 10) / 10;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, rounded));
+}
+
+function applyZoom(win: BrowserWindow, zoom: number): void {
+  if (win.webview?.renderer === "cef") {
+    // Electrobun's native page-zoom API is WebKit-only. Scale the entire CEF
+    // document and compensate its layout viewport so the transformed html
+    // remains exactly the size of the native window in both directions.
+    win.webview.executeJavascript(
+      `(() => {
+        const root = document.documentElement;
+        const zoom = ${zoom};
+        if (zoom === 1) {
+          root.style.removeProperty("transform");
+          root.style.removeProperty("transform-origin");
+          root.style.removeProperty("width");
+          root.style.removeProperty("height");
+          root.style.removeProperty("overflow");
+          return;
+        }
+        root.style.setProperty("transform", ` + "`scale(${zoom})`" + `);
+        root.style.setProperty("transform-origin", "0 0");
+        root.style.setProperty("width", ` + "`${100 / zoom}vw`" + `);
+        root.style.setProperty("height", ` + "`${100 / zoom}vh`" + `);
+        root.style.setProperty("overflow", "hidden");
+      })()`
+    );
+    return;
+  }
+  win.setPageZoom(zoom);
+}
+
 /**
- * Restore a saved zoom level onto the window and keep re-applying it: WebKit
- * page zoom can reset on (re)load, so we re-set it once the DOM is ready.
+ * Restore a saved zoom level onto the window and keep re-applying it after a
+ * renderer reload.
  */
 function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
-  desiredZoom = initialZoom;
-  if (initialZoom !== 1) {
-    win.setPageZoom(initialZoom);
-  }
+  desiredZoom = clampZoom(initialZoom);
+  applyZoom(win, desiredZoom);
   win.webview?.on("dom-ready", () => {
-    if (win.getPageZoom() !== desiredZoom) {
-      win.setPageZoom(desiredZoom);
-    }
+    applyZoom(win, desiredZoom);
   });
 }
 
@@ -234,7 +268,7 @@ export function attachWindowStates(
 
 /** Record a new zoom level (e.g. from the View menu) and persist it. */
 export function saveZoom(zoom: number) {
-  desiredZoom = zoom;
+  desiredZoom = clampZoom(zoom);
   clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => {
     const store = activeStore;
@@ -242,6 +276,22 @@ export function saveZoom(zoom: number) {
       void store.update({ zoom: desiredZoom }).catch(reportWindowStateError);
     }
   }, SAVE_DEBOUNCE_MS);
+}
+
+/** Apply and persist an absolute page zoom level. */
+export function setPageZoom(win: BrowserWindow, zoom: number): void {
+  const nextZoom = clampZoom(zoom);
+  applyZoom(win, nextZoom);
+  saveZoom(nextZoom);
+}
+
+/** Apply and persist one menu/shortcut zoom step. */
+export function adjustPageZoom(
+  win: BrowserWindow,
+  direction: "in" | "out"
+): void {
+  const delta = direction === "in" ? ZOOM_STEP : -ZOOM_STEP;
+  setPageZoom(win, desiredZoom + delta);
 }
 
 /** Capture the final window state and wait until every queued write settles. */

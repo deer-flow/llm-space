@@ -122,7 +122,7 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
         {
           label: "Zoom In",
           action: "zoomIn",
-          accelerator: "CommandOrControl+Plus",
+          accelerator: "CommandOrControl+=",
         },
         {
           label: "Zoom Out",
