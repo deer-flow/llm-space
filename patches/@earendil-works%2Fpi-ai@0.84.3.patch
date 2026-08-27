@@ -1,5 +1,5 @@
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e44a8efa59 100644
+index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85445b915a 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
 @@ -72,7 +72,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
@@ -20,10 +20,10 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
 +                msgIndex++;
 +                continue;
 +            }
-             const isDifferentModel = assistantMsg.model !== model.id &&
-                 assistantMsg.provider === model.provider &&
-                 assistantMsg.api === model.api;
-@@ -305,6 +310,7 @@ function appendCustomToolCallInput(block, nextInput, close) {
+             const isSameProviderAndApi = assistantMsg.provider === model.provider && assistantMsg.api === model.api;
+             const isSameModel = isSameProviderAndApi && assistantMsg.model === model.id;
+             const isDifferentModel = isSameProviderAndApi && assistantMsg.model !== model.id;
+@@ -320,6 +325,7 @@ function appendCustomToolCallInput(block, nextInput, close) {
  export async function processResponsesStream(openaiStream, output, stream, model, options) {
      let sawTerminalResponseEvent = false;
      const outputSlots = new Map();
@@ -31,7 +31,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
      const reasoningBlocksById = new Map();
      const applyMessagePhaseStopReason = (item) => {
          if (item.type === "message" && item.phase === "final_answer") {
-@@ -413,9 +419,66 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -430,9 +436,66 @@ export async function processResponsesStream(openaiStream, output, stream, model
              });
          }
      };
@@ -99,7 +99,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
          if (response?.id) {
              output.responseId = response.id;
          }
-@@ -459,6 +522,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -476,6 +539,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
              output.responseId = event.response.id;
          }
          else if (event.type === "response.output_item.added") {
@@ -107,7 +107,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
              createSlot(event.output_index, event.item);
          }
          else if (event.type === "response.reasoning_summary_text.delta") {
-@@ -556,6 +620,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -573,6 +637,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
          }
          else if (event.type === "response.output_item.done") {
              const item = event.item;
@@ -115,7 +115,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
              applyMessagePhaseStopReason(item);
              const slot = getOrCreateSlot(event.output_index, item);
              if (item.type === "reasoning" && slot?.type === "thinking") {
-@@ -574,6 +639,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -591,6 +656,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              }
              else if (item.type === "message" && slot?.type === "text") {
                  slot.block.text = item.content?.map((c) => (c.type === "output_text" ? c.text : c.refusal)).join("") || "";
@@ -126,7 +126,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..5a2d12500e369a1e22a8f0d1d84d72e4
                  stream.push({
                      type: "text_end",
 diff --git a/dist/api/openai-responses.d.ts b/dist/api/openai-responses.d.ts
-index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e46221e2c 100644
+index 41267bd50904069aa0879cc8634ea94bc1045236..cc4a5b401a49b0db170cdc0380ed76faff7a6f9c 100644
 --- a/dist/api/openai-responses.d.ts
 +++ b/dist/api/openai-responses.d.ts
 @@ -5,6 +5,7 @@ export interface OpenAIResponsesOptions extends StreamOptions {
@@ -138,11 +138,11 @@ index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e
  /**
   * Generate function for OpenAI Responses API
 diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
-index 7b578e03bbe2edf0f32908483a58997f83768c2f..abf0384359479466a1565ef7beca6095f71270fa 100644
+index 0fb7e8b26f323f2b44a5a4b760bccedc4c3abdd0..32bdd63434afc5201a4c956ffc10152e9260fb4f 100644
 --- a/dist/api/openai-responses.js
 +++ b/dist/api/openai-responses.js
-@@ -150,6 +150,9 @@ export const streamSimple = (model, context, options) => {
-     const base = buildBaseOptions(model, context, options, options?.apiKey);
+@@ -155,6 +155,9 @@ export const streamSimple = (model, context, options) => {
+     };
      const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
      const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
 +    if (options?.responseApiNativeTools?.length) {
@@ -151,7 +151,7 @@ index 7b578e03bbe2edf0f32908483a58997f83768c2f..abf0384359479466a1565ef7beca6095
      return stream(model, context, {
          ...base,
          reasoningEffort,
-@@ -219,11 +222,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
+@@ -230,11 +233,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
      if (options?.serviceTier !== undefined) {
          params.service_tier = options.serviceTier;
      }
@@ -168,10 +168,10 @@ index 7b578e03bbe2edf0f32908483a58997f83768c2f..abf0384359479466a1565ef7beca6095
      if (options?.toolChoice !== undefined) {
          params.tool_choice = options.toolChoice;
 diff --git a/dist/types.d.ts b/dist/types.d.ts
-index 6ea9e391ecbf6a54c111170ad74653dcc9135085..6c2fce9e33aebe798bfd44d0f7efd607b0e29b0b 100644
+index 5bba63f8790aaa67e96dbb815778cc5e4f59f277..5da825852683f4b8bb5af02c821b442ba2899e43 100644
 --- a/dist/types.d.ts
 +++ b/dist/types.d.ts
-@@ -216,6 +216,8 @@ export interface SimpleStreamOptions extends StreamOptions {
+@@ -226,6 +226,8 @@ export interface SimpleStreamOptions extends StreamOptions {
      };
      /** Custom token budgets for thinking levels (token-based providers only) */
      thinkingBudgets?: ThinkingBudgets;
@@ -180,7 +180,7 @@ index 6ea9e391ecbf6a54c111170ad74653dcc9135085..6c2fce9e33aebe798bfd44d0f7efd607
  }
  export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (model: Model<TApi>, context: Context, options?: TOptions) => AssistantMessageEventStream;
  export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> = (model: ImagesModel<TApi>, context: ImagesContext, options?: TOptions) => Promise<AssistantImages>;
-@@ -228,7 +230,30 @@ export interface TextContent {
+@@ -238,7 +240,30 @@ export interface TextContent {
      type: "text";
      text: string;
      textSignature?: string;
@@ -212,12 +212,12 @@ index 6ea9e391ecbf6a54c111170ad74653dcc9135085..6c2fce9e33aebe798bfd44d0f7efd607
  export interface ThinkingContent {
      type: "thinking";
      thinking: string;
-@@ -306,6 +331,8 @@ export interface AssistantMessage {
+@@ -318,6 +343,8 @@ export interface AssistantMessage {
      deferred?: DeferredHandle;
      errorMessage?: string;
      rawStopReason?: string;
 +    nativeToolActivities?: NativeToolActivity[];
 +    responseOutputItems?: ResponseOutputItem[];
-     timestamp: number;
- }
- export interface ToolResultMessage<TDetails = any> {
+     /**
+      * Provider indication of whether the model explicitly ended its turn.
+      * Preserved for debugging and does not currently affect agent control flow.

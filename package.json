@@ -36,8 +36,8 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@earendil-works/pi-ai": "^0.84.1",
-    "@earendil-works/pi-agent-core": "^0.84.1",
+    "@earendil-works/pi-ai": "^0.84.3",
+    "@earendil-works/pi-agent-core": "^0.84.3",
     "@tanstack/react-virtual": "^3.14.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -77,6 +77,6 @@
     "typebox": "catalog:"
   },
   "patchedDependencies": {
-    "@earendil-works/pi-ai@0.84.1": "patches/@earendil-works%2Fpi-ai@0.84.1.patch"
+    "@earendil-works/pi-ai@0.84.3": "patches/@earendil-works%2Fpi-ai@0.84.3.patch"
   }
 }
