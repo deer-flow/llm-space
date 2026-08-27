@@ -4,6 +4,19 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.2] - 2026-08-27
+
+### Changed
+
+- The bundled pi packages are upgraded to `0.84.3` while preserving Responses
+  native-tool replay, citations, and provider-hosted activity metadata.
+
+### Fixed
+
+- Message lists follow streaming output without fighting user scrolling, and
+  switching between standard and virtualized layouts no longer reuses stale
+  container measurements.
+
 ## [4.14.1] - 2026-08-19
 
 ### Fixed
