@@ -4,6 +4,16 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.1] - 2026-08-29
+
+### Fixed
+
+- Prompt templates that reference live skill variables refresh when the enabled
+  skill set changes instead of reusing stale whole-template snapshots. Existing
+  thread snapshots migrate automatically on their next run.
+- Message views no longer steal the scroll position when streaming starts away
+  from the bottom or after a one-shot message focus has already been consumed.
+
 ## [4.15.0] - 2026-08-27
 
 ### Changed
