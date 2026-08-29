@@ -76,7 +76,7 @@ export interface PlanCompactionOptions {
   hasMetaUserPrompt?: boolean;
 }
 
-/** True for the synthetic first user message created by this compactor. */
+/** True for the synthetic checkpoint user message created by this compactor. */
 export function isCompactionMessage(message: Message | undefined): boolean {
   if (message?.role !== "user") return false;
   const text = getMessageText(message);

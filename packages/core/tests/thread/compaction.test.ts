@@ -135,6 +135,16 @@ Ship more
       "a2",
     ]);
     expect(nextPlan.keptMessages.map((message) => message.id)).toEqual(["u3"]);
+
+    const reapplied = applyCompactionPreview(
+      nextPlan,
+      "## Goal\nNewest task"
+    );
+    expect(reapplied[0]?.id).toBe("meta");
+    expect(reapplied[1]?.id).toBe(applied[1]?.id);
+    expect(isCompactionMessage(reapplied[1])).toBe(true);
+    expect(getMessageText(reapplied[1]!)).toContain("## Goal\nNewest task");
+    expect(reapplied.slice(2).map((message) => message.id)).toEqual(["u3"]);
   });
 
   test("serializes tool calls and truncates large results", () => {
