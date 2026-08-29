@@ -14,6 +14,7 @@ await mock.module("electrobun/bun", () => ({
 }));
 
 const { executeCommandInBun } = await import("./commands");
+const { attachWindowStates } = await import("./app/window-state");
 
 function _createDependencies(openedUrls: string[]) {
   return {
@@ -78,9 +79,19 @@ describe("executeCommandInBun openLink", () => {
 describe("executeCommandInBun page zoom", () => {
   test("uses a compensated root transform for the CEF Performance edition", () => {
     const scripts: string[] = [];
+    const windowListeners = new Map<string, (() => void)[]>();
+    const webviewListeners = new Map<string, (() => void)[]>();
     const window = {
+      getFrame: () => ({ x: 0, y: 0, width: 1200, height: 800 }),
       getPageZoom: () => {
         throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
+      },
+      isFullScreen: () => false,
+      isMaximized: () => false,
+      on: (name: string, listener: () => void) => {
+        const listeners = windowListeners.get(name) ?? [];
+        listeners.push(listener);
+        windowListeners.set(name, listeners);
       },
       setPageZoom: () => {
         throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
@@ -88,8 +99,28 @@ describe("executeCommandInBun page zoom", () => {
       webview: {
         renderer: "cef",
         executeJavascript: (script: string) => scripts.push(script),
+        on: (name: string, listener: () => void) => {
+          const listeners = webviewListeners.get(name) ?? [];
+          listeners.push(listener);
+          webviewListeners.set(name, listeners);
+        },
       },
     };
+    const store = {
+      state: {
+        frame: { x: 0, y: 0, width: 1200, height: 800 },
+        isMaximized: false,
+        isFullScreen: false,
+      },
+      update: () => Promise.resolve(),
+    };
+
+    attachWindowStates(window as never, {
+      store: store as never,
+      onFullScreenChange: () => undefined,
+    });
+    for (const listener of webviewListeners.get("dom-ready") ?? []) listener();
+    scripts.length = 0;
 
     executeCommandInBun(
       { type: "resetZoom", args: {} },

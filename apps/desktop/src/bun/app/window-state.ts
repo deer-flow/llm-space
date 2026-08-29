@@ -200,6 +200,7 @@ const ZOOM_MAX = 3;
 /** The zoom level we want applied; kept in sync by {@link saveZoom}. */
 let desiredZoom = 1;
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
+const cefDomReadyWindows = new WeakSet<BrowserWindow>();
 
 function clampZoom(zoom: number): number {
   const rounded = Math.round(zoom * 10) / 10;
@@ -208,6 +209,10 @@ function clampZoom(zoom: number): number {
 
 function applyZoom(win: BrowserWindow, zoom: number): void {
   if (win.webview?.renderer === "cef") {
+    // CEF creates its browser asynchronously after BrowserWindow returns.
+    // Calling executeJavascript before dom-ready dereferences Electrobun's
+    // not-yet-created CefBrowser and can SIGTRAP during profile startup.
+    if (!cefDomReadyWindows.has(win)) return;
     // Electrobun's native page-zoom API is WebKit-only. Scale the entire CEF
     // document and compensate its layout viewport so the transformed html
     // remains exactly the size of the native window in both directions.
@@ -243,6 +248,7 @@ function attachZoomPersistence(win: BrowserWindow, initialZoom: number) {
   desiredZoom = clampZoom(initialZoom);
   applyZoom(win, desiredZoom);
   win.webview?.on("dom-ready", () => {
+    if (win.webview?.renderer === "cef") cefDomReadyWindows.add(win);
     applyZoom(win, desiredZoom);
   });
 }

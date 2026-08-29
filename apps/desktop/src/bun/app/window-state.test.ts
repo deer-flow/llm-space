@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import type { WindowState } from "@llm-space/core/server";
 
-import { attachWindowStatePersistence } from "./window-state";
+import {
+  attachWindowStatePersistence,
+  attachWindowStates,
+  setPageZoom,
+} from "./window-state";
 
 interface Frame {
   x: number;
@@ -17,11 +21,29 @@ class FakeWindow {
   maximized = false;
   maximizeCalls = 0;
   restoredFrames: Frame[] = [];
+  scripts: string[] = [];
+  webview?: {
+    renderer: "cef" | "native";
+    executeJavascript: (script: string) => void;
+    on: (name: string, listener: () => void) => void;
+  };
 
   private readonly _listeners = new Map<string, (() => void)[]>();
+  private readonly _webviewListeners = new Map<string, (() => void)[]>();
 
-  constructor(frame: Frame) {
+  constructor(frame: Frame, renderer?: "cef" | "native") {
     this.frame = frame;
+    if (renderer) {
+      this.webview = {
+        renderer,
+        executeJavascript: (script) => this.scripts.push(script),
+        on: (name, listener) => {
+          const listeners = this._webviewListeners.get(name) ?? [];
+          listeners.push(listener);
+          this._webviewListeners.set(name, listeners);
+        },
+      };
+    }
   }
 
   on(name: string, listener: () => void): void {
@@ -32,6 +54,10 @@ class FakeWindow {
 
   emit(name: string): void {
     for (const listener of this._listeners.get(name) ?? []) listener();
+  }
+
+  emitWebview(name: string): void {
+    for (const listener of this._webviewListeners.get(name) ?? []) listener();
   }
 
   getFrame(): Frame {
@@ -159,5 +185,36 @@ describe("window state persistence", () => {
       isMaximized: true,
       isFullScreen: false,
     });
+  });
+});
+
+describe("CEF zoom persistence", () => {
+  test("waits for dom-ready and applies the latest queued zoom", () => {
+    const frame = { x: 100, y: 80, width: 1280, height: 800 };
+    const win = new FakeWindow(frame, "cef");
+    const store = new FakeStore({
+      frame,
+      isMaximized: false,
+      isFullScreen: false,
+    });
+
+    attachWindowStates(win as never, {
+      store: store as never,
+      zoom: 1.2,
+      onFullScreenChange: () => undefined,
+    });
+
+    expect(win.scripts).toEqual([]);
+
+    setPageZoom(win as never, 1.3);
+    expect(win.scripts).toEqual([]);
+
+    win.emitWebview("dom-ready");
+    expect(win.scripts).toHaveLength(1);
+    expect(win.scripts[0]).toContain("const zoom = 1.3");
+
+    setPageZoom(win as never, 1.4);
+    expect(win.scripts).toHaveLength(2);
+    expect(win.scripts[1]).toContain("const zoom = 1.4");
   });
 });

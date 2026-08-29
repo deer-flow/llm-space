@@ -4,6 +4,14 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.2] - 2026-08-29
+
+### Fixed
+
+- The Performance edition waits for Chromium's DOM-ready signal before
+  restoring page zoom, preventing second-launch startup crashes caused by
+  executing JavaScript before the CEF browser exists.
+
 ## [4.15.1] - 2026-08-29
 
 ### Fixed
