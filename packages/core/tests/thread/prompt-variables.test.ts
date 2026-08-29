@@ -273,6 +273,103 @@ describe("renderThreadPromptVariables — template output freeze", () => {
     });
     expect(fresh.context.systemPrompt).toBe("V2");
   });
+
+  test("re-renders a template when its live skills change", async () => {
+    const base = context(
+      "{% if available_skills %}{{available_skills}}{% endif %}",
+      {
+        variables: {
+          available_skills: {
+            type: "skills",
+            skillNames: [],
+            format: "markdown-list",
+            indent: 0,
+          },
+        },
+      }
+    );
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadSkills: () =>
+        Promise.resolve([
+          { name: "first", description: "First skill", path: "/first" },
+        ]),
+    });
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      loadSkills: () =>
+        Promise.resolve([
+          { name: "second", description: "Second skill", path: "/second" },
+        ]),
+    });
+
+    expect(first.context.systemPrompt).toBe("- **first**: First skill");
+    expect(second.context.systemPrompt).toBe("- **second**: Second skill");
+  });
+
+  test("migrates a legacy template snapshot that references live skills", async () => {
+    const base = context(
+      "{% if available_skills %}{{available_skills}}{% endif %}",
+      {
+        variables: {
+          available_skills: {
+            type: "skills",
+            skillNames: [],
+            format: "markdown-list",
+            indent: 0,
+          },
+        },
+      }
+    );
+    const refreshed = await renderThreadPromptVariables({
+      context: {
+        ...base,
+        snapshot: {
+          variables: {
+            [SYSTEM_PROMPT_PLACE_KEY]: { "\0rendered": "STALE" },
+          },
+        },
+      },
+      loadSkills: () =>
+        Promise.resolve([
+          { name: "fresh", description: "Fresh skill", path: "/fresh" },
+        ]),
+    });
+
+    expect(refreshed.context.systemPrompt).toBe("- **fresh**: Fresh skill");
+  });
+
+  test("keeps a template frozen while its live skills stay unchanged", async () => {
+    const base = context(
+      "{{current_date}}{% if available_skills %} {{available_skills}}{% endif %}",
+      {
+        variables: {
+          current_date: { type: "currentDate", format: "iso-date" },
+          available_skills: {
+            type: "skills",
+            skillNames: [],
+            format: "markdown-list",
+            indent: 0,
+          },
+        },
+      }
+    );
+    const skills = [
+      { name: "same", description: "Same skill", path: "/same" },
+    ];
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadSkills: () => Promise.resolve(skills),
+      now: () => new Date("2026-08-29T00:00:00Z"),
+    });
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      loadSkills: () => Promise.resolve(skills),
+      now: () => new Date("2026-08-30T00:00:00Z"),
+    });
+
+    expect(second.context.systemPrompt).toBe(first.context.systemPrompt);
+  });
 });
 
 describe("removePromptVariableSnapshotNames — value-edit invalidation", () => {
