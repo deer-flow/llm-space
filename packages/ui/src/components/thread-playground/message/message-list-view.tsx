@@ -139,8 +139,12 @@ export function MessageListView({
   const storeMessages = useThreadStore(
     (state) => state.thread.context?.messages
   );
-  const { appendMessage, moveMessage, resolveRunValidationIssue } =
-    useThreadStoreActions();
+  const {
+    appendMessage,
+    consumeAutoFocusMessage,
+    moveMessage,
+    resolveRunValidationIssue,
+  } = useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
@@ -172,6 +176,13 @@ export function MessageListView({
     () => messages.map((message) => message.id),
     [messages]
   );
+  const autoFocusMessageIndex = autoFocusMessageId
+    ? messages.findIndex((message) => message.id === autoFocusMessageId)
+    : -1;
+  const validationMessageId = runValidationIssue?.messageId ?? null;
+  const validationMessageIndex = validationMessageId
+    ? messages.findIndex((message) => message.id === validationMessageId)
+    : -1;
   const collapsedMessageIdSet = useMemo(
     () => new Set(collapsedMessageIds),
     [collapsedMessageIds]
@@ -407,27 +418,23 @@ export function MessageListView({
     return followMessageViewportBottom(viewport, content);
   }, [getScrollElement, status]);
   useEffect(() => {
-    if (!autoFocusMessageId) {
+    if (!autoFocusMessageId || autoFocusMessageIndex < 0) {
       return;
     }
-    const index = messages.findIndex(
-      (message) => message.id === autoFocusMessageId
-    );
-    if (index >= 0) {
-      scrollToMessageIndex(index, "auto");
-    }
-  }, [autoFocusMessageId, messages, scrollToMessageIndex]);
+    scrollToMessageIndex(autoFocusMessageIndex, "auto");
+    consumeAutoFocusMessage(autoFocusMessageId);
+  }, [
+    autoFocusMessageId,
+    autoFocusMessageIndex,
+    consumeAutoFocusMessage,
+    scrollToMessageIndex,
+  ]);
   useEffect(() => {
-    if (!runValidationIssue?.messageId) {
+    if (!validationMessageId || validationMessageIndex < 0) {
       return;
     }
-    const index = messages.findIndex(
-      (message) => message.id === runValidationIssue.messageId
-    );
-    if (index >= 0) {
-      scrollToMessageIndex(index, "auto");
-    }
-  }, [messages, runValidationIssue, scrollToMessageIndex]);
+    scrollToMessageIndex(validationMessageIndex, "auto");
+  }, [validationMessageId, validationMessageIndex, scrollToMessageIndex]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const showNavigator = displayMessages.length > 1;

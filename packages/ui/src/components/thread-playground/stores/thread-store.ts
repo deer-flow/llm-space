@@ -154,6 +154,7 @@ export interface ThreadState {
   removeEvaluationRubric(id: string): boolean;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
+  consumeAutoFocusMessage(messageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
   removeMessage(id: string): void;
   updateSystemPrompt(systemPrompt: string): void;
@@ -704,6 +705,11 @@ export function createThreadStore(
             ...messages.slice(index),
           ]);
           set({ autoFocusMessageId: message.id });
+        },
+        consumeAutoFocusMessage(messageId: string) {
+          if (get().autoFocusMessageId === messageId) {
+            set({ autoFocusMessageId: null });
+          }
         },
         moveMessage(fromIndex: number, toIndex: number) {
           updateMessages((messages) => {
@@ -1815,6 +1821,7 @@ const selectActions = (s: ThreadState) => ({
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,
+  consumeAutoFocusMessage: s.consumeAutoFocusMessage,
   moveMessage: s.moveMessage,
   removeMessage: s.removeMessage,
   updateSystemPrompt: s.updateSystemPrompt,

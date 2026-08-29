@@ -22,8 +22,9 @@ class FakeViewport extends EventTarget {
   }
 }
 
-function _bottomFollowerHarness() {
+function _bottomFollowerHarness(initialScrollTop = 800) {
   const viewport = new FakeViewport();
+  viewport.scrollTop = initialScrollTop;
   const content = new EventTarget();
   const frames: FrameRequestCallback[] = [];
   const canceledFrames: number[] = [];
@@ -73,6 +74,28 @@ describe("followMessageViewportBottom", () => {
     frames.shift()?.(0);
 
     expect(viewport.scrollTop).toBe(1_000);
+    cleanup();
+  });
+
+  test("does not take over when a run starts away from the bottom", () => {
+    const { cleanup, frames, resize, viewport } = _bottomFollowerHarness(400);
+
+    expect(viewport.scrollTop).toBe(400);
+    viewport.scrollHeight = 1_200;
+    resize([], {} as ResizeObserver);
+    expect(frames).toHaveLength(0);
+    expect(viewport.scrollTop).toBe(400);
+    cleanup();
+  });
+
+  test("pauses following as soon as the user interacts with the viewport", () => {
+    const { cleanup, frames, resize, viewport } = _bottomFollowerHarness();
+
+    viewport.dispatchEvent(new Event("pointerdown"));
+    viewport.scrollHeight = 1_200;
+    resize([], {} as ResizeObserver);
+    expect(frames).toHaveLength(0);
+    expect(viewport.scrollTop).toBe(800);
     cleanup();
   });
 

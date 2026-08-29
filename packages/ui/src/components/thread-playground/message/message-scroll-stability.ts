@@ -21,6 +21,13 @@ interface ScrollStabilizationSession {
 const sessions = new WeakMap<HTMLElement, ScrollStabilizationSession>();
 const STABILIZATION_TIMEOUT_MS = 10_000;
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48;
+const AUTO_SCROLL_START_THRESHOLD_PX = 160;
+const FOLLOW_CANCEL_EVENTS = [
+  "keydown",
+  "pointerdown",
+  "touchstart",
+  "wheel",
+] as const;
 
 /**
  * Follow layout growth at the bottom of an active run without subscribing the
@@ -38,13 +45,14 @@ export function followMessageViewportBottom(
 ) {
   const scheduleFrame = options.scheduleFrame ?? requestAnimationFrame;
   const cancelFrame = options.cancelFrame ?? cancelAnimationFrame;
-  let following = true;
+  const distanceFromBottom = () =>
+    viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
+  let following = distanceFromBottom() <= AUTO_SCROLL_START_THRESHOLD_PX;
   let frameId: number | null = null;
   let previousScrollTop = viewport.scrollTop;
 
   const isNearBottom = () =>
-    viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <=
-    AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
+    distanceFromBottom() <= AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
   const scrollToBottom = () => {
     frameId = null;
     if (!following) {
@@ -67,19 +75,30 @@ export function followMessageViewportBottom(
     }
     previousScrollTop = scrollTop;
   };
+  const stopFollowing = () => {
+    following = false;
+  };
 
   const observer = (
     options.createResizeObserver ??
     ((callback: ResizeObserverCallback) => new ResizeObserver(callback))
   )(scheduleScrollToBottom);
   viewport.addEventListener("scroll", handleScroll, { passive: true });
+  for (const type of FOLLOW_CANCEL_EVENTS) {
+    viewport.addEventListener(type, stopFollowing, { passive: true });
+  }
   observer.observe(content);
-  viewport.scrollTop = viewport.scrollHeight;
+  if (following) {
+    viewport.scrollTop = viewport.scrollHeight;
+  }
   previousScrollTop = viewport.scrollTop;
 
   return () => {
     observer.disconnect();
     viewport.removeEventListener("scroll", handleScroll);
+    for (const type of FOLLOW_CANCEL_EVENTS) {
+      viewport.removeEventListener(type, stopFollowing);
+    }
     if (frameId !== null) {
       cancelFrame(frameId);
     }
