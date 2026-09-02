@@ -55,7 +55,7 @@ export const execCodeTool: BuiltinTool = {
   name: "exec_code",
   icon: "code-2",
   description:
-    'Execute Python, JavaScript, or TypeScript code in a persistent notebook-style session and return stdout, stderr, the last expression result, and execution metadata. Pass session_id null to create a session, then reuse the returned session_id to keep variables, imports, and working-directory state. You must use this tool with runtime "bun" whenever you need to execute a JavaScript or TypeScript script. Use it for CodeAct-style workflows, exploratory data analysis, advanced data analysis, multi-step computation, data processing, and verifiable logic. Sessions are isolated from one another and expire after inactivity. Use dedicated file tools instead when the task is simply to read or modify files.',
+    'Execute Python, JavaScript, or TypeScript code in a persistent notebook-style session and return stdout, stderr, the last expression result, and execution metadata. Pass session_id null to create a session, then reuse the returned session_id to keep variables, imports, and working-directory state. You must use this tool with runtime "bun" whenever you need to execute a JavaScript or TypeScript script. Use it for arithmetic and scientific calculations, CodeAct-style workflows, multi-step computation, data processing, and verifiable logic. For exploratory or advanced data analysis, use runtime "python" and reuse the returned session_id across calls so variables, imports, loaded datasets, and intermediate results remain available. Sessions are isolated from one another and expire after inactivity. Use dedicated file tools instead when the task is simply to read or modify files.',
   strict: true,
   parameters: {
     type: "object",

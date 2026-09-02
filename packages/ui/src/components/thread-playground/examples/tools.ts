@@ -97,6 +97,52 @@ const BASH_TOOL: FunctionTool = _functionTool({
   },
 });
 
+const EXEC_CODE_TOOL: FunctionTool = _functionTool({
+  name: "exec_code",
+  description:
+    'Execute Python, JavaScript, or TypeScript code in a persistent notebook-style session and return stdout, stderr, the last expression result, and execution metadata. Pass session_id null to create a session, then reuse the returned session_id to keep variables, imports, and working-directory state. You must use this tool with runtime "bun" whenever you need to execute a JavaScript or TypeScript script. Use it for arithmetic and scientific calculations, CodeAct-style workflows, multi-step computation, data processing, and verifiable logic. For exploratory or advanced data analysis, use runtime "python" and reuse the returned session_id across calls so variables, imports, loaded datasets, and intermediate results remain available. Sessions are isolated from one another and expire after inactivity. Use dedicated file tools instead when the task is simply to read or modify files.',
+  strict: true,
+  parameters: {
+    type: "object",
+    required: ["description", "runtime", "code", "session_id"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Must be the first parameter. A short human-readable explanation of what the code does and why it is being run.",
+      },
+      runtime: {
+        type: "string",
+        enum: ["python", "bun"],
+        description:
+          "The execution runtime. Use python for Python and bun for JavaScript or TypeScript.",
+      },
+      code: {
+        type: "string",
+        description:
+          "Source code for this notebook cell. The last expression is returned as result without requiring print(). In Bun sessions, load modules with require() rather than static import declarations.",
+      },
+      session_id: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description:
+          "Pass null to create a new session. To retain variables and imports, pass the session_id returned by the previous call and keep runtime unchanged.",
+      },
+      cwd: {
+        type: "string",
+        description:
+          "Optional working directory for this cell. Relative paths resolve from the workspace root. If omitted, a new session starts at the workspace root and an existing session keeps its current directory.",
+      },
+      timeout_ms: {
+        type: "number",
+        description:
+          "Optional execution timeout in milliseconds. Defaults to 120000 and is capped at 600000. A timeout destroys the session.",
+        default: 120_000,
+      },
+    },
+    additionalProperties: false,
+  },
+});
+
 const READ_FILE_TOOL: FunctionTool = _functionTool({
   name: "read",
   description:
@@ -684,6 +730,12 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
   },
   { type: "separator" },
   { type: "tool", label: "bash", tool: BASH_TOOL, icon: TerminalIcon },
+  {
+    type: "tool",
+    label: "exec_code",
+    tool: EXEC_CODE_TOOL,
+    icon: CodeIcon,
+  },
   {
     type: "tool",
     label: "read",

@@ -157,6 +157,12 @@ describe("exec_code built-in tool", () => {
     expect(parameters.properties.timeout_ms?.default).toBe(120_000);
     expect(execCodeTool.description).toContain("notebook-style session");
     expect(execCodeTool.description).toContain("CodeAct-style workflows");
+    expect(execCodeTool.description).toContain(
+      "arithmetic and scientific calculations"
+    );
+    expect(execCodeTool.description).toContain(
+      'data analysis, use runtime "python" and reuse the returned session_id'
+    );
     expect(parameters.properties.code?.description).toContain("require()");
     expect(parameters.additionalProperties).toBe(false);
   });

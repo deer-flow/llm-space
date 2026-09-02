@@ -220,6 +220,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
         "grep",
         "glob",
         "bash",
+        "exec_code",
         "todo_write",
         "present_files",
       ]),

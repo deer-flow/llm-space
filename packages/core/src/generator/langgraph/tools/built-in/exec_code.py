@@ -358,9 +358,12 @@ def exec_code(
     Pass session_id null to create a session, then reuse the returned session_id
     to retain variables, imports, and working-directory state. You must use
     runtime ``bun`` whenever executing JavaScript or TypeScript. Use this tool
-    for CodeAct-style workflows, exploratory or advanced data analysis,
-    multi-step computation, data processing, and verifiable logic. Sessions
-    expire after 30 minutes of inactivity.
+    for arithmetic and scientific calculations, CodeAct-style workflows,
+    multi-step computation, data processing, and verifiable logic. For
+    exploratory or advanced data analysis, use runtime ``python`` and reuse the
+    returned session_id across calls so variables, imports, loaded datasets,
+    and intermediate results remain available. Sessions expire after 30 minutes
+    of inactivity.
 
     Args:
         description: A short explanation of what the code does and why.
