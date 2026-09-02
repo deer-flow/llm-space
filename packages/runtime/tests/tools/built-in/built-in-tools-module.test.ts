@@ -103,6 +103,9 @@ describe("built-in tools module", () => {
       "todo_write",
       "sleep",
       "ask_user_question",
+      "calculator",
+      "date_difference",
+      "exec_code",
     ]);
     expect(
       tools.listTools().find((tool) => tool.name === "generate_image")

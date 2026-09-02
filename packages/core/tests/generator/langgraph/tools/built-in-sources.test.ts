@@ -37,9 +37,199 @@ describe("built-in tool sources manifest", () => {
   });
 
   it("covers the expected built-in tools", () => {
+    expect(BUILTIN_TOOL_SOURCES.calculator).toContain("def calculator(");
+    expect(BUILTIN_TOOL_SOURCES.date_difference).toContain(
+      "def date_difference("
+    );
+    expect(BUILTIN_TOOL_SOURCES.exec_code).toContain("def exec_code(");
     expect(BUILTIN_TOOL_SOURCES.read).toContain("def read(");
     expect(BUILTIN_TOOL_SOURCES.web_search).toContain("SEARCH_PROVIDER");
     expect(Object.keys(BUILTIN_TOOL_SOURCES).length).toBeGreaterThanOrEqual(16);
+  });
+
+  it("executes generated Python and Bun code through exec_code", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "llm-space-python-exec-code-")
+    );
+    const toolPath = path.join(root, "exec_code.py");
+    try {
+      await writeFile(toolPath, BUILTIN_TOOL_SOURCES.exec_code!, "utf8");
+      const script = `
+import importlib.util
+import sys
+import types
+
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+
+spec = importlib.util.spec_from_file_location("exec_code", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+python_first = module.exec_code(
+    "test python", "python", """values = [2, 3, 5]
+sum(values)""", None,
+    timeout_ms=5000,
+)
+assert python_first["result"] == "10"
+assert python_first["execution_count"] == 1
+python_second = module.exec_code(
+    "continue python", "python", """values.append(7)
+values""",
+    python_first["session_id"], timeout_ms=5000,
+)
+assert python_second["result"] == "[2, 3, 5, 7]"
+assert python_second["execution_count"] == 2
+
+bun_first = module.exec_code(
+    "test bun", "bun", 'let answer: number = 40; answer + 1', None,
+    timeout_ms=5000,
+)
+assert bun_first["result"] == "41"
+bun_second = module.exec_code(
+    "continue bun", "bun", 'answer + 2', bun_first["session_id"],
+    timeout_ms=5000,
+)
+assert bun_second["result"] == "42"
+`;
+      const child = Bun.spawn(["python3", "-c", script, toolPath], {
+        cwd: root,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(stdout).toBe("");
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("executes the generated date difference tool with endpoint options", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "llm-space-python-date-difference-")
+    );
+    const toolPath = path.join(root, "date_difference.py");
+    try {
+      await writeFile(
+        toolPath,
+        BUILTIN_TOOL_SOURCES.date_difference!,
+        "utf8"
+      );
+      const script = `
+import importlib.util
+import sys
+import types
+
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+
+spec = importlib.util.spec_from_file_location("date_difference", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+assert module.date_difference("2026-09-01", "2026-09-03") == "2 days"
+assert module.date_difference(
+    "2026-09-01", "2026-09-03", True, True
+) == "3 days"
+assert module.date_difference(
+    "2026-09-01 10:20:30", "2026-09-03 13:24:35"
+) == "2 days, 3 hours, 4 minutes, 5 seconds"
+
+for start, end in (
+    ("2025-02-29", "2025-03-01"),
+    ("2026-09-03", "2026-09-01"),
+    ("2026-09-01", "2026-09-03 00:00:00"),
+):
+    try:
+        module.date_difference(start, end)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"expected failure for {start}, {end}")
+`;
+      const child = Bun.spawn(["python3", "-c", script, toolPath], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(stdout).toBe("");
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("executes the generated calculator with TypeScript-compatible semantics", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "llm-space-python-calculator-")
+    );
+    const calculatorPath = path.join(root, "calculator.py");
+    try {
+      await writeFile(calculatorPath, BUILTIN_TOOL_SOURCES.calculator!, "utf8");
+      const script = `
+import importlib.util
+import math
+import sys
+import types
+
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+
+spec = importlib.util.spec_from_file_location("calculator", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+assert module.calculator("2 + 3 * 4") == 14
+assert module.calculator("2 ** 3 ** 2") == 512
+assert math.isclose(module.calculator("Math.sin(Math.PI / 2) + sqrt(81)"), 10)
+assert module.calculator("-5 % 2") == -1
+
+for expression in ("1 / 0", "sqrt(-1)", "process.exit()", "1e309"):
+    try:
+        module.calculator(expression)
+    except ValueError as error:
+        assert str(error).startswith("Calculator "), str(error)
+    else:
+        raise AssertionError(f"expected failure for {expression}")
+`;
+      const child = Bun.spawn(["python3", "-c", script, calculatorPath], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(stdout).toBe("");
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("parses YAML literal block descriptions in generated Python", async () => {

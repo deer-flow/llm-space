@@ -1,4 +1,7 @@
 import {
+  CalculatorIcon,
+  CalendarClockIcon,
+  Code2Icon,
   CircleHelpIcon,
   CloudSunIcon,
   Edit3Icon,
@@ -22,6 +25,9 @@ import {
 
 /** Stable icon keys set on each built-in tool's `icon` field (bun side). */
 const ICON_BY_KEY: Record<string, LucideIcon> = {
+  calculator: CalculatorIcon,
+  "calendar-clock": CalendarClockIcon,
+  "code-2": Code2Icon,
   "file-text": FileTextIcon,
   "file-output": FileOutputIcon,
   "file-pen-line": FilePenLineIcon,
@@ -43,6 +49,9 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
 
 /** Fallback for tools persisted before the `icon` field existed. */
 const ICON_KEY_BY_NAME: Record<string, string> = {
+  calculator: "calculator",
+  date_difference: "calendar-clock",
+  exec_code: "code-2",
   read: "file-text",
   write: "file-output",
   edit: "pencil",

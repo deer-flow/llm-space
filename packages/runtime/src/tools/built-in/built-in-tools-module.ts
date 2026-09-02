@@ -1,5 +1,11 @@
 import type { RuntimeModule } from "../runtime-module";
 
+import { calculatorBuiltInTools } from "./calculator";
+import { dateDifferenceBuiltInTools } from "./date-difference";
+import {
+  createExecCodeBuiltInTools,
+  ExecCodeSessionManager,
+} from "./exec-code";
 import { createFsBuiltInTools } from "./fs";
 import type { FsBuiltInToolsDependencies } from "./fs";
 import { createMediaBuiltInTools } from "./media";
@@ -15,10 +21,12 @@ export type BuiltInToolsModuleDependencies = FsBuiltInToolsDependencies &
 export function createBuiltInToolsModule(
   dependencies: BuiltInToolsModuleDependencies
 ): RuntimeModule {
+  let execCodeSessions: ExecCodeSessionManager | null = null;
   return {
     id: "llm-space.built-in-tools",
     register(tools) {
       _assertDependencies(dependencies);
+      execCodeSessions = new ExecCodeSessionManager(dependencies.workspaceRoot);
       tools.register({
         id: "llm-space.built-in-tools.web",
         entries: createWebBuiltInTools(dependencies),
@@ -33,8 +41,17 @@ export function createBuiltInToolsModule(
       });
       tools.register({
         id: "llm-space.built-in-tools.misc",
-        entries: miscBuiltInTools,
+        entries: [
+          ...miscBuiltInTools,
+          ...calculatorBuiltInTools,
+          ...dateDifferenceBuiltInTools,
+          ...createExecCodeBuiltInTools(execCodeSessions),
+        ],
       });
+    },
+    start() {
+      execCodeSessions?.start();
+      return () => execCodeSessions?.shutdown();
     },
   };
 }
