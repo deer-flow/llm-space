@@ -118,12 +118,12 @@ export interface ThreadState {
   collapsedMessageIds: string[];
   runValidationIssue: RunValidationIssue | null;
   /**
-   * Id of the message whose editor should grab focus on mount — set only by
-   * append/insert. Every other editor mounts with autoFocus off so opening a
-   * thread doesn't thrash focus/scroll across N editors. Store-only; never
-   * serialized into the thread.
+   * One-shot id of the message whose editor should grab focus — set only by
+   * append/insert and consumed after the real editing surface reports focus.
+   * This prevents a recreated View from replaying stale focus/scroll effects.
+   * Store-only; never serialized into the thread.
    */
-  autoFocusMessageId: string | null;
+  pendingAutoFocusMessageId: string | null;
   changeHistory: ChangeHistory;
   /** Thread snapshot + completion time after each run; most recent last. */
   runHistory: RunHistoryEntry[];
@@ -154,7 +154,7 @@ export interface ThreadState {
   removeEvaluationRubric(id: string): boolean;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
-  consumeAutoFocusMessage(messageId: string): void;
+  consumePendingAutoFocusMessage(messageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
   removeMessage(id: string): void;
   updateSystemPrompt(systemPrompt: string): void;
@@ -674,7 +674,7 @@ export function createThreadStore(
         executingToolCallIds: [],
         collapsedMessageIds: [],
         runValidationIssue: null,
-        autoFocusMessageId: null,
+        pendingAutoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
         runHistory: initialRunHistory,
         evaluations: initialEvaluations,
@@ -683,7 +683,7 @@ export function createThreadStore(
         appendMessage() {
           const message = createUserMessage();
           updateMessages((messages) => [...messages, message]);
-          set({ autoFocusMessageId: message.id });
+          set({ pendingAutoFocusMessageId: message.id });
           return message.id;
         },
         resolveRunValidationIssue() {
@@ -704,11 +704,11 @@ export function createThreadStore(
             message,
             ...messages.slice(index),
           ]);
-          set({ autoFocusMessageId: message.id });
+          set({ pendingAutoFocusMessageId: message.id });
         },
-        consumeAutoFocusMessage(messageId: string) {
-          if (get().autoFocusMessageId === messageId) {
-            set({ autoFocusMessageId: null });
+        consumePendingAutoFocusMessage(messageId: string) {
+          if (get().pendingAutoFocusMessageId === messageId) {
+            set({ pendingAutoFocusMessageId: null });
           }
         },
         moveMessage(fromIndex: number, toIndex: number) {
@@ -1821,7 +1821,7 @@ const selectActions = (s: ThreadState) => ({
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,
-  consumeAutoFocusMessage: s.consumeAutoFocusMessage,
+  consumePendingAutoFocusMessage: s.consumePendingAutoFocusMessage,
   moveMessage: s.moveMessage,
   removeMessage: s.removeMessage,
   updateSystemPrompt: s.updateSystemPrompt,

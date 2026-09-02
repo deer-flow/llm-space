@@ -12,7 +12,6 @@ export function retainRecentPaneKeys(
   const candidates = [
     ...(activeKey === null ? [] : [activeKey]),
     ...previousKeys,
-    ...[...availableKeys].reverse(),
   ];
   const retained: string[] = [];
   const seen = new Set<string>();
@@ -29,4 +28,29 @@ export function retainRecentPaneKeys(
   }
 
   return retained;
+}
+
+export function reconcileRecentPaneKeys({
+  previousKeys,
+  availableKeys,
+  activeKey,
+  limit,
+}: {
+  previousKeys: readonly string[];
+  availableKeys: readonly string[];
+  activeKey: string | null;
+  limit: number;
+}): { retained: string[]; evicted: string[] } {
+  const retained = retainRecentPaneKeys(
+    previousKeys,
+    availableKeys,
+    activeKey,
+    limit
+  );
+  const retainedSet = new Set(retained);
+  const availableSet = new Set(availableKeys);
+  const evicted = [...new Set(previousKeys)].filter(
+    (key) => availableSet.has(key) && !retainedSet.has(key)
+  );
+  return { retained, evicted };
 }

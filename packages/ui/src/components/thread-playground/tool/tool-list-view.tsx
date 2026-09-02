@@ -151,7 +151,7 @@ export function ToolListView({
           />
         ))}
         {!presentational && (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 className={cn(

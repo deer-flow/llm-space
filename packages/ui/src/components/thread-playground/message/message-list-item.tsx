@@ -14,7 +14,10 @@ import { CircleAlertIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { CodeEditor } from "@llm-space/ui/components/code-editor";
+import {
+  CodeEditor,
+  type CodeEditorRenderMode,
+} from "@llm-space/ui/components/code-editor";
 import { openFirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
@@ -31,7 +34,7 @@ import {
   useThreadStore,
   useThreadStoreActions,
 } from "../stores";
-import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
+import { usePromptSyntaxEnhancementsForContext } from "../variable/use-prompt-syntax-enhancements";
 
 import { CitationList } from "./citation-list";
 import { ImageContentList } from "./image-content-view";
@@ -69,7 +72,13 @@ function _MessageListItem({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { fidelity } = useRenderingFidelity();
-  const variableExtension = usePromptVariableExtensionForContext(
+  const editorRenderMode: CodeEditorRenderMode =
+    fidelity === "rich"
+      ? "full"
+      : fidelity === "on-demand"
+        ? "on-demand"
+        : "plain";
+  const promptSyntaxEnhancements = usePromptSyntaxEnhancementsForContext(
     createMessagePromptVariablePlaceKey(message.id),
     context
   );
@@ -81,10 +90,6 @@ function _MessageListItem({
     [message]
   );
   const citationExtension = useTextCitationExtension(assistantTextContents);
-  const editorExtensions = useMemo(
-    () => [...(variableExtension ?? []), ...citationExtension],
-    [citationExtension, variableExtension]
-  );
   const text = useMemo(() => getMessageText(message), [message]);
   const imageContents = useMemo(() => {
     const result: { content: ImageContent; contentIndex: number }[] = [];
@@ -117,6 +122,7 @@ function _MessageListItem({
   );
   const {
     addMessageImageContent,
+    consumePendingAutoFocusMessage,
     insertMessageBefore,
     run,
     updateMessageTextContent,
@@ -136,6 +142,9 @@ function _MessageListItem({
     },
     [updateMessageTextContent, message.id]
   );
+  const handleAutoFocusComplete = useCallback(() => {
+    consumePendingAutoFocusMessage(message.id);
+  }, [consumePendingAutoFocusMessage, message.id]);
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       if (message.role !== "user") {
@@ -279,10 +288,13 @@ function _MessageListItem({
               <CodeEditor
                 className="max-h-[40vh] min-h-9.5 w-full bg-transparent"
                 autoFocus={autoFocus}
+                onAutoFocusComplete={
+                  autoFocus ? handleAutoFocusComplete : undefined
+                }
                 hideFocusRing
                 hideBorder
                 scrollOnFocus
-                plain={fidelity === "lite"}
+                renderMode={editorRenderMode}
                 placeholder={
                   placeholder ??
                   `Enter ${message.role === "user" ? "user" : "assistant"} message here`
@@ -290,7 +302,8 @@ function _MessageListItem({
                 streaming={streaming}
                 readonly={readonly}
                 value={text}
-                extraExtensions={editorExtensions}
+                enhancements={promptSyntaxEnhancements}
+                extraExtensions={citationExtension}
                 onChange={handleTextContentChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}

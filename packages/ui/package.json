@@ -29,6 +29,7 @@
     "@dnd-kit/utilities": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@formkit/auto-animate": "^0.9.0",
+    "@lezer/highlight": "1.2.3",
     "@llm-space/core": "workspace:*",
     "@lobehub/icons": "^5.10.1",
     "@radix-ui/react-slot": "^1.3.3",

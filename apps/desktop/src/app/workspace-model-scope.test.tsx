@@ -1,28 +1,57 @@
 /* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-empty-function, @typescript-eslint/unbound-method */
 import { afterEach, describe, expect, test } from "bun:test";
 
-import type { AgentEvent, AgentTransport, Thread } from "@llm-space/core";
-import type { ModelClient } from "@llm-space/ui/host";
+import type {
+  AgentEvent,
+  AgentTransport,
+  ModelProviderGroup,
+  Thread,
+} from "@llm-space/core";
+import {
+  EditorCommitScope,
+  useRegisterEditorCommit,
+  type EditorCommitScopeHandle,
+} from "@llm-space/ui/components/code-editor/editor-commit-scope";
+import {
+  ThreadPlaygroundSession,
+  ThreadPlaygroundView,
+} from "@llm-space/ui/components/thread-playground";
+import {
+  HostServicesProvider,
+  type HostServices,
+  type ModelClient,
+} from "@llm-space/ui/host";
 import {
   QueryClient,
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
-import { act, useCallback, useEffect, useLayoutEffect, useState } from "react";
+import {
+  act,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { runRemoteRuntimeActionIfAllowed } from "@/components/remote-runtime-actions";
+import { paneIdForTab } from "@/components/thread-tabs/pane-mutation-actions";
 import { RuntimePaneHost } from "@/components/thread-tabs/runtime-pane-host";
 import { RuntimeRunTracker } from "@/components/thread-tabs/runtime-run-tracker";
 import { switchWorkspaceRuntimeIfAllowed } from "@/components/thread-tabs/runtime-workspace-transition";
 import { SerializedPersistence } from "@/components/thread-tabs/serialized-persistence";
 import { settleStreamingPane } from "@/components/thread-tabs/settle-streaming-pane";
 import { usePaneRefreshAcknowledgement } from "@/components/thread-tabs/use-pane-refresh-ack";
+import type { AppTab } from "@/components/thread-tabs/use-thread-tabs";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
   createThreadStore,
   type ThreadStore,
+  useThreadStore,
+  useThreadStoreApi,
 } from "../../../../packages/ui/src/components/thread-playground/stores";
 import {
   useThreadPlaygroundEvents,
@@ -346,6 +375,158 @@ function _StoreEventBridge({
   return null;
 }
 
+function _ThreadSessionProbe({
+  onStore,
+  onUnmount,
+}: {
+  onStore(store: ThreadStore): void;
+  onUnmount(): void;
+}) {
+  const store = useThreadStoreApi();
+  useEffect(() => {
+    onStore(store);
+    return onUnmount;
+  }, [onStore, onUnmount, store]);
+  return null;
+}
+
+function _ThreadViewProbe({
+  onMessageCount,
+  onUnmount,
+}: {
+  onMessageCount(count: number): void;
+  onUnmount(): void;
+}) {
+  const count = useThreadStore(
+    (state) => state.thread.context?.messages?.length ?? 0
+  );
+  useEffect(() => {
+    onMessageCount(count);
+  }, [count, onMessageCount]);
+  useEffect(() => onUnmount, [onUnmount]);
+  return null;
+}
+
+function _ThreadSessionHarness({
+  host,
+  initialValue,
+  onMessageCount,
+  onSessionStore,
+  onSessionUnmount,
+  onViewUnmount,
+  showView,
+  transport,
+}: {
+  host: HostServices;
+  initialValue: Thread;
+  onMessageCount(count: number): void;
+  onSessionStore(store: ThreadStore): void;
+  onSessionUnmount(): void;
+  onViewUnmount(): void;
+  showView: boolean;
+  transport?: AgentTransport;
+}) {
+  return (
+    <HostServicesProvider value={host}>
+      <ThreadPlaygroundSession
+        initialValue={initialValue}
+        runtimeId="local"
+        transport={transport}
+      >
+        <_ThreadSessionProbe
+          onStore={onSessionStore}
+          onUnmount={onSessionUnmount}
+        />
+        {showView ? (
+          <_ThreadViewProbe
+            onMessageCount={onMessageCount}
+            onUnmount={onViewUnmount}
+          />
+        ) : null}
+      </ThreadPlaygroundSession>
+    </HostServicesProvider>
+  );
+}
+
+function _EditorCommitProbe({
+  editorId,
+  events,
+}: {
+  editorId: string;
+  events: string[];
+}) {
+  const commit = useCallback(() => {
+    events.push(`commit:${editorId}`);
+  }, [editorId, events]);
+  useRegisterEditorCommit(commit);
+  return null;
+}
+
+function _CommitScopeView({
+  events,
+  handles,
+  paneId,
+}: {
+  events: string[];
+  handles: Map<string, EditorCommitScopeHandle>;
+  paneId: string;
+}) {
+  const handleReady = useCallback(
+    (handle: EditorCommitScopeHandle | null) => {
+      if (handle) handles.set(paneId, handle);
+      else handles.delete(paneId);
+    },
+    [handles, paneId]
+  );
+  useEffect(
+    () => () => {
+      events.push(`unmount:${paneId}`);
+    },
+    [events, paneId]
+  );
+  return (
+    <EditorCommitScope onReady={handleReady}>
+      <_EditorCommitProbe editorId={`${paneId}:message`} events={events} />
+      <_EditorCommitProbe editorId={`${paneId}:tool-result`} events={events} />
+    </EditorCommitScope>
+  );
+}
+
+function _ViewLruHarness({
+  activeId,
+  capacity,
+  events,
+  tabs,
+}: {
+  activeId: string;
+  capacity: number;
+  events: string[];
+  tabs: AppTab[];
+}) {
+  const handlesRef = useRef(new Map<string, EditorCommitScopeHandle>());
+  const commitPane = useCallback((paneId: string) => {
+    handlesRef.current.get(paneId)?.commitAll();
+  }, []);
+  return (
+    <RuntimePaneHost
+      tabs={tabs}
+      activeId={activeId}
+      getPaneKey={paneIdForTab}
+      maxMountedPanes={capacity}
+      onBeforeViewUnmount={commitPane}
+      renderPane={(tab, _active, viewMounted) =>
+        viewMounted ? (
+          <_CommitScopeView
+            events={events}
+            handles={handlesRef.current}
+            paneId={paneIdForTab(tab)}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
 describe("WorkspaceModelScope", () => {
   test("runtime changes preserve the mounted workspace identity", async () => {
     const clients = new Map<RuntimeId, ModelClient>([
@@ -410,7 +591,274 @@ describe("WorkspaceModelScope", () => {
   });
 });
 
+describe("ThreadPlayground Session/View lifecycle", () => {
+  test("releasing and remounting a view preserves the exact session store", async () => {
+    const modelProvider = {
+      id: "openai",
+      name: "OpenAI",
+      profiles: [{ id: "default", name: "Default" }],
+      models: [
+        {
+          id: "test-model",
+          name: "Test Model",
+          api: "openai-responses",
+          provider: "openai",
+          baseUrl: "https://example.test/v1",
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 1000,
+          maxTokens: 100,
+        },
+      ],
+    } as ModelProviderGroup;
+    const client: ModelClient = {
+      ..._client(),
+      availableModels: async () => [modelProvider],
+    };
+    const createClient = () => client;
+    const streamStarted = _deferred();
+    const releaseStream = _deferred();
+    const transport: AgentTransport = async function* () {
+      streamStarted.resolve();
+      await releaseStream.promise;
+      yield* [
+        _event({
+          type: "message_start",
+          message: { role: "assistant" },
+        }),
+        _event({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+        }),
+        _event({
+          type: "message_update",
+          assistantMessageEvent: {
+            type: "text_delta",
+            contentIndex: 0,
+            delta: "Completed while hidden",
+          },
+        }),
+        _event({
+          type: "message_end",
+          message: { role: "assistant" },
+        }),
+      ];
+    };
+    const host = {
+      executeTool: null,
+      files: { resolvePath: async (path: string) => path },
+      skills: {},
+    } as HostServices;
+    const initialValue: Thread = {
+      model: { provider: "openai", id: "test-model" },
+      context: {
+        messages: [
+          {
+            id: "user-1",
+            role: "user",
+            content: [{ type: "text", text: "Run" }],
+          },
+        ],
+      },
+    };
+    let sessionStore: ThreadStore | null = null;
+    let firstStore: ThreadStore | null = null;
+    let sessionUnmounts = 0;
+    let viewUnmounts = 0;
+    const messageCounts: number[] = [];
+    const onSessionStore = (store: ThreadStore) => {
+      sessionStore = store;
+      firstStore ??= store;
+    };
+    const onSessionUnmount = () => {
+      sessionUnmounts += 1;
+    };
+    const onViewUnmount = () => {
+      viewUnmounts += 1;
+    };
+    const onMessageCount = (count: number) => {
+      messageCounts.push(count);
+    };
+    const render = (showView: boolean) => (
+      <WorkspaceModelScope
+        runtimeId="local"
+        createClient={createClient}
+      >
+        <_ThreadSessionHarness
+          host={host}
+          initialValue={initialValue}
+          onMessageCount={onMessageCount}
+          onSessionStore={onSessionStore}
+          onSessionUnmount={onSessionUnmount}
+          onViewUnmount={onViewUnmount}
+          showView={showView}
+          transport={transport}
+        />
+      </WorkspaceModelScope>
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => {
+      activeRoot?.render(render(true));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(typeof ThreadPlaygroundView).toBe("function");
+    expect(firstStore).not.toBeNull();
+    const runningStore = sessionStore as ThreadStore | null;
+    if (!runningStore) throw new Error("Thread session did not mount");
+
+    const runPromise = runningStore.getState().run();
+    await streamStarted.promise;
+
+    await act(async () => activeRoot?.render(render(false)));
+    expect({ sessionUnmounts, viewUnmounts }).toEqual({
+      sessionUnmounts: 0,
+      viewUnmounts: 1,
+    });
+
+    await act(async () => {
+      releaseStream.resolve();
+      await runPromise;
+    });
+    expect(runningStore.getState().status).toBe("idle");
+
+    await act(async () => activeRoot?.render(render(true)));
+    expect(sessionStore).toBe(firstStore);
+    expect(messageCounts.at(-1)).toBe(2);
+    expect(
+      runningStore.getState().thread.context?.messages?.at(-1)?.content
+    ).toContainEqual({ type: "text", text: "Completed while hidden" });
+    expect(sessionUnmounts).toBe(0);
+  });
+});
+
+describe("View LRU draft commits", () => {
+  const threadTabs: AppTab[] = ["a", "b"].map((id) => ({
+    id: `thread:${id}`,
+    type: "thread",
+    path: `/${id}.json`,
+    runtimeId: "local",
+    paneId: `pane:${id}`,
+  }));
+
+  test("commits every registered editor before an evicted view unmounts", async () => {
+    const events: string[] = [];
+    const render = (activeId: string) => (
+      <_ViewLruHarness
+        activeId={activeId}
+        capacity={1}
+        events={events}
+        tabs={threadTabs}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => activeRoot?.render(render("thread:a")));
+    await act(async () => activeRoot?.render(render("thread:b")));
+
+    expect(events).toEqual([
+      "commit:pane:a:message",
+      "commit:pane:a:tool-result",
+      "unmount:pane:a",
+    ]);
+  });
+
+  test("does not request a commit when no view is evicted", async () => {
+    const events: string[] = [];
+    const render = (activeId: string) => (
+      <_ViewLruHarness
+        activeId={activeId}
+        capacity={2}
+        events={events}
+        tabs={threadTabs}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => activeRoot?.render(render("thread:a")));
+    await act(async () => activeRoot?.render(render("thread:b")));
+
+    expect(events).toEqual([]);
+  });
+
+  test("commits a Trace editor before an evicted view unmounts", async () => {
+    const events: string[] = [];
+    const tabs: AppTab[] = [
+      threadTabs[0],
+      {
+        id: "trace:project:trace",
+        type: "trace",
+        runtimeId: "local",
+        projectId: "project",
+        traceKey: "trace",
+        title: "Trace",
+      },
+    ];
+    const render = (activeId: string) => (
+      <_ViewLruHarness
+        activeId={activeId}
+        capacity={1}
+        events={events}
+        tabs={tabs}
+      />
+    );
+    activeRoot = _createRoot();
+
+    await act(async () => activeRoot?.render(render(tabs[0].id)));
+    await act(async () => activeRoot?.render(render(tabs[1].id)));
+    await act(async () => activeRoot?.render(render(tabs[0].id)));
+
+    expect(events).toEqual([
+      "commit:pane:a:message",
+      "commit:pane:a:tool-result",
+      "unmount:pane:a",
+      "commit:trace:project:trace:message",
+      "commit:trace:project:trace:tool-result",
+      "unmount:trace:project:trace",
+    ]);
+  });
+});
+
 describe("RuntimePaneHost", () => {
+  test("defaults to retaining the three most recently active pane views", async () => {
+    const panes: TestPane[] = ["a", "b", "c", "d"].map((id) => ({
+      id: `pane-${id}`,
+      runtimeId: "local",
+    }));
+    const mountedByPane = new Map<string, boolean>();
+    const getPaneKey = (pane: TestPane) => pane.id;
+    const renderPane = (
+      pane: TestPane,
+      _active: boolean,
+      viewMounted: boolean
+    ) => {
+      mountedByPane.set(pane.id, viewMounted);
+      return null;
+    };
+    const render = (activeId: string) => (
+      <RuntimePaneHost
+        tabs={panes}
+        activeId={activeId}
+        getPaneKey={getPaneKey}
+        renderPane={renderPane}
+      />
+    );
+    activeRoot = _createRoot();
+
+    for (const pane of panes) {
+      await act(async () => activeRoot?.render(render(pane.id)));
+    }
+
+    expect(Object.fromEntries(mountedByPane)).toEqual({
+      "pane-a": false,
+      "pane-b": true,
+      "pane-c": true,
+      "pane-d": true,
+    });
+  });
+
   test("switching active panes does not rerender an unrelated hidden pane", async () => {
     const panes: TestPane[] = [
       { id: "pane-a", runtimeId: "local" },

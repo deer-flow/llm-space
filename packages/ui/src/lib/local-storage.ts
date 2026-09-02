@@ -10,6 +10,11 @@ export const LOCAL_STORAGE_KEYS = {
   theme: "llm-space-theme",
   primaryColor: "llm-space-primary",
   renderingFidelity: "llm-space-rendering-fidelity",
+  messageVirtualizationMode: "llm-space:message-virtualization-mode",
+  customVirtualizationThreshold:
+    "llm-space:custom-virtualization-threshold",
+  viewCacheSize: "llm-space:view-cache-size",
+  threadViewCacheSize: "llm-space:thread-view-cache-size",
   autoRunTools: "llm-space-auto-run-tools",
   reactLoop: "llm-space-react-loop",
   messageStatsSummaryMode: "llm-space-message-stats-summary-mode",
