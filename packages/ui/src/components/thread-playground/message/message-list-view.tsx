@@ -54,6 +54,7 @@ import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
 import { followMessageViewportBottom } from "./message-scroll-stability";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
+import { measureVirtualRowHeight } from "./virtual-row-measurement";
 
 const MESSAGE_VIRTUALIZATION_THRESHOLD = 20;
 const MESSAGE_OVERSCAN = 5;
@@ -214,7 +215,7 @@ export function MessageListView({
   );
   // TanStack Virtual exposes a mutable imperative controller by design.
   // eslint-disable-next-line react-hooks/incompatible-library
-  const virtualizer = useVirtualizer({
+  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: shouldVirtualize ? displayRows.length : 0,
     estimateSize: estimateMessageSize,
     getItemKey: getMessageKey,
@@ -224,8 +225,8 @@ export function MessageListView({
     directDomUpdates: true,
     directDomUpdatesMode: "transform",
     useCachedMeasurements: measurementsFrozen || dragging,
-    measureElement: (element) => {
-      const height = element.getBoundingClientRect().height;
+    measureElement: (element, entry) => {
+      const height = measureVirtualRowHeight(element, entry);
       const index = Number(element.getAttribute("data-index"));
       const message = displayMessages[index];
       if (message && height > 0) {
