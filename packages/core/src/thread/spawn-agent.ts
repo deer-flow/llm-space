@@ -161,7 +161,7 @@ export function buildSubagentThread(
     content: [
       {
         type: "text",
-        text: `Parent task: ${parentName}\nTask: ${args.task_name}\nRole: ${role}\nDescription: ${args.description}\n\n${ROLE_INSTRUCTIONS[role]}\n\n${args.prompt}`,
+        text: `The following task was delegated by the parent agent based on the user's goal. It is not a verbatim message from the user. Follow the task instructions below.\n\nParent task: ${parentName}\nTask: ${args.task_name}\nRole: ${role}\nDescription: ${args.description}\n\n${ROLE_INSTRUCTIONS[role]}\n\n${args.prompt}`,
       },
     ],
   });
