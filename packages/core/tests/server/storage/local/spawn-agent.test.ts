@@ -117,7 +117,7 @@ test("preserves readable task names and resolves normalized filename collisions"
   );
   for (const [index, result] of results.entries()) {
     const child = await storage.read(result.path);
-    expect(getMessageText(child.context!.messages![0])).toContain(
+    expect(getMessageText(child.context!.messages![0]!)).toContain(
       `Task: ${names[index]}\n`
     );
   }

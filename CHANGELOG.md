@@ -4,6 +4,36 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.16.0] - 2026-09-03
+
+### Added
+
+- A `spawn_agent` built-in Tool requests a manually created subtask. Calls pause
+  automatic execution and ReAct loops; creating a subtask opens its tab and
+  expands its folder without starting a run or filling in the tool response.
+- Subtasks inherit prompt templates, variables, model settings, and tools suited
+  to general work, research, or code review. Readable task names become unique
+  filenames, and missing subtask files can be created again from the tool card.
+- An `exec_code` built-in Tool runs Python, JavaScript, and TypeScript in
+  persistent sessions, retaining variables and imports between calls.
+- `calculator` and `date_difference` built-in Tools handle mathematical
+  expressions and date or time intervals, with matching Python exports.
+
+### Changed
+
+- The General Agent template now includes `exec_code` and replaces its previous
+  `agent()` function with `spawn_agent`.
+- Python exports explicitly report that manual subtask creation requires the
+  desktop app; generated tools and project plans explain this limitation.
+- Scrollbars use consistent thumb styling throughout the app.
+- The remote runtime protocol is now v5. Update the server alongside the desktop
+  app to use this version.
+
+### Fixed
+
+- Long conversations in the Performance edition keep consistent message spacing
+  when the page is zoomed.
+
 ## [4.15.2] - 2026-08-29
 
 ### Fixed
