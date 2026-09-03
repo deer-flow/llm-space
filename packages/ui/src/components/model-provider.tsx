@@ -2,7 +2,7 @@
 
 import type * as pi from "@earendil-works/pi-ai";
 import type {
-  ArkImageGenerationConfig,
+  ImageGenerationConfig,
   CustomModel,
   ModelConfig,
   ModelProviderGroup,
@@ -46,7 +46,7 @@ interface ModelContextValue {
       api?:
         "anthropic-messages" | "openai-completions" | "openai-responses" | null;
       icon?: string | null;
-      imageGeneration?: ArkImageGenerationConfig;
+      imageGeneration?: ImageGenerationConfig;
     }
   ) => Promise<void>;
   setModelEnabled: (
@@ -323,7 +323,7 @@ export function ModelProvider({
           | "openai-responses"
           | null;
         icon?: string | null;
-        imageGeneration?: ArkImageGenerationConfig;
+        imageGeneration?: ImageGenerationConfig;
       }
     ) => {
       const result = await enqueueMutation(client, () =>
@@ -608,7 +608,7 @@ export function useUpdateProvider(): (
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
-    imageGeneration?: ArkImageGenerationConfig;
+    imageGeneration?: ImageGenerationConfig;
   }
 ) => Promise<void> {
   return useModelProvider().updateProvider;

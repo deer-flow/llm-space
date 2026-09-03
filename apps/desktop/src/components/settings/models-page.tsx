@@ -3,9 +3,11 @@
 import {
   formatProviderProfileLabel,
   getArkImageModelDefinitions,
+  getMiniMaxImageModelDefinitions,
   type ArkImageGenerationConfig,
   type CustomModel,
   type ModelProviderGroup,
+  type MiniMaxImageGenerationConfig,
   type ProviderProfile,
   type SeedreamImageModelDefinition,
 } from "@llm-space/core";
@@ -1076,6 +1078,9 @@ function ProviderEditor({
           {provider.id === "ark" && canManageModels ? (
             <_ArkImageGenerationEditor provider={provider} />
           ) : null}
+          {provider.id === "minimax" && canManageModels ? (
+            <_MiniMaxImageGenerationEditor provider={provider} />
+          ) : null}
         </div>
       </ScrollArea>
 
@@ -1221,7 +1226,7 @@ function _ArkImageGenerationEditor({
   provider: ModelProviderGroup;
 }) {
   const updateProvider = useUpdateProvider();
-  const config = provider.imageGeneration ?? {};
+  const config: ArkImageGenerationConfig = provider.imageGeneration ?? {};
   const models = getArkImageModelDefinitions(config);
   const disabledModels = new Set(config.disabledModels ?? []);
   const enabledModels = models.filter((model) => !disabledModels.has(model.id));
@@ -1411,6 +1416,65 @@ function _ArkImageGenerationEditor({
   );
 }
 
+/** Manage MiniMax image-model availability alongside its connection profiles. */
+function _MiniMaxImageGenerationEditor({
+  provider,
+}: {
+  provider: ModelProviderGroup;
+}) {
+  const updateProvider = useUpdateProvider();
+  const config: MiniMaxImageGenerationConfig =
+    provider.imageGeneration ?? {};
+  const models = getMiniMaxImageModelDefinitions(config);
+  const disabledModels = new Set(config.disabledModels ?? []);
+  const enabledCount = models.length - disabledModels.size;
+
+  const update = (imageGeneration: MiniMaxImageGenerationConfig) => {
+    void updateProvider(provider.id, { imageGeneration }).catch((error) => {
+      toast.error("Failed to update MiniMax image generation", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    });
+  };
+
+  const handleModelEnabled = (modelId: string, enabled: boolean) => {
+    const disabled = new Set(config.disabledModels ?? []);
+    if (enabled) disabled.delete(modelId);
+    else disabled.add(modelId);
+    update({
+      disabledModels: disabled.size > 0 ? [...disabled] : undefined,
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">Image models</span>
+        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+          {enabledCount === models.length
+            ? models.length
+            : `${enabledCount}/${models.length}`}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {models.map((model) => (
+          <_ImageModelListItem
+            key={model.id}
+            providerName={provider.name}
+            model={model}
+            enabled={!disabledModels.has(model.id)}
+            isCustom={false}
+            onToggle={(enabled) => handleModelEnabled(model.id, enabled)}
+            onEdit={() => undefined}
+            onDelete={() => undefined}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Image-model row matching the existing Chat model management interaction. */
 function _ImageModelListItem({
   providerName,
@@ -1422,7 +1486,7 @@ function _ImageModelListItem({
   onDelete,
 }: {
   providerName: string;
-  model: SeedreamImageModelDefinition;
+  model: { id: string; name: string; icon?: string };
   enabled: boolean;
   isCustom: boolean;
   onToggle: (enabled: boolean) => void;

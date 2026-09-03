@@ -1,6 +1,6 @@
 import type {
-  ArkImageGenerationConfig,
   CustomModel,
+  ImageGenerationConfig,
   ModelConfig,
   ProviderProfile,
 } from "@llm-space/core";
@@ -58,8 +58,8 @@ export interface ProviderConfig {
    * so these models can later be singled out for deletion.
    */
   customModels?: string[];
-  /** Native Ark image-model inventory; only valid on the builtin Ark provider. */
-  imageGeneration?: ArkImageGenerationConfig;
+  /** Native image-model inventory for a supported builtin provider. */
+  imageGeneration?: ImageGenerationConfig;
 }
 
 /** Shape of `settings/models.json`. */

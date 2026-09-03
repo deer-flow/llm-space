@@ -1,6 +1,6 @@
 import * as pi from "@earendil-works/pi-ai";
 
-import type { ArkImageGenerationConfig } from "./image-generation";
+import type { ImageGenerationConfig } from "./image-generation";
 import type { ProviderProfile } from "./provider-profile";
 
 /**
@@ -25,8 +25,8 @@ export interface ModelProviderGroup {
   disabledModels?: string[];
   /** Ids of the user-added custom models within this provider. */
   customModels?: string[];
-  /** Native Ark image-model inventory. Present only on the Ark provider. */
-  imageGeneration?: ArkImageGenerationConfig;
+  /** Native image-model inventory exposed by a supported provider. */
+  imageGeneration?: ImageGenerationConfig;
   websiteLink?: string;
   websiteURL?: string;
   apiKeyURL?: string;
