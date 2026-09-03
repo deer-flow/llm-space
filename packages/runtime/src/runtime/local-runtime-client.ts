@@ -208,6 +208,12 @@ export class LocalRuntimeClient implements RuntimeClient {
     return this._deps.localFs.read(path);
   }
 
+  createSubagentThread(
+    input: Parameters<RuntimeClient["createSubagentThread"]>[0],
+  ) {
+    return this._deps.localFs.createSubagentThread(input);
+  }
+
   async fsWrite(path: string, thread: Parameters<RuntimeClient["fsWrite"]>[1]) {
     await this._deps.localFs.write(path, thread);
   }

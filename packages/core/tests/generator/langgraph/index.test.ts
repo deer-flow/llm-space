@@ -2,74 +2,93 @@ import { describe, expect, test } from "bun:test";
 
 import { langgraphGenerator } from "../../../src/generator/langgraph/index";
 import type { GeneratorCapabilities, GeneratorRunInput } from "../../../src/generator/types";
+import { SPAWN_AGENT_TOOL } from "../../../src/thread/spawn-agent";
 import type { WorkflowContext } from "../../../src/workflow";
 
 
 describe("langgraphGenerator", () => {
-  test("writes a Makefile with the development server target", async () => {
-    const written = new Map<string, string>();
-    const phases: string[] = [];
-    const logs: string[] = [];
-    const capabilities: GeneratorCapabilities = {
-      checkUv() {
-        return Promise.resolve({ installed: false });
-      },
-      runUv() {
-        return Promise.resolve({
-          code: 0,
-          stdout: "",
-          stderr: "",
-          timedOut: false,
-        });
-      },
-      writeFile(_rootDir, relativePath, contents) {
-        written.set(relativePath, contents);
-        return Promise.resolve();
-      },
-      removeFile() {
-        return Promise.resolve();
-      },
-    };
-    const workflow: WorkflowContext = {
-      phase(title) {
-        phases.push(title);
-      },
-      log(message) {
-        logs.push(message);
-      },
-      agent() {
-        return Promise.resolve("");
-      },
-      parallel<T>(thunks: (() => Promise<T>)[]) {
-        return Promise.all(thunks.map((thunk) => thunk()));
-      },
-      signal: new AbortController().signal,
-    };
-    const input: GeneratorRunInput = {
-      targetDir: "/authorized/output",
-      context: {},
-      rendered: {},
-      systemPromptTemplate: "You are helpful.",
-      skills: [],
-      renderedVariableValues: {},
-      model: { provider: "openai", id: "gpt-5" },
-      modelInfo: {
-        name: "GPT-5",
-        anthropic: false,
-        deepseekThinking: false,
-        supportsReasoning: true,
-      },
-      capabilities,
-    };
+  test.each([false, true])(
+    "writes a runnable project and documents spawn_agent=%s",
+    async (hasSpawnAgent) => {
+      const written = new Map<string, string>();
+      const phases: string[] = [];
+      const logs: string[] = [];
+      const capabilities: GeneratorCapabilities = {
+        checkUv() {
+          return Promise.resolve({ installed: false });
+        },
+        runUv() {
+          return Promise.resolve({
+            code: 0,
+            stdout: "",
+            stderr: "",
+            timedOut: false,
+          });
+        },
+        writeFile(_rootDir, relativePath, contents) {
+          written.set(relativePath, contents);
+          return Promise.resolve();
+        },
+        removeFile() {
+          return Promise.resolve();
+        },
+      };
+      const workflow: WorkflowContext = {
+        phase(title) {
+          phases.push(title);
+        },
+        log(message) {
+          logs.push(message);
+        },
+        agent() {
+          return Promise.resolve("");
+        },
+        parallel<T>(thunks: (() => Promise<T>)[]) {
+          return Promise.all(thunks.map((thunk) => thunk()));
+        },
+        signal: new AbortController().signal,
+      };
+      const input: GeneratorRunInput = {
+        targetDir: "/authorized/output",
+        context: hasSpawnAgent ? { tools: [SPAWN_AGENT_TOOL] } : {},
+        rendered: {},
+        systemPromptTemplate: "You are helpful.",
+        skills: [],
+        renderedVariableValues: {},
+        model: { provider: "openai", id: "gpt-5" },
+        modelInfo: {
+          name: "GPT-5",
+          anthropic: false,
+          deepseekThinking: false,
+          supportsReasoning: true,
+        },
+        capabilities,
+      };
 
     await langgraphGenerator.run(workflow, input);
 
-    expect(written.get("Makefile")).toBe(
-      ".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n"
-    );
-    expect(phases.at(-1)).toBe("Done");
-    expect(logs).toContain("uv not found — skipping dependency install");
-  });
+      expect(written.get("Makefile")).toBe(
+        ".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n",
+      );
+      expect(phases.at(-1)).toBe("Done");
+      expect(logs).toContain("uv not found — skipping dependency install");
+      if (hasSpawnAgent) {
+        expect(written.get("src/tools/spawn_agent.py")).toContain(
+          "raise NotImplementedError",
+        );
+        expect(written.get("src/agents/agent.py")).toContain("spawn_agent");
+        expect(written.get("PLAN.md")).toContain(
+          "not supported in Python exports",
+        );
+        expect(written.get("PLAN.md")).not.toContain(
+          "Nothing else to implement",
+        );
+        expect(
+          logs.some((line) => line.includes("not supported in Python exports")),
+        ).toBe(true);
+      }
+    },
+  );
 
   test("rejects provider-hosted tools before writing any files", async () => {
     const written: string[] = [];

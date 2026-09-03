@@ -1,5 +1,6 @@
 import { uuid, type Message, type Tool } from "@llm-space/core";
 import type { SkillInfo } from "@llm-space/core";
+import { SPAWN_AGENT_TOOL } from "@llm-space/core/thread";
 import {
   BookOpenTextIcon,
   BotIcon,
@@ -70,17 +71,8 @@ export interface PromptExample {
 
 export type PromptExampleItem = PromptExample | { type: "separator" };
 
-/** Resolve shared tool definitions by their function `name` (not display label). */
-function pickTools(names: string[]): Tool[] {
-  return TOOL_EXAMPLES.filter(
-    (item) => item.type === "tool" && names.includes(item.tool.name)
-  )
-    .map((item) => (item.type === "tool" ? item.tool : undefined))
-    .filter(Boolean) as Tool[];
-}
-
 /**
- * Like {@link pickTools} but seeds the runtime `type: "builtin"` variant so the
+ * Seeds the runtime `type: "builtin"` variant so the
  * tools are wired to real execution. Reuses each example's schema and preserves
  * the requested order; icons resolve by name in `getBuiltInToolIcon`.
  */
@@ -224,7 +216,7 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
         "todo_write",
         "present_files",
       ]),
-      ...pickTools(["agent"]),
+      SPAWN_AGENT_TOOL,
     ],
     messages: generalAgentMessages,
   },

@@ -777,6 +777,8 @@ function PageWorkspace({
       });
     },
     reopenClosedTab: () => void reopenClosed(),
+    openThread: ({ path, runtimeId, activate }) =>
+      tabs.open(path, runtimeId, { activate }),
     selectNextTab: () => activateVisibleSibling(1),
     selectPreviousTab: () => activateVisibleSibling(-1),
     toggleSidebar: () => toggleSidebar(),

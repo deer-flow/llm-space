@@ -63,6 +63,7 @@ import { Switch } from "@llm-space/ui/ui/switch";
 
 import { GenerateProjectButton } from "./codegen/generate-project-button";
 import { MessageListView } from "./message/message-list-view";
+import { SubagentParentPathContext } from "./message/spawn-agent-card";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
@@ -96,6 +97,8 @@ import { PromptVariablesListView } from "./variable/prompt-variables-list-view";
 export interface ThreadPlaygroundProps {
   className?: string;
   path: string;
+  /** Present only for a saved workspace thread that can create child files. */
+  subagentParentPath?: string;
   title?: string;
   headerDetails?: ReactNode;
   /** Extra actions rendered at the right edge of the header (always visible). */
@@ -234,13 +237,15 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      {viewMounted ? (
-        <ThreadPlaygroundContent
-          runtimeId={ownerRuntimeId}
-          onApplyCompaction={onApplyCompaction}
-          {...props}
-        />
-      ) : null}
+      <SubagentParentPathContext.Provider value={props.subagentParentPath}>
+        {viewMounted ? (
+          <ThreadPlaygroundContent
+            runtimeId={ownerRuntimeId}
+            onApplyCompaction={onApplyCompaction}
+            {...props}
+          />
+        ) : null}
+      </SubagentParentPathContext.Provider>
     </ThreadStoreContext.Provider>
   );
 }

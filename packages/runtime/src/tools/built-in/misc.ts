@@ -1,4 +1,5 @@
 import type { BuiltinTool } from "@llm-space/core";
+import { SPAWN_AGENT_TOOL } from "@llm-space/core/thread";
 
 import type { ToolEntry } from "../tool-registry";
 
@@ -157,6 +158,16 @@ export const askUserQuestionTool: BuiltinTool = {
 // -- registry -----------------------------------------------------------------
 
 export const miscBuiltInTools: ToolEntry[] = [
+  {
+    tool: SPAWN_AGENT_TOOL,
+    execute() {
+      return Promise.reject(
+        new Error(
+          "spawn_agent requires the user to click Create subtask in the desktop app.",
+        ),
+      );
+    },
+  },
   {
     tool: todoWriteTool,
     async execute() {

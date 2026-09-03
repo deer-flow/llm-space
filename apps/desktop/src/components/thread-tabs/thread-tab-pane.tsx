@@ -400,6 +400,7 @@ function _ThreadTabPane({
       className={cn("bg-background size-full shadow-lg", !active && "hidden")}
       loading={isLoading}
       path={path}
+      subagentParentPath={path}
       initialValue={thread}
       readonly={mutationReserved}
       active={active}

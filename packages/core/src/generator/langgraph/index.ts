@@ -164,6 +164,14 @@ export const langgraphGenerator: GeneratorDefinition = {
         workflow.log(`Skipping unknown built-in tool: ${t.name}`);
       }
     }
+    const hasSpawnAgent = builtinIncluded.some(
+      (tool) => tool.name === "spawn_agent",
+    );
+    if (hasSpawnAgent) {
+      workflow.log(
+        "spawn_agent is not supported in Python exports; emitting an explicit NotImplementedError placeholder.",
+      );
+    }
     const hasMcp = mcpTools.length > 0;
     const useMetaUserPrompt =
       input.useMetaUserPrompt ?? isMetaUserMessage(context);
@@ -288,7 +296,7 @@ export const langgraphGenerator: GeneratorDefinition = {
       await write(file.path, file.contents);
     }
 
-    await write("PLAN.md", planMd(functionTools, mcpTools));
+    await write("PLAN.md", planMd(functionTools, mcpTools, hasSpawnAgent));
 
     workflow.phase("Done");
     return { dir, files: written, depsInstall };

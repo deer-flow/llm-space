@@ -19,6 +19,12 @@ function createRuntime(): RuntimeClient {
     readTextFile: (path: string) => Promise.resolve(`remote:${path}`),
     textFileExists: (path: string) => Promise.resolve(path === "/remote.md"),
     fsWrite: () => Promise.resolve(),
+    createSubagentThread: () =>
+      Promise.resolve({
+        path: "project/tasks/parent-review.json",
+        status: "created",
+        message: "Created, not yet run.",
+      }),
     fsArchiveRun: (_path, run) =>
       Promise.resolve({
         id: run.id,
@@ -295,4 +301,44 @@ describe("handleRuntimeRpc", () => {
       });
     }
   });
+});
+
+
+test("routes child creation with the supplied current snapshot", async () => {
+  const runtime = createRuntime();
+  let received: unknown;
+  runtime.createSubagentThread = (input) => {
+    received = input;
+    return Promise.resolve({
+      path: "project/tasks/parent-review.json",
+      status: "created",
+      message: "Created, not yet run.",
+    });
+  };
+  const params = {
+    parentPath: "project/parent.json",
+    thread: { context: { systemPrompt: "Unsaved" } },
+    arguments: {
+      description: "Review code",
+      task_name: "review",
+      prompt: "Review it",
+    },
+  };
+  const result = await handleRuntimeRpc(runtime, {
+    id: "child",
+    method: "fs.createSubagentThread",
+    params,
+  });
+  expect(result).toMatchObject({ ok: true, result: { status: "created" } });
+  expect(received).toMatchObject(params);
+  expect(
+    await handleRuntimeRpc(runtime, {
+      id: "bad",
+      method: "fs.createSubagentThread",
+      params: {
+        ...params,
+        arguments: { ...params.arguments, task_name: "../bad" },
+      },
+    }),
+  ).toMatchObject({ ok: false });
 });

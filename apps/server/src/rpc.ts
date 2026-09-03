@@ -1,4 +1,5 @@
 import type { ProviderConnectionRef, Thread } from "@llm-space/core";
+import { parseSpawnAgentArgs } from "@llm-space/core/thread";
 import type { RuntimeClient } from "@llm-space/runtime/runtime";
 
 import { ServerError, toServerError } from "./errors";
@@ -72,6 +73,12 @@ async function _dispatch(
       return null;
     case "fs.read":
       return runtime.fsRead(_stringParam(params, "path"));
+    case "fs.createSubagentThread":
+      return runtime.createSubagentThread({
+        parentPath: _stringParam(params, "parentPath"),
+        thread: _threadParam(params),
+        arguments: parseSpawnAgentArgs(_recordParam(params, "arguments")),
+      });
     case "fs.write":
       await runtime.fsWrite(_stringParam(params, "path"), _threadParam(params));
       return null;

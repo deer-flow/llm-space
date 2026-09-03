@@ -37,6 +37,7 @@ import { useThreadStore, useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
 import { ImageContentView } from "./image-content-view";
+import { SpawnAgentCard } from "./spawn-agent-card";
 import { ToolCallInputView } from "./tool-call-input-view";
 import { useToolCallRunner } from "./use-tool-call-runner";
 import {
@@ -244,6 +245,13 @@ function _ToolCallListItem({
           value={outputText}
           onOpenChange={setPreviewOpen}
         />
+        {toolCall.input.name === "spawn_agent" && (
+          <SpawnAgentCard
+            messageId={messageId}
+            toolCall={toolCall}
+            readonly={readonly || streaming}
+          />
+        )}
         <ToolCallResponseEditor
           input={toolCall.input}
           plain={fidelity === "lite"}

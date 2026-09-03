@@ -502,3 +502,46 @@ async function _expectConnectError(
     }
   );
 }
+
+
+test("creates subtask threads through the owning remote runtime", async () => {
+  let body: unknown;
+  const input = {
+    parentPath: "project/parent.json",
+    thread: { runtimeId: "remote:test", context: { systemPrompt: "Unsaved" } },
+    arguments: {
+      description: "Review code",
+      task_name: "review",
+      prompt: "Review it",
+    },
+  };
+  await _withFetch(
+    async (request) => {
+      body = await request.json();
+      return Response.json({
+        id: "1",
+        ok: true,
+        result: {
+          path: "project/tasks/parent-review.json",
+          status: "created",
+          message: "Created, not yet run.",
+        },
+      });
+    },
+    async () => {
+      const client = new RemoteRuntimeClient({
+        id: "remote:test",
+        name: "Test",
+        baseUrl: "http://remote.test",
+        token: "secret",
+      });
+      expect(await client.createSubagentThread(input)).toMatchObject({
+        path: "project/tasks/parent-review.json",
+      });
+    },
+  );
+  expect(body).toMatchObject({
+    method: "fs.createSubagentThread",
+    params: input,
+  });
+});

@@ -374,3 +374,45 @@ assert revealed == [str(target)]
     }
   });
 });
+
+
+it("executes Python spawn_agent and reports unsupported without filesystem effects", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "spawn-agent-python-"));
+  try {
+    const toolPath = path.join(root, "spawn_agent.py");
+    await writeFile(toolPath, BUILTIN_TOOL_SOURCES.spawn_agent!, "utf8");
+    const script = `
+import runpy, sys, types, pathlib
+sys.dont_write_bytecode = True
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+module = runpy.run_path(sys.argv[1])
+try:
+    module["spawn_agent"]("Review code", "review", "Review it")
+except NotImplementedError as error:
+    assert "not supported in Python exports" in str(error)
+else:
+    raise AssertionError("Expected NotImplementedError")
+assert sorted(p.name for p in pathlib.Path(".").iterdir()) == ["spawn_agent.py"]
+print("unsupported-without-side-effects")
+`;
+    const child = Bun.spawn(["python3", "-c", script, toolPath], {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(stdout).toContain("unsupported-without-side-effects");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -187,6 +187,11 @@ export interface ThreadState {
     isError?: boolean
   ): void;
   addTool(tool: Tool): boolean;
+  setToolCallSubtaskPath(
+    messageId: string,
+    toolCallId: string,
+    path: string | null
+  ): void;
   updateTool(name: string, tool: Tool): boolean;
   removeTool(name: string): void;
   toggleMessageRole(id: string): void;
@@ -1039,6 +1044,17 @@ export function createThreadStore(
               return undefined;
             }
             return { content, isError: nextIsError };
+          });
+        },
+        setToolCallSubtaskPath(messageId, toolCallId, path) {
+          updateMessage(messageId, (message) => {
+            if (message.role !== "assistant") return message;
+            return {
+              ...message,
+              toolCalls: message.toolCalls?.map((call) =>
+                call.id === toolCallId ? { ...call, subtaskPath: path } : call
+              ),
+            };
           });
         },
         toggleMessageRole(id: string) {

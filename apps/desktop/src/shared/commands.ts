@@ -169,6 +169,11 @@ export interface SyncLangfuseTraceIdsCommand extends GenericCommand<
 
 // --- Tabs ------------------------------------------------------------------
 
+export interface OpenThreadCommand extends GenericCommand<
+  "openThread",
+  { path: string; runtimeId?: RuntimeId; activate?: boolean }
+> {}
+
 /**
  * Close a tab. `id` is the app-tab id (`thread:{path}` or `trace:{project}:{key}`);
  * `path` is kept for legacy thread callers; omitting both closes the active tab.
@@ -314,6 +319,7 @@ export interface ApplyUpdateAndRestartCommand extends GenericCommand<"applyUpdat
 
 /** The discriminated union of every command. */
 export type Command =
+  | OpenThreadCommand
   | NewFileCommand
   | NewFileFromPromptExampleCommand
   | OpenStartFromExampleCommand
@@ -410,6 +416,7 @@ export const COMMAND_META: Record<
   closeOtherTabs: { label: "Close Other Tabs", target: "webview" },
   closeAllTabs: { label: "Close All Tabs", target: "webview" },
   reopenClosedTab: { label: "Reopen Closed Tab", target: "webview" },
+  openThread: { label: "Open Thread", target: "webview" },
   selectNextTab: { label: "Select Next Tab", target: "webview" },
   selectPreviousTab: { label: "Select Previous Tab", target: "webview" },
   toggleSidebar: { label: "Toggle Sidebar", target: "webview" },

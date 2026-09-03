@@ -5,6 +5,11 @@ import * as path from "node:path";
 import * as z from "zod";
 
 import {
+  buildSubagentThread,
+  parseSpawnAgentArgs,
+  validateThreadFileStem,
+  type CreateSubagentThreadInput,
+  type CreateSubagentThreadResult,
   createRunPreview,
   isRunSnapshot,
   normalizeRunHistory,
@@ -164,6 +169,81 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
       this._resourceKey(p),
       (canonical.runHistoryIndex ?? []).map((run) => run.snapshotRef)
     );
+  }
+
+  /** Publish complete child files without ever replacing an existing name. */
+  async createSubagentThread(
+    input: CreateSubagentThreadInput,
+  ): Promise<CreateSubagentThreadResult> {
+    if (
+      !input.parentPath ||
+      path.isAbsolute(input.parentPath) ||
+      input.parentPath.includes("\\") ||
+      input.parentPath.split("/").includes("..")
+    ) {
+      throw new Error("parentPath must be a workspace-relative thread path.");
+    }
+    const parent = this._resolve(input.parentPath);
+    const parentStat = await fs.stat(parent);
+    if (!parentStat.isFile() || !parent.endsWith(".json")) {
+      throw new Error("The parent must be a saved JSON thread.");
+    }
+    const args = parseSpawnAgentArgs(input.arguments);
+    const parentName = path.basename(parent, ".json");
+    const taskFileName = args.task_name.toLowerCase().replace(/\s+/g, "-");
+    const stem = `${parentName}-${taskFileName}`;
+    const validation = validateThreadFileStem(stem);
+    if (!validation.valid) throw new Error(validation.error);
+    const directory = path.join(path.dirname(parent), "tasks");
+    // Use the same runtime's workspace; refuse existing symlinks escaping it.
+    const root = await fs.realpath(this.root);
+    const assertWithinRoot = (target: string) => {
+      const relative = path.relative(root, target);
+      if (
+        relative === ".." ||
+        relative.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relative)
+      ) {
+        throw new Error("Subtask directory is outside the workspace.");
+      }
+    };
+    assertWithinRoot(await fs.realpath(path.dirname(parent)));
+    await fs.mkdir(directory, { recursive: true });
+    const realDirectory = await fs.realpath(directory);
+    assertWithinRoot(realDirectory);
+    const child = buildSubagentThread(input.thread, parentName, args);
+    for (let suffix = 0; ; suffix++) {
+      const title = `${stem}${suffix ? `-${suffix}` : ""}`;
+      const destination = path.join(realDirectory, `${title}.json`);
+      const temporary = path.join(
+        realDirectory,
+        `.subtask-${crypto.randomUUID()}.tmp`,
+      );
+      const serializable = packThreadImages({ ...child, title });
+      PersistedThreadZodSchema.parse(serializable);
+      try {
+        await fs.writeFile(temporary, JSON.stringify(serializable, null, 2), {
+          flag: "wx",
+          mode: 0o600,
+        });
+        // link is exclusive and atomic: readers never see a partial JSON file.
+        await fs.link(temporary, destination);
+        const resource = path.posix.join(
+          path.posix.dirname(this._relative(input.parentPath)),
+          "tasks",
+          `${title}.json`,
+        );
+        return {
+          path: resource,
+          status: "created",
+          message: "Created, not yet run.",
+        };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      } finally {
+        await fs.rm(temporary, { force: true });
+      }
+    }
   }
 
   /** Persist one complete run snapshot and return its lightweight reference. */

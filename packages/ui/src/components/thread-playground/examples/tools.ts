@@ -1,4 +1,5 @@
 import type { BuiltinTool, FunctionTool } from "@llm-space/core";
+import { SPAWN_AGENT_TOOL } from "@llm-space/core/thread";
 import {
   ActivityIcon,
   BotIcon,
@@ -553,39 +554,6 @@ export const ASK_USER_QUESTION_BUILTIN_TOOL: BuiltinTool = {
   terminate: true,
 };
 
-const AGENT_TOOL: FunctionTool = _functionTool({
-  name: "agent",
-  description:
-    "Spawns a sub-agent to autonomously carry out a self-contained task (e.g. a broad codebase search, multi-step research, or an isolated implementation) and returns its final result. Use to delegate work that doesn't need your ongoing input, or to run independent tasks in parallel. Do not use for simple lookups you can answer directly, or tasks that require interactive back-and-forth steering.",
-  strict: true,
-  parameters: {
-    type: "object",
-    required: ["description", "prompt"],
-    properties: {
-      description: {
-        type: "string",
-        description: "A short (3-6 word) summary of the sub-agent's task.",
-      },
-      prompt: {
-        type: "string",
-        description:
-          "The full, self-contained task for the sub-agent. It starts with no memory of this conversation, so include all relevant context, file paths, and the expected output.",
-      },
-      subagent_type: {
-        type: "string",
-        description:
-          'Which specialized agent persona to launch (e.g. "general-purpose", "researcher", "code-reviewer"). Defaults to a general-purpose agent if omitted.',
-      },
-      run_in_background: {
-        type: "boolean",
-        description:
-          "Run the sub-agent asynchronously and return immediately instead of blocking on its result. Defaults to false.",
-      },
-    },
-    additionalProperties: false,
-  },
-});
-
 const TASK_CREATE_TOOL: FunctionTool = _functionTool({
   name: "task",
   description:
@@ -781,8 +749,8 @@ export const TOOL_EXAMPLES: ToolExampleItem[] = [
   },
   {
     type: "tool",
-    label: "agent",
-    tool: AGENT_TOOL,
+    label: "spawn_agent",
+    tool: { ...SPAWN_AGENT_TOOL, type: "function" },
     icon: BotIcon,
   },
   {

@@ -1,10 +1,3 @@
-/**
- * The host-capability interfaces the Thread Playground depends on. In the
- * desktop app these are backed by Electrobun RPC; a web build supplies no-op /
- * static implementations. Keeping them as injected interfaces is what lets the
- * same UI render in both contexts.
- */
-
 import type {
   AgentTransport,
   ArkImageGenerationConfig,
@@ -25,6 +18,16 @@ import type {
   SkillsSettings,
   Thread,
 } from "@llm-space/core";
+import type {
+  CreateSubagentThreadInput,
+  CreateSubagentThreadResult,
+} from "@llm-space/core/thread";
+/**
+ * The host-capability interfaces the Thread Playground depends on. In the
+ * desktop app these are backed by Electrobun RPC; a web build supplies no-op /
+ * static implementations. Keeping them as injected interfaces is what lets the
+ * same UI render in both contexts.
+ */
 
 /** A tool call's result, normalized across the built-in and MCP backends. */
 export interface ToolCallResult extends BuiltinToolCallResponse {
@@ -226,6 +229,14 @@ export interface HostServices {
   skills: SkillsHost;
   mcp: McpHost;
   builtinTools: BuiltinToolsHost;
+  /** Manual-only child thread creation; absent on display-only hosts. */
+  subagents?: {
+    create(
+      input: CreateSubagentThreadInput & RuntimeOwnedHostOptions
+    ): Promise<CreateSubagentThreadResult>;
+    open(input: { path: string; runtimeId: string }): void;
+    exists(input: { path: string; runtimeId: string }): Promise<boolean>;
+  };
   pluginTools: PluginToolsHost;
   paths: PathsHost;
   files: FilesHost;

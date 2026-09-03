@@ -45,3 +45,20 @@ describe("generate_image tool example", () => {
     });
   });
 });
+
+
+test("General Agent uses the terminating built-in spawn_agent", () => {
+  const example = PROMPT_EXAMPLES.find(
+    (item) => item.type === "example" && item.id === "general-agent",
+  );
+  if (example?.type !== "example" || !Array.isArray(example.tools))
+    throw new Error("Missing example");
+  expect(
+    example.tools.find(
+      (tool) => tool.type === "builtin" && tool.name === "spawn_agent",
+    ),
+  ).toMatchObject({ type: "builtin", name: "spawn_agent", terminate: true });
+  expect(
+    example.tools.some((tool) => "name" in tool && tool.name === "agent"),
+  ).toBe(false);
+});

@@ -389,6 +389,8 @@ export function createMainWindowRPC({
             toolName,
             arguments: args,
           }),
+        createSubagentThread: ({ runtimeId, ...input }) =>
+          getRuntime(runtimeId).createSubagentThread(input),
         builtInListTools: ({ runtimeId }) =>
           Promise.resolve(getRuntime(runtimeId).builtInListTools()),
         builtInCallTool: ({

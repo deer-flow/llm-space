@@ -25,6 +25,11 @@ import type {
   ThreadRunSnapshot,
   ThreadSnapshot,
 } from "@llm-space/core";
+import type {
+  CreateSubagentThreadInput,
+  CreateSubagentThreadResult,
+} from "@llm-space/core/thread";
+
 
 import type {
   TraceConnectedProjectInput,
@@ -147,6 +152,10 @@ export interface RuntimeClient {
     model: CustomModel;
     originalId?: string;
   }): Promise<ModelProviderGroup[]>;
+
+  createSubagentThread(
+    input: CreateSubagentThreadInput,
+  ): Promise<CreateSubagentThreadResult>;
 
   fsLs(path: string): Promise<FileNode[]>;
   fsMkdir(path: string): Promise<void>;
