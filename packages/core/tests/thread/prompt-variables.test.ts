@@ -360,15 +360,175 @@ describe("renderThreadPromptVariables — template output freeze", () => {
     const first = await renderThreadPromptVariables({
       context: base,
       loadSkills: () => Promise.resolve(skills),
-      now: () => new Date("2026-08-29T00:00:00Z"),
+      now: () => new Date(2026, 7, 29, 8),
     });
+    // Same calendar day, later time: skills and the rendered date are both
+    // unchanged, so the frozen output is reused byte-for-byte.
     const second = await renderThreadPromptVariables({
       context: { ...base, snapshot: first.snapshot },
       loadSkills: () => Promise.resolve(skills),
-      now: () => new Date("2026-08-30T00:00:00Z"),
+      now: () => new Date(2026, 7, 29, 22),
     });
 
     expect(second.context.systemPrompt).toBe(first.context.systemPrompt);
+  });
+});
+
+describe("renderThreadPromptVariables — currentDate freshness", () => {
+  test("template reuses frozen output within the same day", async () => {
+    const base = context("Today: {% if true %}{{current_date}}{% endif %}", {
+      variables: {
+        current_date: { type: "currentDate", format: "iso-date" },
+      },
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 8),
+    });
+    // Same calendar day: the frozen output and its snapshot entry are reused
+    // byte-for-byte, keeping prompt-cache-friendly stability.
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 29, 22),
+    });
+
+    expect(first.context.systemPrompt).toBe("Today: 2026-08-29");
+    expect(second.context.systemPrompt).toBe(first.context.systemPrompt);
+    expect(second.snapshot?.variables?.[SYSTEM_PROMPT_PLACE_KEY]).toStrictEqual(
+      first.snapshot?.variables?.[SYSTEM_PROMPT_PLACE_KEY]
+    );
+  });
+
+  test("template re-renders with the new date once the day moves", async () => {
+    const base = context("Today: {% if true %}{{current_date}}{% endif %}", {
+      variables: {
+        current_date: { type: "currentDate", format: "iso-date" },
+      },
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 8),
+    });
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 30, 8),
+    });
+    // The refreshed snapshot records the new fingerprint, so the new day's
+    // output is itself stable across same-day re-runs.
+    const third = await renderThreadPromptVariables({
+      context: { ...base, snapshot: second.snapshot },
+      now: () => new Date(2026, 7, 30, 23),
+    });
+
+    expect(first.context.systemPrompt).toBe("Today: 2026-08-29");
+    expect(second.context.systemPrompt).toBe("Today: 2026-08-30");
+    expect(third.context.systemPrompt).toBe("Today: 2026-08-30");
+  });
+
+  test("local-date-time templates re-render once the formatted time moves", async () => {
+    const base = context("Now: {% if true %}{{current_date}}{% endif %}", {
+      variables: {
+        current_date: { type: "currentDate", format: "local-date-time" },
+      },
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 9, 0, 0),
+    });
+    // Identical clock reading: the frozen output still matches what a fresh
+    // render would produce, so it is reused.
+    const same = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 29, 9, 0, 0),
+    });
+    // One second later: the fingerprint differs, so the place re-renders.
+    const next = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 29, 9, 0, 1),
+    });
+
+    expect(same.context.systemPrompt).toBe(first.context.systemPrompt);
+    expect(next.context.systemPrompt).not.toBe(first.context.systemPrompt);
+    expect(next.context.systemPrompt).toContain("09:00:01");
+  });
+
+  test("templates without currentDate references stay frozen across days", async () => {
+    const base = context("{% if greeting %}Hi {{ greeting }}{% endif %}");
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 8),
+    });
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 8, 2, 8),
+    });
+
+    expect(first.context.systemPrompt).toBe("Hi Hi");
+    expect(second.context.systemPrompt).toBe("Hi Hi");
+  });
+
+  test("date fingerprint reuse does not bypass the skills fingerprint", async () => {
+    const base = context(
+      "{% if true %}{{current_date}}{% endif %} {{available_skills}}",
+      {
+        variables: {
+          current_date: { type: "currentDate", format: "iso-date" },
+          available_skills: {
+            type: "skills",
+            skillNames: [],
+            format: "markdown-list",
+            indent: 0,
+          },
+        },
+      }
+    );
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 8),
+      loadSkills: () =>
+        Promise.resolve([
+          { name: "first", description: "First skill", path: "/first" },
+        ]),
+    });
+    // Same day but changed skills: the skills fingerprint still invalidates.
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 29, 22),
+      loadSkills: () =>
+        Promise.resolve([
+          { name: "second", description: "Second skill", path: "/second" },
+        ]),
+    });
+
+    expect(first.context.systemPrompt).toBe(
+      "2026-08-29 - **first**: First skill"
+    );
+    expect(second.context.systemPrompt).toContain("2026-08-29");
+    expect(second.context.systemPrompt).toContain("- **second**: Second skill");
+  });
+
+  test("simple path re-renders the current date instead of serving frozen", async () => {
+    const base = context("Today: {{current_date}}", {
+      variables: {
+        current_date: { type: "currentDate", format: "iso-date" },
+      },
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      now: () => new Date(2026, 7, 29, 8),
+    });
+    const second = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      now: () => new Date(2026, 7, 30, 8),
+    });
+    const third = await renderThreadPromptVariables({
+      context: { ...base, snapshot: second.snapshot },
+      now: () => new Date(2026, 7, 30, 20),
+    });
+
+    expect(first.context.systemPrompt).toBe("Today: 2026-08-29");
+    expect(second.context.systemPrompt).toBe("Today: 2026-08-30");
+    expect(third.context.systemPrompt).toBe("Today: 2026-08-30");
   });
 });
 
