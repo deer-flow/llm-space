@@ -289,7 +289,7 @@ function _searchEnvBlock(search: SearchSettings, withValues: boolean): string {
     withValues ? _searchKeyLiteral(value) : "";
   return `
 # Web-search backend for the built-in web_search / web_fetch tools:
-# one of firecrawl, tavily, or brave.
+# one of firecrawl, tavily, brave, or searxng.
 SEARCH_PROVIDER=${search.provider}
 # Optional — Firecrawl's free tier works without a key.
 FIRECRAWL_API_KEY=${key(search.firecrawlApiKey)}
@@ -297,6 +297,8 @@ FIRECRAWL_API_KEY=${key(search.firecrawlApiKey)}
 TAVILY_API_KEY=${key(search.tavilyApiKey)}
 # Required only when SEARCH_PROVIDER=brave.
 BRAVE_API_KEY=${key(search.braveApiKey)}
+# Required only when SEARCH_PROVIDER=searxng.
+SEARXNG_BASE_URL=${key(search.searxngBaseUrl)}
 `;
 }
 

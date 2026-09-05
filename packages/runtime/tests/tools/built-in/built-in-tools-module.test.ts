@@ -31,6 +31,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -71,6 +72,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: "/tmp/workspace",
     });
@@ -134,6 +136,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: "/tmp/workspace",
     } as never);
@@ -161,6 +164,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -198,6 +202,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -235,6 +240,7 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        searxngBaseUrl: "http://localhost:8080",
       }),
       workspaceRoot: directory,
     }).register(tools);
