@@ -51,6 +51,9 @@ function createRuntime(): RuntimeClient {
       braveApiKey: "",
       firecrawlApiKey: "",
       tavilyApiKey: "",
+      exaApiKey: "",
+      anysearchApiKey: "",
+      zhihuAccessSecret: "",
     }),
     getNetworkSettings: () => ({
       enabled: false,
