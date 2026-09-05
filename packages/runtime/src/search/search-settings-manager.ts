@@ -16,6 +16,9 @@ const VALID_PROVIDERS: readonly SearchProviderId[] = [
   "brave",
   "firecrawl",
   "tavily",
+  "exa",
+  "anysearch",
+  "zhihu",
 ];
 
 const SearchSettingsFileSchema = z.object({
@@ -23,6 +26,9 @@ const SearchSettingsFileSchema = z.object({
   braveApiKey: z.string().optional(),
   firecrawlApiKey: z.string().optional(),
   tavilyApiKey: z.string().optional(),
+  exaApiKey: z.string().optional(),
+  anysearchApiKey: z.string().optional(),
+  zhihuAccessSecret: z.string().optional(),
 });
 
 /**
@@ -88,6 +94,18 @@ export class SearchSettingsManager {
         typeof input.tavilyApiKey === "string"
           ? input.tavilyApiKey
           : DEFAULT_SEARCH_SETTINGS.tavilyApiKey,
+      exaApiKey:
+        typeof input.exaApiKey === "string"
+          ? input.exaApiKey
+          : DEFAULT_SEARCH_SETTINGS.exaApiKey,
+      anysearchApiKey:
+        typeof input.anysearchApiKey === "string"
+          ? input.anysearchApiKey
+          : DEFAULT_SEARCH_SETTINGS.anysearchApiKey,
+      zhihuAccessSecret:
+        typeof input.zhihuAccessSecret === "string"
+          ? input.zhihuAccessSecret
+          : DEFAULT_SEARCH_SETTINGS.zhihuAccessSecret,
     };
   }
 }
