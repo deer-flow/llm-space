@@ -578,7 +578,13 @@ export async function grep(
   }
   args.push("--regexp", pattern, "--", searchPath);
 
-  const { stdout, stderr, code } = await _run("rg", args);
+  const { stdout, stderr, code } = await _run(
+    "rg",
+    args,
+    undefined,
+    undefined,
+    SUBPROCESS_MAX_OUTPUT_BYTES
+  );
   if (code === 1) {
     return "No matches found.";
   }
@@ -620,6 +626,10 @@ export const globTool: BuiltinTool = {
   },
 };
 
+// The full path list is returned to the model and persisted with the thread,
+// so a broad pattern (e.g. `**/*` over a home directory) must be capped.
+const GLOB_MAX_RESULTS = 200;
+
 export async function glob(
   globPattern: string,
   targetDirectory: string | undefined,
@@ -642,10 +652,13 @@ export async function glob(
   if (matches.length === 0) {
     return "No files matched.";
   }
-  return matches
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
-    .map((match) => match.path)
-    .join("\n");
+  matches.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const shown = matches.slice(0, GLOB_MAX_RESULTS);
+  const lines = shown.map((match) => match.path).join("\n");
+  if (matches.length > GLOB_MAX_RESULTS) {
+    return `${lines}\n... [showing first ${GLOB_MAX_RESULTS} of ${matches.length} matches; narrow the pattern or target directory]`;
+  }
+  return lines;
 }
 
 // -- bash ---------------------------------------------------------------------
@@ -683,6 +696,10 @@ export const bashTool: BuiltinTool = {
 
 const BASH_DEFAULT_TIMEOUT_MS = 120_000;
 const BASH_MAX_TIMEOUT_MS = 600_000;
+// Matches READ_MAX_SIZE_BYTES: subprocess output is returned to the model and
+// persisted into the thread, so an unbounded stream (e.g. `cat huge.log`)
+// must not flow through untouched.
+const SUBPROCESS_MAX_OUTPUT_BYTES = 256 * 1024;
 
 export async function bash(
   command: string,
@@ -701,7 +718,8 @@ export async function bash(
     "bash",
     ["-c", command],
     timeoutMs,
-    workspaceRoot
+    workspaceRoot,
+    SUBPROCESS_MAX_OUTPUT_BYTES
   );
   return { stdout, stderr, exitCode: code };
 }
@@ -913,15 +931,14 @@ function _run(
   command: string,
   args: string[],
   timeoutMs?: number,
-  cwd?: string
+  cwd?: string,
+  maxOutputBytes?: number
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
     });
-    let stdout = "";
-    let stderr = "";
     let timedOut = false;
     const timer =
       timeoutMs === undefined
@@ -930,12 +947,40 @@ function _run(
             timedOut = true;
             child.kill("SIGKILL");
           }, timeoutMs);
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
+    // Collect into Buffers so the cap is enforced on bytes, not UTF-16 code
+    // units; once a stream crosses it, detach the listener and resume() so the
+    // child never blocks on a full pipe while we discard the rest.
+    const collect = (stream: NodeJS.ReadableStream) => {
+      let chunks = Buffer.alloc(0);
+      let truncated = false;
+      stream.on("data", (chunk: Buffer) => {
+        if (truncated) {
+          return;
+        }
+        chunks = Buffer.concat([chunks, chunk]);
+        if (
+          maxOutputBytes !== undefined &&
+          chunks.length >= maxOutputBytes
+        ) {
+          truncated = true;
+          stream.removeAllListeners("data");
+          stream.resume();
+        }
+      });
+      return () => ({ chunks, truncated });
+    };
+    const stdoutChunks = collect(child.stdout);
+    const stderrChunks = collect(child.stderr);
+    const suffix =
+      maxOutputBytes === undefined
+        ? ""
+        : `\n... [truncated at ${maxOutputBytes} bytes; redirect output to a file and read ranges with the read tool]`;
+    const capped = (collected: () => { chunks: Buffer; truncated: boolean }) => {
+      const { chunks, truncated } = collected();
+      // Slice on a UTF-8 code-point boundary so the marker can't split one.
+      const text = chunks.subarray(0, maxOutputBytes).toString("utf8");
+      return truncated ? text + suffix : text;
+    };
     child.on("error", (error) => {
       if (timer) clearTimeout(timer);
       reject(error);
@@ -946,7 +991,11 @@ function _run(
         reject(new Error(`Command timed out after ${timeoutMs}ms`));
         return;
       }
-      resolve({ stdout, stderr, code: code ?? 0 });
+      resolve({
+        stdout: capped(stdoutChunks),
+        stderr: capped(stderrChunks),
+        code: code ?? 0,
+      });
     });
   });
 }
