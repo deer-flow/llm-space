@@ -31,6 +31,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -71,6 +74,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: "/tmp/workspace",
     });
@@ -134,6 +140,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: "/tmp/workspace",
     } as never);
@@ -161,6 +170,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -198,6 +210,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -235,6 +250,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
