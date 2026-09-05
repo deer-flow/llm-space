@@ -4,9 +4,22 @@ import {
   type BrowserWindow,
 } from "electrobun/bun";
 
+import { MESSAGES } from "../../i18n/messages";
+import { commandLabel } from "../../shared/command-labels";
 import type { Command } from "../../shared/commands";
+import type { AppLanguage } from "../../shared/language";
 
 import { isChineseLocale } from "./locales";
+
+/**
+ * The menu follows the OS display language: it is built once at startup, and
+ * an in-app language change (renderer localStorage) cannot reach it until
+ * settings are synced to the main process. Role items (Undo, Copy, …) are
+ * rendered by the OS and localize themselves.
+ */
+function _menuLang(): AppLanguage {
+  return isChineseLocale() ? "zh" : "en";
+}
 
 /**
  * The app (first) submenu. Its update item is the one dynamic piece: normally
@@ -14,17 +27,27 @@ import { isChineseLocale } from "./locales";
  * "Restart to Update" (VS Code pattern). `setUpdateReadyInMenu` rebuilds the
  * whole menu — `setApplicationMenu` is idempotent and can be re-called anytime.
  */
-function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
+function _appSubmenu(
+  updateReady: boolean,
+  lang: AppLanguage
+): ApplicationMenuItemConfig {
+  const t = MESSAGES[lang];
   const updateItem = updateReady
-    ? { label: "Restart to Update", action: "restartToUpdate" }
-    : { label: "Check for Updates...", action: "checkForUpdates" };
+    ? {
+        label: commandLabel("applyUpdateAndRestart", lang),
+        action: "restartToUpdate",
+      }
+    : {
+        label: commandLabel("checkForUpdates", lang),
+        action: "checkForUpdates",
+      };
   return {
     submenu: [
-      { label: "About LLM Space", role: "about" },
+      { label: t.menu.about, role: "about" },
       updateItem,
       { type: "divider" },
       {
-        label: "Settings...",
+        label: t.menu.settings,
         action: "settings",
         accelerator: "CommandOrControl+,",
       },
@@ -34,7 +57,7 @@ function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
       { role: "showAll" },
       { type: "divider" },
       {
-        label: "Quit LLM Space",
+        label: t.menu.quit,
         role: "quit",
         accelerator: "CommandOrControl+Q",
       },
@@ -43,49 +66,60 @@ function _appSubmenu(updateReady: boolean): ApplicationMenuItemConfig {
 }
 
 function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
+  const lang = _menuLang();
+  const t = MESSAGES[lang];
   return [
-    _appSubmenu(updateReady),
+    _appSubmenu(updateReady, lang),
     {
-      label: "File",
+      label: t.menu.file,
       submenu: [
         {
-          label: "New File",
+          label: commandLabel("newFile", lang),
           action: "newThread",
           accelerator: "CommandOrControl+N",
         },
-        { label: "New from Examples...", action: "newFromExamples" },
+        { label: t.menu.newFromExamples, action: "newFromExamples" },
         { type: "divider" },
         {
-          label: "New Folder",
+          label: commandLabel("newFolder", lang),
           action: "newFolder",
           accelerator: "CommandOrControl+Shift+N",
         },
         { type: "divider" },
-        { label: "Import from Files...", action: "importFiles" },
-        { label: "Import from Clipboard", action: "importFromClipboard" },
+        { label: commandLabel("importFiles", lang), action: "importFiles" },
+        {
+          label: commandLabel("importFromClipboard", lang),
+          action: "importFromClipboard",
+        },
         { type: "divider" },
-        { label: "Share...", action: "shareThread" },
+        { label: t.menu.share, action: "shareThread" },
         { type: "divider" },
-        { label: "Refresh Workspace", action: "refreshTree" },
-        { label: "Reveal Workspace Folder", action: "revealWorkspaceFolder" },
+        { label: t.menu.refreshWorkspace, action: "refreshTree" },
+        {
+          label: t.menu.revealWorkspaceFolder,
+          action: "revealWorkspaceFolder",
+        },
         { type: "divider" },
         {
-          label: "Close Tab",
+          label: commandLabel("closeTab", lang),
           action: "closeTab",
           accelerator: "CommandOrControl+W",
         },
-        { label: "Close Others", action: "closeOtherTabs" },
-        { label: "Close All Tabs", action: "closeAllTabs" },
+        { label: t.menu.closeOthers, action: "closeOtherTabs" },
+        {
+          label: commandLabel("closeAllTabs", lang),
+          action: "closeAllTabs",
+        },
         { type: "divider" },
         {
-          label: "Reopen Closed Tabs",
+          label: t.menu.reopenClosedTabs,
           action: "reopenClosedTabs",
           accelerator: "CommandOrControl+Shift+T",
         },
       ],
     },
     {
-      label: "Edit",
+      label: t.menu.edit,
       submenu: [
         { role: "undo" },
         { role: "redo" },
@@ -99,57 +133,57 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
       ],
     },
     {
-      label: "View",
+      label: t.menu.view,
       submenu: [
         {
-          label: "Command Palette...",
+          label: t.menu.commandPalette,
           action: "commandPalette",
           accelerator: "CommandOrControl+Shift+P",
         },
         { type: "divider" },
         {
-          label: "Toggle Sidebar",
+          label: commandLabel("toggleSidebar", lang),
           action: "toggleSidebar",
           accelerator: "CommandOrControl+B",
         },
         { type: "divider" },
         {
-          label: "Reload",
+          label: commandLabel("reload", lang),
           action: "reload",
           accelerator: "CommandOrControl+Shift+R",
         },
         { type: "divider" },
         {
-          label: "Zoom In",
+          label: commandLabel("zoomIn", lang),
           action: "zoomIn",
           accelerator: "CommandOrControl+=",
         },
         {
-          label: "Zoom Out",
+          label: commandLabel("zoomOut", lang),
           action: "zoomOut",
           accelerator: "CommandOrControl+-",
         },
         {
-          label: "Reset Zoom",
+          label: commandLabel("resetZoom", lang),
           action: "resetZoom",
           accelerator: "CommandOrControl+0",
         },
       ],
     },
     {
-      label: "Window",
+      label: t.menu.window,
       role: "window",
       submenu: [
         { role: "minimize" },
         { role: "bringAllToFront" },
         { type: "divider" },
         {
-          label: "Select Previous Tab",
+          label: commandLabel("selectPreviousTab", lang),
           action: "selectPreviousTab",
           accelerator: "CommandOrControl+Option+Left",
         },
         {
-          label: "Select Next Tab",
+          label: commandLabel("selectNextTab", lang),
           action: "selectNextTab",
           accelerator: "CommandOrControl+Option+Right",
         },
@@ -158,18 +192,18 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
       ],
     },
     {
-      label: "Help",
+      label: t.menu.help,
       submenu: [
-        { label: "View Documentation", action: "openDocument" },
+        { label: t.menu.viewDocumentation, action: "openDocument" },
         { type: "divider" },
-        { label: "Visit Official Website", action: "openOfficialWebsite" },
-        { label: "Visit GitHub Project", action: "openGitHubProject" },
-        { label: "Visit Harness 101", action: "openHarness101" },
+        { label: t.menu.visitOfficialWebsite, action: "openOfficialWebsite" },
+        { label: t.menu.visitGitHubProject, action: "openGitHubProject" },
+        { label: t.menu.visitHarness101, action: "openHarness101" },
         { type: "divider" },
-        { label: "Report Bug", action: "reportBugs" },
-        { label: "Donate", action: "donate" },
+        { label: t.menu.reportBug, action: "reportBugs" },
+        { label: t.menu.donate, action: "donate" },
         { type: "divider" },
-        { label: "Onboard", action: "onboard" },
+        { label: t.menu.onboard, action: "onboard" },
       ],
     },
   ];
