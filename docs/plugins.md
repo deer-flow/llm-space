@@ -160,6 +160,21 @@ Plugin before enabling or running it:
 Descriptions are UI copy, not identifiers. Stable IDs still come from the
 Plugin package name and the declaring file or object ID.
 
+### 2.4 Bundled default plugin
+
+LLM Space ships one default Plugin, the Memory plugin
+(`@llm-space/memory`), which gives the agent cross-project persistent
+memory through the `memory_save`, `memory_search`, and `memory_forget`
+Plugin Tools plus a `memory` Skill that tells the agent when to use them.
+
+On startup, before plugins are discovered, the desktop app writes the
+plugin into `<home>/plugins/@llm-space/memory/` if that directory does
+not exist yet. Seeding is once-only and never overwrites: if you delete,
+replace, or edit the plugin, your version is kept. The agent's memories
+live in `LLM_SPACE_HOME/data/plugins/@llm-space/memory/memories.jsonl`,
+which survives plugin updates and is shared by every workspace, making
+the memory cross-project by design.
+
 ## 3. Metadata in `package.json`
 
 Minimal metadata:

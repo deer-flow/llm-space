@@ -16,6 +16,9 @@ async function _bootstrapDesktopApp(): Promise<void> {
   const { seedSkills } = await import("./skills/seed");
   seedSkills();
 
+  const { seedDefaultPlugins } = await import("./plugins/seed");
+  seedDefaultPlugins();
+
   const { startDesktopApp } = await import("./app");
   await startDesktopApp();
 }
