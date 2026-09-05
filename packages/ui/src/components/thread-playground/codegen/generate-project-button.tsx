@@ -451,6 +451,9 @@ export function GenerateProjectButton({
             firecrawlApiKey: resolveKey(search.firecrawlApiKey),
             tavilyApiKey: resolveKey(search.tavilyApiKey),
             braveApiKey: resolveKey(search.braveApiKey),
+            exaApiKey: resolveKey(search.exaApiKey),
+            anysearchApiKey: resolveKey(search.anysearchApiKey),
+            zhihuAccessSecret: resolveKey(search.zhihuAccessSecret),
           }
         : undefined;
 

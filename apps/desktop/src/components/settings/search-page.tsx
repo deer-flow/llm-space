@@ -65,8 +65,9 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
       description={
         <>
           Choose the provider for the built-in <code>web_search</code> tool.
-          When Brave Search is selected, <code>web_fetch</code> continues to use
-          Firecrawl for safe page extraction.
+          When Brave Search, Exa, AnySearch, or Zhihu is selected,{" "}
+          <code>web_fetch</code> continues to use Firecrawl for safe page
+          extraction.
         </>
       }
     >
@@ -86,6 +87,9 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
               <SelectItem value="brave">Brave Search</SelectItem>
               <SelectItem value="firecrawl">Firecrawl</SelectItem>
               <SelectItem value="tavily">Tavily</SelectItem>
+              <SelectItem value="exa">Exa (MCP)</SelectItem>
+              <SelectItem value="anysearch">AnySearch (MCP)</SelectItem>
+              <SelectItem value="zhihu">Zhihu (MCP)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -122,10 +126,40 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
           onBlur={() => void persist(settings)}
         />
 
+        <ApiKeyField
+          label="Exa API key (optional)"
+          value={settings.exaApiKey}
+          getKeyUrl="https://dashboard.exa.ai/api-keys"
+          onChange={(e) => setSettings({ ...settings, exaApiKey: e.target.value })}
+          onBlur={() => void persist(settings)}
+        />
+
+        <ApiKeyField
+          label="AnySearch API key (optional)"
+          value={settings.anysearchApiKey}
+          getKeyUrl="https://www.anysearch.com/console/api-keys"
+          onChange={(e) =>
+            setSettings({ ...settings, anysearchApiKey: e.target.value })
+          }
+          onBlur={() => void persist(settings)}
+        />
+
+        <ApiKeyField
+          label="Zhihu Access Secret"
+          value={settings.zhihuAccessSecret}
+          getKeyUrl="https://developer.zhihu.com/"
+          onChange={(e) =>
+            setSettings({ ...settings, zhihuAccessSecret: e.target.value })
+          }
+          onBlur={() => void persist(settings)}
+        />
+
         <p className="text-muted-foreground text-xs">
           Values starting with <code>$</code> are read from the environment
           (e.g. <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
-          <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>).
+          <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>). Exa
+          and AnySearch work without a key at lower rate limits; Zhihu requires
+          the Access Secret from its developer console (个人中心).
         </p>
       </div>
     </SettingsPage>
