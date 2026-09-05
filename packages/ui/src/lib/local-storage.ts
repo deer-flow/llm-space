@@ -13,6 +13,7 @@ export const LOCAL_STORAGE_KEYS = {
   autoRunTools: "llm-space-auto-run-tools",
   reactLoop: "llm-space-react-loop",
   messageStatsSummaryMode: "llm-space-message-stats-summary-mode",
+  language: "llm-space-language",
   landingLanguage: "llm-space-lang",
   experimentalTracing: "llm-space-experimental-tracing",
   experimentalReactScan: "llm-space-experimental-react-scan",

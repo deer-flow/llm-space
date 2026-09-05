@@ -10,24 +10,27 @@ import { TooltipProvider } from "@llm-space/ui/ui/tooltip";
 
 import { ExperimentalProvider } from "@/components/experimental-provider";
 import { PluginCommandExecutionProvider } from "@/components/plugin-command-execution-provider";
+import { I18nProvider } from "@/i18n/i18n-provider";
 
 import { QueryProvider } from "./query-provider";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <ExperimentalProvider>
-        <QueryProvider>
-          <TooltipProvider delayDuration={1000}>
-            <PluginCommandExecutionProvider>
-              <div className="flex size-full flex-col">
-                <ThemedToaster />
-                {children}
-              </div>
-            </PluginCommandExecutionProvider>
-          </TooltipProvider>
-        </QueryProvider>
-      </ExperimentalProvider>
+      <I18nProvider>
+        <ExperimentalProvider>
+          <QueryProvider>
+            <TooltipProvider delayDuration={1000}>
+              <PluginCommandExecutionProvider>
+                <div className="flex size-full flex-col">
+                  <ThemedToaster />
+                  {children}
+                </div>
+              </PluginCommandExecutionProvider>
+            </TooltipProvider>
+          </QueryProvider>
+        </ExperimentalProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

@@ -6,6 +6,9 @@ import { Input } from "@llm-space/ui/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
+
 
 
 /**
@@ -28,6 +31,7 @@ export function ApiKeyField({
   /** Helper text rendered under the input. */
   description?: ReactNode;
 } & ComponentProps<typeof Input>) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   return (
     <div className="flex flex-col gap-2">
@@ -38,7 +42,7 @@ export function ApiKeyField({
             href={getKeyUrl}
             className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
           >
-            Get API key
+            {t.apiKeyField.getKey}
           </Link>
         ) : null}
       </div>
@@ -53,7 +57,10 @@ export function ApiKeyField({
           type="button"
           onClick={() => setVisible((v) => !v)}
           className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 transition-colors"
-          aria-label={visible ? `Hide ${label}` : `Show ${label}`}
+          aria-label={formatMessage(
+            visible ? t.apiKeyField.hideAria : t.apiKeyField.showAria,
+            { label }
+          )}
         >
           {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
