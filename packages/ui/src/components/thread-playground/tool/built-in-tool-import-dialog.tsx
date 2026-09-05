@@ -80,7 +80,12 @@ const FILE_SYSTEM_TOOL_NAMES = new Set([
 
 const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search", "weather_report"]);
 
-const MEDIA_TOOL_NAMES = new Set(["generate_image"]);
+const MEDIA_TOOL_NAMES = new Set([
+  "generate_image",
+  "list_voices",
+  "speak",
+  "stop_speaking",
+]);
 
 function _BuiltInToolImportDialog({
   existingToolNames,
@@ -115,7 +120,9 @@ function _BuiltInToolImportDialog({
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
-  const generateImageTool = tools.find((tool) => tool.name === "generate_image");
+  const generateImageTool = tools.find(
+    (tool) => tool.name === "generate_image"
+  );
   const imageProviderId = generateImageTool
     ? getToolConnectionProviderId(generateImageTool)
     : undefined;
@@ -482,9 +489,7 @@ function _GenerateImageConfigFields({
           >
             <SelectValue placeholder="Choose model" />
           </SelectTrigger>
-          <SelectContent
-            onPointerDownOutside={(e) => e.preventDefault()}
-          >
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {enabledModels.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.name}

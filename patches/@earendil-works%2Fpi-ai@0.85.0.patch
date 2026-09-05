@@ -1,5 +1,5 @@
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85445b915a 100644
+index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cca0d8095c 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
 @@ -72,7 +72,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
@@ -99,7 +99,7 @@ index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85
          if (response?.id) {
              output.responseId = response.id;
          }
-@@ -476,6 +539,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -479,6 +542,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
              output.responseId = event.response.id;
          }
          else if (event.type === "response.output_item.added") {
@@ -107,7 +107,7 @@ index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85
              createSlot(event.output_index, event.item);
          }
          else if (event.type === "response.reasoning_summary_text.delta") {
-@@ -573,6 +637,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -576,6 +640,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
          }
          else if (event.type === "response.output_item.done") {
              const item = event.item;
@@ -115,7 +115,7 @@ index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85
              applyMessagePhaseStopReason(item);
              const slot = getOrCreateSlot(event.output_index, item);
              if (item.type === "reasoning" && slot?.type === "thinking") {
-@@ -591,6 +656,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -594,6 +659,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              }
              else if (item.type === "message" && slot?.type === "text") {
                  slot.block.text = item.content?.map((c) => (c.type === "output_text" ? c.text : c.refusal)).join("") || "";
@@ -126,7 +126,7 @@ index c35771dcc9b2173d0b459d13c6d86e622de45e9a..cce7cc959f2c9b1482cab5957ffadd85
                  stream.push({
                      type: "text_end",
 diff --git a/dist/api/openai-responses.d.ts b/dist/api/openai-responses.d.ts
-index 41267bd50904069aa0879cc8634ea94bc1045236..cc4a5b401a49b0db170cdc0380ed76faff7a6f9c 100644
+index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e46221e2c 100644
 --- a/dist/api/openai-responses.d.ts
 +++ b/dist/api/openai-responses.d.ts
 @@ -5,6 +5,7 @@ export interface OpenAIResponsesOptions extends StreamOptions {
@@ -138,10 +138,10 @@ index 41267bd50904069aa0879cc8634ea94bc1045236..cc4a5b401a49b0db170cdc0380ed76fa
  /**
   * Generate function for OpenAI Responses API
 diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
-index 0fb7e8b26f323f2b44a5a4b760bccedc4c3abdd0..32bdd63434afc5201a4c956ffc10152e9260fb4f 100644
+index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982962b7676 100644
 --- a/dist/api/openai-responses.js
 +++ b/dist/api/openai-responses.js
-@@ -155,6 +155,9 @@ export const streamSimple = (model, context, options) => {
+@@ -156,6 +156,9 @@ export const streamSimple = (model, context, options) => {
      };
      const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
      const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
@@ -151,7 +151,7 @@ index 0fb7e8b26f323f2b44a5a4b760bccedc4c3abdd0..32bdd63434afc5201a4c956ffc10152e
      return stream(model, context, {
          ...base,
          reasoningEffort,
-@@ -230,11 +233,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
+@@ -231,11 +234,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
      if (options?.serviceTier !== undefined) {
          params.service_tier = options.serviceTier;
      }
@@ -168,7 +168,7 @@ index 0fb7e8b26f323f2b44a5a4b760bccedc4c3abdd0..32bdd63434afc5201a4c956ffc10152e
      if (options?.toolChoice !== undefined) {
          params.tool_choice = options.toolChoice;
 diff --git a/dist/types.d.ts b/dist/types.d.ts
-index 5bba63f8790aaa67e96dbb815778cc5e4f59f277..5da825852683f4b8bb5af02c821b442ba2899e43 100644
+index 85f95217bae764ef5a4fe4e9195ccbd8f2562a1e..f69f8fd542db171e467b6057e0843c5d89ba615b 100644
 --- a/dist/types.d.ts
 +++ b/dist/types.d.ts
 @@ -226,6 +226,8 @@ export interface SimpleStreamOptions extends StreamOptions {
@@ -212,7 +212,7 @@ index 5bba63f8790aaa67e96dbb815778cc5e4f59f277..5da825852683f4b8bb5af02c821b442b
  export interface ThinkingContent {
      type: "thinking";
      thinking: string;
-@@ -318,6 +343,8 @@ export interface AssistantMessage {
+@@ -320,6 +345,8 @@ export interface AssistantMessage {
      deferred?: DeferredHandle;
      errorMessage?: string;
      rawStopReason?: string;

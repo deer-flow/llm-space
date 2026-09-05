@@ -325,6 +325,7 @@ function PageWorkspace({
     [tabs.activeId, tabs.tabs, workspaceRuntimeId]
   );
   const threadStateRef = useRef(new Map<string, Thread>());
+  const visibleActiveTab = visibleTabs.find((tab) => tab.id === visibleActiveId);
   const handleThreadStateChange = useCallback(
     (tabId: string, thread: Thread | null) => {
       if (thread) threadStateRef.current.set(tabId, thread);
@@ -1066,6 +1067,9 @@ function PageWorkspace({
           >
             <FileSystemTreeView
               runtimeId={workspaceRuntimeId}
+              activeFilePath={
+                visibleActiveTab?.type === "thread" ? visibleActiveTab.path : null
+              }
               className={
                 effectiveSidebarMode === "files" ? "min-h-0 flex-1" : "hidden"
               }

@@ -31,6 +31,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -82,6 +83,7 @@ function _FileSystemTreeView({
   className,
   headerStart,
   runtimeId,
+  activeFilePath,
   onSelectFile,
   onRemove,
   onMove,
@@ -89,6 +91,8 @@ function _FileSystemTreeView({
 }: {
   className?: string;
   runtimeId: RuntimeId;
+  /** Active tab's file in this runtime; synchronization never opens a tab. */
+  activeFilePath?: string | null;
   headerStart?: ReactNode;
   /** Fired with a file's path when it is selected (folders aren't selectable). */
   onSelectFile?: (path: string, runtimeId: RuntimeId) => void;
@@ -145,6 +149,35 @@ function _FileSystemTreeView({
   // loads (no rename, no tab — works for both files and folders).
   const [pendingDuplicate, setPendingDuplicate] = useState<string | null>(null);
   const [openActionsPath, setOpenActionsPath] = useState<string | null>(null);
+  const treeRootRef = useRef<HTMLDivElement>(null);
+  const pendingActiveScroll = useRef<string | null>(null);
+
+  // One-way tab → tree synchronization. Do not reuse pendingThread: that flow
+  // calls onSelectFile and could reactivate a stale tab after an async listing.
+  // Expand only on a tab/runtime change, so manual folder collapse stays put.
+  useEffect(() => {
+    pendingActiveScroll.current = activeFilePath ?? null;
+    setSelectedId(activeFilePath ?? null);
+    if (activeFilePath) {
+      for (const dir of _ancestorDirs(activeFilePath)) expand(dir);
+    }
+  }, [activeFilePath, runtimeId, expand]);
+
+  // Listings arrive independently. Wait until the actual row is mounted, and
+  // cancel obsolete frames on tab changes without moving keyboard focus.
+  useEffect(() => {
+    const path = pendingActiveScroll.current;
+    if (!path) return;
+    const frame = requestAnimationFrame(() => {
+      const row = treeRootRef.current?.querySelector(
+        `[data-tree-id="${CSS.escape(path)}"]`
+      );
+      if (!row) return;
+      row.scrollIntoView({ block: "nearest" });
+      pendingActiveScroll.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeFilePath, runtimeId, nodesByPath]);
 
   // Open a freshly created file in a tab and select its node in the tree.
   function revealCreatedFile(path: string) {
@@ -501,7 +534,7 @@ function _FileSystemTreeView({
   }
 
   return (
-    <div className={cn("flex h-full flex-col", className)}>
+    <div ref={treeRootRef} className={cn("flex h-full flex-col", className)}>
       <header className="text-muted-foreground electrobun-webkit-app-region-drag flex h-11.5 items-center justify-between px-3 text-xs font-medium">
         {headerStart ?? (
           <span className={cn(fullScreen ? "opacity-100" : "opacity-0")}>
@@ -535,6 +568,8 @@ function _FileSystemTreeView({
             renderItem={renderItem}
             onDocumentDrag={onDocumentDrag}
             onSelectChange={(item) => {
+              pendingActiveScroll.current = null;
+              setSelectedId(item?.id ?? null);
               if (item) onSelectFile?.(item.id, runtimeId);
             }}
           />

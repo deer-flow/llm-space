@@ -11,6 +11,7 @@ import type { FsBuiltInToolsDependencies } from "./fs";
 import { createMediaBuiltInTools } from "./media";
 import type { MediaBuiltInToolsDependencies } from "./media";
 import { miscBuiltInTools } from "./misc";
+import { createSpeechBuiltInTools, MacSpeechManager } from "./speech";
 import { createWebBuiltInTools } from "./web";
 import type { WebBuiltInToolsDependencies } from "./web";
 
@@ -22,6 +23,7 @@ export function createBuiltInToolsModule(
   dependencies: BuiltInToolsModuleDependencies
 ): RuntimeModule {
   let execCodeSessions: ExecCodeSessionManager | null = null;
+  let speech: MacSpeechManager | null = null;
   return {
     id: "llm-space.built-in-tools",
     register(tools) {
@@ -39,6 +41,13 @@ export function createBuiltInToolsModule(
         id: "llm-space.built-in-tools.media",
         entries: createMediaBuiltInTools(dependencies),
       });
+      if (process.platform === "darwin") {
+        speech = new MacSpeechManager();
+        tools.register({
+          id: "llm-space.built-in-tools.speech",
+          entries: createSpeechBuiltInTools(speech),
+        });
+      }
       tools.register({
         id: "llm-space.built-in-tools.misc",
         entries: [
@@ -51,7 +60,10 @@ export function createBuiltInToolsModule(
     },
     start() {
       execCodeSessions?.start();
-      return () => execCodeSessions?.shutdown();
+      return () => {
+        speech?.shutdown();
+        return execCodeSessions?.shutdown();
+      };
     },
   };
 }

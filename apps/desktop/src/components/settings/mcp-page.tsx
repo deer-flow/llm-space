@@ -18,6 +18,7 @@ import {
   type McpTransportType,
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Link } from "@llm-space/ui/components/link";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -25,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
@@ -48,6 +50,7 @@ import {
   Database,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
   Loader2,
   MoreHorizontal,
@@ -86,6 +89,7 @@ import {
 } from "@/client/mcp";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { matchesMcpEndpoint, MCP_RECOMMENDATIONS } from "./mcp-recommendations";
 import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
@@ -119,7 +123,7 @@ const EMPTY_FORM: ServerForm = {
   headers: [],
 };
 
-function _formFromServer(server: McpServerView | null): ServerForm {
+function _formFromServer(server: McpServerDraft | null): ServerForm {
   if (!server) {
     return { ...EMPTY_FORM };
   }
@@ -272,13 +276,24 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when the selected server's id changes, not on every object update (would clobber in-progress edits)
   }, [creating, selectedServer?.id]);
 
-  const createServer = () => {
-    setSelectedIdBeforeCreate(selectedId);
+  const createServer = (draft?: McpServerDraft) => {
+    if (!creating) setSelectedIdBeforeCreate(selectedId);
     setCreating(true);
     setSelectedId(null);
     setFormError(null);
-    setForm({ ...EMPTY_FORM });
-    setDirty(false);
+    const nextForm = _formFromServer(draft ?? null);
+    if (draft) {
+      let suffix = 2;
+      while (
+        servers.some(
+          (server) => server.serverName === normalizeMcpName(nextForm.name)
+        )
+      ) {
+        nextForm.name = `${draft.name} ${suffix++}`;
+      }
+    }
+    setForm(nextForm);
+    setDirty(Boolean(draft));
     setTools([]);
   };
 
@@ -489,17 +504,16 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     )}
                   </button>
                 </Tooltip>
-                <Tooltip content="Add MCP server">
+                <AddMcpMenu onAdd={createServer}>
                   <button
                     type="button"
                     aria-label="Add MCP server"
                     disabled={saving || dirty || testingServerId !== null}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
-                    onClick={createServer}
                   >
                     <Plus className="size-4" />
                   </button>
-                </Tooltip>
+                </AddMcpMenu>
               </div>
             </div>
             <ScrollArea className="min-h-0 grow">
@@ -653,7 +667,7 @@ function McpServerListItem({
         "group relative flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors",
         disabled
           ? "pointer-events-none opacity-50"
-          : "cursor-pointer hover:bg-accent",
+          : "hover:bg-accent cursor-pointer",
         selected && "bg-accent"
       )}
       onClick={() => {
@@ -716,7 +730,36 @@ function McpServerListItem({
   );
 }
 
-function McpEmptyState({ onAdd }: { onAdd: () => void }) {
+function AddMcpMenu({
+  onAdd,
+  children,
+}: {
+  onAdd: (draft?: McpServerDraft) => void;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-52">
+        <DropdownMenuItem onSelect={() => onAdd()}>
+          <Plus />
+          Add New MCP Server
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div role="group" aria-label="Recommended">
+          <DropdownMenuLabel>Recommended</DropdownMenuLabel>
+          {MCP_RECOMMENDATIONS.map(({ draft }) => (
+            <DropdownMenuItem key={draft.name} onSelect={() => onAdd(draft)}>
+              {draft.name}
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function McpEmptyState({ onAdd }: { onAdd: (draft?: McpServerDraft) => void }) {
   return (
     <SettingsEmptyState
       icon={ServerCog}
@@ -724,10 +767,12 @@ function McpEmptyState({ onAdd }: { onAdd: () => void }) {
       title="Connect tools through MCP"
       description="Add a local command or remote endpoint, discover its tools, and make those capabilities available to your threads."
       actions={
-        <Button onClick={onAdd}>
-          <Plus className="size-4" />
-          Add MCP server
-        </Button>
+        <AddMcpMenu onAdd={onAdd}>
+          <Button>
+            <Plus className="size-4" />
+            Add MCP server
+          </Button>
+        </AddMcpMenu>
       }
       capabilities={[
         {
@@ -801,6 +846,14 @@ function ServerEditor({
   onDisconnect: () => void;
   onCancel: () => void;
 }) {
+  const recommendation = MCP_RECOMMENDATIONS.find(
+    ({ draft }) =>
+      draft.transport === form.transport &&
+      (draft.transport === "stdio"
+        ? draft.command === form.command &&
+          form.argsText.split("\n").includes(draft.args?.[0] ?? "")
+        : matchesMcpEndpoint(form.url, draft.url))
+  );
   const patch = (partial: Partial<ServerForm>) =>
     onFormChange({ ...form, ...partial });
   const savedToolItems: McpToolSummary[] =
@@ -901,6 +954,27 @@ function ServerEditor({
           ) : null}
         </div>
 
+        {recommendation?.credential && !readOnly ? (
+          <div className="border-primary/20 bg-primary/5 flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3">
+            <div className="min-w-0 flex-1 basis-48">
+              <p className="text-sm font-medium">
+                {recommendation.credential.requirement === "required"
+                  ? "API token required"
+                  : "API token optional"}
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                {recommendation.credential.instructions}
+              </p>
+            </div>
+            <Button asChild size="sm" className="shrink-0">
+              <Link href={recommendation.credential.url}>
+                {recommendation.credential.label}
+                <ExternalLink className="size-3.5" />
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+
         {formError ? (
           <div className="border-destructive/40 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
             <CircleAlert className="mt-0.5 size-4 shrink-0" />
@@ -910,6 +984,12 @@ function ServerEditor({
 
         {server ? (
           <ReadinessPanel server={server} liveToolsLoaded={tools.length > 0} />
+        ) : null}
+
+        {recommendation && !readOnly ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            {recommendation.setupHint}
+          </p>
         ) : null}
 
         <Field label="Name">

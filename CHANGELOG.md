@@ -4,6 +4,31 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.17.0] - 2026-09-05
+
+### Added
+
+- The MCP add menu now offers alphabetized presets for Amap, Chrome DevTools,
+  Context7, ElevenLabs, GitHub, and Playwright alongside custom server setup.
+- MCP credential guidance includes a prominent Get API token link, required or
+  optional status, and provider-specific setup instructions.
+- macOS Speech built-in tools list installed voices, read text aloud with a
+  selected voice and speech rate, and stop playback without affecting other
+  applications. They require no API key and appear in the Media category on
+  macOS runtimes.
+
+### Changed
+
+- Updated the Pi model and agent libraries to 0.85.0 while retaining the local
+  Responses compatibility patch.
+
+### Fixed
+
+- Switching thread tabs selects and reveals the corresponding file in the
+  sidebar without reopening tabs or moving keyboard focus.
+- MCP credential guidance remains visible after adding a Key to a remote
+  server URL, and duplicate recommended servers receive unique names.
+
 ## [4.16.0] - 2026-09-03
 
 ### Added

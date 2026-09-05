@@ -1,17 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-  mkdtemp,
-  realpath,
-  rm,
-  truncate,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, realpath, rm, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { createBuiltInToolsModule } from "../../../src/tools/built-in/built-in-tools-module";
 import { ToolRegistry } from "../../../src/tools/tool-registry";
-
 
 const TEMP_DIRS: string[] = [];
 
@@ -100,6 +93,9 @@ describe("built-in tools module", () => {
       "bash",
       "present_files",
       "generate_image",
+      ...(process.platform === "darwin"
+        ? ["list_voices", "speak", "stop_speaking"]
+        : []),
       "spawn_agent",
       "todo_write",
       "sleep",
