@@ -27,14 +27,17 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 function _readInitialLanguage(): AppLanguage {
-  if (typeof window === "undefined") {
-    return "en";
-  }
+  // Minimal DOM shims (tests) may expose a window without a navigator; treat
+  // that like a headless default rather than throwing during mount.
+  const navigatorLanguages =
+    typeof window === "undefined" || typeof window.navigator === "undefined"
+      ? []
+      : (window.navigator.languages ?? [window.navigator.language]);
   // An explicit past choice wins; otherwise follow the browser's preferred
   // languages (any Chinese variant opens in Chinese).
   return detectAppLanguage(
     readLocalStorage(LOCAL_STORAGE_KEYS.language),
-    window.navigator.languages ?? [window.navigator.language]
+    navigatorLanguages
   );
 }
 

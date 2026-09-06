@@ -41,6 +41,7 @@ import {
   setPluginSkillHidden,
   setSkillHidden,
 } from "@/client/skills";
+import { useI18n } from "@/i18n/i18n-provider";
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -78,6 +79,7 @@ async function openSkillFolder(skill: SkillInfo) {
 }
 
 export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<SkillsSettings>({
     discoveryPaths: [],
   });
@@ -231,10 +233,12 @@ export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
   return (
     <SettingsPage
       className="flex size-full min-h-0"
-      title="Skills"
+      title={t.skills.title}
       description={
         <>
-          These settings only apply to the built-in <code>skill()</code> tool.
+          {t.skills.descriptionPrefix}
+          <code>skill()</code>
+          {t.skills.descriptionSuffix}
         </>
       }
     >

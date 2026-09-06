@@ -6,11 +6,15 @@ import type { AppLanguage } from "../shared/language";
  * test and by the `AppMessages` type). Plain data on purpose — no React — so
  * the bun main process (native menu) reads the same tree.
  *
- * Coverage note: this tree currently carries the settings dialog chrome, the
- * General / Account / Network / Experimental pages, the command palette,
- * command labels, and the native menu. Larger pages (Models, MCP, Plugins,
- * Skills, Remote Servers) and the thread playground still hold their English
- * strings inline and will migrate tree-by-tree in follow-ups.
+ * Coverage note: this tree carries the settings dialog chrome and pages, the
+ * command palette and command labels, the native menu, the file-tree menus and
+ * confirm dialogs, the thread-tab context menu, the welcome screen, the
+ * "Start from Example" dialog (template cards localize display names and
+ * descriptions only — never the seeded prompts), and the Skills page header.
+ * The shared Thread Playground's header chrome localizes through
+ * `playground-labels.ts` (injected via a packages/ui provider); the deeper
+ * playground surfaces (compaction, generate-project, share, and run-history
+ * dialogs) still hold inline English strings and will migrate in follow-ups.
  */
 const APP_MESSAGES = {
   en: {
@@ -197,6 +201,81 @@ const APP_MESSAGES = {
       saveTo: "Save to…",
       importFrom: "Import from…",
     },
+    fileTree: {
+      /** The OS file manager's name, per platform. */
+      revealInFinder: "Reveal in Finder",
+      revealInExplorer: "Reveal in Explorer",
+      moveToTrash: "Move to Trash",
+      moveToRecycleBin: "Move to Recycle Bin",
+      trashName: "Trash",
+      recycleBinName: "Recycle Bin",
+      importFromFiles: "Import from Files...",
+      importFromClipboard: "Import from Clipboard",
+      copy: "Copy",
+      duplicate: "Duplicate",
+      rename: "Rename",
+      refresh: "Refresh",
+      share: "Share...",
+      settings: "Settings",
+      newFromExamples: "New from Examples",
+      newFromExamplesIn: "New from Examples in {name}",
+      newFolderIn: "New folder in {name}",
+      newFolderInRoot: "New folder in workspace root",
+      moreActionsFor: "More actions for {name}",
+      moreActionsForRoot: "More actions for workspace root",
+      emptyTitle: "No Threads Yet",
+      emptyDescription: "Create a thread to get started.",
+      moveTitlePrefix: "Move “",
+      moveTitleMiddle: "” to the ",
+      moveTitleSuffix: "?",
+      moveDescriptionPrefix: "You can restore it from the ",
+      moveDescriptionSuffix: " later.",
+      moveConfirmPrefix: "Move to ",
+      replaceTitlePrefix: "Replace “",
+      replaceTitleSuffix: "”?",
+      replace: "Replace",
+      replaceDescriptionFolder:
+        "A folder with this name already exists here. Replacing it moves the existing folder to the {trash}.",
+      replaceDescriptionThread:
+        "A thread with this name already exists here. Replacing it moves the existing thread to the {trash}.",
+    },
+    tabBar: {
+      refresh: "Refresh",
+      close: "Close",
+      closeOthers: "Close Others",
+      closeAll: "Close All",
+      copyFile: "Copy file",
+      openTabAria: "Open {label}",
+      closeTabAria: "Close {label}",
+    },
+    startFromExample: {
+      eyebrow: "New thread",
+      title: "Choose how you want to begin",
+      description:
+        "Start clean, launch a capable agent, or pick a featured template. Everything can be changed after creation.",
+      quickStart: "Quick start",
+      pickOneToCreate: "Pick one to create immediately",
+      featuredTemplates: "Featured templates",
+      templatesCount: "{count} templates",
+      eyebrowBlank: "Clean slate",
+      eyebrowRecommended: "Recommended",
+      eyebrowResearch: "Research mode",
+      blankLabel: "Blank Thread",
+    },
+    welcome: {
+      title: "Welcome to LLM Space 4",
+      description:
+        "Start with a ready agent thread, create a blank one, or open an existing file from the left side panel.",
+      startFromExamples: "Start from examples",
+      blankThread: "Blank thread",
+      configureModels: "Configure models",
+      learnMore: "Learn more",
+    },
+    skills: {
+      title: "Skills",
+      descriptionPrefix: "These settings only apply to the built-in ",
+      descriptionSuffix: " tool.",
+    },
   },
   zh: {
     common: {
@@ -363,6 +442,80 @@ const APP_MESSAGES = {
       empty: "未找到命令。",
       saveTo: "保存到…",
       importFrom: "从…导入",
+    },
+    fileTree: {
+      revealInFinder: "在 Finder 中显示",
+      revealInExplorer: "在文件资源管理器中显示",
+      moveToTrash: "移到废纸篓",
+      moveToRecycleBin: "移到回收站",
+      trashName: "废纸篓",
+      recycleBinName: "回收站",
+      importFromFiles: "从文件导入…",
+      importFromClipboard: "从剪贴板导入",
+      copy: "拷贝",
+      duplicate: "创建副本",
+      rename: "重命名",
+      refresh: "刷新",
+      share: "分享…",
+      settings: "设置",
+      newFromExamples: "从示例新建",
+      newFromExamplesIn: "在 {name} 中从示例新建",
+      newFolderIn: "在 {name} 中新建文件夹",
+      newFolderInRoot: "在工作区根目录新建文件夹",
+      moreActionsFor: "{name} 的更多操作",
+      moreActionsForRoot: "工作区根目录的更多操作",
+      emptyTitle: "还没有 Thread",
+      emptyDescription: "创建一个 Thread 开始使用。",
+      moveTitlePrefix: "将“",
+      moveTitleMiddle: "”移到",
+      moveTitleSuffix: "？",
+      moveDescriptionPrefix: "之后可以从",
+      moveDescriptionSuffix: "还原它。",
+      moveConfirmPrefix: "移到",
+      replaceTitlePrefix: "替换“",
+      replaceTitleSuffix: "”？",
+      replace: "替换",
+      replaceDescriptionFolder:
+        "此处已存在同名文件夹。替换会将现有文件夹移到{trash}。",
+      replaceDescriptionThread:
+        "此处已存在同名 Thread。替换会将现有 Thread 移到{trash}。",
+    },
+    tabBar: {
+      refresh: "刷新",
+      close: "关闭",
+      closeOthers: "关闭其他",
+      closeAll: "关闭全部",
+      copyFile: "拷贝文件",
+      openTabAria: "打开 {label}",
+      closeTabAria: "关闭 {label}",
+    },
+    startFromExample: {
+      eyebrow: "新建 Thread",
+      title: "选择你的起点",
+      description:
+        "从空白开始、启动一个强大的 Agent，或选择精选模板。创建之后一切都可以修改。",
+      quickStart: "快速开始",
+      pickOneToCreate: "选择其一，立即创建",
+      featuredTemplates: "精选模板",
+      templatesCount: "{count} 个模板",
+      eyebrowBlank: "干净画布",
+      eyebrowRecommended: "推荐",
+      eyebrowResearch: "研究模式",
+      blankLabel: "空白 Thread",
+    },
+    welcome: {
+      title: "欢迎使用 LLM Space 4",
+      description:
+        "从一个现成的 Agent Thread 开始、创建空白 Thread，或从左侧面板打开已有文件。",
+      startFromExamples: "从示例开始",
+      blankThread: "空白 Thread",
+      configureModels: "配置模型",
+      learnMore: "了解更多",
+    },
+    skills: {
+      title: "技能",
+      descriptionPrefix: "这些设置仅影响内置的 ",
+      descriptionSuffix: " 工具。",
     },
   },
 };

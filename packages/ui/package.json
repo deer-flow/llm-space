@@ -9,6 +9,7 @@
     "./ui/*": "./src/ui/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./components/thread-playground": "./src/components/thread-playground/index.tsx",
+    "./components/thread-playground/playground-labels": "./src/components/thread-playground/playground-labels.tsx",
     "./components/thread-playground/examples/prompts": "./src/components/thread-playground/examples/prompts.ts",
     "./components/code-editor": "./src/components/code-editor/index.tsx",
     "./components/*": "./src/components/*.tsx",
