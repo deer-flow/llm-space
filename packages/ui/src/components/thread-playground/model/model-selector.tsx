@@ -21,6 +21,7 @@ import {
 
 import { useModels, useRefreshModels } from "../../model-provider";
 import { ModelAvatar } from "../model-avatar";
+import { usePlaygroundLabels } from "../playground-labels";
 import { ProviderAvatar } from "../provider-avatar";
 import { useThreadStoreActions } from "../stores";
 
@@ -53,17 +54,20 @@ export function ModelSelector({
   const refreshModels = useRefreshModels();
   const { updateModel } = useThreadStoreActions();
   const { actions } = useHostServices();
+  const { providerDisplayName } = usePlaygroundLabels();
   const [open, setOpen] = useState(false);
 
   const items = useMemo(
     () =>
       [...providers]
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) =>
+          providerDisplayName(a).localeCompare(providerDisplayName(b))
+        )
         .map((group) => {
           const disabled = new Set(group.disabledModels ?? []);
           return {
             id: group.id,
-            name: group.name,
+            name: providerDisplayName(group),
             icon: group.icon,
             items: group.models
               .filter((model) => !disabled.has(model.id))
@@ -71,7 +75,7 @@ export function ModelSelector({
           };
         })
         .filter((group) => group.items.length > 0),
-    [providers]
+    [providerDisplayName, providers]
   );
 
   const modelMeta = useMemo(() => {
@@ -177,7 +181,7 @@ export function ModelSelector({
           }) => (
             <ComboboxGroup
               className="mb-2"
-              key={provider.name}
+              key={provider.id}
               items={provider.items}
             >
               <ComboboxLabel className="flex items-center gap-1.5">

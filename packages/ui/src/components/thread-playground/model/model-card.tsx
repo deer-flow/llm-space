@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@llm-space/ui/lib/utils";
 
-
 import { useModel, useModels } from "../../model-provider";
+import { usePlaygroundLabels } from "../playground-labels";
 
 function formatTokenCount(value: number) {
   return value.toLocaleString();
@@ -36,10 +36,16 @@ function ModelCardField({
   );
 }
 
-function BoolValue({ value }: { value: boolean }) {
+function BoolValue({
+  value,
+  labels,
+}: {
+  value: boolean;
+  labels: { supported: string; notSupported: string };
+}) {
   return (
     <span className={value ? "" : "text-muted-foreground"}>
-      {value ? "Supported" : "Not supported"}
+      {value ? labels.supported : labels.notSupported}
     </span>
   );
 }
@@ -52,6 +58,8 @@ export function ModelCard({
   className?: string;
 }) {
   const providers = useModels();
+  const { dialogs, providerDisplayName } = usePlaygroundLabels();
+  const labels = dialogs.modelCard;
   const resolvedModel = useModel({
     id: model?.id ?? "",
     provider: model?.provider ?? "",
@@ -62,41 +70,45 @@ export function ModelCard({
   const providerName =
     providers.find((group) => group.id === resolvedModel.provider)?.name ??
     resolvedModel.provider;
+  const displayedProviderName = providerDisplayName({
+    id: resolvedModel.provider,
+    name: providerName,
+  });
   const supportsImageInput = resolvedModel.input.includes("image");
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <main className="flex flex-col">
-        <ModelCardField label="Model" value={resolvedModel.id} />
-        <ModelCardField label="Provider" value={providerName} />
-        <ModelCardField label="API type" value={resolvedModel?.api} />
+        <ModelCardField label={labels.model} value={resolvedModel.id} />
+        <ModelCardField label={labels.provider} value={displayedProviderName} />
+        <ModelCardField label={labels.apiType} value={resolvedModel?.api} />
         <ModelCardField
-          label="Base URL"
+          label={labels.baseUrl}
           value={
             <span className="text-left break-all">{resolvedModel.baseUrl}</span>
           }
         />
         <ModelCardField
-          label="Context window"
+          label={labels.contextWindow}
           value={formatTokenCount(resolvedModel.contextWindow)}
         />
         <ModelCardField
-          label="Max tokens"
+          label={labels.maxTokens}
           value={formatTokenCount(resolvedModel.maxTokens)}
         />
         <ModelCardField
-          label="Reasoning"
-          value={<BoolValue value={resolvedModel.reasoning} />}
+          label={labels.reasoning}
+          value={<BoolValue value={resolvedModel.reasoning} labels={labels} />}
         />
         <ModelCardField
-          label="Image input"
-          value={<BoolValue value={supportsImageInput} />}
+          label={labels.imageInput}
+          value={<BoolValue value={supportsImageInput} labels={labels} />}
         />
         <ModelCardField
-          label="Input cost"
+          label={labels.inputCost}
           value={formatCostPerMillion(resolvedModel.cost.input)}
         />
         <ModelCardField
-          label="Output cost"
+          label={labels.outputCost}
           value={formatCostPerMillion(resolvedModel.cost.output)}
         />
       </main>
