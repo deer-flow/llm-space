@@ -851,7 +851,9 @@ function ServerEditor({
       draft.transport === form.transport &&
       (draft.transport === "stdio"
         ? draft.command === form.command &&
-          form.argsText.split("\n").includes(draft.args?.[0] ?? "")
+          form.argsText
+            .split("\n")
+            .includes(draft.args?.find((arg) => !arg.startsWith("-")) ?? "")
         : matchesMcpEndpoint(form.url, draft.url))
   );
   const patch = (partial: Partial<ServerForm>) =>
