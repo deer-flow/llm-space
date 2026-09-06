@@ -276,6 +276,38 @@ const APP_MESSAGES = {
       descriptionPrefix: "These settings only apply to the built-in ",
       descriptionSuffix: " tool.",
     },
+    search: {
+      title: "Search",
+      descriptionPrefix: "Choose the provider for the built-in ",
+      descriptionMiddle:
+        " tool. When Brave Search, Exa, AnySearch, or Zhihu is selected, ",
+      descriptionSuffix:
+        " continues to use Firecrawl for safe page extraction.",
+      providerRow: "Search provider",
+      providerAria: "Search provider",
+      providers: {
+        brave: "Brave Search",
+        firecrawl: "Firecrawl",
+        tavily: "Tavily",
+        exa: "Exa (MCP)",
+        anysearch: "AnySearch (MCP)",
+        zhihu: "Zhihu (MCP)",
+      },
+      keys: {
+        brave: "Brave Search API key",
+        firecrawl: "Firecrawl API key",
+        tavily: "Tavily API key",
+        exa: "Exa API key (optional)",
+        anysearch: "AnySearch API key (optional)",
+        zhihu: "Zhihu Access Secret",
+      },
+      envPrefix: "Values starting with ",
+      envMiddle: " are read from the environment (e.g. ",
+      envSuffix: "). ",
+      keyNotes:
+        "Exa and AnySearch work without a key at lower rate limits; Zhihu requires the Access Secret from its developer console.",
+      failedToSave: "Failed to save search settings",
+    },
   },
   zh: {
     common: {
@@ -516,6 +548,37 @@ const APP_MESSAGES = {
       title: "技能",
       descriptionPrefix: "这些设置仅影响内置的 ",
       descriptionSuffix: " 工具。",
+    },
+    search: {
+      title: "网络搜索",
+      descriptionPrefix: "为内置的 ",
+      descriptionMiddle:
+        " 工具选择提供方。当选择 Brave Search、Exa、AnySearch 或知乎时，",
+      descriptionSuffix: " 仍会使用 Firecrawl 进行安全的页面提取。",
+      providerRow: "搜索提供方",
+      providerAria: "搜索提供方",
+      providers: {
+        brave: "Brave Search",
+        firecrawl: "Firecrawl",
+        tavily: "Tavily",
+        exa: "Exa（MCP）",
+        anysearch: "AnySearch（MCP）",
+        zhihu: "知乎（MCP）",
+      },
+      keys: {
+        brave: "Brave Search API Key",
+        firecrawl: "Firecrawl API Key",
+        tavily: "Tavily API Key",
+        exa: "Exa API Key（可选）",
+        anysearch: "AnySearch API Key（可选）",
+        zhihu: "知乎 Access Secret",
+      },
+      envPrefix: "以 ",
+      envMiddle: " 开头的值会从环境变量读取（例如 ",
+      envSuffix: "）。",
+      keyNotes:
+        "Exa 和 AnySearch 无需 Key 即可使用（限流较低）；知乎需要从开发者平台的个人中心获取 Access Secret。",
+      failedToSave: "保存搜索设置失败",
     },
   },
 };
