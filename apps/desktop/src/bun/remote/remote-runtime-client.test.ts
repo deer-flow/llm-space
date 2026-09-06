@@ -196,6 +196,7 @@ describe("RemoteRuntimeClient", () => {
           braveApiKey: "",
           firecrawlApiKey: "key",
           tavilyApiKey: "",
+          searxngBaseUrl: "http://localhost:8080",
         });
       }
     );

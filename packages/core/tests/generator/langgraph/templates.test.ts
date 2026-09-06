@@ -3,16 +3,23 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import type { ModelConfig, SearchSettings } from "@llm-space/core";
+
 import {
   agentPy,
   applyTemplatePy,
+  envExample,
+  envFile,
   langgraphJson,
   makefile,
   mcpEnvEntries,
   mcpModule,
   metaPromptMiddlewarePy,
 } from "../../../src/generator/langgraph/templates";
-import type { GeneratorMcpServer } from "../../../src/generator/types";
+import type {
+  GeneratorMcpServer,
+  GeneratorModelInfo,
+} from "../../../src/generator/types";
 
 const pythonTmp = mkdtempSync(
   path.join(os.tmpdir(), "llm-space-working-directory-python-")
@@ -324,5 +331,34 @@ describe("meta prompt templates", () => {
     expect(py).toContain(
       "return await handler(_request_with_meta_user_prompt(request, self.text))"
     );
+  });
+});
+
+describe("web-search env blocks", () => {
+  const model = { provider: "openai", id: "gpt-5" } as ModelConfig;
+  const info = {
+    name: "gpt-5",
+    anthropic: false,
+    deepseekThinking: false,
+    supportsReasoning: true,
+  } as GeneratorModelInfo;
+  const searxngSearch: SearchSettings = {
+    provider: "searxng",
+    braveApiKey: "$BRAVE_SEARCH_API_KEY",
+    firecrawlApiKey: "$FIRECRAWL_API_KEY",
+    tavilyApiKey: "$TAVILY_API_KEY",
+    searxngBaseUrl: "http://localhost:8080",
+  };
+
+  test("writes the searxng base URL literally into .env", () => {
+    const env = envFile(model, info, searxngSearch);
+    expect(env).toContain("SEARCH_PROVIDER=searxng");
+    expect(env).toContain("SEARXNG_BASE_URL=http://localhost:8080");
+  });
+
+  test("leaves SEARXNG_BASE_URL blank in .env.example", () => {
+    const example = envExample(model, info, searxngSearch);
+    expect(example).toContain("SEARXNG_BASE_URL=");
+    expect(example).not.toContain("SEARXNG_BASE_URL=http");
   });
 });

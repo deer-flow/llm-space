@@ -16,6 +16,7 @@ const VALID_PROVIDERS: readonly SearchProviderId[] = [
   "brave",
   "firecrawl",
   "tavily",
+  "searxng",
 ];
 
 const SearchSettingsFileSchema = z.object({
@@ -23,6 +24,7 @@ const SearchSettingsFileSchema = z.object({
   braveApiKey: z.string().optional(),
   firecrawlApiKey: z.string().optional(),
   tavilyApiKey: z.string().optional(),
+  searxngBaseUrl: z.string().optional(),
 });
 
 /**
@@ -88,6 +90,10 @@ export class SearchSettingsManager {
         typeof input.tavilyApiKey === "string"
           ? input.tavilyApiKey
           : DEFAULT_SEARCH_SETTINGS.tavilyApiKey,
+      searxngBaseUrl:
+        typeof input.searxngBaseUrl === "string"
+          ? input.searxngBaseUrl
+          : DEFAULT_SEARCH_SETTINGS.searxngBaseUrl,
     };
   }
 }
