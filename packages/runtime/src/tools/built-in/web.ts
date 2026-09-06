@@ -607,6 +607,35 @@ class McpSseSearchProvider implements SearchProvider {
     }
   }
 
+  /**
+   * Answer a server-initiated JSON-RPC request by POSTing back to the session
+   * endpoint. The live Zhihu server pings the client over the SSE stream;
+   * replying keeps the session alive. Unknown requests get a standard
+   * `-32601` so the server does not stall waiting for a response.
+   * Notifications (no `id`) are ignored.
+   */
+  private async _respondToServerRequest(
+    messageUrl: string,
+    frame: { id?: number; method?: string }
+  ): Promise<void> {
+    if (frame.id === undefined) {
+      return;
+    }
+    await this._postMessage(
+      messageUrl,
+      frame.method === "ping"
+        ? { jsonrpc: "2.0", id: frame.id, result: {} }
+        : {
+            jsonrpc: "2.0",
+            id: frame.id,
+            error: {
+              code: -32601,
+              message: `Unsupported method: ${frame.method}`,
+            },
+          }
+    );
+  }
+
   async fetch(url: string): Promise<WebFetchResult> {
     return this._options.fetchDelegate(url);
   }
@@ -640,7 +669,12 @@ class McpSseSearchProvider implements SearchProvider {
       }
     }
 
-    // Read helper: consume stream events until the response with `id` arrives.
+    // Read helper: consume stream events until the response to `id` arrives.
+    // Server-initiated frames (JSON-RPC requests/notifications) carry
+    // `method`; responses carry `result`/`error`. The live Zhihu endpoint
+    // sends `ping` requests with numeric ids that collide with ours, so
+    // matching on `id` alone would mistake a ping for our response and
+    // surface an empty result before the real one arrives.
     const waitFor = async (id: number): Promise<McpToolResult> => {
       while (true) {
         const next = await events.next();
@@ -654,9 +688,16 @@ class McpSseSearchProvider implements SearchProvider {
         }
         const parsed = JSON.parse(next.value.data) as {
           id?: number;
+          method?: string;
           result?: McpToolResult;
           error?: { message?: string };
         };
+        if (parsed.method !== undefined) {
+          // A server-initiated request (e.g. `ping`) or notification — not
+          // our response. Answer it, then keep waiting.
+          await this._respondToServerRequest(messageUrl, parsed);
+          continue;
+        }
         if (parsed.id !== id) {
           continue;
         }

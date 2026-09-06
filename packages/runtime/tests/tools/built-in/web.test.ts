@@ -205,8 +205,12 @@ const NEW_SETTINGS_FIELDS = {
 };
 
 interface RpcCallBody {
+  jsonrpc?: string;
+  id?: number;
   method?: string;
   params?: Record<string, unknown>;
+  result?: unknown;
+  error?: unknown;
 }
 
 function _parseRpcBody(body: unknown): RpcCallBody | undefined {
@@ -468,8 +472,17 @@ describe("Zhihu MCP provider", () => {
             "event: endpoint",
             "data: /api/mcp/zhihu_search/v1/message?sessionId=abc",
             "",
+            // The live server pings the client over the stream, reusing
+            // numeric ids that collide with our requests; the client must
+            // answer the ping and keep waiting for the real response.
+            "event: message",
+            `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })}`,
+            "",
             "event: message",
             `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} })}`,
+            "",
+            "event: message",
+            `data: ${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" })}`,
             "",
             "event: message",
             `data: ${JSON.stringify({
@@ -508,7 +521,7 @@ describe("Zhihu MCP provider", () => {
       includeContent: false,
     })) as { title: string; url: string; snippet?: string; content?: string }[];
 
-    expect(requests.length).toBe(4);
+    expect(requests.length).toBe(6);
     expect(requests[0].method).toBe("GET");
     expect(requests[0].url).toBe(
       "https://developer.zhihu.com/api/mcp/zhihu_search/v1/sse"
@@ -520,11 +533,15 @@ describe("Zhihu MCP provider", () => {
     expect(requests[1].url).toBe(
       "https://developer.zhihu.com/api/mcp/zhihu_search/v1/message?sessionId=abc"
     );
-    expect(requests[2].body?.method).toBe("notifications/initialized");
-    expect(requests[3].body?.params).toEqual({
+    expect(requests[1].body?.method).toBe("initialize");
+    // The ping frames are answered (not mistaken for our responses).
+    expect(requests[2].body).toEqual({ jsonrpc: "2.0", id: 1, result: {} });
+    expect(requests[3].body?.method).toBe("notifications/initialized");
+    expect(requests[4].body?.params).toEqual({
       name: "zhihu_search",
       arguments: { query: "RAG", count: 5 },
     });
+    expect(requests[5].body).toEqual({ jsonrpc: "2.0", id: 2, result: {} });
     expect(result).toEqual([
       {
         title: "RAG 评测方法综述",
