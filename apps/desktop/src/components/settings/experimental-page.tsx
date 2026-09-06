@@ -6,11 +6,14 @@ import { useState } from "react";
 
 import { useCommands } from "@/commands";
 import { useExperimental } from "@/components/experimental-provider";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 
 import { SettingsPage } from "./settings-page";
 import { SettingsToggleRow } from "./settings-toggle-row";
 
 export function ExperimentalPage() {
+  const { t } = useI18n();
   const { tracingEnabled, setTracingEnabled, reactScanEnabled, setReactScanEnabled } =
     useExperimental();
   const { executeCommand } = useCommands();
@@ -25,14 +28,14 @@ export function ExperimentalPage() {
 
   return (
     <SettingsPage
-      title="Experimental"
-      description="Configure preview features that are still under development."
+      title={t.experimental.title}
+      description={t.experimental.description}
       className="overflow-y-auto"
     >
       <div className="flex flex-col gap-6 pb-2">
         <SettingsToggleRow
-          title="Tracing"
-          hint="Enable to connect Langfuse or create a manual project for JSON exports."
+          title={t.experimental.tracing}
+          hint={t.experimental.tracingHint}
           checked={tracingEnabled}
           onCheckedChange={setTracingEnabled}
         />
@@ -40,8 +43,8 @@ export function ExperimentalPage() {
           <>
             <Separator />
             <SettingsToggleRow
-              title="React Scan"
-              hint="Highlight component re-renders after a reload. Dev builds only."
+              title={t.experimental.reactScan}
+              hint={t.experimental.reactScanHint}
               checked={reactScanEnabled}
               onCheckedChange={handleReactScanChange}
             />
@@ -52,12 +55,14 @@ export function ExperimentalPage() {
         open={reloadPromptOpen}
         onOpenChange={setReloadPromptOpen}
         dimBackground={false}
-        title="Reload to apply?"
-        description={`React Scan will be ${
-          reactScanEnabled ? "enabled" : "disabled"
-        } after the app reloads. Reload now?`}
-        cancelLabel="Later"
-        confirmLabel="Reload"
+        title={t.experimental.reloadToApply}
+        description={formatMessage(t.experimental.reloadDescription, {
+          state: reactScanEnabled
+            ? t.experimental.reactScanEnabled
+            : t.experimental.reactScanDisabled,
+        })}
+        cancelLabel={t.experimental.later}
+        confirmLabel={t.experimental.reload}
         confirmVariant="default"
         onConfirm={() => {
           setReloadPromptOpen(false);

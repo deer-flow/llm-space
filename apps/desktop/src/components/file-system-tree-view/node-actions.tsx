@@ -28,6 +28,8 @@ import { toast } from "sonner";
 
 import { createFileSystemClient } from "@/client";
 import { useCommands } from "@/commands";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import type { RuntimeId } from "@/shared/runtime";
 
 import { ShareThreadMenuItem } from "./share-thread-menu-item";
@@ -36,15 +38,19 @@ const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
 
 /**
- * The OS file manager's name, for the "Reveal in …" menu label. Windows calls
- * it Explorer; macOS (and our Linux fallback) say Finder.
+ * Per-language, per-OS labels for the file-tree menus. English keeps the
+ * original wording (Explorer/Recycle Bin on Windows, Finder/Trash elsewhere);
+ * Chinese names the same OS concepts.
  */
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-
-/** The "Move to …" delete label, matching the OS trash's name. */
-const MOVE_TO_TRASH_LABEL = _isWindows
-  ? "Move to Recycle Bin"
-  : "Move to Trash";
+function _useTreeLabels() {
+  const { t } = useI18n();
+  return {
+    reveal: _isWindows ? t.fileTree.revealInExplorer : t.fileTree.revealInFinder,
+    moveToTrash: _isWindows
+      ? t.fileTree.moveToRecycleBin
+      : t.fileTree.moveToTrash,
+  };
+}
 
 /** Shared styling for the small square hover-action triggers. */
 const actionClass = cn(
@@ -135,6 +141,8 @@ export function NodeActions({
   onMenuOpenChange?: (open: boolean) => void;
 }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
+  const { reveal, moveToTrash } = _useTreeLabels();
   const isDir = node.type === "directory";
   // Copy the file to the OS clipboard as a file reference. The bun-side command
   // takes an absolute path, so resolve the workspace-relative node path first.
@@ -151,7 +159,9 @@ export function NodeActions({
       {isDir && (
         <>
           <IconAction
-            label={`New from Examples in ${node.name}`}
+            label={formatMessage(t.fileTree.newFromExamplesIn, {
+              name: node.name,
+            })}
             onClick={() =>
               executeCommand({
                 type: "openStartFromExample",
@@ -162,7 +172,7 @@ export function NodeActions({
             <FilePlus className="size-4" />
           </IconAction>
           <IconAction
-            label={`New folder in ${node.name}`}
+            label={formatMessage(t.fileTree.newFolderIn, { name: node.name })}
             onClick={() =>
               executeCommand({
                 type: "newFolder",
@@ -175,7 +185,9 @@ export function NodeActions({
         </>
       )}
       <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
-        <MoreActionsTrigger label={`More actions for ${node.name}`} />
+        <MoreActionsTrigger
+          label={formatMessage(t.fileTree.moreActionsFor, { name: node.name })}
+        />
         <DropdownMenuContent
           align="end"
           onClick={(e) => e.stopPropagation()}
@@ -190,7 +202,7 @@ export function NodeActions({
             }
           >
             <FolderOpen />
-            {REVEAL_LABEL}
+            {reveal}
           </DropdownMenuItem>
           {!isDir && (
             <>
@@ -198,6 +210,7 @@ export function NodeActions({
               <ShareThreadMenuItem
                 path={node.path}
                 runtimeId={runtimeId}
+                label={t.fileTree.share}
                 executeCommand={executeCommand}
               />
             </>
@@ -213,7 +226,7 @@ export function NodeActions({
                 }
               >
                 <Import />
-                Import from Files...
+                {t.fileTree.importFromFiles}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() =>
@@ -224,7 +237,7 @@ export function NodeActions({
                 }
               >
                 <ClipboardPaste />
-                Import from Clipboard
+                {t.fileTree.importFromClipboard}
               </DropdownMenuItem>
             </>
           )}
@@ -232,7 +245,7 @@ export function NodeActions({
           {!isDir && (
             <DropdownMenuItem onSelect={() => void copyToClipboard()}>
               <ClipboardCopy />
-              Copy
+              {t.fileTree.copy}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -244,7 +257,7 @@ export function NodeActions({
             }
           >
             {isDir ? <FoldersIcon /> : <FilesIcon />}
-            Duplicate
+            {t.fileTree.duplicate}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -255,7 +268,7 @@ export function NodeActions({
             }
           >
             <TextCursorInput />
-            Rename
+            {t.fileTree.rename}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -268,7 +281,7 @@ export function NodeActions({
             }
           >
             <Trash2 />
-            {MOVE_TO_TRASH_LABEL}
+            {moveToTrash}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -291,10 +304,12 @@ export function RootActions({
   onMenuOpenChange?: (open: boolean) => void;
 }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
+  const { reveal } = _useTreeLabels();
   return (
     <span className="flex items-center gap-1">
       <IconAction
-        label="New from Examples"
+        label={t.fileTree.newFromExamples}
         onClick={() =>
           executeCommand({
             type: "openStartFromExample",
@@ -305,7 +320,7 @@ export function RootActions({
         <FilePlus className="size-4" />
       </IconAction>
       <IconAction
-        label="New folder in workspace root"
+        label={t.fileTree.newFolderInRoot}
         onClick={() =>
           executeCommand({ type: "newFolder", args: { parent: "", runtimeId } })
         }
@@ -313,13 +328,13 @@ export function RootActions({
         <FolderPlus className="size-4" />
       </IconAction>
       <IconAction
-        label="Settings"
+        label={t.fileTree.settings}
         onClick={() => executeCommand({ type: "openSettings", args: {} })}
       >
         <SettingsIcon className="size-4" />
       </IconAction>
       <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
-        <MoreActionsTrigger label="More actions for workspace root" />
+        <MoreActionsTrigger label={t.fileTree.moreActionsForRoot} />
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             onSelect={() =>
@@ -330,7 +345,7 @@ export function RootActions({
             }
           >
             <FolderOpen />
-            {REVEAL_LABEL}
+            {reveal}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -341,7 +356,7 @@ export function RootActions({
             }
           >
             <Import />
-            Import from Files...
+            {t.fileTree.importFromFiles}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -352,7 +367,7 @@ export function RootActions({
             }
           >
             <ClipboardPaste />
-            Import from Clipboard
+            {t.fileTree.importFromClipboard}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -361,7 +376,7 @@ export function RootActions({
             }
           >
             <RefreshCw />
-            Refresh
+            {t.fileTree.refresh}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

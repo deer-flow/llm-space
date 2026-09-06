@@ -27,6 +27,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -39,11 +41,6 @@ import { tabLabel, type AppTab } from "./use-thread-tabs";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
-
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-const MOVE_TO_TRASH_LABEL = _isWindows
-  ? "Move to Recycle Bin"
-  : "Move to Trash";
 
 function _getPaneKey(tab: AppTab): string {
   return tab.type === "thread" ? tab.paneId : tab.id;
@@ -129,6 +126,13 @@ export function ThreadTabs({
   toolbarSlot,
 }: ThreadTabsProps) {
   const { resolvedTheme } = useTheme();
+  const { t } = useI18n();
+  const revealLabel = _isWindows
+    ? t.fileTree.revealInExplorer
+    : t.fileTree.revealInFinder;
+  const moveToTrashLabel = _isWindows
+    ? t.fileTree.moveToRecycleBin
+    : t.fileTree.moveToTrash;
   // The chrome-tabs lib renders tab DOM imperatively and exposes no tooltip prop,
   // but it stamps each tab's full path onto `data-tab-id`. Mirror that into the
   // native `title` attribute so hovering a tab reveals its relative path. The
@@ -152,13 +156,19 @@ export function ThreadTabs({
         el.tabIndex = 0;
         el.setAttribute("role", "tab");
         el.setAttribute("aria-selected", String(id === activeId));
-        el.setAttribute("aria-label", `Open ${label}`);
+        el.setAttribute(
+          "aria-label",
+          formatMessage(t.tabBar.openTabAria, { label })
+        );
         const closeButton = el.querySelector<HTMLElement>(".chrome-tab-close");
         closeButton?.setAttribute("role", "button");
         closeButton?.setAttribute("tabindex", "0");
-        closeButton?.setAttribute("aria-label", `Close ${label}`);
+        closeButton?.setAttribute(
+          "aria-label",
+          formatMessage(t.tabBar.closeTabAria, { label })
+        );
       });
-  }, [tabs, activeId]);
+  }, [tabs, activeId, t]);
 
   const handleTabsHeaderDoubleClick = useCallback((e: Event) => {
     if (!electrobun.rpc) {
@@ -374,21 +384,23 @@ export function ThreadTabs({
           <ContextMenuContent className="w-44">
             <ContextMenuGroup>
               <ContextMenuItem onSelect={() => refresh(contextMenuId)}>
-                Refresh
+                {t.tabBar.refresh}
               </ContextMenuItem>
             </ContextMenuGroup>
             <ContextMenuSeparator />
             <ContextMenuGroup>
               <ContextMenuItem onSelect={() => close(contextMenuId)}>
-                Close
+                {t.tabBar.close}
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={!hasOtherTabs}
                 onSelect={() => closeOthers(contextMenuId)}
               >
-                Close Others
+                {t.tabBar.closeOthers}
               </ContextMenuItem>
-              <ContextMenuItem onSelect={closeAll}>Close All</ContextMenuItem>
+              <ContextMenuItem onSelect={closeAll}>
+                {t.tabBar.closeAll}
+              </ContextMenuItem>
             </ContextMenuGroup>
             {contextMenuTab?.type === "thread" && (
               <>
@@ -398,12 +410,13 @@ export function ThreadTabs({
                     copyFile(contextMenuTab.path, contextMenuTab.runtimeId)
                   }
                 >
-                  Copy file
+                  {t.tabBar.copyFile}
                 </ContextMenuItem>
                 <ContextMenuGroup>
                   <ShareThreadMenuItem
                     path={contextMenuTab.path}
                     runtimeId={contextMenuTab.runtimeId}
+                    label={t.fileTree.share}
                     onShare={share}
                   />
                 </ContextMenuGroup>
@@ -414,7 +427,7 @@ export function ThreadTabs({
                       reveal(contextMenuTab.path, contextMenuTab.runtimeId)
                     }
                   >
-                    {REVEAL_LABEL}
+                    {revealLabel}
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
@@ -422,7 +435,7 @@ export function ThreadTabs({
                       moveToTrash(contextMenuTab.path, contextMenuTab.runtimeId)
                     }
                   >
-                    {MOVE_TO_TRASH_LABEL}
+                    {moveToTrashLabel}
                   </ContextMenuItem>
                 </ContextMenuGroup>
               </>

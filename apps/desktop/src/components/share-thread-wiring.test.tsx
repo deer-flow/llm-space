@@ -87,6 +87,7 @@ describe("real share consumer wiring", () => {
       FileTreeShareThreadMenuItem({
         path: "threads/tree.json",
         runtimeId: "remote:tree",
+        label: "Share...",
         executeCommand: treeHarness.executeCommand,
       })
     );
@@ -96,6 +97,7 @@ describe("real share consumer wiring", () => {
       ThreadTabShareThreadMenuItem({
         path: "threads/tab.json",
         runtimeId: "remote:tab",
+        label: "Share...",
         onShare: (path, runtimeId) =>
           tabHarness.executeCommand(buildShareThreadCommand(path, runtimeId)),
       })

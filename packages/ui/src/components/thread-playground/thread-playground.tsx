@@ -72,6 +72,7 @@ import {
   useGetProviderProfileId,
   useProviderProfileSelections,
 } from "./model/provider-profile-selection-provider";
+import { usePlaygroundLabels } from "./playground-labels";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
 import { createRuntimePromptFiles } from "./runtime-prompt-files";
@@ -323,6 +324,7 @@ function ThreadPlaygroundContent({
     }
   }, [abort]);
   const runHistoryPanelRef = usePanelRef();
+  const labels = usePlaygroundLabels();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
   const [generateProjectOpen, setGenerateProjectOpen] = useState(false);
@@ -380,18 +382,18 @@ function ThreadPlaygroundContent({
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Undo last edit"
+                  aria-label={labels.undoLastEdit}
                   disabled={readonly || !undoable}
                   onClick={undo}
                 >
                   <Undo2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Redo last edit">
+              <Tooltip content={labels.redoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Redo last edit"
+                  aria-label={labels.redoLastEdit}
                   disabled={readonly || !redoable}
                   onClick={redo}
                 >
@@ -399,12 +401,12 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
               <DropdownMenu>
-                <Tooltip content="More actions">
+                <Tooltip content={labels.moreActions}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label="More actions"
+                      aria-label={labels.moreActions}
                     >
                       <EllipsisIcon className="size-4" />
                     </Button>
@@ -416,23 +418,25 @@ function ThreadPlaygroundContent({
                     onSelect={toggleHistory}
                   >
                     <HistoryIcon />
-                    {historyOpen ? "Hide Run History" : "View Run History"}
+                    {historyOpen
+                      ? labels.hideRunHistory
+                      : labels.viewRunHistory}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !canCompact}
                     onSelect={() => setCompactDialogOpen(true)}
                   >
                     <FileArchiveIcon />
-                    Compact Conversation
+                    {labels.compactConversation}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !hasModel || !generator}
                     onSelect={() => setGenerateProjectOpen(true)}
                   >
                     <SparklesIcon />
-                    <span className="flex-1">Generate Project</span>
+                    <span className="flex-1">{labels.generateProject}</span>
                     <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-                      Beta
+                      {labels.betaBadge}
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -445,7 +449,7 @@ function ThreadPlaygroundContent({
                     }
                   >
                     <Share2Icon />
-                    Share Thread
+                    {labels.shareThread}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -474,10 +478,10 @@ function ThreadPlaygroundContent({
                   content={
                     <div>
                       {status === "running"
-                        ? "Stop running"
+                        ? labels.stopRunningTooltip
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run this thread"}
+                          ? labels.preparingThreadTooltip
+                          : labels.runThreadTooltip}
                     </div>
                   }
                 >
@@ -485,10 +489,10 @@ function ThreadPlaygroundContent({
                     className="border-r-primary border-none pr-1 pl-4 active:translate-y-0!"
                     aria-label={
                       status === "running"
-                        ? "Stop running thread"
+                        ? labels.stopRunningThreadAria
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run thread"
+                          ? labels.preparingThreadAria
+                          : labels.runThreadAria
                     }
                     disabled={
                       readonlyFromProps ||
@@ -503,10 +507,10 @@ function ThreadPlaygroundContent({
                       <PlayIcon className="size-3" />
                     )}
                     {status === "running"
-                      ? "Stop"
+                      ? labels.stopLabel
                       : status === "preparing"
-                        ? "Preparing"
-                        : "Run"}
+                        ? labels.preparingLabel
+                        : labels.runLabel}
                   </Button>
                 </Tooltip>
                 <DropdownMenu>
@@ -516,7 +520,7 @@ function ThreadPlaygroundContent({
                         "border-none pr-1.5 pl-0.5 active:translate-y-0!",
                         status === "running" && "disabled:opacity-100"
                       )}
-                      aria-label="Run settings"
+                      aria-label={labels.runSettings}
                       disabled={
                         readonlyFromProps || status !== "idle" || !hasModel
                       }
@@ -525,7 +529,7 @@ function ThreadPlaygroundContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-56">
-                    <DropdownMenuLabel>Run settings</DropdownMenuLabel>
+                    <DropdownMenuLabel>{labels.runSettings}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -534,7 +538,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Enable ReAct loop
+                      {labels.enableReActLoop}
                       <Switch
                         size="sm"
                         checked={reactLoop}
@@ -552,7 +556,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Auto run tools
+                      {labels.autoRunTools}
                       <Switch
                         size="sm"
                         checked={effectiveAutoRunTools}

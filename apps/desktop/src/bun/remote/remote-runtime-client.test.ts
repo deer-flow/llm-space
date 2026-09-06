@@ -196,6 +196,9 @@ describe("RemoteRuntimeClient", () => {
           braveApiKey: "",
           firecrawlApiKey: "key",
           tavilyApiKey: "",
+          exaApiKey: "",
+          anysearchApiKey: "",
+          zhihuAccessSecret: "",
         });
       }
     );

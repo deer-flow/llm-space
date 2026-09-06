@@ -36,7 +36,7 @@ The General page configures app-level defaults.
 
 | Setting | Description |
 | --- | --- |
-| Language | Language setting. Only English (US) is supported for now; more languages are coming. |
+| Language | UI language. English (US) and Chinese (中文) are supported; the choice persists and new sessions follow it. The native menu follows the OS display language. |
 | Appearance | App theme. Match the system setting, or force light or dark mode. |
 | Primary color | Accent color used for buttons, links, and highlights. |
 | Rendering | Message rendering mode. `Full` renders messages with full editors; `Fast` shows plain text for smoother scrolling in large Threads. |

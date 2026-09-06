@@ -19,6 +19,9 @@ import {
   WandSparklesIcon,
 } from "lucide-react";
 
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
+
 const FEATURED_IDS = ["blank", "general-agent", "deep-research"] as const;
 
 const FEATURE_ART: Record<(typeof FEATURED_IDS)[number], string> = {
@@ -27,14 +30,82 @@ const FEATURE_ART: Record<(typeof FEATURED_IDS)[number], string> = {
   "deep-research": "/images/thread-starters/deep-research.jpg",
 };
 
-const FEATURE_META: Record<
-  (typeof FEATURED_IDS)[number],
-  { eyebrow: string }
+/** Message-tree key for each featured card's eyebrow badge. */
+const FEATURE_EYEBROW_KEYS = {
+  blank: "eyebrowBlank",
+  "general-agent": "eyebrowRecommended",
+  "deep-research": "eyebrowResearch",
+} as const;
+
+/**
+ * Chinese display names and plain-text descriptions for the template cards,
+ * keyed by example id. Presentation layer only: the `PROMPT_EXAMPLES` catalog
+ * (and every system prompt, seed message, and filename it carries) stays
+ * untouched — `fileStem` continues to drive new-thread filenames.
+ */
+export const EXAMPLE_LOCALIZATIONS_ZH: Record<
+  string,
+  { label: string; description: string }
 > = {
-  blank: { eyebrow: "Clean slate" },
-  "general-agent": { eyebrow: "Recommended" },
-  "deep-research": { eyebrow: "Research mode" },
+  blank: {
+    label: "空白 Thread",
+    description: "一块干净的画布，附带可自定义的简单助手提示词。",
+  },
+  "general-agent": {
+    label: "通用 Agent",
+    description: "类似 DeerFlow 的助手，支持编程、深度研究与更多能力。",
+  },
+  "deep-research": {
+    label: "深度研究",
+    description: "结构化的调研者，围绕主题规划并深入研究。",
+  },
+  translation: {
+    label: "翻译",
+    description: "翻译提示词，专注于保留原意与文风。",
+  },
+  "deep-wiki": {
+    label: "Deep Wiki",
+    description: "带来源引用的长文知识库回答提示词。",
+  },
+  "compact-memory": {
+    label: "记忆压缩",
+    description: "记忆压缩提示词，保持有用上下文简洁。",
+  },
+  "meta-prompt": {
+    label: "元提示词",
+    description: "提示词写作助手，用于改进指令。",
+  },
+  "meta-image-prompt": {
+    label: "元图像提示词",
+    description: "为图像生成构建结构化简报的提示词生成器。",
+  },
 };
+
+/** The localized display label for a template card (falls back to the catalog). */
+function _displayLabel(example: PromptExample, zh: boolean): string {
+  if (example.id === "blank") {
+    // The featured blank card has always used a shorter title than the catalog.
+    return zh
+      ? (EXAMPLE_LOCALIZATIONS_ZH.blank?.label ?? "Blank Thread")
+      : "Blank Thread";
+  }
+  return zh
+    ? (EXAMPLE_LOCALIZATIONS_ZH[example.id]?.label ?? example.label)
+    : example.label;
+}
+
+/** The localized plain-text description for a template card. */
+function _displayDescription(example: PromptExample, zh: boolean): string {
+  if (zh) {
+    const localized = EXAMPLE_LOCALIZATIONS_ZH[example.id]?.description;
+    if (localized) {
+      return localized;
+    }
+  }
+  return example.description
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1");
+}
 
 export function StartFromExampleDialog({
   open,
@@ -45,6 +116,8 @@ export function StartFromExampleDialog({
   onOpenChange: (open: boolean) => void;
   onSelectExample: (example: PromptExample) => void;
 }) {
+  const { lang, t } = useI18n();
+  const zh = lang === "zh";
   const examples = PROMPT_EXAMPLES.filter(isPromptExample);
   const featured = FEATURED_IDS.map((id) =>
     examples.find((example) => example.id === id)
@@ -77,14 +150,13 @@ export function StartFromExampleDialog({
             </div>
             <div className="min-w-0">
               <div className="text-primary mb-1 text-[9px] font-semibold tracking-[0.2em] uppercase">
-                New thread
+                {t.startFromExample.eyebrow}
               </div>
               <DialogTitle className="font-heading text-xl font-semibold tracking-tight">
-                Choose how you want to begin
+                {t.startFromExample.title}
               </DialogTitle>
               <DialogDescription className="mt-1 max-w-xl text-xs leading-relaxed">
-                Start clean, launch a capable agent, or pick a featured template.
-                Everything can be changed after creation.
+                {t.startFromExample.description}
               </DialogDescription>
             </div>
           </div>
@@ -116,10 +188,10 @@ export function StartFromExampleDialog({
                   id="quick-start-heading"
                   className="text-muted-foreground text-[11px] font-semibold tracking-[0.16em] uppercase"
                 >
-                  Quick start
+                  {t.startFromExample.quickStart}
                 </h3>
                 <span className="text-muted-foreground text-[11px]">
-                  Pick one to create immediately
+                  {t.startFromExample.pickOneToCreate}
                 </span>
               </div>
               <div className="grid gap-2.5 md:grid-cols-3">
@@ -127,6 +199,7 @@ export function StartFromExampleDialog({
                   <FeaturedExample
                     key={example.id}
                     example={example}
+                    zh={zh}
                     onSelect={() => selectExample(example)}
                   />
                 ))}
@@ -140,10 +213,12 @@ export function StartFromExampleDialog({
                   className="text-muted-foreground flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em] uppercase"
                 >
                   <BlocksIcon className="size-3.5" />
-                  Featured templates
+                  {t.startFromExample.featuredTemplates}
                 </h3>
                 <span className="text-muted-foreground text-[11px]">
-                  {specialists.length} templates
+                  {formatMessage(t.startFromExample.templatesCount, {
+                    count: specialists.length,
+                  })}
                 </span>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
@@ -151,6 +226,7 @@ export function StartFromExampleDialog({
                   <SpecialistExample
                     key={example.id}
                     example={example}
+                    zh={zh}
                     onSelect={() => selectExample(example)}
                   />
                 ))}
@@ -165,12 +241,16 @@ export function StartFromExampleDialog({
 
 function FeaturedExample({
   example,
+  zh,
   onSelect,
 }: {
   example: PromptExample;
+  zh: boolean;
   onSelect: () => void;
 }) {
-  const meta = FEATURE_META[example.id as keyof typeof FEATURE_META];
+  const { t } = useI18n();
+  const eyebrowKey =
+    FEATURE_EYEBROW_KEYS[example.id as keyof typeof FEATURE_EYEBROW_KEYS];
 
   return (
     <button
@@ -191,14 +271,14 @@ function FeaturedExample({
       <span
         className="relative self-start rounded-full border border-white/15 bg-black/25 px-2 py-0.5 text-[8px] font-semibold tracking-[0.12em] text-white/70 uppercase backdrop-blur-md"
       >
-        {meta.eyebrow}
+        {t.startFromExample[eyebrowKey]}
       </span>
       <div className="relative mt-auto w-full min-w-0">
         <h4 className="font-heading text-base font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.7)]">
-          {_shortLabel(example)}
+          {_displayLabel(example, zh)}
         </h4>
         <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-white/85 drop-shadow-[0_1px_2px_rgb(0_0_0/0.8)]">
-          {_plainDescription(example)}
+          {_displayDescription(example, zh)}
         </p>
       </div>
     </button>
@@ -207,9 +287,11 @@ function FeaturedExample({
 
 function SpecialistExample({
   example,
+  zh,
   onSelect,
 }: {
   example: PromptExample;
+  zh: boolean;
   onSelect: () => void;
 }) {
   const Icon = example.icon;
@@ -224,25 +306,14 @@ function SpecialistExample({
         <Icon className="size-4" />
       </div>
       <div className="min-w-0 grow">
-        <h4 className="font-heading text-sm font-semibold">{example.label}</h4>
+        <h4 className="font-heading text-sm font-semibold">
+          {_displayLabel(example, zh)}
+        </h4>
         <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-relaxed">
-          {_plainDescription(example)}
+          {_displayDescription(example, zh)}
         </p>
       </div>
       <ArrowRightIcon className="text-muted-foreground/50 size-4 shrink-0 transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-primary" />
     </button>
   );
-}
-
-function _shortLabel(example: PromptExample): string {
-  return example.id === "blank" ? "Blank Thread" : example.label;
-}
-
-function _plainDescription(example: PromptExample): string {
-  if (example.id === "blank") {
-    return "A clean canvas with a simple assistant prompt you can customize.";
-  }
-  return example.description
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1");
 }
