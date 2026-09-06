@@ -22,6 +22,7 @@ import {
   type Command as AppCommand,
   type CommandType,
 } from "@/shared/commands";
+import { paletteLabels } from "@/shared/palette-labels";
 
 import { usePluginCommandExecution } from "./plugin-command-execution-provider";
 import {
@@ -124,7 +125,10 @@ export function CommandPalette({
               {commandLabel(type, lang)}
             </CommandItem>
           ))}
-          {onSaveTo && matchesCommandText("Save to", search) ? (
+          {onSaveTo &&
+          paletteLabels("saveTo").some((label) =>
+            matchesCommandText(label, search)
+          ) ? (
             <CommandItem
               value="Save to Thread Storage"
               onSelect={() => {
@@ -135,7 +139,10 @@ export function CommandPalette({
               {t.palette.saveTo}
             </CommandItem>
           ) : null}
-          {onImportFrom && matchesCommandText("Import from", search) ? (
+          {onImportFrom &&
+          paletteLabels("importFrom").some((label) =>
+            matchesCommandText(label, search)
+          ) ? (
             <CommandItem
               value="Import from Thread Storage"
               onSelect={() => {
