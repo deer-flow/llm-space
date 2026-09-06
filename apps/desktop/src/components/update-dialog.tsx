@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { type ReactNode } from "react";
 
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage, type AppMessages } from "@/i18n/messages";
 import type { UpdateStatus } from "@/shared/updates";
 
 type Tone = "primary" | "success" | "danger";
@@ -82,7 +84,8 @@ function UpdateDialogBody({
   onRetry: () => void;
   onClose: () => void;
 }) {
-  const view = viewFor(status, { onRestart, onRetry, onClose });
+  const { t } = useI18n();
+  const view = viewFor(status, { onRestart, onRetry, onClose }, t);
   return (
     <div className="flex flex-col items-center px-6 pt-8 pb-6 text-center">
       <IconBadge tone={view.tone} icon={view.icon} spin={view.spin} />
@@ -114,7 +117,8 @@ function viewFor(
     onRestart,
     onRetry,
     onClose,
-  }: { onRestart: () => void; onRetry: () => void; onClose: () => void }
+  }: { onRestart: () => void; onRetry: () => void; onClose: () => void },
+  t: AppMessages
 ): View {
   switch (status.state) {
     case "checking":
@@ -123,8 +127,8 @@ function viewFor(
         icon: Loader2Icon,
         spin: true,
         progress: true,
-        title: "Checking for updates",
-        description: "Contacting the update server…",
+        title: t.updates.checking,
+        description: t.updates.contacting,
         actions: null,
       };
     case "downloading":
@@ -134,14 +138,20 @@ function viewFor(
         spin: true,
         progress: true,
         progressValue: status.progress,
-        title: "Downloading update",
+        title: t.updates.downloadingTitle,
         description:
           status.progress === undefined
-            ? `Getting version ${status.version} ready to install…`
-            : `Getting version ${status.version} ready to install… ${Math.round(status.progress)}%`,
+            ? formatMessage(t.updates.gettingReady, {
+                version: status.version,
+                progress: "",
+              })
+            : formatMessage(t.updates.gettingReady, {
+                version: status.version,
+                progress: ` ${Math.round(status.progress)}%`,
+              }),
         actions: (
           <Button size="sm" variant="outline" onClick={onClose}>
-            Continue in background
+            {t.updates.continueBackground}
           </Button>
         ),
       };
@@ -149,11 +159,13 @@ function viewFor(
       return {
         tone: "success",
         icon: CheckIcon,
-        title: "You're all set!",
-        description: `You're already running the latest version — v${status.version}.`,
+        title: t.updates.allSet,
+        description: formatMessage(t.updates.latest, {
+          version: status.version,
+        }),
         actions: (
           <Button size="sm" onClick={onClose}>
-            Gotcha
+            {t.updates.gotcha}
           </Button>
         ),
       };
@@ -161,15 +173,17 @@ function viewFor(
       return {
         tone: "primary",
         icon: DownloadIcon,
-        title: "Update ready",
-        description: `Version ${status.version} has been downloaded and is ready to install. Restarting takes just a moment.`,
+        title: t.updates.ready,
+        description: formatMessage(t.updates.readyDescription, {
+          version: status.version,
+        }),
         actions: (
           <>
             <Button size="sm" variant="outline" onClick={onClose}>
-              Later
+              {t.updates.later}
             </Button>
             <Button size="sm" onClick={onRestart}>
-              Restart now
+              {t.updates.restartNow}
             </Button>
           </>
         ),
@@ -178,15 +192,15 @@ function viewFor(
       return {
         tone: "danger",
         icon: TriangleAlertIcon,
-        title: "Update check failed",
+        title: t.updates.checkFailed,
         description: status.message,
         actions: (
           <>
             <Button size="sm" variant="outline" onClick={onClose}>
-              Close
+              {t.updates.close}
             </Button>
             <Button size="sm" onClick={onRetry}>
-              Try again
+              {t.updates.tryAgain}
             </Button>
           </>
         ),
@@ -262,7 +276,7 @@ function IndeterminateBar({ tone }: { tone: Tone }) {
 
 function DeterminateBar({ tone, value }: { tone: Tone; value: number }) {
   return (
-    <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+    <div className="bg-muted mt-6 h-1.5 w-full overflow-hidden rounded-full">
       <div
         className={cn(
           "h-full rounded-full transition-[width] duration-300",

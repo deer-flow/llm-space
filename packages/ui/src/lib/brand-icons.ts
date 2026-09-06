@@ -83,6 +83,7 @@ interface IconMapping {
  * keywords are matched exactly; model keywords are regexes.
  */
 const PROVIDER_MAPPINGS: IconMapping[] = [
+  { Icon: Qwen, keywords: ["qwen"] },
   { Icon: AntGroup, keywords: ["antgroup"] },
   { Icon: Meta, keywords: ["meta"] },
   { Icon: Microsoft, keywords: ["microsoft"] },
@@ -213,6 +214,7 @@ const MODEL_MAPPINGS: IconMapping[] = [
  * omitted and fall back to the initials avatar.
  */
 export const PROVIDER_ICON_ALIASES: Record<string, string> = {
+  "aliyun-qwen": "qwen",
   "amazon-bedrock": "bedrock",
   "ant-ling": "antgroup",
   ark: "volcengine",

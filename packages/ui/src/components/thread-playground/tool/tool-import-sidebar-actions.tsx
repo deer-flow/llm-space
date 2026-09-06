@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
+import { usePlaygroundLabels } from "../playground-labels";
 
 /**
  * Right-side slot for a tool-import sidebar row: shows the tool count badge at
@@ -27,6 +28,7 @@ function _ToolImportSidebarActions({
   onEnableAll: () => void;
   onDisableAll: () => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const [open, setOpen] = useState(false);
 
   return (
@@ -40,7 +42,7 @@ function _ToolImportSidebarActions({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Tool actions"
+            aria-label={dialogs.enableAllTools}
             className={cn(
               "hover:bg-accent-foreground/10 text-muted-foreground hover:text-foreground relative z-10 hidden size-5 shrink-0 items-center justify-center rounded outline-none group-hover/row:flex data-[state=open]:flex",
               open && "text-foreground flex"
@@ -50,12 +52,15 @@ function _ToolImportSidebarActions({
             <MoreHorizontal className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+        <DropdownMenuContent
+          align="end"
+          onClick={(event) => event.stopPropagation()}
+        >
           <DropdownMenuItem onSelect={onEnableAll}>
-            Enable all tools
+            {dialogs.enableAllTools}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onDisableAll}>
-            Disable all tools
+            {dialogs.disableAllTools}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -151,10 +151,7 @@ function DefaultModelSelect() {
 
   return (
     <Select value={value} onValueChange={handleChange}>
-      <SelectTrigger
-        className="w-64"
-        aria-label={t.general.defaultModelAria}
-      >
+      <SelectTrigger className="w-64" aria-label={t.general.defaultModelAria}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -215,20 +212,21 @@ function AnalyticsRow() {
     };
   }, []);
 
-  const handleChange = useCallback(async (next: boolean) => {
-    setEnabled(next); // Optimistic; the RPC echoes the input, so no reconcile.
-    try {
-      await setAnalyticsSettings(next);
-    } catch (error) {
-      setEnabled(!next);
-      toast.error(t.general.analytics.failed, {
-        description:
-          error instanceof Error
-            ? error.message
-            : t.common.pleaseTryAgain,
-      });
-    }
-  }, [t]);
+  const handleChange = useCallback(
+    async (next: boolean) => {
+      setEnabled(next); // Optimistic; the RPC echoes the input, so no reconcile.
+      try {
+        await setAnalyticsSettings(next);
+      } catch (error) {
+        setEnabled(!next);
+        toast.error(t.general.analytics.failed, {
+          description:
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
+        });
+      }
+    },
+    [t]
+  );
 
   return (
     <SettingsRow
@@ -278,9 +276,7 @@ function WorkspaceFolderLink() {
   return (
     <button
       type="button"
-      onClick={() =>
-        executeCommand({ type: "openWorkspaceFolder", args: {} })
-      }
+      onClick={() => executeCommand({ type: "openWorkspaceFolder", args: {} })}
       className="text-primary max-w-[50%] cursor-pointer truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
       title={path}
     >
@@ -315,6 +311,10 @@ export function GeneralPage() {
     setPrimaryColor,
   } = usePrimaryColor();
   const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
+  const handleLanguageChange = (next: AppLanguage) => {
+    if (next === lang) return;
+    setLang(next);
+  };
   return (
     <SettingsPage
       title={t.general.title}
@@ -333,12 +333,9 @@ export function GeneralPage() {
           >
             <Select
               value={lang}
-              onValueChange={(v) => setLang(v as AppLanguage)}
+              onValueChange={(v) => handleLanguageChange(v as AppLanguage)}
             >
-              <SelectTrigger
-                className="w-32"
-                aria-label={t.general.language}
-              >
+              <SelectTrigger className="w-32" aria-label={t.general.language}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -353,10 +350,7 @@ export function GeneralPage() {
 
           <SettingsRow
             label={
-              <RowLabel
-                title={t.general.theme}
-                hint={t.general.themeHint}
-              />
+              <RowLabel title={t.general.theme} hint={t.general.themeHint} />
             }
           >
             <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
@@ -409,10 +403,7 @@ export function GeneralPage() {
               value={fidelity}
               onValueChange={(v) => setFidelity(v as RenderingFidelity)}
             >
-              <SelectTrigger
-                className="w-32"
-                aria-label={t.general.rendering}
-              >
+              <SelectTrigger className="w-32" aria-label={t.general.rendering}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

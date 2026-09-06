@@ -12,6 +12,8 @@ import { memo, useCallback, useMemo, type MouseEvent } from "react";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 
+import { usePlaygroundLabels } from "../playground-labels";
+
 import { useMessageStatsSummaryMode } from "./message-stats-summary-mode";
 
 const COMPACT_TOKEN_FORMATTER = new Intl.NumberFormat("en", {
@@ -35,6 +37,9 @@ function _formatDuration(durationMs: number): string {
 }
 
 function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
+  const {
+    dialogs: { stats },
+  } = usePlaygroundLabels();
   const cached = usage.cacheRead + usage.cacheWrite;
   const total = usage.input + usage.output + cached;
   if (total <= 0) {
@@ -44,7 +49,7 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
   return (
     <div
       role="img"
-      aria-label={`Input ${formatTokens(usage.input)} tokens. Output ${formatTokens(usage.output)} tokens. Cached ${formatTokens(cached)} tokens.`}
+      aria-label={`${stats.input} ${formatTokens(usage.input)}. ${stats.output} ${formatTokens(usage.output)}. ${stats.cached} ${formatTokens(cached)}.`}
       className="mt-2 w-72 max-w-full"
     >
       <div className="bg-foreground/8 flex h-2 overflow-hidden rounded-full">
@@ -78,16 +83,16 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.5625rem]">
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
-          Input {formatTokens(usage.input)}
+          {stats.input} {formatTokens(usage.input)}
         </span>
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
-          Output {formatTokens(usage.output)}
+          {stats.output} {formatTokens(usage.output)}
         </span>
         {cached > 0 && (
           <span className="flex items-center gap-1">
             <span className="size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-            Cached {formatTokens(cached)}
+            {stats.cached} {formatTokens(cached)}
           </span>
         )}
       </div>
@@ -96,6 +101,9 @@ function _TokenUsageBar({ usage }: { usage: ModelUsage }) {
 }
 
 function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
+  const {
+    dialogs: { stats },
+  } = usePlaygroundLabels();
   const firstTokenMs = timing.firstTokenMs;
   const hasFirstToken = firstTokenMs !== undefined;
   const firstTokenPercent =
@@ -106,8 +114,8 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
     ? Math.max(0, timing.durationMs - firstTokenMs)
     : null;
   const ariaLabel = hasFirstToken
-    ? `Request sent. First token after ${_formatDuration(firstTokenMs)}. Completed after ${_formatDuration(timing.durationMs)}.`
-    : `Request sent. Completed after ${_formatDuration(timing.durationMs)}.`;
+    ? `${stats.requestSent}. ${stats.firstToken} ${_formatDuration(firstTokenMs)}. ${stats.complete} ${_formatDuration(timing.durationMs)}.`
+    : `${stats.requestSent}. ${stats.complete} ${_formatDuration(timing.durationMs)}.`;
 
   return (
     <div role="img" aria-label={ariaLabel} className="mt-1.5 w-72 max-w-full">
@@ -124,7 +132,7 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
             )}
             style={{ left: `${firstTokenPercent}%` }}
           >
-            First token
+            {stats.firstToken}
           </span>
         )}
         <div className="bg-foreground/8 relative flex h-2 overflow-hidden rounded-full">
@@ -153,22 +161,22 @@ function _TimingTimeline({ timing }: { timing: AssistantMessageTiming }) {
           )}
         </div>
         <div className="text-muted-foreground mt-0.5 flex justify-between text-[0.5625rem]">
-          <span>Request sent</span>
-          <span>Complete</span>
+          <span>{stats.requestSent}</span>
+          <span>{stats.complete}</span>
         </div>
       </div>
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.5625rem]">
         {hasFirstToken && (
           <span className="flex items-center gap-1">
             <span className="bg-muted-foreground/50 size-1.5 rounded-full" />
-            Waiting {_formatDuration(firstTokenMs)}
+            {stats.waiting(_formatDuration(firstTokenMs))}
           </span>
         )}
         <span className="flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
           {generationMs === null
-            ? "Response"
-            : `Generating ${_formatDuration(generationMs)}`}
+            ? stats.response
+            : stats.generating(_formatDuration(generationMs))}
         </span>
       </div>
     </div>
@@ -187,6 +195,9 @@ function _MessageStatsSummary({
   variant?: "default" | "header";
 }) {
   const { mode, setMode } = useMessageStatsSummaryMode();
+  const {
+    dialogs: { stats },
+  } = usePlaygroundLabels();
   const usageRows = useMemo(
     () => (hasModelUsage(usage) ? usageBreakdownRows(usage) : []),
     [usage]
@@ -203,19 +214,19 @@ function _MessageStatsSummary({
     if (!timing) {
       return null;
     }
-    return `${_formatDuration(timing.durationMs)} total`;
-  }, [timing]);
+    return `${_formatDuration(timing.durationMs)} ${stats.total}`;
+  }, [stats, timing]);
   const tokenLabel = useMemo(() => {
     if (!hasModelUsage(usage)) {
       return null;
     }
     const cached = usage.cacheRead + usage.cacheWrite;
     return [
-      `${COMPACT_TOKEN_FORMATTER.format(usage.input)} in`,
-      `${COMPACT_TOKEN_FORMATTER.format(usage.output)} out`,
-      `${COMPACT_TOKEN_FORMATTER.format(cached)} cached`,
+      `${COMPACT_TOKEN_FORMATTER.format(usage.input)} ${stats.input}`,
+      `${COMPACT_TOKEN_FORMATTER.format(usage.output)} ${stats.output}`,
+      `${COMPACT_TOKEN_FORMATTER.format(cached)} ${stats.cached}`,
     ].join(" / ");
-  }, [usage]);
+  }, [stats, usage]);
   const label =
     variant === "header"
       ? mode === "timing"
@@ -262,13 +273,15 @@ function _MessageStatsSummary({
           {usageRows.length > 0 && (
             <section>
               <div className="text-foreground mb-1 font-medium">
-                Token usage
+                {stats.tokenUsage}
               </div>
               {usage && <_TokenUsageBar usage={usage} />}
               <div className="mt-2 grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
                 {usageRows.map((row) => (
                   <div key={row.label} className="contents">
-                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className="text-muted-foreground">
+                      {_localizedUsageLabel(row.label, stats)}
+                    </span>
                     <span className="text-right font-mono tabular-nums">
                       {row.value}
                     </span>
@@ -279,11 +292,13 @@ function _MessageStatsSummary({
           )}
           {timing && (
             <section className={cn(usageRows.length > 0 && "mt-5")}>
-              <div className="text-foreground mb-1 font-medium">Timing</div>
+              <div className="text-foreground mb-1 font-medium">
+                {stats.timing}
+              </div>
               <_TimingTimeline timing={timing} />
               <div className="mt-1.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 leading-tight">
                 <span className="text-muted-foreground">
-                  Total response time
+                  {stats.totalResponseTime}
                 </span>
                 <span className="text-right font-mono tabular-nums">
                   {_formatDuration(timing.durationMs)}
@@ -291,7 +306,7 @@ function _MessageStatsSummary({
                 {timing?.firstTokenMs !== undefined && (
                   <>
                     <span className="text-muted-foreground">
-                      Time to first token (TTFT)
+                      {stats.timeToFirstToken}
                     </span>
                     <span className="text-right font-mono tabular-nums">
                       {_formatDuration(timing.firstTokenMs)}
@@ -301,17 +316,17 @@ function _MessageStatsSummary({
                 {tokensPerSecond !== null && (
                   <>
                     <span className="text-muted-foreground">
-                      Tokens per second (TPS)
+                      {stats.tokensPerSecond}
                     </span>
                     <span className="text-right font-mono tabular-nums">
-                      {tokensPerSecond.toFixed(1)} tokens/s
+                      {stats.tokensPerSecondValue(tokensPerSecond.toFixed(1))}
                     </span>
                   </>
                 )}
               </div>
               {timing.firstTokenMs !== undefined && (
                 <p className="text-muted-foreground mt-1.5 text-[0.5625rem] leading-snug">
-                  TPS counts output tokens only during the generating segment.
+                  {stats.tpsHint}
                 </p>
               )}
             </section>
@@ -344,3 +359,23 @@ function _MessageStatsSummary({
 }
 
 export const MessageStatsSummary = memo(_MessageStatsSummary);
+
+function _localizedUsageLabel(
+  label: string,
+  stats: ReturnType<typeof usePlaygroundLabels>["dialogs"]["stats"]
+): string {
+  switch (label) {
+    case "Input":
+      return stats.input;
+    case "Output":
+      return stats.output;
+    case "Cache Read":
+      return stats.cacheRead;
+    case "Cost":
+      return stats.cost;
+    case "Total":
+      return stats.total;
+    default:
+      return label;
+  }
+}

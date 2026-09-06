@@ -38,8 +38,14 @@ import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
-import { Item, ItemContent, ItemDescription, ItemGroup } from "@llm-space/ui/ui/item";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+} from "@llm-space/ui/ui/item";
 
+import { usePlaygroundLabels } from "./playground-labels";
 import { RunEvaluationDialog } from "./run-evaluation-dialog";
 import { RunTraceView } from "./run-trace-view";
 import { useThreadStore, useThreadStoreActions } from "./stores";
@@ -53,6 +59,8 @@ const VERDICT_LABELS: Record<EvaluationRecord["verdict"], string> = {
 };
 
 function _RunHistoryListView({ onClose }: { onClose: () => void }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const [containerRef] = useAutoAnimation();
   const runHistory = useThreadStore((s) => s.runHistory);
   const evaluations = useThreadStore((s) => s.evaluations);
@@ -245,7 +253,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
               {inspectingRunIndex + 1} of {runs.length}
             </div>
           </div>
-          <Tooltip content="Previous run">
+          <Tooltip content={labels.previousRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -256,7 +264,7 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
               <ChevronLeftIcon className="size-3" />
             </Button>
           </Tooltip>
-          <Tooltip content="Next run">
+          <Tooltip content={labels.nextRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -372,9 +380,9 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             setRunPendingRemoval(null);
           }
         }}
-        title="Remove Run?"
-        description="This removes the saved run from this thread and removes any evaluations that reference it."
-        confirmLabel="Remove"
+        title={dialogs.confirmations.removeRunTitle}
+        description={dialogs.confirmations.removeRunDescription}
+        confirmLabel={dialogs.remove}
         onConfirm={() => {
           const run = runPendingRemoval;
           setRunPendingRemoval(null);
@@ -390,9 +398,9 @@ function _RunHistoryListView({ onClose }: { onClose: () => void }) {
             setEvaluationPendingRemoval(null);
           }
         }}
-        title="Remove Evaluation?"
-        description="This removes the saved evaluation from this thread. The compared runs are kept."
-        confirmLabel="Remove"
+        title={dialogs.confirmations.removeEvaluationTitle}
+        description={dialogs.confirmations.removeEvaluationDescription}
+        confirmLabel={dialogs.remove}
         onConfirm={() => {
           const evaluation = evaluationPendingRemoval;
           setEvaluationPendingRemoval(null);
@@ -424,6 +432,8 @@ function _RunHistoryItem({
   onRestore: (run: RunHistoryEntry) => void;
   onRequestRemove: (run: RunHistoryEntry) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const summary = runEntrySummary(run);
   const modelLabel = runEntryModelLabel(run);
   const messageCountLabel = runEntryMessageCountLabel(run);
@@ -467,7 +477,7 @@ function _RunHistoryItem({
           {summary}
         </ItemDescription>
         <div className="shrink-0" onClick={stopInspectClick}>
-          <Tooltip content="Remove run">
+          <Tooltip content={labels.removeRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -496,7 +506,9 @@ function _RunHistoryItem({
           className="flex shrink-0 items-center gap-0.5"
           onClick={stopInspectClick}
         >
-          <Tooltip content={selected ? "Remove from comparison" : "Select run"}>
+          <Tooltip
+            content={selected ? labels.removeFromComparison : labels.selectRun}
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -525,7 +537,7 @@ function _RunHistoryItem({
               </span>
             </Button>
           </Tooltip>
-          <Tooltip content="Inspect run">
+          <Tooltip content={labels.inspectRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -535,7 +547,7 @@ function _RunHistoryItem({
               <EyeIcon className="size-3" />
             </Button>
           </Tooltip>
-          <Tooltip content="Restore run">
+          <Tooltip content={labels.restoreRun}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -611,6 +623,8 @@ function _EvaluationListItem({
   onOpenEvaluation: (leftRunId: string, rightRunId: string) => void;
   onRequestRemove: (evaluation: EvaluationRecord) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const verdictLabel = VERDICT_LABELS[evaluation.verdict];
   const leftAverage = averageScoreForRun(
     evaluation.rubric,
@@ -659,7 +673,7 @@ function _EvaluationListItem({
             {format(evaluation.updatedAt)}
           </span>
           <div onClick={stopOpenClick}>
-            <Tooltip content="Remove evaluation">
+            <Tooltip content={labels.removeEvaluation}>
               <Button
                 variant="ghost"
                 size="icon-sm"

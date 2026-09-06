@@ -21,13 +21,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
 } from "lucide-react";
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Markdown } from "@llm-space/ui/components/markdown";
@@ -57,6 +51,7 @@ import { Textarea } from "@llm-space/ui/ui/textarea";
 
 import { useFirstAvailableModel } from "../model-provider";
 
+import { usePlaygroundLabels } from "./playground-labels";
 import { createRuntimePromptFiles } from "./runtime-prompt-files";
 import {
   useThreadStore,
@@ -88,6 +83,8 @@ export function ThreadCompactionDialog({
   onApplyCompaction?: (thread: Thread) => Promise<void>;
   showTrigger?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.compaction;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setDialogOpen = useCallback(
@@ -104,7 +101,9 @@ export function ThreadCompactionDialog({
   const [instructions, setInstructions] = useState("");
   const instructionsRef = useRef("");
   const preparationVersionRef = useRef(0);
-  const messages = useThreadStore((state) => state.thread.context?.messages ?? []);
+  const messages = useThreadStore(
+    (state) => state.thread.context?.messages ?? []
+  );
   const threadModel = useThreadStore((state) => state.thread.model);
   const runtimeId = useThreadStore((state) => state.runtimeId);
   const fallbackModel = useFirstAvailableModel();
@@ -115,8 +114,7 @@ export function ThreadCompactionDialog({
     isMetaUserMessage(state.thread.context)
   );
   const realTurnCount = useMemo(
-    () =>
-      planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount,
+    () => planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount,
     [hasMetaUserPrompt, messages]
   );
   const maxKeepTurns = Math.max(0, realTurnCount - 1);
@@ -277,7 +275,9 @@ export function ThreadCompactionDialog({
       }
       setDialogOpen(false);
       toast.success(
-        onApplyCompaction ? "Compacted thread created" : "Conversation compacted",
+        onApplyCompaction
+          ? "Compacted thread created"
+          : "Conversation compacted",
         {
           description: `${freshPlan.keptTurnCount} recent ${freshPlan.keptTurnCount === 1 ? "turn remains" : "turns remain"} verbatim.`,
         }
@@ -304,16 +304,14 @@ export function ThreadCompactionDialog({
       {showTrigger ? (
         <Tooltip
           content={
-            canCompact
-              ? "Compact conversation"
-              : "At least two user turns are needed to compact"
+            canCompact ? labels.compactConversation : labels.needsTwoTurns
           }
         >
           <DialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon-lg"
-              aria-label="Compact conversation"
+              aria-label={labels.compactConversation}
               disabled={disabled || !canCompact}
             >
               <FileArchiveIcon className="size-4" />
@@ -333,17 +331,17 @@ export function ThreadCompactionDialog({
               <FileArchiveIcon className="size-4" />
             </div>
             <DialogTitle className="col-start-2 flex items-center gap-2 text-base">
-              Compact conversation
+              {labels.title}
               <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-                Preview
+                {labels.preview}
               </span>
             </DialogTitle>
             <DialogDescription className="col-start-2">
               {step === "introduction"
-                ? "See how compaction creates room without losing the thread."
+                ? labels.introDescription
                 : step === "configure"
-                  ? "Choose what stays verbatim and what the checkpoint should emphasize."
-                  : "Review the generated checkpoint before changing the conversation."}
+                  ? labels.configureDescription
+                  : labels.reviewDescription}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -390,24 +388,26 @@ export function ThreadCompactionDialog({
             onClick={() => actions.openLink(docsUrl("compaction"))}
           >
             <CircleHelpIcon className="size-4" />
-            Help
+            {labels.help}
           </Button>
           <div className="flex items-center justify-end gap-2">
             {step === "introduction" ? (
               <>
                 <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                  Cancel
+                  {dialogs.cancel}
                 </Button>
-                <Button onClick={() => setStep("configure")}>Next</Button>
+                <Button onClick={() => setStep("configure")}>
+                  {labels.next}
+                </Button>
               </>
             ) : null}
             {step === "configure" ? (
               <>
                 <Button variant="ghost" onClick={() => setStep("introduction")}>
-                  Back
+                  {labels.back}
                 </Button>
                 <Button onClick={() => void startCompaction()}>
-                  Start compact
+                  {labels.start}
                 </Button>
               </>
             ) : null}
@@ -418,18 +418,15 @@ export function ThreadCompactionDialog({
                   disabled={busy}
                   onClick={() => setStep("configure")}
                 >
-                  Back
+                  {labels.back}
                 </Button>
-                {text.trim() &&
-                !visibleError &&
-                !preparing &&
-                !streaming ? (
+                {text.trim() && !visibleError && !preparing && !streaming ? (
                   <Button
                     disabled={applying}
                     onClick={() => void applyPreview()}
                   >
                     {applying ? <Spinner className="size-3" /> : null}
-                    {applying ? "Creating copy…" : "Apply compaction"}
+                    {applying ? labels.creatingCopy : labels.apply}
                   </Button>
                 ) : (
                   <Button
@@ -439,9 +436,9 @@ export function ThreadCompactionDialog({
                     {busy ? <Spinner className="size-3" /> : null}
                     {busy
                       ? preparing
-                        ? "Preparing…"
-                        : "Compacting…"
-                      : "Try again"}
+                        ? labels.preparing
+                        : labels.compacting
+                      : labels.tryAgain}
                   </Button>
                 )}
               </>
@@ -496,7 +493,8 @@ function WizardStepIndicator({ step }: { step: WizardStep }) {
                     "border-primary bg-primary text-primary-foreground",
                   active &&
                     "border-primary bg-primary/10 text-primary ring-primary/10 ring-4",
-                  !completed && !active &&
+                  !completed &&
+                    !active &&
                     "border-border/60 text-muted-foreground"
                 )}
               >
@@ -577,7 +575,7 @@ function IntroductionStep() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 divide-x rounded-xl border bg-background/40">
+      <div className="bg-background/40 grid grid-cols-3 divide-x rounded-xl border">
         <IntroPrinciple
           icon={<ShieldCheckIcon className="size-4" />}
           title="Preview first"
@@ -635,7 +633,7 @@ function ConfigureStep({
             onValueChange={onKeepTurnsChange}
           >
             <SelectTrigger
-              className="w-full bg-background/60"
+              className="bg-background/60 w-full"
               aria-label="Keep recent turns"
             >
               <SelectValue />
@@ -731,12 +729,8 @@ function CompactionMap({
           </span>
         </div>
 
-        <HistoryPanel
-          title="After"
-          badge={`checkpoint + ${keptTurns}`}
-          accent
-        >
-          <div className="border-primary/25 bg-primary/[0.07] rounded-lg border p-3 shadow-sm shadow-primary/5">
+        <HistoryPanel title="After" badge={`checkpoint + ${keptTurns}`} accent>
+          <div className="border-primary/25 bg-primary/[0.07] shadow-primary/5 rounded-lg border p-3 shadow-sm">
             <div className="text-primary mb-2 flex items-center gap-1.5 font-mono text-[0.5625rem]">
               <FileArchiveIcon className="size-3" />
               &lt;system-reminder&gt;
@@ -804,18 +798,23 @@ function ExecutionStep({
   onRegenerate: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-3xl overflow-hidden rounded-xl border bg-background/40">
+    <div className="bg-background/40 mx-auto max-w-3xl overflow-hidden rounded-xl border">
       <div className="flex h-12 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium">Live checkpoint</span>
           {busy ? (
             <span className="text-primary flex items-center gap-1.5 text-[0.6875rem]">
               <Spinner className="size-3" />
-              {applying ? "Creating copy" : preparing ? "Preparing" : "Streaming"}
+              {applying
+                ? "Creating copy"
+                : preparing
+                  ? "Preparing"
+                  : "Streaming"}
             </span>
           ) : text && !error ? (
             <span className="text-muted-foreground text-[0.6875rem]">
-              Ready to apply · {keptTurns} recent {keptTurns === 1 ? "turn" : "turns"} kept
+              Ready to apply · {keptTurns} recent{" "}
+              {keptTurns === 1 ? "turn" : "turns"} kept
             </span>
           ) : null}
         </div>
@@ -993,14 +992,20 @@ function MiniTurn({
 
 function MessageBlock({ label }: { label: string }) {
   return (
-    <div className="border-amber-400/20 bg-amber-400/[0.05] text-amber-200/80 flex h-8 items-center gap-2 rounded-md border px-2 text-[0.625rem]">
+    <div className="flex h-8 items-center gap-2 rounded-md border border-amber-400/20 bg-amber-400/[0.05] px-2 text-[0.625rem] text-amber-200/80">
       <FileStackIcon className="size-3" />
       {label}
     </div>
   );
 }
 
-function FlowChip({ label, accent = false }: { label: string; accent?: boolean }) {
+function FlowChip({
+  label,
+  accent = false,
+}: {
+  label: string;
+  accent?: boolean;
+}) {
   return (
     <span
       className={cn(

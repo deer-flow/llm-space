@@ -56,6 +56,7 @@ import { toast } from "sonner";
 
 import { traceClient } from "@/client";
 import { useCommands, useRegisterCommands } from "@/commands";
+import { useI18n } from "@/i18n/i18n-provider";
 import type { RuntimeId } from "@/shared/runtime";
 import type {
   TraceConnectedProjectInput,
@@ -126,6 +127,7 @@ export function TracePanel({
   runtimeId,
 }: TracePanelProps) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
@@ -397,11 +399,11 @@ export function TracePanel({
     <div className={cn("bg-sidebar flex h-full flex-col", className)}>
       <header className="electrobun-webkit-app-region-drag flex h-11.5 items-center justify-between px-3">
         <span className="ml-auto flex items-center gap-0.5">
-          <Tooltip content="Add Trace Project">
+          <Tooltip content={t.common.tooltips.addTraceProject}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Add Trace Project"
+              aria-label={t.common.tooltips.addTraceProject}
               onClick={openProjectDialog}
             >
               <PlusIcon className="size-4" />

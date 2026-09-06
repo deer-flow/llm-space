@@ -26,6 +26,9 @@ import {
 import { Switch } from "@llm-space/ui/ui/switch";
 import { useEffect, useState } from "react";
 
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
+
 interface ImageModelFormState {
   id: string;
   name: string;
@@ -69,6 +72,7 @@ export function ImageModelEditorDialog({
   existingIds: readonly string[];
   onSave: (model: SeedreamImageModelDefinition, originalId?: string) => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<ImageModelFormState>(() =>
     _initialState(model)
   );
@@ -133,19 +137,17 @@ export function ImageModelEditorDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {model ? "Edit image model" : "Add custom image model"}
+            {model ? t.models.editImageModel : t.models.addImageModel}
           </DialogTitle>
-          <DialogDescription>
-            Image models reuse this provider&apos;s API key and base URL.
-          </DialogDescription>
+          <DialogDescription>{t.models.imageModelHint}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <_Field label="Model ID">
+          <_Field label={t.models.modelId}>
             <Input
               value={form.id}
-              placeholder="ep-20260731-example"
-              aria-label="Image model ID"
+              placeholder={t.models.imageModelIdPlaceholder}
+              aria-label={t.models.modelId}
               aria-invalid={duplicateId}
               onChange={(event) =>
                 setForm((current) => ({ ...current, id: event.target.value }))
@@ -153,16 +155,16 @@ export function ImageModelEditorDialog({
             />
             {duplicateId && (
               <p className="text-destructive mt-1.5 text-xs">
-                This model ID is already in use.
+                {t.models.imageModelIdInUse}
               </p>
             )}
           </_Field>
 
-          <_Field label="Model name">
+          <_Field label={t.models.modelName}>
             <Input
               value={form.name}
-              placeholder="Seedream endpoint"
-              aria-label="Image model name"
+              placeholder={t.models.imageModelNamePlaceholder}
+              aria-label={t.models.modelName}
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
@@ -172,7 +174,7 @@ export function ImageModelEditorDialog({
             />
           </_Field>
 
-          <_Field label="Icon">
+          <_Field label={t.models.icon}>
             <div className="flex items-center gap-2">
               <ModelAvatar
                 id={id || "image-model"}
@@ -181,8 +183,8 @@ export function ImageModelEditorDialog({
               />
               <Input
                 value={form.icon}
-                placeholder="Auto (e.g. seedream)"
-                aria-label="Image model icon"
+                placeholder={t.models.imageModelIconPlaceholder}
+                aria-label={t.models.icon}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -193,7 +195,7 @@ export function ImageModelEditorDialog({
             </div>
           </_Field>
 
-          <_Field label="Supported sizes">
+          <_Field label={t.models.supportedSizes}>
             <div className="grid grid-cols-2 gap-2">
               {SEEDREAM_IMAGE_SIZES.map((size) => (
                 <div
@@ -204,7 +206,7 @@ export function ImageModelEditorDialog({
                   <Switch
                     size="sm"
                     checked={form.supportedSizes.includes(size)}
-                    aria-label={`Support ${size}`}
+                    aria-label={formatMessage(t.models.supportSize, { size })}
                     onCheckedChange={(enabled) =>
                       handleSizeToggle(size, enabled)
                     }
@@ -214,7 +216,7 @@ export function ImageModelEditorDialog({
             </div>
           </_Field>
 
-          <_Field label="Default size">
+          <_Field label={t.models.defaultSize}>
             <Select
               value={form.defaultSize}
               disabled={form.supportedSizes.length === 0}
@@ -225,7 +227,10 @@ export function ImageModelEditorDialog({
                 }))
               }
             >
-              <SelectTrigger className="w-full" aria-label="Model default size">
+              <SelectTrigger
+                className="w-full"
+                aria-label={t.models.defaultSize}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -241,10 +246,10 @@ export function ImageModelEditorDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.models.cancel}
           </Button>
           <Button onClick={handleSave} disabled={!canSave}>
-            {model ? "Save" : "Add"}
+            {model ? t.models.save : t.models.add}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -44,8 +44,8 @@ function _readInitialLanguage(): AppLanguage {
 /**
  * Supplies the active UI language and its message tree to the renderer. The
  * choice persists in localStorage (mirrored to the host like every other
- * managed key); the native menu keeps following the OS locale until app
- * settings sync to the main process.
+ * managed key); the main process rebuilds the native menu when this value
+ * changes.
  */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<AppLanguage>(_readInitialLanguage);

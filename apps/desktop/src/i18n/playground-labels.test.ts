@@ -16,18 +16,16 @@ describe("PLAYGROUND_LABELS", () => {
 
   test("every label is a non-empty string in every language", () => {
     for (const labels of Object.values(PLAYGROUND_LABELS)) {
-      for (const [key, value] of Object.entries(labels) as [string, string][]) {
-        expect(typeof value).toBe("string");
-        expect(value.length).toBeGreaterThan(0);
-        expect(key).toBeDefined();
-      }
+      _assertTextLeaves(labels);
     }
   });
 
   test("the en values stay in sync with the packages/ui defaults", () => {
     // The web viewer renders the defaults, so English must not drift between
     // the two definitions.
-    expect(PLAYGROUND_LABELS.en).toEqual(DEFAULT_PLAYGROUND_LABELS);
+    expect(_serializableLabels(PLAYGROUND_LABELS.en)).toEqual(
+      _serializableLabels(DEFAULT_PLAYGROUND_LABELS)
+    );
   });
 
   test("zh actually translates the label set", () => {
@@ -41,3 +39,26 @@ describe("PLAYGROUND_LABELS", () => {
     );
   });
 });
+
+function _assertTextLeaves(value: unknown): void {
+  if (typeof value === "string") {
+    expect(value.length).toBeGreaterThan(0);
+    return;
+  }
+  if (typeof value === "function") return;
+  expect(typeof value).toBe("object");
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    _assertTextLeaves(child);
+  }
+}
+
+function _serializableLabels(value: unknown): unknown {
+  if (typeof value === "function") return value.toString();
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+      key,
+      _serializableLabels(child),
+    ])
+  );
+}

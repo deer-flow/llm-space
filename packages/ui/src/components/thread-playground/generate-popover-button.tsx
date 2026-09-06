@@ -1,14 +1,19 @@
 "use client";
 
-
 import { SparklesIcon, WandSparkles } from "lucide-react";
 import { type KeyboardEvent, memo, useCallback, useState } from "react";
 
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@llm-space/ui/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@llm-space/ui/ui/popover";
 import { Textarea } from "@llm-space/ui/ui/textarea";
+
+import { usePlaygroundLabels } from "./playground-labels";
 
 interface GeneratePopoverButtonProps {
   className?: string;
@@ -23,6 +28,8 @@ function _GeneratePopoverButton({
   placeholder = "Describe what your function does (or paste your code), and we'll generate a definition.",
   onGenerate,
 }: GeneratePopoverButtonProps) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
 
@@ -53,18 +60,18 @@ function _GeneratePopoverButton({
       className={className}
       variant="ghost"
       size={iconOnly ? "icon" : "sm"}
-      aria-label="Generate"
+      aria-label={labels.generate}
       aria-expanded={open}
     >
       <WandSparkles data-icon={iconOnly ? undefined : "inline-start"} />
-      {iconOnly ? null : "Generate"}
+      {iconOnly ? null : labels.generate}
     </Button>
   );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       {iconOnly ? (
-        <Tooltip content="Generate">
+        <Tooltip content={labels.generate}>
           <PopoverTrigger asChild>{button}</PopoverTrigger>
         </Tooltip>
       ) : (
@@ -93,7 +100,7 @@ function _GeneratePopoverButton({
             onClick={handleGenerate}
           >
             <SparklesIcon />
-            Generate
+            {labels.generate}
           </Button>
         </div>
       </PopoverContent>

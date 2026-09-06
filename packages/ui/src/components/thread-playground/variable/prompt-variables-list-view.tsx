@@ -28,6 +28,7 @@ import { useAutoAnimation } from "@llm-space/ui/lib/use-auto-animation";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore } from "../stores";
 
 import { PROMPT_DATE_FORMATS } from "./prompt-variable-options";
@@ -60,6 +61,7 @@ export function PromptVariablesListView({
   /** Whether this belongs to the active tab — gates the single-slot command. */
   active?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
     (s) => s.thread.context?.variableVariants
@@ -189,7 +191,7 @@ export function PromptVariablesListView({
             onClick={openManage}
           >
             <PlusIcon className="size-3" />
-            Add
+            {dialogs.sections.add}
           </Button>
         )}
         <PromptVariablesDialog

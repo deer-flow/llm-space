@@ -25,6 +25,8 @@ import { Button } from "@llm-space/ui/ui/button";
 import { Input } from "@llm-space/ui/ui/input";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 
+import { usePlaygroundLabels } from "./playground-labels";
+
 function _emptyCriterion(): EvaluationCriterion {
   return { id: uuid(), name: "" };
 }
@@ -50,12 +52,13 @@ export function EvaluationRubricEditor({
   onRemove: (id: string) => boolean;
   onSaved: (rubric: EvaluationRubricRecord) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const [name, setName] = useState(rubric?.name ?? "");
   const [criteria, setCriteria] = useState(() => _initialCriteria(rubric));
   const [removeOpen, setRemoveOpen] = useState(false);
   const normalizedNames = useMemo(
-    () =>
-      criteria.map((criterion) => criterion.name.trim().toLowerCase()),
+    () => criteria.map((criterion) => criterion.name.trim().toLowerCase()),
     [criteria]
   );
   const duplicateNames = useMemo(() => {
@@ -213,34 +216,34 @@ export function EvaluationRubricEditor({
                       </label>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
-                      <Tooltip content="Move criterion up">
+                      <Tooltip content={labels.moveCriterionUp}>
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          aria-label={`Move ${criterion.name || `criterion ${index + 1}`} up`}
+                          aria-label={labels.moveCriterionUp}
                           disabled={index === 0}
                           onClick={() => moveCriterion(index, -1)}
                         >
                           <ArrowUpIcon className="size-3" />
                         </Button>
                       </Tooltip>
-                      <Tooltip content="Move criterion down">
+                      <Tooltip content={labels.moveCriterionDown}>
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          aria-label={`Move ${criterion.name || `criterion ${index + 1}`} down`}
+                          aria-label={labels.moveCriterionDown}
                           disabled={index === criteria.length - 1}
                           onClick={() => moveCriterion(index, 1)}
                         >
                           <ArrowDownIcon className="size-3" />
                         </Button>
                       </Tooltip>
-                      <Tooltip content="Remove criterion">
+                      <Tooltip content={labels.removeCriterion}>
                         <Button
                           size="icon-sm"
                           variant="ghost"
                           className="hover:text-destructive"
-                          aria-label={`Remove ${criterion.name || `criterion ${index + 1}`}`}
+                          aria-label={labels.removeCriterion}
                           disabled={criteria.length <= MIN_RUBRIC_CRITERIA}
                           onClick={() =>
                             setCriteria((current) =>
@@ -289,9 +292,9 @@ export function EvaluationRubricEditor({
       <ConfirmDialog
         open={removeOpen}
         onOpenChange={setRemoveOpen}
-        title="Delete rubric?"
-        description="The reusable definition will be removed. Saved evaluations keep their immutable rubric snapshots and scores."
-        confirmLabel="Delete"
+        title={dialogs.confirmations.deleteRubricTitle}
+        description={dialogs.confirmations.deleteRubricDescription}
+        confirmLabel={dialogs.remove}
         dimBackground={false}
         onConfirm={() => {
           setRemoveOpen(false);

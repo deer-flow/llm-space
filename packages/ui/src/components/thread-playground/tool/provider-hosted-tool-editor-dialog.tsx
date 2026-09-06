@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStoreActions } from "../stores/thread-store";
 
 import { parseProviderHostedToolConfig } from "./provider-hosted-tool-config";
@@ -40,6 +41,8 @@ export function ProviderHostedToolEditorDialog({
   tool: ProviderHostedTool | null;
 }) {
   const { addTool, updateTool } = useThreadStoreActions();
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.toolEditor;
   const editorRef = useRef<CodeEditorHandle>(null);
   const [text, setText] = useState("");
   const [originalKey, setOriginalKey] = useState<string | null>(null);
@@ -95,20 +98,14 @@ export function ProviderHostedToolEditorDialog({
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {tool
-              ? "Edit provider-hosted tool"
-              : "Add provider-hosted tool"}
+            {tool ? labels.editProviderHosted : labels.addProviderHosted}
           </DialogTitle>
           <DialogDescription>
-            This JSON is passed directly to the selected model service. Fields
-            beyond type are preserved unchanged. LLM Space does not verify
-            whether the selected provider or model supports the tool or its
-            parameters. Provider-hosted tools run inside the model request and
-            are not controlled by Auto run tools.
+            {labels.providerHostedDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="text-sm font-medium">Configuration</div>
+          <div className="text-sm font-medium">{labels.configuration}</div>
           <CodeEditor
             ref={editorRef}
             className="min-h-0 flex-1 font-mono text-sm"
@@ -120,9 +117,11 @@ export function ProviderHostedToolEditorDialog({
         </div>
         <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {dialogs.cancel}
           </Button>
-          <Button onClick={handleSave}>{tool ? "Save" : "Create"}</Button>
+          <Button onClick={handleSave}>
+            {tool ? dialogs.save : dialogs.create}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

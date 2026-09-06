@@ -46,6 +46,7 @@ import { createBuiltInToolsModule } from "../tools/built-in";
 import { TraceManager } from "../traces";
 import { UpdaterService } from "../updates";
 
+import { setMenuLanguage } from "./menu";
 import { createShutdownCoordinator } from "./shutdown-coordinator";
 import { createMainWindow } from "./window";
 import { flushWindowState } from "./window-state";
@@ -298,6 +299,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
   };
 
   try {
+    setMenuLanguage(
+      localStorageManager.snapshot().values["llm-space-language"]
+    );
     rpc = createMainWindowRPC({
       analytics,
       executeCommand: (command) => executeCommand(command, getMainWindow()),
@@ -311,6 +315,9 @@ export async function startDesktopApp(): Promise<DesktopAppRuntime> {
       gistWriter,
       homePath,
       localStorageManager,
+      onLocalStorageSet: (key, value) => {
+        if (key === "llm-space-language") setMenuLanguage(value);
+      },
       runtimeRouter,
       remoteServerManager,
       skillsManager,

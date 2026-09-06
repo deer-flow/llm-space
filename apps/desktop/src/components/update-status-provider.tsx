@@ -15,6 +15,8 @@ import { toast } from "sonner";
 
 import { useCommands } from "@/commands";
 import { UpdateDialog } from "@/components/update-dialog";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { electrobun } from "@/lib/electrobun";
 import type {
   UpdateStatus,
@@ -52,6 +54,7 @@ function _UpdateReadyCard({
   onRestart: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
   const restartButtonRef = _useNativeClick(onRestart);
   const dismissButtonRef = _useNativeClick(onDismiss);
   return (
@@ -60,19 +63,19 @@ function _UpdateReadyCard({
         <CheckIcon className="size-4" />
       </div>
       <div className="min-w-0 grow">
-        <div className="text-sm font-medium">Update ready</div>
+        <div className="text-sm font-medium">{t.updates.ready}</div>
         <div className="truncate text-xs text-white/65">
-          v{version} is ready to install.
+          {formatMessage(t.updates.downloaded, { version })}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button ref={restartButtonRef} size="sm">
-          Restart
+          {t.updates.restart}
         </Button>
         <button
           ref={dismissButtonRef}
           type="button"
-          aria-label="Dismiss"
+          aria-label={t.updates.dismiss}
           className="flex size-6 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -95,12 +98,14 @@ function _UpdateDownloadingCard({
   status: Extract<UpdateStatus, { state: "downloading" }>;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
   const dismissButtonRef = _useNativeClick(onDismiss);
   const { version, progress, bytesDownloaded, totalBytes } = status;
   const progressLabel = _formatDownloadProgress(
     progress,
     bytesDownloaded,
-    totalBytes
+    totalBytes,
+    t
   );
   return (
     <div className="pointer-events-auto w-[356px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-black/45 p-3.5 text-white shadow-2xl backdrop-blur-md">
@@ -109,7 +114,7 @@ function _UpdateDownloadingCard({
           <Loader2Icon className="size-4 animate-spin" />
         </div>
         <div className="min-w-0 grow">
-          <div className="text-sm font-medium">Downloading update</div>
+          <div className="text-sm font-medium">{t.updates.downloading}</div>
           <div className="truncate text-xs text-white/65">
             v{version} — {progressLabel}
           </div>
@@ -117,7 +122,7 @@ function _UpdateDownloadingCard({
         <button
           ref={dismissButtonRef}
           type="button"
-          aria-label="Dismiss"
+          aria-label={t.updates.dismiss}
           className="flex size-6 shrink-0 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
         >
           <XIcon className="size-4" />
@@ -143,15 +148,21 @@ function _UpdateDownloadingCard({
 function _formatDownloadProgress(
   progress?: number,
   bytesDownloaded?: number,
-  totalBytes?: number
+  totalBytes?: number,
+  t?: ReturnType<typeof useI18n>["t"]
 ): string {
   const percent = progress === undefined ? null : `${Math.round(progress)}%`;
   if (bytesDownloaded === undefined) {
-    return percent ?? "this continues in the background.";
+    return (
+      percent ?? t?.updates.background ?? "this continues in the background."
+    );
   }
 
   const downloaded = _formatBytes(bytesDownloaded);
-  const size = totalBytes === undefined ? downloaded : `${downloaded} / ${_formatBytes(totalBytes)}`;
+  const size =
+    totalBytes === undefined
+      ? downloaded
+      : `${downloaded} / ${_formatBytes(totalBytes)}`;
   return percent ? `${percent} · ${size}` : size;
 }
 
@@ -192,6 +203,7 @@ const UpdateStatusContext = createContext<UpdateStatusValue | null>(null);
  */
 export function UpdateStatusProvider({ children }: { children: ReactNode }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   const [readyVersion, setReadyVersion] = useState<string | null>(null);
   const lastNotifiedVersion = useRef<string | null>(null);
   // Manual "Check for Updates" flow.
@@ -268,7 +280,8 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
         case "ready": {
           toast.dismiss(DOWNLOADING_TOAST_ID);
           setDialogOpen(false);
-          const alreadyAnnounced = lastNotifiedVersion.current === status.version;
+          const alreadyAnnounced =
+            lastNotifiedVersion.current === status.version;
           if (!manual && alreadyAnnounced) return;
           lastNotifiedVersion.current = status.version;
           toast.custom(
@@ -302,9 +315,9 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void rpc.request.pendingInstalledVersion({}).then((version) => {
       if (cancelled || !version) return;
-      toast.success(`Updated to v${version}`, {
+      toast.success(formatMessage(t.updates.updatedTo, { version }), {
         action: {
-          label: "Release notes",
+          label: t.updates.releaseNotes,
           onClick: () =>
             executeCommand({
               type: "openLink",
@@ -316,7 +329,7 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [executeCommand]);
+  }, [executeCommand, t]);
 
   return (
     <UpdateStatusContext.Provider value={{ readyVersion }}>

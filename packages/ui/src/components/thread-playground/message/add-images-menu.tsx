@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardPasteIcon, FileIcon, ImagePlusIcon } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
-
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStoreActions } from "../stores/thread-store";
 
 function readImageFile(
@@ -35,11 +35,17 @@ function readImageFile(
 export function AddImagesMenu({
   messageId,
   disabled,
+  onOpenChange,
 }: {
   messageId: string;
   disabled?: boolean;
+  /** Lets the containing message keep its hover toolbar visible while open. */
+  onOpenChange?: (open: boolean) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.images;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
   const { addMessageImageContent } = useThreadStoreActions();
 
   const addImage = useCallback(
@@ -87,6 +93,14 @@ export function AddImagesMenu({
     }
   }, [addImage]);
 
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      onOpenChange?.(nextOpen);
+    },
+    [onOpenChange]
+  );
+
   return (
     <>
       <input
@@ -94,30 +108,30 @@ export function AddImagesMenu({
         type="file"
         accept="image/*"
         multiple
-        aria-label="Image files"
+        aria-label={labels.fileInputAria}
         className="hidden"
         onChange={handleFilesSelected}
       />
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Add image to message"
+            aria-label={labels.addImageAria}
             disabled={disabled}
           >
             <ImagePlusIcon className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Add Images</DropdownMenuLabel>
+          <DropdownMenuLabel>{labels.addImages}</DropdownMenuLabel>
           <DropdownMenuItem onSelect={handleFromFiles}>
             <FileIcon />
-            From Files
+            {labels.fromFiles}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleFromClipboard}>
             <ClipboardPasteIcon />
-            From Clipboard
+            {labels.fromClipboard}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

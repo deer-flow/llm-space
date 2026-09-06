@@ -332,7 +332,13 @@ export function ThreadTabs({
                     : "w-23 pl-18"
               )}
             >
-              <Tooltip content={sidebarOpen ? "Hide sidebar" : "Show sidebar"}>
+              <Tooltip
+                content={
+                  sidebarOpen
+                    ? t.common.tooltips.hideSidebar
+                    : t.common.tooltips.showSidebar
+                }
+              >
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -360,12 +366,12 @@ export function ThreadTabs({
               pinnedRight={
                 <div className="flex h-full items-center gap-0.5 pt-0.5 pl-1.5">
                   {toolbarSlot}
-                  <Tooltip content="New blank thread">
+                  <Tooltip content={t.common.tooltips.newBlankThread}>
                     <Button
                       className="hover:bg-primary! rounded-full"
                       size="icon-sm"
                       variant="ghost"
-                      aria-label="New blank thread"
+                      aria-label={t.common.tooltips.newBlankThread}
                       onMouseDown={_preventFocusSteal}
                       onClick={onNewFile}
                     >

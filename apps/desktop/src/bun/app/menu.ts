@@ -7,17 +7,20 @@ import {
 import { MESSAGES } from "../../i18n/messages";
 import { commandLabel } from "../../shared/command-labels";
 import type { Command } from "../../shared/commands";
-import type { AppLanguage } from "../../shared/language";
+import { isAppLanguage, type AppLanguage } from "../../shared/language";
 
 import { isChineseLocale } from "./locales";
 
 /**
- * The menu follows the OS display language: it is built once at startup, and
- * an in-app language change (renderer localStorage) cannot reach it until
- * settings are synced to the main process. Role items (Undo, Copy, …) are
- * rendered by the OS and localize themselves.
+ * The menu defaults to the OS display language and follows an explicit
+ * in-app language choice as soon as the renderer persists it. Role items
+ * (Undo, Copy, …) are rendered by the OS and localize themselves.
  */
+let menuLanguage: AppLanguage | null = null;
+let updateReady = false;
+
 function _menuLang(): AppLanguage {
+  if (menuLanguage) return menuLanguage;
   return isChineseLocale() ? "zh" : "en";
 }
 
@@ -215,7 +218,14 @@ function _buildMenu(updateReady: boolean): ApplicationMenuItemConfig[] {
  * ready. `null` restores the default item.
  */
 export function setUpdateReadyInMenu(version: string | null) {
-  ApplicationMenu.setApplicationMenu(_buildMenu(version !== null));
+  updateReady = version !== null;
+  ApplicationMenu.setApplicationMenu(_buildMenu(updateReady));
+}
+
+/** Rebuild the native menu after the renderer persists an explicit language. */
+export function setMenuLanguage(value: string | null | undefined) {
+  menuLanguage = isAppLanguage(value) ? value : null;
+  ApplicationMenu.setApplicationMenu(_buildMenu(updateReady));
 }
 
 /**
@@ -281,7 +291,7 @@ export function registerMenuActions(
   window: BrowserWindow,
   executeCommand: (command: Command, window: BrowserWindow) => void
 ) {
-  ApplicationMenu.setApplicationMenu(_buildMenu(false));
+  ApplicationMenu.setApplicationMenu(_buildMenu(updateReady));
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const { action } = (event as { data: { action: string } }).data;
     const command = MENU_ACTION_COMMANDS[action];

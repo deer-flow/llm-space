@@ -64,6 +64,7 @@ import { ConfirmDialog } from "../../confirm-dialog";
 import { useFirstAvailableModel, useModels } from "../../model-provider";
 import { Tooltip } from "../../tooltip";
 import { useProviderProfileSelection } from "../model/provider-profile-selection-provider";
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreApi } from "../stores/thread-store";
 
 import { createGenerateProjectPromptPreparer } from "./generate-project-prompt-preparer";
@@ -116,6 +117,8 @@ export function GenerateProjectButton({
   onOpenChange?: (open: boolean) => void;
   showTrigger?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
   const {
     generator,
     createTransport,
@@ -472,10 +475,7 @@ export function GenerateProjectButton({
       });
     }
     try {
-      if (
-        !envCreated ||
-        !(await generator.openDevTerminal(result.dir))
-      ) {
+      if (!envCreated || !(await generator.openDevTerminal(result.dir))) {
         await openGeneratedProject();
       }
     } catch (e) {
@@ -513,7 +513,7 @@ export function GenerateProjectButton({
         <Tooltip
           content={
             <span className="flex items-center gap-1.5">
-              Generate a runnable agent for this thread
+              {labels.trigger}
               <BetaBadge />
             </span>
           }
@@ -521,7 +521,7 @@ export function GenerateProjectButton({
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label="Generate a runnable agent (Beta)"
+            aria-label={labels.trigger}
             disabled={disabled || running || !model}
             onClick={() => setDialogOpen(true)}
           >
@@ -537,19 +537,19 @@ export function GenerateProjectButton({
               <SparklesIcon className="size-4" />
             </span>
             <DialogTitle className="col-start-2 flex items-center gap-2">
-              Generate a runnable agent
+              {labels.title}
               <BetaBadge />
             </DialogTitle>
             <DialogDescription className="col-start-2">
               {step === "framework"
-                ? "Turn this thread into a real codebase—prompt, tools, variables, messages, and a plan to finish it."
+                ? labels.frameworkDescription
                 : step === "target"
-                  ? "Name the project, choose its home, and preview what will be created."
+                  ? labels.targetDescription
                   : uvMissing
                     ? "uv is needed to scaffold the project."
                     : result
                       ? "The thread is now a runnable agent project."
-                      : "Compiling thread context into a runnable project."}
+                      : labels.compilingDescription}
             </DialogDescription>
           </DialogHeader>
 
@@ -609,90 +609,90 @@ export function GenerateProjectButton({
             ) : null}
           </div>
 
-          <DialogFooter className="border-t bg-background/80 px-6 py-4 backdrop-blur-xl sm:justify-between">
+          <DialogFooter className="bg-background/80 border-t px-6 py-4 backdrop-blur-xl sm:justify-between">
             <Button
               variant="ghost"
               onClick={() => actions.openLink(docsUrl("generating-projects"))}
             >
               <CircleHelpIcon className="size-4" />
-              Help
+              {labels.help}
             </Button>
             <div className="flex items-center justify-end gap-2">
               {step === "framework" ? (
-              <>
-                <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setStep("target")}>
-                  Next
-                </Button>
-              </>
+                <>
+                  <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+                    {labels.cancel}
+                  </Button>
+                  <Button onClick={() => setStep("target")}>
+                    {labels.next}
+                  </Button>
+                </>
               ) : null}
 
               {step === "target" ? (
-              <>
-                <Button
-                  variant="ghost"
-                  disabled={preparing}
-                  onClick={() => setStep("framework")}
-                >
-                  Back
-                </Button>
-                <Button
-                  disabled={preparing || !projectName.trim()}
-                  onClick={prepareAndRun}
-                >
-                  {preparing ? <Spinner className="size-3" /> : null}
-                  {preparing ? "Checking…" : "Generate"}
-                </Button>
-              </>
+                <>
+                  <Button
+                    variant="ghost"
+                    disabled={preparing}
+                    onClick={() => setStep("framework")}
+                  >
+                    {labels.back}
+                  </Button>
+                  <Button
+                    disabled={preparing || !projectName.trim()}
+                    onClick={prepareAndRun}
+                  >
+                    {preparing ? <Spinner className="size-3" /> : null}
+                    {preparing ? labels.checking : labels.generate}
+                  </Button>
+                </>
               ) : null}
 
               {step === "run" && uvMissing ? (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setUvMissing(false);
-                    setStep("target");
-                  }}
-                >
-                  Back
-                </Button>
-                <Button onClick={() => actions.openLink(UV_INSTALL_URL)}>
-                  <ExternalLinkIcon className="size-4" />
-                  Install uv
-                </Button>
-              </>
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setUvMissing(false);
+                      setStep("target");
+                    }}
+                  >
+                    {labels.back}
+                  </Button>
+                  <Button onClick={() => actions.openLink(UV_INSTALL_URL)}>
+                    <ExternalLinkIcon className="size-4" />
+                    {labels.installUv}
+                  </Button>
+                </>
               ) : null}
 
               {step === "run" && !uvMissing ? (
-              <>
-                {result ? (
+                <>
+                  {result ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => void openGeneratedProject()}
+                    >
+                      <FolderOpenIcon className="size-4" />
+                      {labels.openFolder}
+                    </Button>
+                  ) : null}
+                  {running ? (
+                    <Button variant="ghost" onClick={cancelRun}>
+                      {labels.cancel}
+                    </Button>
+                  ) : null}
                   <Button
-                    variant="ghost"
-                    onClick={() => void openGeneratedProject()}
+                    variant="default"
+                    disabled={running}
+                    onClick={() =>
+                      result ? setEnvConfirmOpen(true) : setDialogOpen(false)
+                    }
                   >
-                    <FolderOpenIcon className="size-4" />
-                    Open folder
+                    {running ? <Spinner className="size-3" /> : null}
+                    {running ? labels.generating : labels.done}
                   </Button>
-                ) : null}
-                {running ? (
-                  <Button variant="ghost" onClick={cancelRun}>
-                    Cancel
-                  </Button>
-                ) : null}
-                <Button
-                  variant="default"
-                  disabled={running}
-                  onClick={() =>
-                    result ? setEnvConfirmOpen(true) : setDialogOpen(false)
-                  }
-                >
-                  {running ? <Spinner className="size-3" /> : null}
-                  {running ? "Generating…" : "Done"}
-                </Button>
-              </>
+                </>
               ) : null}
             </div>
           </DialogFooter>
@@ -708,10 +708,10 @@ export function GenerateProjectButton({
             setDialogOpen(false);
           }
         }}
-        title="Create a .env file for you?"
-        description="Write your model and search-engine API keys — resolving values from your environment variables — into the project's .env so it's ready to run. You can also do this yourself later."
-        cancelLabel="No thanks"
-        confirmLabel="Yes, create .env"
+        title={dialogs.confirmations.createEnvFileTitle}
+        description={dialogs.confirmations.createEnvFileDescription}
+        cancelLabel={dialogs.confirmations.noThanks}
+        confirmLabel={dialogs.confirmations.createEnvFile}
         confirmVariant="default"
         dimBackground={false}
         onCancel={skipEnvFile}
@@ -731,11 +731,7 @@ function BetaBadge() {
 }
 
 /** Ordered wizard steps with their stepper titles. */
-const STEPS: { id: WizardStep; title: string }[] = [
-  { id: "framework", title: "Introduction" },
-  { id: "target", title: "Destination" },
-  { id: "run", title: "Build" },
-];
+const STEPS: WizardStep[] = ["framework", "target", "run"];
 
 /**
  * Horizontal numbered stepper (reui-style): each step is an indicator circle +
@@ -743,10 +739,17 @@ const STEPS: { id: WizardStep; title: string }[] = [
  * steps show a checkmark, the active step is highlighted, pending steps muted.
  */
 function StepIndicator({ step }: { step: WizardStep }) {
-  const activeIndex = STEPS.findIndex((s) => s.id === step);
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
+  const titles: Record<WizardStep, string> = {
+    framework: labels.intro,
+    target: labels.destination,
+    run: labels.build,
+  };
+  const activeIndex = STEPS.findIndex((id) => id === step);
   return (
     <div className="mx-auto flex max-w-2xl items-center">
-      {STEPS.map((s, index) => {
+      {STEPS.map((id, index) => {
         const state =
           index < activeIndex
             ? "completed"
@@ -755,11 +758,8 @@ function StepIndicator({ step }: { step: WizardStep }) {
               : "pending";
         return (
           <div
-            key={s.id}
-            className={cn(
-              "flex items-center",
-              index === 0 ? "" : "flex-1"
-            )}
+            key={id}
+            className={cn("flex items-center", index === 0 ? "" : "flex-1")}
           >
             {index > 0 ? (
               <span
@@ -774,9 +774,9 @@ function StepIndicator({ step }: { step: WizardStep }) {
                 className={cn(
                   "flex size-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition-all duration-300",
                   state === "completed" &&
-                    "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+                    "border-primary bg-primary text-primary-foreground shadow-primary/20 shadow-sm",
                   state === "active" &&
-                    "border-primary bg-primary/10 text-primary ring-4 ring-primary/8",
+                    "border-primary bg-primary/10 text-primary ring-primary/8 ring-4",
                   state === "pending" &&
                     "border-border/60 text-muted-foreground"
                 )}
@@ -795,7 +795,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
                     : "text-foreground"
                 )}
               >
-                {s.title}
+                {titles[id]}
               </span>
             </div>
           </div>
@@ -813,6 +813,8 @@ function FrameworkStep({
   selected: string;
   onSelect: (id: string) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
   return (
     <div className="flex flex-col gap-3.5">
       <div className="bg-card group relative min-h-52 overflow-hidden rounded-2xl border shadow-sm">
@@ -829,25 +831,24 @@ function FrameworkStep({
         <div className="relative flex min-h-52 w-[62%] flex-col justify-center p-6">
           <div className="text-primary mb-3 flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] uppercase">
             <WorkflowIcon className="size-3.5" />
-            Playground → code
+            {labels.playgroundToCode}
           </div>
           <h3 className="max-w-md text-2xl font-semibold tracking-tight text-balance">
-            Take the agent out of the playground.
+            {labels.takeAgentOut}
           </h3>
           <p className="text-muted-foreground mt-2 max-w-md text-sm/relaxed">
-            Export the intelligence already assembled here into a project you
-            can inspect, version, and run.
+            {labels.exportIntelligence}
           </p>
 
           <div className="mt-5 flex items-center gap-2 text-[0.6875rem] font-medium">
             <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
               <BotIcon className="text-muted-foreground size-3.5" />
-              Playground context
+              {labels.playgroundContext}
             </span>
             <ArrowRightIcon className="text-muted-foreground size-3.5" />
             <span className="bg-background/80 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md">
               <PackageIcon className="text-muted-foreground size-3.5" />
-              Runnable project
+              {labels.runnableProject}
             </span>
           </div>
         </div>
@@ -855,13 +856,13 @@ function FrameworkStep({
 
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium">Export format</p>
+          <p className="text-sm font-medium">{labels.exportFormat}</p>
           <p className="text-muted-foreground text-xs">
-            Choose the runtime that will receive this thread.
+            {labels.chooseRuntime}
           </p>
         </div>
         <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
-          1 available
+          {labels.available}
         </span>
       </div>
 
@@ -941,20 +942,22 @@ function TargetStep({
   onUseMetaUserPromptChange: (next: boolean) => void;
   onBrowse: () => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h3 className="text-lg font-semibold tracking-tight">
-          Give your agent a home
+          {labels.giveHome}
         </h3>
         <p className="text-muted-foreground mt-1 text-xs">
-          Choose where the editable project will live.
+          {labels.chooseProjectHome}
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
         <div className="border-border/60 bg-muted/10 flex flex-col gap-3.5 rounded-2xl border p-4">
-          <Field label="Parent directory">
+          <Field label={labels.parentDirectory}>
             <div className="flex items-center gap-2">
               <Input
                 value={parentDir}
@@ -972,12 +975,12 @@ function TargetStep({
                 className="cursor-pointer"
               >
                 <FolderIcon className="size-4" />
-                Browse
+                {labels.browse}
               </Button>
             </div>
           </Field>
 
-          <Field label="Project name">
+          <Field label={labels.projectName}>
             <Input
               value={projectName}
               disabled={disabled}
@@ -989,37 +992,51 @@ function TargetStep({
           </Field>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">Project path</span>
+            <span className="text-xs font-medium">{labels.projectPath}</span>
             <div className="border-border/60 bg-background/70 text-muted-foreground truncate rounded-lg border px-3 py-2 font-mono text-xs shadow-sm">
               {targetPreview}
             </div>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border bg-foreground/[0.025] p-4">
-          <div className="absolute -top-12 -right-12 size-40 rounded-full bg-primary/8 blur-3xl" />
+        <div className="bg-foreground/[0.025] relative overflow-hidden rounded-2xl border p-4">
+          <div className="bg-primary/8 absolute -top-12 -right-12 size-40 rounded-full blur-3xl" />
           <div className="relative flex h-full flex-col">
             <div className="mb-3 flex items-center gap-2">
               <span className="bg-background flex size-8 items-center justify-center rounded-lg border shadow-sm">
                 <FolderTreeIcon className="size-4" />
               </span>
               <div>
-                <p className="text-xs font-semibold">Project blueprint</p>
+                <p className="text-xs font-semibold">
+                  {labels.projectBlueprint}
+                </p>
                 <p className="text-muted-foreground text-[0.6875rem]">
-                  A real, editable Python project
+                  {labels.editablePythonProject}
                 </p>
               </div>
             </div>
             <div className="text-muted-foreground flex flex-1 flex-col gap-1.5 font-mono text-[0.6875rem]">
-              <ProjectTreeLine icon={FolderIcon} label={`${projectName || "my-agent"}/`} strong />
+              <ProjectTreeLine
+                icon={FolderIcon}
+                label={`${projectName || "my-agent"}/`}
+                strong
+              />
               <ProjectTreeLine icon={BotIcon} label="agent.py" nested />
-              <ProjectTreeLine icon={WorkflowIcon} label="langgraph.json" nested />
-              <ProjectTreeLine icon={PackageIcon} label="pyproject.toml" nested />
+              <ProjectTreeLine
+                icon={WorkflowIcon}
+                label="langgraph.json"
+                nested
+              />
+              <ProjectTreeLine
+                icon={PackageIcon}
+                label="pyproject.toml"
+                nested
+              />
               <ProjectTreeLine icon={FileCode2Icon} label="PLAN.md" nested />
               <ProjectTreeLine icon={FolderIcon} label="references/" nested />
             </div>
             <div className="border-border/60 text-muted-foreground mt-3 border-t pt-2.5 text-[0.6875rem]">
-              Thread context and PLAN.md included.
+              {labels.contextIncluded}
             </div>
           </div>
         </div>
@@ -1032,7 +1049,7 @@ function TargetStep({
               htmlFor="use-meta-user-prompt"
               className="text-xs font-medium"
             >
-              Use meta user prompt
+              {labels.useMetaUserPrompt}
             </label>
             <span
               className={cn(
@@ -1043,16 +1060,16 @@ function TargetStep({
               )}
             >
               {!hasFirstUserMessage
-                ? "Unavailable"
+                ? labels.unavailable
                 : metaUserPromptSuggested
-                  ? "Suggested on"
-                  : "Suggested off"}
+                  ? labels.suggestedOn
+                  : labels.suggestedOff}
             </span>
           </div>
           <p className="text-muted-foreground max-w-2xl text-xs">
             {hasFirstUserMessage
-              ? "Reuse the first message as runtime context before every model call."
-              : "This thread has no first user message to use as runtime context."}
+              ? labels.metaPromptEnabled
+              : labels.metaPromptUnavailable}
           </p>
         </div>
         <Switch
@@ -1061,7 +1078,7 @@ function TargetStep({
           checked={useMetaUserPrompt}
           disabled={disabled || !hasFirstUserMessage}
           onCheckedChange={onUseMetaUserPromptChange}
-          aria-label="Use meta user prompt in the generated agent"
+          aria-label={labels.useMetaUserPrompt}
         />
       </div>
 
@@ -1175,6 +1192,8 @@ function RunStep({
   error: string | null;
   running: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
   return (
     <div className="grid h-full min-h-80 gap-4 md:grid-cols-[0.8fr_1.2fr]">
       <div className="relative min-h-56 overflow-hidden rounded-2xl border bg-neutral-950 text-white">
@@ -1186,8 +1205,16 @@ function RunStep({
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
         <div className="relative flex h-full flex-col justify-between p-5">
           <div className="flex items-center gap-2 text-[0.625rem] font-semibold tracking-[0.2em] text-white/65 uppercase">
-            {running ? <Spinner className="size-3" /> : <PackageIcon className="size-3.5" />}
-            {running ? "Building" : error ? "Build stopped" : "Build complete"}
+            {running ? (
+              <Spinner className="size-3" />
+            ) : (
+              <PackageIcon className="size-3.5" />
+            )}
+            {running
+              ? labels.building
+              : error
+                ? labels.buildStopped
+                : labels.buildComplete}
           </div>
           <div>
             <div className="mb-4 flex size-11 items-center justify-center rounded-xl border border-white/15 bg-black/25 backdrop-blur-xl">
@@ -1208,7 +1235,9 @@ function RunStep({
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <TerminalIcon className="text-muted-foreground size-3.5" />
-            <span className="text-xs font-semibold">Build activity</span>
+            <span className="text-xs font-semibold">
+              {labels.buildActivity}
+            </span>
           </div>
           <span className="text-muted-foreground text-[0.625rem] font-semibold tracking-wider uppercase">
             {events.length} events
@@ -1218,21 +1247,21 @@ function RunStep({
           {events.length === 0 && !error ? (
             <div className="text-muted-foreground flex items-center gap-2">
               <Spinner className="size-3" />
-              Preparing the build…
+              {labels.preparingBuild}
             </div>
           ) : null}
           {events.map((event, index) => (
             <ProgressLine key={index} event={event} />
           ))}
           {error ? (
-            <div className="border-destructive/20 bg-destructive/5 text-destructive mt-3 whitespace-pre-wrap rounded-lg border p-3 font-sans text-xs/relaxed">
+            <div className="border-destructive/20 bg-destructive/5 text-destructive mt-3 rounded-lg border p-3 font-sans text-xs/relaxed whitespace-pre-wrap">
               {error}
             </div>
           ) : null}
         </div>
         {running ? (
           <div className="text-muted-foreground border-t px-4 py-3 text-[0.6875rem]">
-            Dependencies may take a moment to install on the first build.
+            {labels.dependenciesMayTake}
           </div>
         ) : null}
       </div>
@@ -1256,6 +1285,8 @@ function SuccessStep({
   depsInstall: DepsInstallStatus;
   hasFunctionTools: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.codegen;
   const steps: { title: string; body: React.ReactNode }[] = [];
 
   // Dependencies weren't installed during generation (usually a slow uv
@@ -1354,7 +1385,7 @@ function SuccessStep({
               Build complete
             </span>
             <h3 className="mt-1 text-2xl font-semibold tracking-tight">
-              Your agent is ready
+              {labels.agentReady}
             </h3>
             <p className="mt-1 max-w-xl truncate font-mono text-xs text-white/60">
               {dir}
@@ -1365,7 +1396,7 @@ function SuccessStep({
 
       <div className="border-border/60 bg-muted/10 flex flex-col gap-4 rounded-2xl border p-5">
         <span className="text-muted-foreground text-[0.6875rem] font-medium tracking-wider uppercase">
-          Next steps
+          {labels.nextSteps}
         </span>
         {steps.map((s, index) => (
           <div key={s.title} className="flex gap-3">
@@ -1385,6 +1416,7 @@ function SuccessStep({
 
 /** A copyable monospace command chip. */
 function CommandBlock({ command }: { command: string }) {
+  const { dialogs } = usePlaygroundLabels();
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => {
     navigator.clipboard
@@ -1410,7 +1442,7 @@ function CommandBlock({ command }: { command: string }) {
       <button
         type="button"
         onClick={copy}
-        aria-label="Copy command"
+        aria-label={dialogs.codegen.copyCommand}
         className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
       >
         {copied ? (

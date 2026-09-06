@@ -71,12 +71,16 @@ export const EXAMPLE_LOCALIZATIONS_ZH: Record<
     label: "记忆压缩",
     description: "记忆压缩提示词，保持有用上下文简洁。",
   },
+  "short-drama-writer": {
+    label: "短剧编剧",
+    description: "以高冲突、快节奏的短剧结构，生成可制作的 JSON 故事。",
+  },
   "meta-prompt": {
     label: "元提示词",
     description: "提示词写作助手，用于改进指令。",
   },
   "meta-image-prompt": {
-    label: "元图像提示词",
+    label: "图像生成元提示词",
     description: "为图像生成构建结构化简报的提示词生成器。",
   },
 };

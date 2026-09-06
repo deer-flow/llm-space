@@ -14,9 +14,16 @@ const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<
   Record<AppLanguage, Record<string, string>>
 > = {
   zh: {
+    "aliyun-qwen": "阿里云千问 AI 平台",
     ark: "火山引擎",
     "ark-agent-plan": "火山引擎",
     "ark-coding-plan": "火山引擎",
+    minimax: "MiniMax",
+    "minimax-cn": "MiniMax（国内）",
+    moonshotai: "月之暗面",
+    "moonshotai-cn": "月之暗面（国内）",
+    zai: "智普",
+    "zai-coding-cn": "智普 Coding（国内）",
   },
 };
 

@@ -14,6 +14,7 @@ import { CircleAlertIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+
 import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { openFirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
 import { useRenderingFidelity } from "@llm-space/ui/components/theme-provider";
@@ -26,6 +27,7 @@ import { Marker, MarkerContent } from "@llm-space/ui/ui/marker";
 import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 import { Skeleton } from "@llm-space/ui/ui/skeleton";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import {
   type RunValidationIssue,
   useThreadStore,
@@ -67,6 +69,7 @@ function _MessageListItem({
   autoFocus?: boolean;
   dragHandleProps?: MessageDragHandleProps;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const containerRef = useRef<HTMLDivElement>(null);
   const { fidelity } = useRenderingFidelity();
   const variableExtension = usePromptVariableExtensionForContext(
@@ -220,12 +223,12 @@ function _MessageListItem({
         )}
       >
         <div className="insert-line absolute top-1.5 right-2 left-0 border-b border-dashed opacity-0 transition-[opacity,border-color,border-style] group-hover:opacity-100"></div>
-        <Tooltip content="Insert Message Here">
+        <Tooltip content={dialogs.tooltips.insertMessage}>
           <Button
             className="text-muted-foreground hover:border-primary hover:bg-primary! hover:text-primary-foreground absolute -top-0.5 -right-3 z-10 size-4 rounded-full opacity-0 transition-[opacity,background-color,color,border-color] group-hover:opacity-100"
             variant="outline"
             size="icon-xs"
-            aria-label="Insert message before this message"
+            aria-label={dialogs.tooltips.insertMessage}
             onClick={() => insertMessageBefore(message.id)}
           >
             <PlusIcon className="size-3" />
@@ -357,6 +360,8 @@ function _ToolStepContinuation({
   toolCalls: ToolCall[];
   readonly?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.toolCalls;
   const status = useThreadStore((state) => state.status);
   const { run } = useThreadStoreActions();
   const { presentational } = useHostServices();
@@ -434,7 +439,7 @@ function _ToolStepContinuation({
     <div className="bg-foreground/4 flex min-w-0 items-center justify-between gap-3 rounded-md px-3 py-1">
       <Marker role="status" className="min-w-0">
         <MarkerContent className="truncate text-xs">
-          {toolCalls.length} tool call{toolCalls.length === 1 ? "" : "s"}
+          {labels.count(toolCalls.length)}
         </MarkerContent>
       </Marker>
       <div className="flex shrink-0 items-center gap-2">
@@ -444,22 +449,22 @@ function _ToolStepContinuation({
             size="sm"
             variant="outline"
             disabled={!canCallTools}
-            aria-label="Call available tools"
+            aria-label={labels.callAvailableTools}
             onClick={() => void handleCallTools()}
           >
-            Call tools
+            {labels.callTools}
           </Button>
         ) : null}
-        <Tooltip content="Run from this message">
+        <Tooltip content={labels.runFromMessage}>
           <Button
             className="invisible shrink-0 group-hover/message:visible"
             size="sm"
             variant="default"
             disabled={!canContinue}
-            aria-label="Run from this message"
+            aria-label={labels.runFromMessage}
             onClick={() => void handleContinue()}
           >
-            Continue
+            {labels.continue}
           </Button>
         </Tooltip>
       </div>

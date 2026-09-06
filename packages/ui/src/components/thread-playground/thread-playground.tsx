@@ -37,10 +37,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import {
-  createShareThreadAction,
-  useHostServices,
-} from "@llm-space/ui/host";
+import { createShareThreadAction, useHostServices } from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -284,8 +281,7 @@ function ThreadPlaygroundContent({
     isMetaUserMessage(s.thread.context)
   );
   const canCompact = useMemo(
-    () =>
-      planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
+    () => planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
     [hasMetaUserPrompt, messages]
   );
   const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
@@ -378,7 +374,7 @@ function ThreadPlaygroundContent({
                 readonlyFromProps && "hidden"
               )}
             >
-              <Tooltip content="Undo last edit">
+              <Tooltip content={labels.undoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
@@ -579,7 +575,7 @@ function ThreadPlaygroundContent({
                 <div className="px-3">
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Models
+                      {labels.dialogs.sections.models}
                     </div>
                     <div className="flex grow items-center">
                       <ModelConfigEditor readonly={readonly} />
@@ -587,7 +583,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Tools
+                      {labels.dialogs.sections.tools}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">
@@ -596,7 +592,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Variables
+                      {labels.dialogs.sections.variables}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">
