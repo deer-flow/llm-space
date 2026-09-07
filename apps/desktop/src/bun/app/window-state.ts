@@ -176,18 +176,32 @@ export function attachWindowStatePersistence(
  * window, so we re-check `isFullScreen()` on resize and fire on change. The
  * initial state is reported immediately.
  */
-function attachFullScreenSync(
+export function attachFullScreenSync(
   win: BrowserWindow,
-  onChange: (fullScreen: boolean) => void
+  onChange: (fullScreen: boolean) => void,
+  retryDelays = [50, 200, 500]
 ) {
   let last = win.isFullScreen();
   onChange(last);
-  win.on("resize", () => {
+  let timers: ReturnType<typeof setTimeout>[] = [];
+
+  const check = () => {
     const next = win.isFullScreen();
     if (next !== last) {
       last = next;
       onChange(next);
     }
+  };
+
+  win.on("resize", () => {
+    check();
+
+    // macOS may emit the resize before Electrobun's fullscreen flag has
+    // caught up with the native transition. Re-check briefly after the event
+    // so renderer chrome (including the fullscreen title) does not remain in
+    // its previous state until another resize happens.
+    for (const timer of timers) clearTimeout(timer);
+    timers = retryDelays.map((delay) => setTimeout(check, delay));
   });
 }
 
