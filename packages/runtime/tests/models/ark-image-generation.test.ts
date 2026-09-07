@@ -4,8 +4,10 @@ import { type ArkImageGenerationConfig } from "@llm-space/core";
 
 import {
   createArkImageGenerator,
+  createConfiguredArkImageGenerator,
   type ArkImageGenerationDependencies,
 } from "../../src/models/ark-image-generation";
+import type { ModelManager } from "../../src/models/model-manager";
 
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
@@ -264,5 +266,120 @@ describe("Ark image generation", () => {
       generate({ ...DEFAULT_INPUT, signal: controller.signal })
     ).rejects.toThrow("Ark image generation was aborted");
     expect(receivedSignal).toBe(controller.signal);
+  });
+
+  test("uses a custom provider connection and Agnes-compatible payload", async () => {
+    let requestUrl = "";
+    let requestHeaders: HeadersInit | undefined;
+    let requestBody: unknown;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: (providerId) =>
+          providerId === "agnes"
+            ? {
+                api: "openai-images-extra-body",
+                models: [
+                  {
+                    id: "agnes-image-2.5-flash",
+                    name: "Agnes Image 2.5 Flash",
+                    supportedSizes: ["1K", "2K", "3K", "4K"],
+                    defaultSize: "2K",
+                  },
+                ],
+              }
+            : undefined,
+        resolveConnection: (connection) => {
+          expect(connection).toEqual({
+            providerId: "agnes",
+            profileId: "agnes-default",
+          });
+          return Promise.resolve({
+            apiKey: "agnes-key",
+            baseUrl: "https://api.agnes-ai.cn/v1/",
+            headers: { "X-Tenant": "test" },
+          });
+        },
+        fetch: (input, init) => {
+          requestUrl =
+            typeof input === "string"
+              ? input
+              : input instanceof URL
+                ? input.href
+                : input.url;
+          requestHeaders = init?.headers;
+          requestBody =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "agnes-image-2.5-flash",
+              data: [{ b64_json: PNG_BASE64, size: "2048x2048" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "agnes-image-2.5-flash",
+      size: "2K",
+      watermark: false,
+      connection: {
+        providerId: "agnes",
+        profileId: "agnes-default",
+      },
+    });
+
+    expect(requestUrl).toBe("https://api.agnes-ai.cn/v1/images/generations");
+    expect(requestHeaders).toMatchObject({
+      Authorization: "Bearer agnes-key",
+      "X-Tenant": "test",
+    });
+    expect(requestBody).toEqual({
+      model: "agnes-image-2.5-flash",
+      prompt: "A red circle",
+      size: "2K",
+      return_base64: true,
+      extra_body: { response_format: "b64_json" },
+    });
+  });
+
+  test("never falls back to the Ark key for a custom provider", async () => {
+    let fallbackApiKey: string | undefined;
+    const modelManager = {
+      getImageGenerationConfig: () => ({
+        api: "openai-images",
+        models: [
+          {
+            id: "fixture",
+            name: "Fixture",
+            supportedSizes: ["1K"],
+            defaultSize: "1K",
+          },
+        ],
+      }),
+      resolveConnection: (
+        _connection: unknown,
+        options: { fallbackApiKey?: string }
+      ) => {
+        fallbackApiKey = options.fallbackApiKey;
+        return Promise.resolve({});
+      },
+    } as unknown as ModelManager;
+    const generate = createConfiguredArkImageGenerator({
+      modelManager,
+      env: { ARK_API_KEY: "ark-secret-canary" },
+    });
+
+    expect(
+      generate({
+        prompt: "fixture",
+        model: "fixture",
+        size: "1K",
+        watermark: false,
+        connection: { providerId: "other-images" },
+      })
+    ).rejects.toThrow('Configure an API key for provider "other-images"');
+    expect(fallbackApiKey).toBeUndefined();
   });
 });

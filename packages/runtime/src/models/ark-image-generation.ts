@@ -7,10 +7,13 @@ import {
   type ImagesOptions,
 } from "@earendil-works/pi-ai";
 import {
-  getArkImageModelDefinition,
-  getArkImageModelDefinitions,
-  isArkImageSizeSupported,
-  type ArkImageGenerationConfig,
+  getImageModelDefinition,
+  getImageModelDefinitions,
+  isImageSizeSupported,
+  SEEDREAM_IMAGE_MODELS,
+  type ImageGenerationApi,
+  type ImageGenerationConfig,
+  type ImageModelDefinition,
   type ProviderConnectionRef,
   type SeedreamImageSize,
 } from "@llm-space/core";
@@ -26,7 +29,7 @@ type FetchLike = (
 ) => Promise<Response>;
 
 export interface ArkImageGenerationDependencies {
-  getConfig(): ArkImageGenerationConfig | undefined;
+  getConfig(providerId: string): ImageGenerationConfig | undefined;
   resolveConnection(
     connection: ProviderConnectionRef
   ): Promise<ResolvedProviderConnection>;
@@ -87,53 +90,59 @@ export function createArkImageGenerator(
     if (!prompt) {
       throw new Error("prompt must be a non-empty string.");
     }
-    const config = dependencies.getConfig();
+    const connectionRef = input.connection ?? { providerId: "ark" };
+    const providerId = connectionRef.providerId;
+    const config = dependencies.getConfig(providerId);
     if (!config) {
       throw new Error(
-        "Configure Image generation in Settings → Models → VolcEngine Ark before calling generate_image."
+        providerId === "ark"
+          ? "Configure Image generation in Settings → Models → VolcEngine Ark before calling generate_image."
+          : `Configure image generation for provider "${providerId}" before calling generate_image.`
       );
     }
-    const modelDefinition = getArkImageModelDefinition(config, input.model);
+    const catalog = providerId === "ark" ? SEEDREAM_IMAGE_MODELS : [];
+    const modelDefinition = getImageModelDefinition(
+      config,
+      input.model,
+      catalog
+    );
     if (!modelDefinition) {
       throw new Error(
-        `The configured Ark image model "${input.model}" is no longer available. Choose an enabled model for generate_image.`
+        `The configured image model "${input.model}" is no longer available on provider "${providerId}". Choose an enabled model for generate_image.`
       );
     }
     if (config.disabledModels?.includes(input.model)) {
       throw new Error(
-        `The configured Ark image model "${modelDefinition.name}" is disabled. Choose an enabled model for generate_image.`
+        `The configured ${providerId === "ark" ? "Ark " : ""}image model "${modelDefinition.name}" is disabled. Choose an enabled model for generate_image.`
       );
     }
-    if (!isArkImageSizeSupported(config, input.model, input.size)) {
+    if (!isImageSizeSupported(config, input.model, input.size, catalog)) {
       throw new Error(
         `${modelDefinition.name} does not support the ${input.size} size preset.`
-      );
-    }
-    const connectionRef = input.connection ?? { providerId: "ark" };
-    if (connectionRef.providerId !== "ark") {
-      throw new Error(
-        `Ark image generation cannot use provider: ${connectionRef.providerId}`
       );
     }
     const connection = await dependencies.resolveConnection(connectionRef);
     const apiKey = connection.apiKey;
     if (!apiKey) {
       throw new Error(
-        "Configure an Ark API key in Settings → Models → VolcEngine Ark before calling generate_image."
+        `Configure an API key for provider "${providerId}" before calling generate_image.`
       );
     }
 
     const imagesModels = createImagesModels();
     imagesModels.setProvider(
-      _createArkImagesProvider({
-        baseUrl: connection.baseUrl ?? ARK_BASE_URL,
+      _createImagesProvider({
+        providerId,
+        baseUrl:
+          connection.baseUrl ?? (providerId === "ark" ? ARK_BASE_URL : ""),
         config,
+        catalog,
         fetch: fetchImpl,
       })
     );
-    const model = imagesModels.getModel("ark", input.model);
+    const model = imagesModels.getModel(providerId, input.model);
     if (!model) {
-      throw new Error(`Unsupported Seedream model: ${input.model}`);
+      throw new Error(`Unsupported image model: ${input.model}`);
     }
     const generated = (await imagesModels.generateImages(
       model,
@@ -161,7 +170,7 @@ export function createArkImageGenerator(
   };
 }
 
-/** Bind Ark generation to the shared model connection resolver. */
+/** Bind provider-owned image generation to the shared model connection resolver. */
 export function createConfiguredArkImageGenerator({
   modelManager,
   env,
@@ -170,59 +179,75 @@ export function createConfiguredArkImageGenerator({
   env: Record<string, string | undefined>;
 }) {
   return createArkImageGenerator({
-    getConfig: () => modelManager.getArkImageGenerationConfig(),
+    getConfig: (providerId) =>
+      modelManager.getImageGenerationConfig(providerId),
     resolveConnection: (connection) =>
       modelManager.resolveConnection(connection, {
-        fallbackApiKey: env.ARK_API_KEY,
+        fallbackApiKey:
+          connection.providerId === "ark" ? env.ARK_API_KEY : undefined,
       }),
   });
 }
 
-/** Build the pi-ai image provider around Ark's native generation endpoint. */
-function _createArkImagesProvider({
+/** Build a pi-ai image provider around the configured request protocol. */
+function _createImagesProvider({
+  providerId,
   baseUrl,
   config,
+  catalog,
   fetch,
 }: {
+  providerId: string;
   baseUrl: string;
-  config: ArkImageGenerationConfig;
+  config: ImageGenerationConfig;
+  catalog: readonly ImageModelDefinition[];
   fetch: FetchLike;
 }) {
-  const models: ImagesModel<typeof ARK_IMAGES_API>[] =
-    getArkImageModelDefinitions(config).map((definition) => ({
-      id: definition.id,
-      name: definition.name,
-      api: ARK_IMAGES_API,
-      provider: "ark",
-      baseUrl,
-      input: ["text"],
-      output: ["image"],
-      cost: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-      },
-    }));
+  if (!baseUrl) {
+    throw new Error(`Configure a Base URL for provider "${providerId}".`);
+  }
+  const api =
+    config.api ?? (providerId === "ark" ? "ark-images" : "openai-images");
+  const models: ImagesModel<typeof ARK_IMAGES_API>[] = getImageModelDefinitions(
+    config,
+    catalog
+  ).map((definition) => ({
+    id: definition.id,
+    name: definition.name,
+    api: ARK_IMAGES_API,
+    provider: providerId,
+    baseUrl,
+    input: ["text"],
+    output: ["image"],
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  }));
   return createImagesProvider({
-    id: "ark",
-    name: "VolcEngine Ark",
+    id: providerId,
+    name: providerId,
     auth: { apiKey: envApiKeyAuth("ARK_API_KEY", ["ARK_API_KEY"]) },
     models,
     api: {
       generateImages: (model, context, options) =>
-        _generateArkImages(model, context.input, options, fetch),
+        _generateImages(model, context.input, options, fetch, api),
     },
   });
 }
 
-/** Execute one synchronous Ark request and normalize it to pi image content. */
-async function _generateArkImages(
+/** Execute one synchronous image request and normalize it to pi image content. */
+async function _generateImages(
   model: ImagesModel<string>,
   input: { type: string; text?: string }[],
   options: ImagesOptions | undefined,
-  fetch: FetchLike
+  fetch: FetchLike,
+  api: ImageGenerationApi
 ): Promise<ArkAssistantImages> {
+  const label =
+    api === "ark-images" ? "Ark image generation" : "Image generation";
   const output: ArkAssistantImages = {
     api: model.api,
     provider: model.provider,
@@ -233,7 +258,7 @@ async function _generateArkImages(
   };
   try {
     if (!options?.apiKey) {
-      throw new Error("No API key for provider: ark");
+      throw new Error(`No API key for provider: ${model.provider}`);
     }
     const prompt = input
       .filter((item) => item.type === "text" && typeof item.text === "string")
@@ -244,9 +269,18 @@ async function _generateArkImages(
       model: model.id,
       prompt,
       size: metadata.size,
-      watermark: metadata.watermark,
-      response_format: "b64_json",
-      stream: false,
+      ...(api === "ark-images"
+        ? {
+            response_format: "b64_json",
+            watermark: metadata.watermark,
+            stream: false,
+          }
+        : api === "openai-images-extra-body"
+          ? {
+              return_base64: true,
+              extra_body: { response_format: "b64_json" },
+            }
+          : { response_format: "b64_json" }),
     };
     const transformed = await options.onPayload?.(payload, model);
     if (transformed !== undefined) {
@@ -269,12 +303,16 @@ async function _generateArkImages(
       },
       model
     );
-    const body = await _readArkResponse(response);
+    const body = await _readImageResponse(response, label);
     if (!response.ok) {
-      throw _arkProviderError(body.error ?? body, `HTTP ${response.status}`);
+      throw _providerError(
+        body.error ?? body,
+        `HTTP ${response.status}`,
+        label
+      );
     }
     if (body.error) {
-      throw _arkProviderError(body.error, "Provider error");
+      throw _providerError(body.error, "Provider error", label);
     }
     const items = Array.isArray(body.data)
       ? (body.data as ArkImageResponseItem[])
@@ -285,11 +323,11 @@ async function _generateArkImages(
     if (!succeeded) {
       const failed = items.find((item) => item.error)?.error;
       if (failed) {
-        throw _arkProviderError(failed, "Image generation failed");
+        throw _providerError(failed, "Image generation failed", label);
       }
-      throw new Error("Ark image generation returned no image data.");
+      throw new Error(`${label} returned no image data.`);
     }
-    const image = _normalizeBase64Image(succeeded.b64_json as string);
+    const image = _normalizeBase64Image(succeeded.b64_json as string, label);
     output.output.push({ type: "image", ...image });
     output.generatedModel =
       typeof body.model === "string" ? body.model : model.id;
@@ -299,16 +337,19 @@ async function _generateArkImages(
   } catch (error) {
     output.stopReason = options?.signal?.aborted ? "aborted" : "error";
     output.errorMessage = options?.signal?.aborted
-      ? "Ark image generation was aborted."
+      ? `${label} was aborted.`
       : error instanceof Error
         ? error.message
-        : "Ark image generation failed.";
+        : `${label} failed.`;
     return output;
   }
 }
 
 /** Read JSON without exposing a provider's raw body in malformed-response errors. */
-async function _readArkResponse(response: Response): Promise<ArkImageResponse> {
+async function _readImageResponse(
+  response: Response,
+  label: string
+): Promise<ArkImageResponse> {
   const text = await response.text();
   try {
     const value = JSON.parse(text) as unknown;
@@ -318,13 +359,17 @@ async function _readArkResponse(response: Response): Promise<ArkImageResponse> {
     return value;
   } catch {
     throw new Error(
-      `Ark image generation returned invalid JSON (HTTP ${response.status}).`
+      `${label} returned invalid JSON (HTTP ${response.status}).`
     );
   }
 }
 
 /** Keep Ark's machine-readable code while avoiding raw response serialization. */
-function _arkProviderError(value: unknown, fallback: string): Error {
+function _providerError(
+  value: unknown,
+  fallback: string,
+  label: string
+): Error {
   const candidate =
     value && typeof value === "object"
       ? (value as { code?: unknown; message?: unknown })
@@ -337,7 +382,7 @@ function _arkProviderError(value: unknown, fallback: string): Error {
     typeof candidate.message === "string" && candidate.message.trim()
       ? candidate.message.trim()
       : "Request failed.";
-  return new Error(`Ark image generation failed (${code}): ${message}`);
+  return new Error(`${label} failed (${code}): ${message}`);
 }
 
 /** Resolve and validate the provider-specific options carried in pi metadata. */
@@ -371,7 +416,10 @@ function _requestHeaders(
 }
 
 /** Normalize either a raw base64 value or a data URL and infer its MIME type. */
-function _normalizeBase64Image(value: string): {
+function _normalizeBase64Image(
+  value: string,
+  label: string
+): {
   data: string;
   mimeType: string;
 } {
@@ -379,11 +427,11 @@ function _normalizeBase64Image(value: string): {
   const mimeType = dataUrl?.[1];
   const data = (dataUrl?.[2] ?? value).replace(/\s/g, "");
   if (!data || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
-    throw new Error("Ark image generation returned malformed base64 data.");
+    throw new Error(`${label} returned malformed base64 data.`);
   }
   const bytes = Buffer.from(data, "base64");
   if (bytes.length === 0) {
-    throw new Error("Ark image generation returned empty image data.");
+    throw new Error(`${label} returned empty image data.`);
   }
   return {
     data,

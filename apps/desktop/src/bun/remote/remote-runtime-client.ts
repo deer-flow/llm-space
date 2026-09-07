@@ -1,5 +1,5 @@
 import type {
-  ArkImageGenerationConfig,
+  ImageGenerationConfig,
   AgentEvent,
   BuiltinTool,
   CustomModel,
@@ -135,7 +135,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }
 
   createSubagentThread(
-    input: Parameters<RuntimeClient["createSubagentThread"]>[0],
+    input: Parameters<RuntimeClient["createSubagentThread"]>[0]
   ) {
     return this._rpc<
       Awaited<ReturnType<RuntimeClient["createSubagentThread"]>>
@@ -315,7 +315,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
-    imageGeneration?: ArkImageGenerationConfig;
+    imageGeneration?: ImageGenerationConfig;
   }) {
     return this._rpc<ModelProviderGroup[]>("models.updateProvider", input);
   }

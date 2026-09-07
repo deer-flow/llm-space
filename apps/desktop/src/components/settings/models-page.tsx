@@ -3,8 +3,10 @@
 import {
   formatProviderProfileLabel,
   getArkImageModelDefinitions,
-  type ArkImageGenerationConfig,
+  getImageModelDefinitions,
   type CustomModel,
+  type ImageGenerationApi,
+  type ImageGenerationConfig,
   type ModelProviderGroup,
   type ProviderProfile,
   type SeedreamImageModelDefinition,
@@ -499,9 +501,7 @@ function ProviderListItem({
         role="button"
         tabIndex={0}
         aria-label={`Select ${provider.name} provider`}
-        aria-expanded={
-          provider.profiles.length > 1 ? expanded : undefined
-        }
+        aria-expanded={provider.profiles.length > 1 ? expanded : undefined}
         onClick={handleGroupClick}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -613,7 +613,7 @@ function ProviderListItem({
                     <button
                       type="button"
                       aria-label={`${profile.name} profile actions`}
-                      className="text-muted-foreground hover:text-foreground mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded opacity-0 hover:bg-accent group-hover/profile:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                      className="text-muted-foreground hover:text-foreground hover:bg-accent mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded opacity-0 group-hover/profile:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
                     >
                       <MoreHorizontal className="size-3.5" />
                     </button>
@@ -1073,8 +1073,8 @@ function ProviderEditor({
             </div>
           ) : null}
 
-          {provider.id === "ark" && canManageModels ? (
-            <_ArkImageGenerationEditor provider={provider} />
+          {(provider.id === "ark" || !isBuiltin) && canManageModels ? (
+            <_ImageGenerationEditor provider={provider} />
           ) : null}
         </div>
       </ScrollArea>
@@ -1173,8 +1173,8 @@ function _ProviderProfileEditor({
               </div>
               {isOfficial ? (
                 <div className="list-item">
-                  Leave it blank to use the official {provider.name}{" "}
-                  environment variable
+                  Leave it blank to use the official {provider.name} environment
+                  variable
                 </div>
               ) : null}
             </div>
@@ -1214,15 +1214,18 @@ function _ProviderProfileEditor({
   );
 }
 
-/** Chat-model-parity inventory management for Ark image models. */
-function _ArkImageGenerationEditor({
+/** Chat-model-parity inventory management for provider-owned image models. */
+function _ImageGenerationEditor({
   provider,
 }: {
   provider: ModelProviderGroup;
 }) {
   const updateProvider = useUpdateProvider();
   const config = provider.imageGeneration ?? {};
-  const models = getArkImageModelDefinitions(config);
+  const models =
+    provider.id === "ark"
+      ? getArkImageModelDefinitions(config)
+      : getImageModelDefinitions(config);
   const disabledModels = new Set(config.disabledModels ?? []);
   const enabledModels = models.filter((model) => !disabledModels.has(model.id));
   const customModels = new Set((config.models ?? []).map((model) => model.id));
@@ -1240,7 +1243,7 @@ function _ArkImageGenerationEditor({
     return true;
   });
 
-  const update = (imageGeneration: ArkImageGenerationConfig) => {
+  const update = (imageGeneration: ImageGenerationConfig) => {
     void updateProvider(provider.id, { imageGeneration }).catch((error) => {
       toast.error("Failed to update image generation", {
         description:
@@ -1307,6 +1310,30 @@ function _ArkImageGenerationEditor({
 
   return (
     <>
+      {provider.id !== "ark" ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Image API type</span>
+          <Select
+            value={config.api ?? "openai-images"}
+            onValueChange={(api) =>
+              update({ ...config, api: api as ImageGenerationApi })
+            }
+          >
+            <SelectTrigger
+              className="w-full"
+              aria-label={`${provider.name} image API type`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="openai-images">OpenAI Images</SelectItem>
+              <SelectItem value="openai-images-extra-body">
+                OpenAI Images with extra_body
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Image models</span>

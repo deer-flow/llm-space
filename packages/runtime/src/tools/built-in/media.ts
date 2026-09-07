@@ -33,9 +33,8 @@ export const generateImageTool: BuiltinTool = {
   type: "builtin",
   name: "generate_image",
   icon: "image",
-  connection: { providerId: "ark" },
   description:
-    "Generate one image with this tool's selected Ark image model. Use the configured default size unless the user requests a supported 1K, 2K, 3K, or 4K preset.",
+    "Generate one image with this tool's selected provider and image model. Use the configured default size unless the user requests a supported 1K, 2K, 3K, or 4K preset.",
   strict: true,
   parameters: {
     type: "object",

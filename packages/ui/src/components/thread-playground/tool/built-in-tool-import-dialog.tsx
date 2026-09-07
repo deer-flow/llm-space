@@ -2,9 +2,11 @@
 
 import {
   getArkImageModelDefinitions,
+  getImageModelDefinitions,
   SEEDREAM_IMAGE_SIZES,
   type BuiltinTool,
   type GenerateImageToolConfig,
+  type ModelProviderGroup,
   type SeedreamImageModelDefinition,
   type SeedreamImageSize,
 } from "@llm-space/core";
@@ -87,6 +89,22 @@ const MEDIA_TOOL_NAMES = new Set([
   "stop_speaking",
 ]);
 
+/** Resolve enabled image models without mixing them into chat inventory. */
+function _enabledImageModels(
+  provider: ModelProviderGroup
+): readonly SeedreamImageModelDefinition[] {
+  const config = provider.imageGeneration;
+  if (!config) {
+    return [];
+  }
+  const disabled = new Set(config.disabledModels ?? []);
+  const models =
+    provider.id === "ark"
+      ? getArkImageModelDefinitions(config)
+      : getImageModelDefinitions(config);
+  return models.filter((model) => !disabled.has(model.id));
+}
+
 function _BuiltInToolImportDialog({
   existingToolNames,
   existingTools,
@@ -117,28 +135,20 @@ function _BuiltInToolImportDialog({
   );
   const [generateImageConfig, setGenerateImageConfig] =
     useState<GenerateImageToolConfig | null>(null);
+  const [imageProviderId, setImageProviderId] = useState<string>();
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
-  const generateImageTool = tools.find(
-    (tool) => tool.name === "generate_image"
+  const imageProviders = useMemo(
+    () => providers.filter((provider) => provider.imageGeneration),
+    [providers]
   );
-  const imageProviderId = generateImageTool
-    ? getToolConnectionProviderId(generateImageTool)
-    : undefined;
   const imageProvider = useMemo(
     () => providers.find((provider) => provider.id === imageProviderId),
     [imageProviderId, providers]
   );
   const enabledImageModels = useMemo(() => {
-    const config = imageProvider?.imageGeneration;
-    if (!config) {
-      return [];
-    }
-    const disabled = new Set(config.disabledModels ?? []);
-    return getArkImageModelDefinitions(config).filter(
-      (model) => !disabled.has(model.id)
-    );
+    return imageProvider ? _enabledImageModels(imageProvider) : [];
   }, [imageProvider]);
 
   const loadTools = useCallback(async () => {
@@ -189,11 +199,20 @@ function _BuiltInToolImportDialog({
       return;
     }
     const existing = existingTools.get("generate_image");
+    const providerId = existing
+      ? getToolConnectionProviderId(existing)
+      : imageProviders.find(
+          (provider) => _enabledImageModels(provider).length > 0
+        )?.id;
+    setImageProviderId(providerId);
     if (existing) {
       setGenerateImageConfig(_readGenerateImageConfig(existing.config));
       return;
     }
-    const first = enabledImageModels[0];
+    const provider = imageProviders.find(
+      (candidate) => candidate.id === providerId
+    );
+    const first = provider ? _enabledImageModels(provider)[0] : undefined;
     setGenerateImageConfig(
       first
         ? {
@@ -203,14 +222,41 @@ function _BuiltInToolImportDialog({
           }
         : null
     );
-  }, [enabledImageModels, existingTools, open]);
+  }, [existingTools, imageProviders, open]);
 
   /** Persist config immediately for an existing tool or keep it as an add draft. */
-  const handleGenerateImageConfigChange = (config: GenerateImageToolConfig) => {
+  const handleGenerateImageConfigChange = (
+    config: GenerateImageToolConfig,
+    providerId = imageProviderId
+  ) => {
     setGenerateImageConfig(config);
     const existing = existingTools.get("generate_image");
     if (existing) {
-      onUpdate(existing.name, { ...existing, config: { ...config } });
+      onUpdate(existing.name, {
+        ...existing,
+        config: { ...config },
+        ...(providerId ? { connection: { providerId } } : {}),
+      });
+    }
+  };
+
+  const handleImageProviderChange = (providerId: string) => {
+    setImageProviderId(providerId);
+    const provider = imageProviders.find(
+      (candidate) => candidate.id === providerId
+    );
+    const first = provider ? _enabledImageModels(provider)[0] : undefined;
+    if (first) {
+      handleGenerateImageConfigChange(
+        {
+          model: first.id,
+          size: first.defaultSize,
+          watermark: true,
+        },
+        providerId
+      );
+    } else {
+      setGenerateImageConfig(null);
     }
   };
 
@@ -228,12 +274,18 @@ function _BuiltInToolImportDialog({
     );
     if (!model || !generateImageConfig) {
       toast.error("Choose an enabled image model", {
-        description:
-          "Enable an Ark image model in Settings, then select it here.",
+        description: "Enable an image model in Settings, then select it here.",
       });
       return;
     }
-    onAdd({ ...tool, config: { ...generateImageConfig } });
+    if (!imageProviderId) {
+      return;
+    }
+    onAdd({
+      ...tool,
+      connection: { providerId: imageProviderId },
+      config: { ...generateImageConfig },
+    });
   };
   const filteredTools = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -403,11 +455,13 @@ function _BuiltInToolImportDialog({
                           <_GenerateImageConfigFields
                             config={generateImageConfig}
                             enabledModels={enabledImageModels}
+                            providers={imageProviders}
                             showProfileSelector={
                               (imageProvider?.profiles.length ?? 0) > 1
                             }
                             providerId={imageProviderId}
                             selectedModel={configuredImageModel}
+                            onProviderChange={handleImageProviderChange}
                             onChange={handleGenerateImageConfigChange}
                           />
                         )}
@@ -439,16 +493,20 @@ export const BuiltInToolImportDialog = memo(_BuiltInToolImportDialog);
 function _GenerateImageConfigFields({
   config,
   enabledModels,
+  providers,
   showProfileSelector,
   providerId,
   selectedModel,
+  onProviderChange,
   onChange,
 }: {
   config: GenerateImageToolConfig | null;
   enabledModels: readonly SeedreamImageModelDefinition[];
+  providers: readonly ModelProviderGroup[];
   showProfileSelector: boolean;
   providerId?: string;
   selectedModel?: SeedreamImageModelDefinition;
+  onProviderChange: (providerId: string) => void;
   onChange: (config: GenerateImageToolConfig) => void;
 }) {
   const handleModelChange = (modelId: string) => {
@@ -471,10 +529,30 @@ function _GenerateImageConfigFields({
       className={cn(
         "mt-3 grid gap-3",
         showProfileSelector
-          ? "grid-cols-[minmax(0,1fr)_8rem_7rem_auto]"
-          : "grid-cols-[minmax(0,1fr)_7rem_auto]"
+          ? "grid-cols-[9rem_minmax(0,1fr)_8rem_7rem_auto]"
+          : "grid-cols-[9rem_minmax(0,1fr)_7rem_auto]"
       )}
     >
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="text-muted-foreground text-xs">Provider</span>
+        <Select value={providerId} onValueChange={onProviderChange}>
+          <SelectTrigger
+            className="w-full"
+            size="sm"
+            aria-label="Generate image provider"
+          >
+            <SelectValue placeholder="Choose provider" />
+          </SelectTrigger>
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
+            {providers.map((provider) => (
+              <SelectItem key={provider.id} value={provider.id}>
+                {provider.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-muted-foreground text-xs">Model</span>
         <Select
@@ -553,7 +631,8 @@ function _GenerateImageConfigFields({
 
       {enabledModels.length === 0 ? (
         <p className="text-destructive col-span-full text-xs">
-          Enable an Ark image model in Settings before adding this tool.
+          Enable an image model for this provider in Settings before adding this
+          tool.
         </p>
       ) : !config || !selectedModel ? (
         <p className="text-destructive col-span-full text-xs">
