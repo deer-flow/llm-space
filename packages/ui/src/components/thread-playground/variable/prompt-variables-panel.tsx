@@ -63,6 +63,7 @@ import {
   SelectValue,
 } from "@llm-space/ui/ui/select";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 
 import {
@@ -103,6 +104,8 @@ function _PromptVariablesPanel({
   disabled,
   initialSelection,
 }: PromptVariablesPanelProps) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.variablesPanel;
   const { skills: skillsHost } = useHostServices();
   const rawVariables = useThreadStore((s) => s.thread.context?.variables);
   const rawVariableVariants = useThreadStore(
@@ -187,7 +190,7 @@ function _PromptVariablesPanel({
           kind: "builtIn",
           name,
           variable,
-          status: variable.value.trim() || "(empty)",
+          status: variable.value.trim() || labels.empty,
         });
         continue;
       }
@@ -205,7 +208,7 @@ function _PromptVariablesPanel({
           kind: "builtIn",
           name,
           variable,
-          status: variable.value.trim() || "(no file)",
+          status: variable.value.trim() || labels.noFile,
         });
         continue;
       }
@@ -218,12 +221,12 @@ function _PromptVariablesPanel({
         name,
         variable,
         status: includesAllSkills(variable)
-          ? "All skills"
+          ? labels.allSkills
           : selectedCount === 0
-            ? "None selected"
+            ? labels.noneSelected
             : missingCount > 0
-              ? `${missingCount} missing`
-              : `${selectedCount} selected`,
+              ? labels.missingSkills(missingCount)
+              : labels.selectedSkills(selectedCount),
         warning: missingCount > 0 || Boolean(skillsError),
       });
     }
@@ -232,11 +235,11 @@ function _PromptVariablesPanel({
         kind: "custom",
         name,
         value,
-        status: value.trim() ? value : "(empty)",
+        status: value.trim() ? value : labels.empty,
       })
     );
     return { builtInItems, typedItems, customItems: custom };
-  }, [customValues, skillsByName, skillsError, variables]);
+  }, [customValues, labels, skillsByName, skillsError, variables]);
 
   // Apply a chip-open target once, then let in-dialog selection stay user-owned
   // across variable edits.
@@ -363,7 +366,7 @@ function _PromptVariablesPanel({
         <aside className="flex w-64 shrink-0 flex-col border-r px-2 py-3">
           <ScrollArea className="min-h-0 grow">
             <div className="grid gap-3">
-              <VariableListGroup title="Built-in">
+              <VariableListGroup title={labels.builtIn}>
                 {builtInItems.map((item) => (
                   <VariableListRow
                     key={`${item.kind}:${item.name}`}
@@ -380,9 +383,10 @@ function _PromptVariablesPanel({
                 ))}
               </VariableListGroup>
               <VariableListGroup
-                title="Custom"
+                title={labels.custom}
                 action={
                   <AddVariableMenu
+                    labels={labels}
                     disabled={disabled}
                     onAddText={addCustom}
                     onAddJson={addJson}
@@ -394,7 +398,7 @@ function _PromptVariablesPanel({
                       size="icon-sm"
                       className="text-muted-foreground hover:text-foreground size-6"
                       disabled={disabled}
-                      aria-label="Add custom variable"
+                      aria-label={labels.addCustom}
                     >
                       <PlusIcon className="size-3.5" />
                     </Button>
@@ -423,8 +427,9 @@ function _PromptVariablesPanel({
                   ))
                 ) : (
                   <div className="text-muted-foreground px-2 py-1 text-xs">
-                    No custom variables.{" "}
+                    {labels.noCustom}{" "}
                     <AddVariableMenu
+                      labels={labels}
                       disabled={disabled}
                       onAddText={addCustom}
                       onAddJson={addJson}
@@ -435,7 +440,7 @@ function _PromptVariablesPanel({
                         className="text-muted-foreground hover:text-foreground focus-visible:text-foreground underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
                         disabled={disabled}
                       >
-                        Add variable
+                        {labels.addVariable}
                       </button>
                     </AddVariableMenu>
                     .
@@ -445,6 +450,7 @@ function _PromptVariablesPanel({
             </div>
           </ScrollArea>
           <AddVariableMenu
+            labels={labels}
             disabled={disabled}
             onAddText={addCustom}
             onAddJson={addJson}
@@ -458,7 +464,7 @@ function _PromptVariablesPanel({
               disabled={disabled}
             >
               <PlusIcon className="size-3.5" />
-              Add custom variable
+              {labels.addCustom}
             </Button>
           </AddVariableMenu>
         </aside>
@@ -505,15 +511,19 @@ function _PromptVariablesPanel({
             setPendingRemove(null);
           }
         }}
-        title="Delete variable?"
+        title={dialogs.confirmations.deleteVariableTitle}
         description={
           pendingRemove
             ? pendingRemove.hasReferences
-              ? `This thread references "{{${pendingRemove.name}}}". Deleting this variable will leave unresolved placeholders.`
-              : `This removes "{{${pendingRemove.name}}}" and its value from this thread.`
+              ? dialogs.confirmations.deleteVariableReferencedDescription(
+                  pendingRemove.name
+                )
+              : dialogs.confirmations.deleteVariableDescription(
+                  pendingRemove.name
+                )
             : undefined
         }
-        confirmLabel="Delete variable"
+        confirmLabel={dialogs.confirmations.deleteVariable}
         onConfirm={() => {
           pendingRemove?.onConfirm();
           setPendingRemove(null);
@@ -544,6 +554,7 @@ function VariableListGroup({
 }
 
 function AddVariableMenu({
+  labels,
   disabled,
   onAddText,
   onAddJson,
@@ -551,6 +562,7 @@ function AddVariableMenu({
   side,
   children,
 }: {
+  labels: ReturnType<typeof usePlaygroundLabels>["dialogs"]["variablesPanel"];
   disabled?: boolean;
   onAddText: () => void;
   onAddJson: () => void;
@@ -566,7 +578,7 @@ function AddVariableMenu({
       <DropdownMenuContent align="start" side={side} sideOffset={4}>
         <DropdownMenuItem onSelect={onAddText}>
           <TypeIcon className="size-3.5" />
-          Text
+          {labels.text}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onAddJson}>
           <BracesIcon className="size-3.5" />
@@ -574,7 +586,7 @@ function AddVariableMenu({
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onAddFile}>
           <FileTextIcon className="size-3.5" />
-          File content
+          {labels.fileContent}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -594,6 +606,7 @@ function VariableListRow({
   onSelect: () => void;
   onRemove?: () => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   return (
     <div
       className={cn(
@@ -619,11 +632,11 @@ function VariableListRow({
         <span className="min-w-0 grow truncate font-mono">{item.name}</span>
       </button>
       {onRemove ? (
-        <Tooltip content="Delete variable">
+        <Tooltip content={dialogs.tooltips.deleteVariable}>
           <button
             type="button"
             className="text-muted-foreground hover:bg-muted hover:text-destructive focus-visible:ring-ring/30 absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded opacity-0 transition-opacity outline-none group-hover/variable-row:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
-            aria-label={`Delete ${item.name}`}
+            aria-label={dialogs.tooltips.deleteVariable}
             disabled={disabled}
             onClick={onRemove}
           >
@@ -793,14 +806,15 @@ function CurrentDateVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadCurrentDateVariable) => void;
 }) {
+  const labels = usePlaygroundLabels().dialogs.variablesPanel;
   return (
     <DetailShell
       icon={<CalendarDaysIcon className="text-muted-foreground size-4" />}
-      title="Current date"
+      title={labels.currentDate}
       disabled={disabled}
     >
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
-        <Field label="Name">
+        <Field label={labels.name}>
           <VariableNameInput
             name={name}
             disabled={disabled}
@@ -810,7 +824,7 @@ function CurrentDateVariableDetail({
             onCommit={(next) => onRename(name, next)}
           />
         </Field>
-        <Field label="Format">
+        <Field label={labels.format}>
           <Select
             value={variable.format}
             disabled={disabled}
@@ -831,7 +845,7 @@ function CurrentDateVariableDetail({
           </Select>
         </Field>
       </div>
-      <Field label="Value">
+      <Field label={labels.value}>
         <PreviewBlock value={formatCurrentDateVariable(variable.format)} />
       </Field>
     </DetailShell>
@@ -855,6 +869,7 @@ function WorkingDirectoryVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadWorkingDirectoryVariable) => void;
 }) {
+  const labels = usePlaygroundLabels().dialogs.variablesPanel;
   const { builtinTools, files } = useHostServices();
   const [draftPath, setDraftPath] = useState(variable.value);
   const [directoryExists, setDirectoryExists] = useState<boolean | null>(null);
@@ -910,14 +925,11 @@ function WorkingDirectoryVariableDetail({
     [checkPath, files, name, onUpdate, variable]
   );
 
-  const handlePathChange = useCallback(
-    (value: string) => {
-      ++directoryCheckIdRef.current;
-      setDirectoryExists(null);
-      setDraftPath(value);
-    },
-    []
-  );
+  const handlePathChange = useCallback((value: string) => {
+    ++directoryCheckIdRef.current;
+    setDirectoryExists(null);
+    setDraftPath(value);
+  }, []);
 
   const browse = useCallback(async () => {
     const path = await files.pickDirectory();
@@ -945,10 +957,10 @@ function WorkingDirectoryVariableDetail({
   return (
     <DetailShell
       icon={<FolderOpenIcon className="text-muted-foreground size-4" />}
-      title="Current working directory"
+      title={labels.currentWorkingDirectory}
       disabled={disabled}
     >
-      <Field label="Name">
+      <Field label={labels.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -958,7 +970,7 @@ function WorkingDirectoryVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Directory">
+      <Field label={labels.directory}>
         <div className="flex items-center gap-2">
           <Input
             className="h-7 font-mono text-xs"
@@ -976,7 +988,7 @@ function WorkingDirectoryVariableDetail({
             onClick={() => void browse()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Browse…
+            {labels.browse}
           </Button>
         </div>
         {directoryExists === true && (
@@ -989,7 +1001,7 @@ function WorkingDirectoryVariableDetail({
             onClick={() => void reveal()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Reveal in Finder
+            {labels.revealInFinder}
           </Button>
         )}
       </Field>
@@ -1049,6 +1061,8 @@ function SkillsVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadSkillsVariable) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.variablesPanel;
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
   const selectedSkills = variable.skillNames.flatMap((skillName) => {
     const skill = skillsByName.get(skillName);
@@ -1074,7 +1088,7 @@ function SkillsVariableDetail({
   return (
     <DetailShell
       icon={<SparklesIcon className="text-muted-foreground size-4" />}
-      title="Available skills"
+      title={labels.availableSkills}
       disabled={disabled}
       action={
         <Button
@@ -1085,14 +1099,14 @@ function SkillsVariableDetail({
           onClick={() => setSkillsDialogOpen(true)}
         >
           <ListFilterIcon className="size-3.5" />
-          Select skills
+          {labels.selectSkills}
         </Button>
       }
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
-        <Field label="Name">
+        <Field label={labels.name}>
           <VariableNameInput
             name={name}
             disabled={disabled}
@@ -1102,7 +1116,7 @@ function SkillsVariableDetail({
             onCommit={(next) => onRename(name, next)}
           />
         </Field>
-        <Field label="Format">
+        <Field label={labels.format}>
           <Select
             value={variable.format}
             disabled={disabled}
@@ -1116,13 +1130,15 @@ function SkillsVariableDetail({
             <SelectContent>
               {PROMPT_SKILLS_FORMATS.map((format) => (
                 <SelectItem key={format.value} value={format.value}>
-                  {format.label}
+                  {format.value === "markdown-list"
+                    ? labels.markdownList
+                    : format.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Indent">
+        <Field label={labels.indent}>
           <Select
             value={String(variable.indent)}
             disabled={disabled}
@@ -1134,14 +1150,14 @@ function SkillsVariableDetail({
             <SelectContent>
               {PROMPT_SKILLS_INDENTS.map((indent) => (
                 <SelectItem key={indent} value={String(indent)}>
-                  {indent === 0 ? "Default" : `${indent} spaces`}
+                  {indent === 0 ? labels.default : labels.spaces(indent)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
       </div>
-      <Field label="Value" className="flex min-h-0 grow flex-col">
+      <Field label={labels.value} className="flex min-h-0 grow flex-col">
         <CodeEditor
           className={cn(
             "min-h-32 grow",
@@ -1150,7 +1166,7 @@ function SkillsVariableDetail({
           )}
           language="markdown"
           readonly
-          value={skillsLoading ? "Loading skills..." : preview}
+          value={skillsLoading ? labels.loadingSkills : preview}
         />
       </Field>
       <SkillSelectionDialog
@@ -1185,15 +1201,16 @@ function CustomVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, value: string) => void;
 }) {
+  const labels = usePlaygroundLabels().dialogs.variablesPanel;
   return (
     <DetailShell
       icon={<TypeIcon className="text-muted-foreground size-4" />}
-      title="User defined variable"
+      title={labels.userDefined}
       disabled={disabled}
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
-      <Field label="Name">
+      <Field label={labels.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1203,7 +1220,7 @@ function CustomVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Value" className="flex min-h-0 grow flex-col">
+      <Field label={labels.value} className="flex min-h-0 grow flex-col">
         <CodeEditor
           className="min-h-32 grow"
           language="markdown"
@@ -1234,16 +1251,17 @@ function JsonVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadVariable) => void;
 }) {
+  const labels = usePlaygroundLabels().dialogs.variablesPanel;
   const error = _jsonError(variable.value);
   return (
     <DetailShell
       icon={<BracesIcon className="text-muted-foreground size-4" />}
-      title="JSON variable"
+      title={labels.jsonVariable}
       disabled={disabled}
       className="flex h-full flex-col"
       contentClassName="flex min-h-0 grow flex-col"
     >
-      <Field label="Name">
+      <Field label={labels.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1253,7 +1271,7 @@ function JsonVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="Value (JSON)" className="flex min-h-0 grow flex-col">
+      <Field label={labels.valueJson} className="flex min-h-0 grow flex-col">
         <CodeEditor
           language="json"
           value={variable.value}
@@ -1292,6 +1310,7 @@ function FileVariableDetail({
   onRename: (oldName: string, newName: string) => boolean;
   onUpdate: (name: string, variable: ThreadVariable) => void;
 }) {
+  const labels = usePlaygroundLabels().dialogs.variablesPanel;
   const { files } = useHostServices();
   const browse = useCallback(async () => {
     const path = await files.pickFile();
@@ -1303,10 +1322,10 @@ function FileVariableDetail({
   return (
     <DetailShell
       icon={<FileTextIcon className="text-muted-foreground size-4" />}
-      title="File content variable"
+      title={labels.fileVariable}
       disabled={disabled}
     >
-      <Field label="Name">
+      <Field label={labels.name}>
         <VariableNameInput
           name={name}
           disabled={disabled}
@@ -1316,7 +1335,7 @@ function FileVariableDetail({
           onCommit={(next) => onRename(name, next)}
         />
       </Field>
-      <Field label="File path">
+      <Field label={labels.filePath}>
         <div className="flex items-center gap-2">
           <Input
             className="h-7 font-mono text-xs"
@@ -1335,7 +1354,7 @@ function FileVariableDetail({
             onClick={() => void browse()}
           >
             <FolderOpenIcon className="size-3.5" />
-            Browse…
+            {labels.browse}
           </Button>
         </div>
       </Field>

@@ -37,6 +37,7 @@ import {
 import { readShareThread, shareThread } from "@/client/share";
 import { useCommands } from "@/commands";
 import { useGithubAuth } from "@/components/github-auth-provider";
+import { useI18n } from "@/i18n/i18n-provider";
 import type { RuntimeId } from "@/shared/runtime";
 
 import {
@@ -68,6 +69,7 @@ export function ShareThreadDialog({
   runtimeId: RuntimeId;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   const { state: authState, signIn } = useGithubAuth();
   const { executeCommand } = useCommands();
 
@@ -241,7 +243,7 @@ export function ShareThreadDialog({
           <div className="relative shrink-0 overflow-hidden border-b">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:30px_30px] opacity-20 [mask-image:radial-gradient(circle_at_78%_50%,black,transparent_64%)]"
+              className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [mask-image:radial-gradient(circle_at_78%_50%,black,transparent_64%)] bg-[size:30px_30px] opacity-20"
             />
             <div
               aria-hidden="true"
@@ -251,17 +253,19 @@ export function ShareThreadDialog({
             <div className="relative grid items-center gap-5 px-6 pt-6 pb-4 md:grid-cols-[1fr_1.05fr]">
               <div>
                 <span className="text-primary text-[0.625rem] font-semibold tracking-[0.18em] uppercase">
-                  {status === "success" ? "Published" : "Read-only web share"}
+                  {status === "success"
+                    ? t.account.published
+                    : t.account.shareReadOnlyWeb}
                 </span>
                 <DialogTitle className="mt-1.5 text-xl font-semibold tracking-tight">
                   {status === "success"
-                    ? "Your thread is ready to travel."
-                    : "Share the thread—not a screenshot."}
+                    ? t.account.shareReadyTitle
+                    : t.account.shareDialogTitle}
                 </DialogTitle>
                 <DialogDescription className="mt-1.5 max-w-sm">
                   {status === "success"
-                    ? "Send this link to anyone. They can explore the full read-only thread without a GitHub account."
-                    : "Others can open it in LLM Space or explore it read-only on the web."}
+                    ? t.account.shareReadyDescription
+                    : t.account.shareDialogDescription}
                 </DialogDescription>
               </div>
               <SharePreview />
@@ -282,13 +286,13 @@ export function ShareThreadDialog({
               <div className="flex h-72 flex-col gap-4 p-6">
                 <div className="space-y-2.5">
                   <label htmlFor="share-title" className="text-xs font-medium">
-                    Title
+                    {t.account.shareTitleLabel}
                   </label>
                   <Input
                     id="share-title"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    placeholder="Untitled thread"
+                    placeholder={t.account.shareUntitled}
                     disabled={busy}
                   />
                 </div>
@@ -298,13 +302,13 @@ export function ShareThreadDialog({
                     htmlFor="share-description"
                     className="text-xs font-medium"
                   >
-                    Description
+                    {t.account.shareDescriptionLabel}
                   </label>
                   <Textarea
                     id="share-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Add a short note for the people opening this link…"
+                    placeholder={t.account.shareDescriptionPlaceholder}
                     disabled={busy}
                     rows={3}
                     className="min-h-28 flex-1 resize-none"
@@ -319,7 +323,7 @@ export function ShareThreadDialog({
             )}
           </div>
 
-          <DialogFooter className="border-t bg-background/80 shrink-0 px-6 py-4 backdrop-blur-xl sm:justify-between">
+          <DialogFooter className="bg-background/80 shrink-0 border-t px-6 py-4 backdrop-blur-xl sm:justify-between">
             <Button
               variant="ghost"
               onClick={() =>
@@ -330,25 +334,30 @@ export function ShareThreadDialog({
               }
             >
               <CircleHelpIcon className="size-4" />
-              Help
+              {t.account.help}
             </Button>
             <div className="flex items-center justify-end gap-2">
               {status === "success" ? (
-                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+                <Button onClick={() => handleOpenChange(false)}>
+                  {t.account.done}
+                </Button>
               ) : (
                 <>
-                  <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-                    Cancel
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleOpenChange(false)}
+                  >
+                    {t.account.cancel}
                   </Button>
                   <Button onClick={handleGenerate} disabled={busy}>
                     {busy ? <Loader2Icon className="animate-spin" /> : null}
                     {status === "awaitingAuth"
-                      ? "Waiting for GitHub sign-in…"
+                      ? t.account.waitingForGitHubSignIn
                       : status === "generating"
-                        ? "Creating link…"
+                        ? t.account.creatingLink
                         : status === "error"
-                          ? "Try again"
-                          : "Generate link"}
+                          ? t.account.tryAgain
+                          : t.account.generateLink}
                     {!busy ? <SendIcon className="size-3.5" /> : null}
                   </Button>
                 </>
@@ -362,9 +371,10 @@ export function ShareThreadDialog({
         open={confirmSignInOpen}
         onOpenChange={handleConfirmSignInOpenChange}
         dimBackground={false}
-        title="Sign in to GitHub?"
-        description="Sharing publishes this thread as a secret GitHub Gist, so you need to sign in to GitHub first. Continue?"
-        confirmLabel="Sign in and continue"
+        title={t.confirm.signInToGitHubTitle}
+        description={t.confirm.signInToGitHubDescription}
+        cancelLabel={t.confirm.cancel}
+        confirmLabel={t.confirm.signInAndContinue}
         confirmVariant="default"
         onConfirm={handleConfirmSignIn}
       />
@@ -374,6 +384,7 @@ export function ShareThreadDialog({
 
 /** Theme-aware HTML illustration of the read-only page the link opens. */
 function SharePreview() {
+  const { t } = useI18n();
   return (
     <div className="relative mx-auto h-32 w-full max-w-64" aria-hidden="true">
       <div className="bg-background/35 absolute inset-3 -rotate-3 rounded-xl border backdrop-blur-sm" />
@@ -408,7 +419,7 @@ function SharePreview() {
       </div>
       <div className="bg-background/90 absolute right-0 bottom-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[0.625rem] font-medium shadow-lg backdrop-blur-xl">
         <MousePointer2Icon className="text-primary size-3" />
-        Open in LLM Space
+        {t.account.openInLlmSpace}
       </div>
     </div>
   );
@@ -475,7 +486,7 @@ function ShareSuccess({
             {hasHiddenUrlTail ? (
               <span
                 aria-hidden="true"
-                className="from-transparent via-background/80 to-background pointer-events-none absolute inset-y-0 right-0 w-20 rounded-r-md bg-gradient-to-r"
+                className="via-background/80 to-background pointer-events-none absolute inset-y-0 right-0 w-20 rounded-r-md bg-gradient-to-r from-transparent"
               />
             ) : null}
           </div>
@@ -485,11 +496,7 @@ function ShareSuccess({
             onClick={onCopy}
             className="shrink-0 cursor-pointer"
           >
-            {copied ? (
-              <CheckIcon className="text-emerald-500" />
-            ) : (
-              <CopyIcon />
-            )}
+            {copied ? <CheckIcon className="text-emerald-500" /> : <CopyIcon />}
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>

@@ -51,5 +51,7 @@ export const ToolCall = Type.Object({
    * The output of the tool call.
    */
   output: Type.Optional(ToolCallOutput),
+  /** UI-only link to a manually created subtask; null clears a missing link. */
+  subtaskPath: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 export type ToolCall = Static<typeof ToolCall>;

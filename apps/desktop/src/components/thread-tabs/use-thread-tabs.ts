@@ -87,10 +87,15 @@ export interface ThreadTabs {
   /** Currently focused tab id, or `null` when no tabs are open. */
   activeId: string | null;
   /**
-   * Open a workspace thread path, adding it if absent and focusing it. Callers
+   * Open a workspace thread path, adding it if absent. Defaults to focusing it;
+   * pass activate: false to preserve the current selection. Callers
    * already know the file exists; a stale path reports as a pane read error.
    */
-  open: (path: string, runtimeId?: RuntimeId) => void;
+  open: (
+    path: string,
+    runtimeId?: RuntimeId,
+    options?: { activate?: boolean },
+  ) => void;
   /**
    * Open an imported trace workbench, adding it if absent and focusing it. The
    * trace must already be listed by the Trace Panel or restorable from storage.
@@ -410,19 +415,26 @@ export function useThreadTabs(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restoration check; reads initial tabs/options and must not re-run when they change
   }, []);
 
-  const open = useCallback((path: string, runtimeId: RuntimeId = "local") => {
-    const id = _threadTabId(path, runtimeId);
-    if (tabsRef.current.some((tab) => tab.id === id)) {
-      setActiveId(id);
-      return;
-    }
-    setTabs((prev) =>
-      prev.some((tab) => tab.id === id)
-        ? prev
-        : [...prev, _createThreadTab(path, runtimeId)]
-    );
-    setActiveId(id);
-  }, []);
+  const open = useCallback(
+    (
+      path: string,
+      runtimeId: RuntimeId = "local",
+      options: { activate?: boolean } = {},
+    ) => {
+      const id = _threadTabId(path, runtimeId);
+      if (tabsRef.current.some((tab) => tab.id === id)) {
+        if (options.activate !== false) setActiveId(id);
+        return;
+      }
+      setTabs((prev) =>
+        prev.some((tab) => tab.id === id)
+          ? prev
+          : [...prev, _createThreadTab(path, runtimeId)],
+      );
+      if (options.activate !== false) setActiveId(id);
+    },
+    [],
+  );
 
   const openTrace = useCallback(
     ({

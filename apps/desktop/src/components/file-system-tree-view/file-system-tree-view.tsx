@@ -31,6 +31,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -42,18 +43,18 @@ import {
   type TreeDataItem,
   type TreeRenderItemParams,
 } from "@/components/tree-view";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { RuntimeId } from "@/shared/runtime";
+
 
 import type { AcquireFileMutation } from "./file-mutation-guard";
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
 
-/** What the OS calls its trash, for the delete-confirmation copy. */
-const TRASH_NAME =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
-    ? "Recycle Bin"
-    : "Trash";
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
 
 /** The special workspace folder that deep-link shared-thread imports land in. */
 const SHARED_DIR = "shared";
@@ -82,6 +83,7 @@ function _FileSystemTreeView({
   className,
   headerStart,
   runtimeId,
+  activeFilePath,
   onSelectFile,
   onRemove,
   onMove,
@@ -89,6 +91,8 @@ function _FileSystemTreeView({
 }: {
   className?: string;
   runtimeId: RuntimeId;
+  /** Active tab's file in this runtime; synchronization never opens a tab. */
+  activeFilePath?: string | null;
   headerStart?: ReactNode;
   /** Fired with a file's path when it is selected (folders aren't selectable). */
   onSelectFile?: (path: string, runtimeId: RuntimeId) => void;
@@ -100,6 +104,8 @@ function _FileSystemTreeView({
 }) {
   const fullScreen = useFullScreen();
   const seedHost = useHostServices();
+  const { t } = useI18n();
+  const trashName = _isWindows ? t.fileTree.recycleBinName : t.fileTree.trashName;
   const mutationReconciliation = useMemo(
     () => ({ onMove, onRemove }),
     [onMove, onRemove]
@@ -145,6 +151,35 @@ function _FileSystemTreeView({
   // loads (no rename, no tab — works for both files and folders).
   const [pendingDuplicate, setPendingDuplicate] = useState<string | null>(null);
   const [openActionsPath, setOpenActionsPath] = useState<string | null>(null);
+  const treeRootRef = useRef<HTMLDivElement>(null);
+  const pendingActiveScroll = useRef<string | null>(null);
+
+  // One-way tab → tree synchronization. Do not reuse pendingThread: that flow
+  // calls onSelectFile and could reactivate a stale tab after an async listing.
+  // Expand only on a tab/runtime change, so manual folder collapse stays put.
+  useEffect(() => {
+    pendingActiveScroll.current = activeFilePath ?? null;
+    setSelectedId(activeFilePath ?? null);
+    if (activeFilePath) {
+      for (const dir of _ancestorDirs(activeFilePath)) expand(dir);
+    }
+  }, [activeFilePath, runtimeId, expand]);
+
+  // Listings arrive independently. Wait until the actual row is mounted, and
+  // cancel obsolete frames on tab changes without moving keyboard focus.
+  useEffect(() => {
+    const path = pendingActiveScroll.current;
+    if (!path) return;
+    const frame = requestAnimationFrame(() => {
+      const row = treeRootRef.current?.querySelector(
+        `[data-tree-id="${CSS.escape(path)}"]`
+      );
+      if (!row) return;
+      row.scrollIntoView({ block: "nearest" });
+      pendingActiveScroll.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeFilePath, runtimeId, nodesByPath]);
 
   // Open a freshly created file in a tab and select its node in the tree.
   function revealCreatedFile(path: string) {
@@ -501,7 +536,7 @@ function _FileSystemTreeView({
   }
 
   return (
-    <div className={cn("flex h-full flex-col", className)}>
+    <div ref={treeRootRef} className={cn("flex h-full flex-col", className)}>
       <header className="text-muted-foreground electrobun-webkit-app-region-drag flex h-11.5 items-center justify-between px-3 text-xs font-medium">
         {headerStart ?? (
           <span className={cn(fullScreen ? "opacity-100" : "opacity-0")}>
@@ -521,9 +556,9 @@ function _FileSystemTreeView({
         ) : data.length === 0 ? (
           <Empty className="h-full">
             <EmptyHeader>
-              <EmptyTitle>No Threads Yet</EmptyTitle>
+              <EmptyTitle>{t.fileTree.emptyTitle}</EmptyTitle>
               <EmptyDescription>
-                Create a thread to get started.
+                {t.fileTree.emptyDescription}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -535,6 +570,8 @@ function _FileSystemTreeView({
             renderItem={renderItem}
             onDocumentDrag={onDocumentDrag}
             onSelectChange={(item) => {
+              pendingActiveScroll.current = null;
+              setSelectedId(item?.id ?? null);
               if (item) onSelectFile?.(item.id, runtimeId);
             }}
           />
@@ -548,13 +585,15 @@ function _FileSystemTreeView({
         }}
         title={
           <>
-            Move &ldquo;
+            {t.fileTree.moveTitlePrefix}
             {deleting ? basename(deleting).replace(/\.json$/, "") : ""}
-            &rdquo; to the {TRASH_NAME}?
+            {t.fileTree.moveTitleMiddle}
+            {trashName}
+            {t.fileTree.moveTitleSuffix}
           </>
         }
-        description={`You can restore it from the ${TRASH_NAME} later.`}
-        confirmLabel={`Move to ${TRASH_NAME}`}
+        description={`${t.fileTree.moveDescriptionPrefix}${trashName}${t.fileTree.moveDescriptionSuffix}`}
+        confirmLabel={`${t.fileTree.moveConfirmPrefix}${trashName}`}
         onConfirm={() => {
           const path = deleting;
           setDeleting(null);
@@ -575,23 +614,26 @@ function _FileSystemTreeView({
         }}
         title={
           <>
-            Replace &ldquo;
+            {t.fileTree.replaceTitlePrefix}
             {overwriteConflict
               ? overwriteConflict.isDir
                 ? overwriteConflict.name
                 : overwriteConflict.name.replace(/\.json$/, "")
               : ""}
-            &rdquo;?
+            {t.fileTree.replaceTitleSuffix}
           </>
         }
         description={
           overwriteConflict
-            ? `${overwriteConflict.isDir ? "A folder" : "A thread"} with this name already exists here. Replacing it moves the existing ${
-                overwriteConflict.isDir ? "folder" : "thread"
-              } to the ${TRASH_NAME}.`
+            ? formatMessage(
+                overwriteConflict.isDir
+                  ? t.fileTree.replaceDescriptionFolder
+                  : t.fileTree.replaceDescriptionThread,
+                { trash: trashName }
+              )
             : undefined
         }
-        confirmLabel="Replace"
+        confirmLabel={t.fileTree.replace}
         onConfirm={() => {
           overwriteConflict?.resolve(true);
           setOverwriteConflict(null);

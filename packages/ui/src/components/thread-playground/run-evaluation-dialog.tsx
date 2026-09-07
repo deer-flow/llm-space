@@ -35,9 +35,8 @@ import {
 } from "@llm-space/ui/ui/dialog";
 import { Textarea } from "@llm-space/ui/ui/textarea";
 
-
-
 import { EvaluationRubricEditor } from "./evaluation-rubric-editor";
+import { usePlaygroundLabels } from "./playground-labels";
 import { RunEvaluationScorecard } from "./run-evaluation-scorecard";
 import { RunTraceView } from "./run-trace-view";
 
@@ -82,6 +81,7 @@ export function RunEvaluationDialog({
   onSaveRubric: (input: EvaluationRubricInput) => EvaluationRubricRecord | null;
   onRemoveRubric: (id: string) => boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const [verdict, setVerdict] = useState<EvaluationRecord["verdict"] | null>(
     null
   );
@@ -346,9 +346,9 @@ export function RunEvaluationDialog({
       <ConfirmDialog
         open={removeScoresOpen}
         onOpenChange={setRemoveScoresOpen}
-        title="Remove rubric scores?"
-        description="Saving without a rubric permanently removes the saved rubric snapshot and all criterion scores from this evaluation. This cannot be undone."
-        confirmLabel="Remove scores and save"
+        title={dialogs.confirmations.removeRubricScoresTitle}
+        description={dialogs.confirmations.removeRubricScoresDescription}
+        confirmLabel={dialogs.confirmations.removeScoresAndSave}
         dimBackground={false}
         onConfirm={() => {
           setRemoveScoresOpen(false);

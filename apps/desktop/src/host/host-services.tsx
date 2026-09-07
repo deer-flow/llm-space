@@ -147,6 +147,39 @@ export function DesktopHostProvider({ children }: { children: ReactNode }) {
           listBuiltInTools(options?.runtimeId as RuntimeId | undefined),
         fsReveal,
       },
+      subagents: {
+        exists: async ({ path, runtimeId }) => {
+          const parts = path.split("/");
+          let directory = "";
+          for (const [index, name] of parts.entries()) {
+            const nodes = await _rpc().request.fsLs({
+              path: directory,
+              runtimeId: runtimeId as RuntimeId,
+            });
+            const node = nodes.find((entry) => entry.name === name);
+            if (!node) return false;
+            if (index === parts.length - 1) return node.type === "file";
+            if (node.type !== "directory") return false;
+            directory = node.path;
+          }
+          return false;
+        },
+        create: ({ runtimeId, ...input }) =>
+          _rpc().request.createSubagentThread({
+            ...input,
+            runtimeId: runtimeId as RuntimeId,
+          }),
+        open: ({ path, runtimeId }) => {
+          executeCommand({
+            type: "revealInTree",
+            args: { path, runtimeId: runtimeId as RuntimeId },
+          });
+          executeCommand({
+            type: "openThread",
+            args: { path, runtimeId: runtimeId as RuntimeId },
+          });
+        },
+      },
       pluginTools: {
         list: ({ runtimeId } = {}) =>
           runtimeId && runtimeId !== "local"

@@ -6,7 +6,7 @@ import { Utils, type BrowserWindow } from "electrobun/bun";
 import { COMMAND_META, type Command } from "../shared/commands";
 
 import { isChineseLocale } from "./app/locales";
-import { saveZoom } from "./app/window-state";
+import { adjustPageZoom, setPageZoom } from "./app/window-state";
 import type { GitHubAuthManager } from "./auth";
 import {
   importFilesWithNativePicker,
@@ -24,12 +24,6 @@ const DOCS_ZH_CN_URL = "https://my.feishu.cn/wiki/QnGGwGkoti8nwok2cEOc2oMvnrd";
 
 /** The GitHub issues page opened by the `reportBugs` command. */
 const ISSUES_URL = "https://github.com/deer-flow/llm-space/issues";
-
-const ZOOM_STEP = 0.1;
-const ZOOM_MIN = 0.3;
-const ZOOM_MAX = 3.0;
-const clampZoom = (zoom: number) =>
-  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 
 export interface BunCommandDependencies {
   githubAuth: Pick<GitHubAuthManager, "signIn" | "signOut">;
@@ -67,20 +61,15 @@ export function executeCommandInBun(
   }
   switch (command.type) {
     case "zoomIn": {
-      const zoom = clampZoom(window.getPageZoom() + ZOOM_STEP);
-      window.setPageZoom(zoom);
-      saveZoom(zoom);
+      adjustPageZoom(window, "in");
       return;
     }
     case "zoomOut": {
-      const zoom = clampZoom(window.getPageZoom() - ZOOM_STEP);
-      window.setPageZoom(zoom);
-      saveZoom(zoom);
+      adjustPageZoom(window, "out");
       return;
     }
     case "resetZoom": {
-      window.setPageZoom(1);
-      saveZoom(1);
+      setPageZoom(window, 1);
       return;
     }
     case "reload": {

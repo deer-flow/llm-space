@@ -134,6 +134,14 @@ export class RemoteRuntimeClient implements RuntimeClient {
     return this._rpc<Thread>("fs.read", { path });
   }
 
+  createSubagentThread(
+    input: Parameters<RuntimeClient["createSubagentThread"]>[0],
+  ) {
+    return this._rpc<
+      Awaited<ReturnType<RuntimeClient["createSubagentThread"]>>
+    >("fs.createSubagentThread", input);
+  }
+
   async fsWrite(path: string, thread: Thread) {
     await this._rpc<null>("fs.write", { path, thread });
   }

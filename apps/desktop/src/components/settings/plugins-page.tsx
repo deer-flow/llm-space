@@ -83,6 +83,8 @@ import {
   setPluginSettings,
   uninstallPlugin,
 } from "@/client/plugins";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { electrobun } from "@/lib/electrobun";
 
 import { SettingsEmptyState } from "./settings-empty-state";
@@ -129,16 +131,6 @@ const EXTENSION_KIND_ICONS: Record<PluginExtensionKind, LucideIcon> = {
   settings: Settings2,
 };
 
-const EXTENSION_KIND_LABELS: Record<PluginExtensionKind, string> = {
-  skill: "Skills",
-  mcp: "MCP Servers",
-  model: "Models",
-  command: "Commands",
-  tool: "Tools",
-  threadStorage: "Thread Storage",
-  settings: "Settings",
-};
-
 const EXTENSION_KIND_ORDER: readonly PluginExtensionKind[] = [
   "skill",
   "mcp",
@@ -154,6 +146,7 @@ export function PluginsPage({
 }: {
   preferredPluginId?: string;
 }) {
+  const { t } = useI18n();
   const [plugins, setPlugins] = useState<PluginView[]>([]);
   const [pluginsPath, setPluginsPath] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -208,11 +201,10 @@ export function PluginsPage({
 
   return (
     <SettingsPage
-      title="Plugins"
+      title={t.plugins.title}
       description={
         <span>
-          Extend LLM Space with skills, MCP servers, model providers, commands,
-          and thread storage. Plugins are installed in the{" "}
+          {t.plugins.descriptionPrefix}
           <button
             type="button"
             className="text-foreground underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -221,7 +213,7 @@ export function PluginsPage({
           >
             plugins directory
           </button>
-          .
+          {t.plugins.descriptionSuffix}
         </span>
       }
       className="flex size-full min-h-0"
@@ -324,6 +316,7 @@ function PluginList({
   onChanged: (plugins: PluginView[]) => void;
   onRefresh: () => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -345,7 +338,7 @@ function PluginList({
         <Input
           className="h-8 pl-7"
           aria-label="Search plugins"
-          placeholder="Search plugins"
+          placeholder={t.plugins.searchPlaceholder}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -402,6 +395,7 @@ function PluginListItem({
   onSelect: () => void;
   onChanged: (plugins: PluginView[]) => void;
 }) {
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reloading, setReloading] = useState(false);
@@ -520,14 +514,14 @@ function PluginListItem({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Uninstall ${plugin.displayName}?`}
-        description={
-          <>
-            This permanently deletes the Plugin folder at{" "}
-            <span className="font-mono">{plugin.path}</span>.
-          </>
-        }
-        confirmLabel="Uninstall"
+        title={formatMessage(t.confirm.uninstallPluginTitle, {
+          name: plugin.displayName,
+        })}
+        description={formatMessage(t.confirm.uninstallPluginDescription, {
+          path: plugin.path,
+        })}
+        cancelLabel={t.confirm.cancel}
+        confirmLabel={t.confirm.uninstall}
         dimBackground={false}
         onConfirm={() => void handleUninstall()}
       />
@@ -542,6 +536,16 @@ function PluginEditor({
   plugin: PluginView | null;
   onChanged: (plugins: PluginView[]) => void;
 }) {
+  const { t } = useI18n();
+  const extensionKindLabels: Record<PluginExtensionKind, string> = {
+    skill: t.settingsDialog.pages.skills,
+    mcp: t.settingsDialog.pages.mcp,
+    model: t.settingsDialog.pages.models,
+    command: t.plugins.commands,
+    tool: t.plugins.tools,
+    threadStorage: t.plugins.threadStorage,
+    settings: t.plugins.settings,
+  };
   const [settings, setSettings] = useState<JsonObject>(plugin?.settings ?? {});
   const [reloading, setReloading] = useState(false);
   const settingsError = plugin?.extensions.find(
@@ -607,7 +611,7 @@ function PluginEditor({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Enabled</span>
+              <span className="text-sm font-medium">{t.plugins.enabled}</span>
               <Switch
                 checked={plugin.enabled}
                 disabled={
@@ -643,7 +647,7 @@ function PluginEditor({
                 }}
               >
                 <RefreshCw className={reloading ? "animate-spin" : undefined} />
-                Reload
+                {t.plugins.reload}
               </Button>
             ) : null}
             <Button
@@ -651,7 +655,7 @@ function PluginEditor({
               variant="ghost"
               onClick={() => _reveal(plugin.path)}
             >
-              <FolderOpen /> Reveal folder
+              <FolderOpen /> {t.plugins.revealFolder}
             </Button>
           </div>
 
@@ -660,14 +664,14 @@ function PluginEditor({
               value="general"
               className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
             >
-              General
+              {t.plugins.general}
             </TabsTrigger>
             {plugin.settingsSchema || settingsError ? (
               <TabsTrigger
                 value="settings"
                 className="w-auto! justify-center! px-0 py-0.5! text-xs uppercase after:inset-x-0! after:inset-y-auto! after:bottom-[-5px]! after:h-0.5! after:w-auto!"
               >
-                Settings
+                {t.plugins.settings}
               </TabsTrigger>
             ) : null}
           </TabsList>
@@ -680,25 +684,33 @@ function PluginEditor({
           <ScrollArea className="h-full w-full max-w-full">
             <div className="flex max-w-full min-w-0 flex-col gap-8 pt-5 pr-4 pb-4">
               <section className="space-y-3">
-                <h4 className="text-sm font-medium">Plugin</h4>
+                <h4 className="text-sm font-medium">{t.plugins.plugin}</h4>
                 <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
-                  <span className="text-muted-foreground">Compatibility</span>
-                  <span>{plugin.engineRange ?? "Not specified"}</span>
+                  <span className="text-muted-foreground">
+                    {t.plugins.compatibility}
+                  </span>
+                  <span>{plugin.engineRange ?? t.plugins.notSpecified}</span>
                   {plugin.author ? (
                     <>
-                      <span className="text-muted-foreground">Author</span>
+                      <span className="text-muted-foreground">
+                        {t.plugins.author}
+                      </span>
                       <span>{plugin.author}</span>
                     </>
                   ) : null}
                   {plugin.license ? (
                     <>
-                      <span className="text-muted-foreground">License</span>
+                      <span className="text-muted-foreground">
+                        {t.plugins.license}
+                      </span>
                       <span>{plugin.license}</span>
                     </>
                   ) : null}
                   {plugin.homepage ? (
                     <>
-                      <span className="text-muted-foreground">Homepage</span>
+                      <span className="text-muted-foreground">
+                        {t.plugins.homepage}
+                      </span>
                       <Link
                         href={plugin.homepage}
                         className="min-w-0 truncate underline underline-offset-2"
@@ -707,7 +719,9 @@ function PluginEditor({
                       </Link>
                     </>
                   ) : null}
-                  <span className="text-muted-foreground">Location</span>
+                  <span className="text-muted-foreground">
+                    {t.plugins.location}
+                  </span>
                   <button
                     type="button"
                     className="hover:text-foreground min-w-0 truncate text-left font-mono underline underline-offset-2"
@@ -721,7 +735,9 @@ function PluginEditor({
 
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium">Extensions</h4>
+                  <h4 className="text-sm font-medium">
+                    {t.plugins.extensions}
+                  </h4>
                   <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                     {plugin.extensions.length}
                   </span>
@@ -743,7 +759,7 @@ function PluginEditor({
                                 aria-hidden="true"
                               />
                               <span className="truncate text-xs font-medium">
-                                {EXTENSION_KIND_LABELS[group.kind]}
+                                {extensionKindLabels[group.kind]}
                               </span>
                               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none tabular-nums">
                                 {group.extensions.length}

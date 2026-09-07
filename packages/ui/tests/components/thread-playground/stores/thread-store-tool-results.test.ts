@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import type { AgentEvent, AgentTransport } from "@llm-space/core";
+import {
+  getToolCallOutputText,
+  SPAWN_AGENT_TOOL,
+} from "@llm-space/core/thread";
 
 import { createThreadStore } from "../../../../src/components/thread-playground/stores/thread-store";
 
@@ -335,4 +339,142 @@ describe("auto-run tool results", () => {
       variables: { current_working_directory: "/workspace" },
     });
   });
+});
+
+describe("spawn_agent pauses automatic runs", () => {
+  test.each([false, true])(
+    "pauses the whole batch with ReAct=%s",
+    async (reactLoop) => {
+      const calls = [
+        {
+          type: "toolCall",
+          id: "read-1",
+          name: "read",
+          arguments: { path: "/tmp/a" },
+        },
+        {
+          type: "toolCall",
+          id: "spawn-1",
+          name: "spawn_agent",
+          arguments: {
+            description: "Review code",
+            task_name: "review",
+            prompt: "Review it",
+          },
+        },
+      ];
+      let modelCalls = 0;
+      let toolCalls = 0;
+      const transport: AgentTransport = async function* () {
+        modelCalls++;
+        yield _event({ type: "message_start", message: { role: "assistant" } });
+        for (const [contentIndex, toolCall] of calls.entries()) {
+          yield _event({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "toolcall_start",
+              contentIndex,
+              partial: { content: calls },
+            },
+          });
+          yield _event({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "toolcall_end",
+              contentIndex,
+              toolCall,
+            },
+          });
+        }
+        yield _event({ type: "message_end", message: { role: "assistant" } });
+      };
+      const store = createThreadStore(
+        {
+          context: {
+            messages: [
+              {
+                id: "u",
+                role: "user",
+                content: [{ type: "text", text: "Delegate this" }],
+              },
+            ],
+            tools: [
+              SPAWN_AGENT_TOOL,
+              {
+                type: "builtin",
+                name: "read",
+                description: "Read",
+                parameters: { type: "object", properties: {} },
+              },
+            ],
+          },
+        },
+        {
+          transport,
+          resolveModel: () => ({ provider: "test", id: "test" }),
+          getAutoRunTools: () => true,
+          getReactLoop: () => reactLoop,
+          executeTool: () => {
+            toolCalls++;
+            return Promise.resolve({ content: [], isError: false });
+          },
+        }
+      );
+      await store.getState().run();
+      expect(modelCalls).toBe(1);
+      expect(toolCalls).toBe(0);
+      expect(store.getState().status).toBe("idle");
+      const last = store.getState().thread.context?.messages?.at(-1);
+      expect(last?.role).toBe("assistant");
+      if (last?.role === "assistant") {
+        expect(last.toolCalls).toHaveLength(2);
+        expect(
+          last.toolCalls?.every((call) => getToolCallOutputText(call) === "")
+        ).toBe(true);
+      }
+    }
+  );
+});
+
+describe("manual subtask links", () => {
+  test.each([undefined, "My own response"])(
+    "keeps output untouched when linking and clearing: %s",
+    (text) => {
+      const output =
+        text === undefined
+          ? undefined
+          : {
+              content: [{ type: "text" as const, text }],
+              isError: false,
+            };
+      const store = createThreadStore({
+        context: {
+          messages: [
+            {
+              id: "assistant",
+              role: "assistant",
+              content: [],
+              toolCalls: [
+                {
+                  id: "spawn",
+                  input: { name: "spawn_agent", arguments: {} },
+                  output,
+                },
+              ],
+            },
+          ],
+        },
+      });
+      for (const path of ["tasks/child.json", null, "tasks/child-1.json"]) {
+        store.getState().setToolCallSubtaskPath("assistant", "spawn", path);
+        const message = store.getState().thread.context!.messages![0];
+        if (message.role !== "assistant") throw new Error("Expected assistant");
+        const call = message.toolCalls![0];
+        expect(call.subtaskPath).toBe(path);
+        expect(call.output).toEqual(output);
+        const restored = JSON.parse(JSON.stringify(call)) as typeof call;
+        expect(restored.subtaskPath).toBe(path);
+      }
+    }
+  );
 });

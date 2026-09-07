@@ -1,6 +1,5 @@
 "use client";
 
-
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -12,6 +11,8 @@ import { ArrowDownToLineIcon } from "lucide-react";
 
 import { useCommands } from "@/commands";
 import { useUpdateStatus } from "@/components/update-status-provider";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 
 /**
  * The persistent "update ready" affordance: a badged icon button at the right
@@ -24,16 +25,17 @@ import { useUpdateStatus } from "@/components/update-status-provider";
 export function UpdateIndicator() {
   const { readyVersion } = useUpdateStatus();
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   if (!readyVersion) return null;
 
   return (
     <Popover>
-      <Tooltip content="Update ready — restart to install">
+      <Tooltip content={t.updates.readyTooltip}>
         <PopoverTrigger asChild>
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label="Update ready"
+            aria-label={t.updates.ready}
             className="relative"
           >
             <ArrowDownToLineIcon />
@@ -41,13 +43,10 @@ export function UpdateIndicator() {
           </Button>
         </PopoverTrigger>
       </Tooltip>
-      <PopoverContent
-        align="end"
-        className="z-[70] flex w-64 flex-col gap-2"
-      >
-        <span className="text-sm font-medium">Update ready</span>
+      <PopoverContent align="end" className="z-[70] flex w-64 flex-col gap-2">
+        <span className="text-sm font-medium">{t.updates.ready}</span>
         <span className="text-muted-foreground text-xs">
-          v{readyVersion} has been downloaded. Restart to install.
+          {formatMessage(t.updates.downloaded, { version: readyVersion })}
         </span>
         <Button
           size="sm"
@@ -56,7 +55,7 @@ export function UpdateIndicator() {
             executeCommand({ type: "applyUpdateAndRestart", args: {} })
           }
         >
-          Restart Now
+          {t.updates.restartNow}
         </Button>
       </PopoverContent>
     </Popover>

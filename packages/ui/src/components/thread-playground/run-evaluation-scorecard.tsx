@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@llm-space/ui/ui/select";
 
+import { usePlaygroundLabels } from "./playground-labels";
 
 const NO_RUBRIC = "none";
 const SAVED_RUBRIC = "saved";
@@ -49,6 +50,8 @@ export function RunEvaluationScorecard({
   onCreateRubric: () => void;
   onEditRubric: (rubric: EvaluationRubricRecord) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const currentDefinition = rubric
     ? (rubrics.find((value) => value.id === rubric.id) ?? null)
     : null;
@@ -127,7 +130,10 @@ export function RunEvaluationScorecard({
               );
             }}
           >
-            <SelectTrigger className="w-52" aria-label="Evaluation rubric">
+            <SelectTrigger
+              className="w-52"
+              aria-label={labels.evaluationRubric}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -162,11 +168,11 @@ export function RunEvaluationScorecard({
             </Button>
           )}
           {currentDefinition && (
-            <Tooltip content="Edit rubric">
+            <Tooltip content={labels.editRubric}>
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label={`Edit rubric ${currentDefinition.name}`}
+                aria-label={labels.editRubric}
                 onClick={() => onEditRubric(currentDefinition)}
               >
                 <Edit3Icon className="size-3" />
@@ -177,7 +183,7 @@ export function RunEvaluationScorecard({
             content={
               rubrics.length >= MAX_EVALUATION_RUBRICS
                 ? `Maximum ${MAX_EVALUATION_RUBRICS} rubrics per thread`
-                : "Create rubric"
+                : labels.createRubric
             }
           >
             <span

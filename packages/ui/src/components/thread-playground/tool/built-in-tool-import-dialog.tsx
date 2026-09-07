@@ -40,6 +40,7 @@ import {
 import { Switch } from "@llm-space/ui/ui/switch";
 
 import { ProviderProfileSelector } from "../model/provider-profile-selector";
+import { usePlaygroundLabels } from "../playground-labels";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 import { sortToolsByName } from "./sort-tools-by-name";
@@ -56,13 +57,6 @@ interface BuiltInToolCategory {
   label: string;
   icon: LucideIcon;
 }
-
-const BUILT_IN_TOOL_CATEGORIES: BuiltInToolCategory[] = [
-  { id: "fileSystem", label: "File system", icon: FilesIcon },
-  { id: "web", label: "Web", icon: GlobeIcon },
-  { id: "media", label: "Media", icon: ImageIcon },
-  { id: "misc", label: "Misc", icon: CloudSunIcon },
-];
 
 const FILE_SYSTEM_TOOL_NAMES = new Set([
   "read",
@@ -83,6 +77,9 @@ const WEB_TOOL_NAMES = new Set(["web_fetch", "web_search", "weather_report"]);
 const MEDIA_TOOL_NAMES = new Set([
   "generate_image",
   "generate_minimax_image",
+  "list_voices",
+  "speak",
+  "stop_speaking",
 ]);
 
 function _BuiltInToolImportDialog({
@@ -106,6 +103,17 @@ function _BuiltInToolImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.builtIn;
+  const categories = useMemo<BuiltInToolCategory[]>(
+    () => [
+      { id: "fileSystem", label: labels.fileSystem, icon: FilesIcon },
+      { id: "web", label: labels.web, icon: GlobeIcon },
+      { id: "media", label: labels.media, icon: ImageIcon },
+      { id: "misc", label: labels.misc, icon: CloudSunIcon },
+    ],
+    [labels]
+  );
   const [tools, setTools] = useState<BuiltinTool[]>([]);
   const [query, setQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] =
@@ -118,7 +126,9 @@ function _BuiltInToolImportDialog({
   const toolRowRefs = useRef(new Map<string, HTMLDivElement>());
   const { builtinTools } = useHostServices();
   const providers = useModels();
-  const generateImageTool = tools.find((tool) => tool.name === "generate_image");
+  const generateImageTool = tools.find(
+    (tool) => tool.name === "generate_image"
+  );
   const imageProviderId = generateImageTool
     ? getToolConnectionProviderId(generateImageTool)
     : undefined;
@@ -141,12 +151,12 @@ function _BuiltInToolImportDialog({
     try {
       setTools(await builtinTools.list({ runtimeId }));
     } catch (error) {
-      toast.error("Failed to load built-in tools", {
+      toast.error(labels.loadFailed, {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     }
-  }, [builtinTools, runtimeId]);
+  }, [builtinTools, labels.loadFailed, runtimeId]);
 
   useEffect(() => {
     if (!open) {
@@ -223,9 +233,8 @@ function _BuiltInToolImportDialog({
       (candidate) => candidate.id === generateImageConfig?.model
     );
     if (!model || !generateImageConfig) {
-      toast.error("Choose an enabled image model", {
-        description:
-          "Enable an Ark image model in Settings, then select it here.",
+      toast.error(labels.chooseImageModel, {
+        description: labels.chooseImageModelHint,
       });
       return;
     }
@@ -244,7 +253,7 @@ function _BuiltInToolImportDialog({
   }, [tools, query]);
   const toolsByCategory = useMemo(() => {
     const result = new Map<BuiltInToolCategoryId, BuiltinTool[]>(
-      BUILT_IN_TOOL_CATEGORIES.map((category) => [category.id, []])
+      categories.map((category) => [category.id, []])
     );
     for (const tool of filteredTools) {
       result.get(_categoryForTool(tool.name))!.push(tool);
@@ -257,7 +266,7 @@ function _BuiltInToolImportDialog({
       );
     }
     return result;
-  }, [filteredTools]);
+  }, [categories, filteredTools]);
   const selectedTools = toolsByCategory.get(selectedCategoryId) ?? [];
 
   return (
@@ -275,10 +284,8 @@ function _BuiltInToolImportDialog({
         }}
       >
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add built-in tools</DialogTitle>
-          <DialogDescription>
-            Choose built-in tools to make available in this thread.
-          </DialogDescription>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside className="flex w-44 shrink-0 flex-col gap-2 border-r p-3">
@@ -287,13 +294,13 @@ function _BuiltInToolImportDialog({
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools"
-                aria-label="Search tools"
+                placeholder={dialogs.searchTools}
+                aria-label={dialogs.searchTools}
                 className="h-8 pl-7 text-xs"
               />
             </div>
             <div className="flex flex-col gap-1">
-              {BUILT_IN_TOOL_CATEGORIES.map((category) => {
+              {categories.map((category) => {
                 const CategoryIcon = category.icon;
                 const categoryTools = toolsByCategory.get(category.id) ?? [];
                 const selected = category.id === selectedCategoryId;
@@ -343,9 +350,7 @@ function _BuiltInToolImportDialog({
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {selectedTools.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-center text-sm">
-                  {query.trim()
-                    ? "No tools match your search."
-                    : "No built-in tools in this category."}
+                  {query.trim() ? labels.emptySearch : labels.emptyCategory}
                 </div>
               ) : (
                 selectedTools.map((tool) => {
@@ -412,7 +417,7 @@ function _BuiltInToolImportDialog({
                         className="mt-0.5"
                         checked={exists}
                         disabled={!exists && !canAdd}
-                        aria-label={`${exists ? "Remove" : "Add"} ${tool.name}`}
+                        aria-label={`${exists ? dialogs.remove : dialogs.add} ${tool.name}`}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
                         }
@@ -485,9 +490,7 @@ function _GenerateImageConfigFields({
           >
             <SelectValue placeholder="Choose model" />
           </SelectTrigger>
-          <SelectContent
-            onPointerDownOutside={(e) => e.preventDefault()}
-          >
+          <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {enabledModels.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.name}

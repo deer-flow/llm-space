@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
 import { BuiltInToolImportDialog } from "./built-in-tool-import-dialog";
@@ -50,6 +51,7 @@ export function ToolListView({
   const runtimeId = useThreadStore((s) => s.runtimeId);
   const { addTool, removeTool, updateTool } = useThreadStoreActions();
   const { presentational } = useHostServices();
+  const { dialogs } = usePlaygroundLabels();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [providerHostedDialogOpen, setProviderHostedDialogOpen] =
     useState(false);
@@ -163,7 +165,7 @@ export function ToolListView({
                 disabled={readonly}
               >
                 <PlusIcon className="size-3" />
-                Add
+                {dialogs.sections.add}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -174,7 +176,7 @@ export function ToolListView({
                 }}
               >
                 <PackageCheckIcon />
-                Add Built-in Tools
+                {dialogs.sections.addBuiltInTools}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
@@ -183,7 +185,7 @@ export function ToolListView({
                 }}
               >
                 <PackageCheckIcon />
-                Add Plugin Tools
+                {dialogs.sections.addPluginTools}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
@@ -193,16 +195,16 @@ export function ToolListView({
                 }}
               >
                 <CableIcon />
-                Add MCP Tools
+                {dialogs.sections.addMcpTools}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={openAddProviderHostedDialog}>
                 <CloudIcon />
-                Add Provider-Hosted Tool
+                {dialogs.sections.addProviderHostedTool}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={openAddDialog}>
                 <FunctionSquareIcon />
-                Add Custom Function Tool
+                {dialogs.sections.addCustomFunctionTool}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

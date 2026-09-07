@@ -154,6 +154,7 @@ export interface ThreadState {
   removeEvaluationRubric(id: string): boolean;
   appendMessage(): void;
   insertMessageBefore(beforeMessageId: string): void;
+  consumeAutoFocusMessage(messageId: string): void;
   moveMessage(fromIndex: number, toIndex: number): void;
   removeMessage(id: string): void;
   updateSystemPrompt(systemPrompt: string): void;
@@ -186,6 +187,11 @@ export interface ThreadState {
     isError?: boolean
   ): void;
   addTool(tool: Tool): boolean;
+  setToolCallSubtaskPath(
+    messageId: string,
+    toolCallId: string,
+    path: string | null
+  ): void;
   updateTool(name: string, tool: Tool): boolean;
   removeTool(name: string): void;
   toggleMessageRole(id: string): void;
@@ -705,6 +711,11 @@ export function createThreadStore(
           ]);
           set({ autoFocusMessageId: message.id });
         },
+        consumeAutoFocusMessage(messageId: string) {
+          if (get().autoFocusMessageId === messageId) {
+            set({ autoFocusMessageId: null });
+          }
+        },
         moveMessage(fromIndex: number, toIndex: number) {
           updateMessages((messages) => {
             if (
@@ -1033,6 +1044,17 @@ export function createThreadStore(
               return undefined;
             }
             return { content, isError: nextIsError };
+          });
+        },
+        setToolCallSubtaskPath(messageId, toolCallId, path) {
+          updateMessage(messageId, (message) => {
+            if (message.role !== "assistant") return message;
+            return {
+              ...message,
+              toolCalls: message.toolCalls?.map((call) =>
+                call.id === toolCallId ? { ...call, subtaskPath: path } : call
+              ),
+            };
           });
         },
         toggleMessageRole(id: string) {
@@ -1815,6 +1837,7 @@ const selectActions = (s: ThreadState) => ({
 
   appendMessage: s.appendMessage,
   insertMessageBefore: s.insertMessageBefore,
+  consumeAutoFocusMessage: s.consumeAutoFocusMessage,
   moveMessage: s.moveMessage,
   removeMessage: s.removeMessage,
   updateSystemPrompt: s.updateSystemPrompt,

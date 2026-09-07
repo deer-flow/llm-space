@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
+import { usePlaygroundLabels } from "../playground-labels";
 
 import { parseTodoWriteInput } from "./todo-write-input";
 import { TodoWriteView } from "./todo-write-view";
@@ -227,9 +228,7 @@ function _ToolCallArgumentRow({
               "text-muted-foreground absolute top-0.5 left-0 size-5 aria-expanded:visible",
               // Object rows always show their expand/collapse chevron; other
               // rows only reveal the actions button on hover.
-              isObject
-                ? "visible"
-                : "invisible group-hover/argument:visible",
+              isObject ? "visible" : "invisible group-hover/argument:visible",
               open && "visible"
             )}
             size="icon-xs"
@@ -307,7 +306,9 @@ function _ToolCallArgumentRow({
         expanded={expanded}
         onToggle={toggleExpanded}
         onActivate={linkKind ? handleActivate : undefined}
-        activateTitle={linkKind === "url" ? "Open in browser" : "Reveal in file manager"}
+        activateTitle={
+          linkKind === "url" ? "Open in browser" : "Reveal in file manager"
+        }
       />
       {typeof value === "string" ? (
         <PreviewDialog
@@ -352,10 +353,7 @@ function _PathArrayArgumentRow({
         <span className="text-muted-foreground">: [</span>
       </div>
       {paths.map((p, index) => (
-        <div
-          key={index}
-          className="flex min-w-0 items-baseline whitespace-pre"
-        >
+        <div key={index} className="flex min-w-0 items-baseline whitespace-pre">
           <span className="shrink-0">{"    "}</span>
           <button
             type="button"
@@ -365,7 +363,9 @@ function _PathArrayArgumentRow({
           >
             {formatJson(p)}
           </button>
-          <span className="shrink-0">{index < paths.length - 1 ? "," : ""}</span>
+          <span className="shrink-0">
+            {index < paths.length - 1 ? "," : ""}
+          </span>
         </div>
       ))}
       <div className="whitespace-pre">
@@ -403,6 +403,8 @@ function ArgumentLine({
   onActivate?: () => void;
   activateTitle?: string;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const pointerDraggedRef = useRef(false);
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
@@ -488,7 +490,7 @@ function ArgumentLine({
     // The click handler lives on `line` itself; the wrapping span here is only
     // the tooltip trigger. Adding another onClick would fire onToggle twice as
     // the event bubbles, cancelling the toggle out.
-    <Tooltip content={`Click to ${expanded ? "collapse" : "expand"}`}>
+    <Tooltip content={expanded ? labels.collapse : labels.expand}>
       <span>{line}</span>
     </Tooltip>
   );

@@ -1,17 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-  mkdtemp,
-  realpath,
-  rm,
-  truncate,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, realpath, rm, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { createBuiltInToolsModule } from "../../../src/tools/built-in/built-in-tools-module";
 import { ToolRegistry } from "../../../src/tools/tool-registry";
-
 
 const TEMP_DIRS: string[] = [];
 
@@ -38,6 +31,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -78,6 +74,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: "/tmp/workspace",
     });
@@ -101,9 +100,16 @@ describe("built-in tools module", () => {
       "present_files",
       "generate_image",
       "generate_minimax_image",
+      ...(process.platform === "darwin"
+        ? ["list_voices", "speak", "stop_speaking"]
+        : []),
+      "spawn_agent",
       "todo_write",
       "sleep",
       "ask_user_question",
+      "calculator",
+      "date_difference",
+      "exec_code",
     ]);
     expect(
       tools.listTools().find((tool) => tool.name === "generate_image")
@@ -135,6 +141,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: "/tmp/workspace",
     } as never);
@@ -162,6 +171,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -199,6 +211,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -236,6 +251,9 @@ describe("built-in tools module", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
       }),
       workspaceRoot: directory,
     }).register(tools);

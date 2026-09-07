@@ -19,6 +19,7 @@ import {
 import { useCallback, type MouseEvent } from "react";
 
 import { useCommands } from "@/commands";
+import { useI18n } from "@/i18n/i18n-provider";
 import { electrobun } from "@/lib/electrobun";
 
 
@@ -36,6 +37,7 @@ export function Welcome({
   onModels,
 }: WelcomeProps) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
 
   const handleHeaderDoubleClick = useCallback(() => {
     void electrobun.rpc?.request.toggleMaximized({});
@@ -65,24 +67,21 @@ export function Welcome({
           <EmptyMedia variant="icon">
             <SparklesIcon className="size-8" />
           </EmptyMedia>
-          <EmptyTitle>Welcome to LLM Space 4</EmptyTitle>
-          <EmptyDescription>
-            Start with a ready agent thread, create a blank one, or open an
-            existing file from the left side panel.
-          </EmptyDescription>
+          <EmptyTitle>{t.welcome.title}</EmptyTitle>
+          <EmptyDescription>{t.welcome.description}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center gap-2">
           <Button onClick={onNewStarter}>
             <SparklesIcon />
-            Start from examples
+            {t.welcome.startFromExamples}
           </Button>
           <Button variant="outline" onClick={onNewFile}>
             <PlusIcon />
-            Blank thread
+            {t.welcome.blankThread}
           </Button>
           <Button variant="outline" onClick={onModels}>
             <SettingsIcon />
-            Configure models
+            {t.welcome.configureModels}
           </Button>
         </EmptyContent>
         <Button
@@ -92,7 +91,7 @@ export function Welcome({
           size="sm"
         >
           <a href="#" onClick={handleLearnMore}>
-            Learn more <ArrowUpRightIcon />
+            {t.welcome.learnMore} <ArrowUpRightIcon />
           </a>
         </Button>
       </Empty>

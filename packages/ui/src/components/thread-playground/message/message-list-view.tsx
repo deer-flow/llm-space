@@ -35,6 +35,7 @@ import { Button } from "@llm-space/ui/ui/button";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import {
   type RunValidationIssue,
   useThreadStore,
@@ -52,7 +53,9 @@ import {
 import { MessageListItem } from "./message-list-item";
 import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
+import { followMessageViewportBottom } from "./message-scroll-stability";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
+import { measureVirtualRowHeight } from "./virtual-row-measurement";
 
 const MESSAGE_VIRTUALIZATION_THRESHOLD = 20;
 const MESSAGE_OVERSCAN = 5;
@@ -121,6 +124,7 @@ export function MessageListView({
   /** Keep measured heights while an ancestor is hidden. */
   measurementsFrozen?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const isSnapshotView = messagesFromProps !== undefined;
   const status = useThreadStore((state) => state.status);
   const streamingMessageId = useThreadStore(
@@ -138,8 +142,12 @@ export function MessageListView({
   const storeMessages = useThreadStore(
     (state) => state.thread.context?.messages
   );
-  const { appendMessage, moveMessage, resolveRunValidationIssue } =
-    useThreadStoreActions();
+  const {
+    appendMessage,
+    consumeAutoFocusMessage,
+    moveMessage,
+    resolveRunValidationIssue,
+  } = useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
@@ -171,6 +179,13 @@ export function MessageListView({
     () => messages.map((message) => message.id),
     [messages]
   );
+  const autoFocusMessageIndex = autoFocusMessageId
+    ? messages.findIndex((message) => message.id === autoFocusMessageId)
+    : -1;
+  const validationMessageId = runValidationIssue?.messageId ?? null;
+  const validationMessageIndex = validationMessageId
+    ? messages.findIndex((message) => message.id === validationMessageId)
+    : -1;
   const collapsedMessageIdSet = useMemo(
     () => new Set(collapsedMessageIds),
     [collapsedMessageIds]
@@ -192,17 +207,14 @@ export function MessageListView({
     (index: number) => {
       const message = displayMessages[index];
       return message
-        ? _estimateMessageHeight(
-            message,
-            collapsedMessageIdSet.has(message.id)
-          )
+        ? _estimateMessageHeight(message, collapsedMessageIdSet.has(message.id))
         : 240;
     },
     [collapsedMessageIdSet, displayMessages]
   );
   // TanStack Virtual exposes a mutable imperative controller by design.
   // eslint-disable-next-line react-hooks/incompatible-library
-  const virtualizer = useVirtualizer({
+  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: shouldVirtualize ? displayRows.length : 0,
     estimateSize: estimateMessageSize,
     getItemKey: getMessageKey,
@@ -212,8 +224,8 @@ export function MessageListView({
     directDomUpdates: true,
     directDomUpdatesMode: "transform",
     useCachedMeasurements: measurementsFrozen || dragging,
-    measureElement: (element) => {
-      const height = element.getBoundingClientRect().height;
+    measureElement: (element, entry) => {
+      const height = measureVirtualRowHeight(element, entry);
       const index = Number(element.getAttribute("data-index"));
       const message = displayMessages[index];
       if (message && height > 0) {
@@ -300,12 +312,6 @@ export function MessageListView({
     },
     [messageIds, moveMessage]
   );
-  const scrollToBottom = useCallback(() => {
-    const viewport = getScrollElement();
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
-    }
-  }, [getScrollElement]);
   const scrollToMessageIndex = useCallback(
     (
       index: number,
@@ -401,32 +407,34 @@ export function MessageListView({
     };
   }, [displayRows.length, getScrollElement, shouldVirtualize]);
   useEffect(() => {
-    if (status === "running") {
-      scrollToBottom();
-    }
-  }, [status, scrollToBottom]);
-  useEffect(() => {
-    if (!autoFocusMessageId) {
+    if (status !== "running") {
       return;
     }
-    const index = messages.findIndex(
-      (message) => message.id === autoFocusMessageId
-    );
-    if (index >= 0) {
-      scrollToMessageIndex(index, "auto");
-    }
-  }, [autoFocusMessageId, messages, scrollToMessageIndex]);
-  useEffect(() => {
-    if (!runValidationIssue?.messageId) {
+    const viewport = getScrollElement();
+    const content = contentRef.current;
+    if (!viewport || !content) {
       return;
     }
-    const index = messages.findIndex(
-      (message) => message.id === runValidationIssue.messageId
-    );
-    if (index >= 0) {
-      scrollToMessageIndex(index, "auto");
+    return followMessageViewportBottom(viewport, content);
+  }, [getScrollElement, status]);
+  useEffect(() => {
+    if (!autoFocusMessageId || autoFocusMessageIndex < 0) {
+      return;
     }
-  }, [messages, runValidationIssue, scrollToMessageIndex]);
+    scrollToMessageIndex(autoFocusMessageIndex, "auto");
+    consumeAutoFocusMessage(autoFocusMessageId);
+  }, [
+    autoFocusMessageId,
+    autoFocusMessageIndex,
+    consumeAutoFocusMessage,
+    scrollToMessageIndex,
+  ]);
+  useEffect(() => {
+    if (!validationMessageId || validationMessageIndex < 0) {
+      return;
+    }
+    scrollToMessageIndex(validationMessageIndex, "auto");
+  }, [validationMessageId, validationMessageIndex, scrollToMessageIndex]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const showNavigator = displayMessages.length > 1;
@@ -455,8 +463,11 @@ export function MessageListView({
                 items={messageIds}
                 strategy={verticalListSortingStrategy}
               >
+                {/* TanStack writes the virtual height directly to the DOM, so
+                    these layouts must not reuse the same container node. */}
                 {shouldVirtualize ? (
                   <div
+                    key="virtualized"
                     ref={virtualizer.containerRef}
                     className="relative w-full"
                   >
@@ -482,7 +493,7 @@ export function MessageListView({
                     })}
                   </div>
                 ) : (
-                  <div className="w-full pt-3">
+                  <div key="standard" className="w-full pt-3">
                     {displayRows.map((row, index) => (
                       <MessageRow
                         key={row.message.id}
@@ -528,7 +539,7 @@ export function MessageListView({
                 }
               >
                 <PlusIcon className="size-4" />
-                Add message
+                {dialogs.messages.add}
               </Button>
               {addMessageSuggested && !dragging && !readonly ? (
                 <>

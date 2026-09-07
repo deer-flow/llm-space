@@ -12,12 +12,14 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 
+import { usePlaygroundLabels } from "./thread-playground/playground-labels";
+
 export function ConfirmDialog({
   open,
   onOpenChange,
   title,
   description,
-  cancelLabel = "Cancel",
+  cancelLabel,
   confirmLabel,
   confirmVariant = "destructive",
   onCancel,
@@ -41,6 +43,7 @@ export function ConfirmDialog({
    */
   dimBackground?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showOverlay={dimBackground}>
@@ -55,7 +58,7 @@ export function ConfirmDialog({
             variant="ghost"
             onClick={() => (onCancel ? onCancel() : onOpenChange(false))}
           >
-            {cancelLabel}
+            {cancelLabel ?? dialogs.cancel}
           </Button>
           <Button variant={confirmVariant} onClick={onConfirm}>
             {confirmLabel}

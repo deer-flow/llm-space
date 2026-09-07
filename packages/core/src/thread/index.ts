@@ -10,3 +10,6 @@ export * from "./run-history-entry";
 export * from "./token-usage";
 export * from "./tool-call-status";
 export * from "./usage";
+export * from "./meta-user-message";
+export * from "./file-stem";
+export * from "./spawn-agent";

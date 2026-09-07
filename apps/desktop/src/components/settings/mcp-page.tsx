@@ -18,6 +18,7 @@ import {
   type McpTransportType,
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
+import { Link } from "@llm-space/ui/components/link";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -25,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
@@ -48,6 +50,7 @@ import {
   Database,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
   Loader2,
   MoreHorizontal,
@@ -84,8 +87,11 @@ import {
   removeMcpServer,
   updateMcpServer,
 } from "@/client/mcp";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import type { RuntimeId } from "@/shared/runtime";
 
+import { matchesMcpEndpoint, MCP_RECOMMENDATIONS } from "./mcp-recommendations";
 import { SettingsEmptyState } from "./settings-empty-state";
 import { SettingsPage } from "./settings-page";
 
@@ -119,7 +125,7 @@ const EMPTY_FORM: ServerForm = {
   headers: [],
 };
 
-function _formFromServer(server: McpServerView | null): ServerForm {
+function _formFromServer(server: McpServerDraft | null): ServerForm {
   if (!server) {
     return { ...EMPTY_FORM };
   }
@@ -197,6 +203,7 @@ function _canCreateServer(form: ServerForm): boolean {
 }
 
 export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
+  const { t } = useI18n();
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIdBeforeCreate, setSelectedIdBeforeCreate] = useState<
@@ -272,13 +279,24 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when the selected server's id changes, not on every object update (would clobber in-progress edits)
   }, [creating, selectedServer?.id]);
 
-  const createServer = () => {
-    setSelectedIdBeforeCreate(selectedId);
+  const createServer = (draft?: McpServerDraft) => {
+    if (!creating) setSelectedIdBeforeCreate(selectedId);
     setCreating(true);
     setSelectedId(null);
     setFormError(null);
-    setForm({ ...EMPTY_FORM });
-    setDirty(false);
+    const nextForm = _formFromServer(draft ?? null);
+    if (draft) {
+      let suffix = 2;
+      while (
+        servers.some(
+          (server) => server.serverName === normalizeMcpName(nextForm.name)
+        )
+      ) {
+        nextForm.name = `${draft.name} ${suffix++}`;
+      }
+    }
+    setForm(nextForm);
+    setDirty(Boolean(draft));
     setTools([]);
   };
 
@@ -456,14 +474,11 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
   };
 
   return (
-    <SettingsPage
-      title="MCP"
-      description="Connect a server to expose its tools, which you can then add to a thread's tools."
-    >
+    <SettingsPage title={t.mcp.title} description={t.mcp.description}>
       {loading && servers.length === 0 && !creating ? (
         <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading MCP servers
+          {t.mcp.loading}
         </div>
       ) : servers.length === 0 && !creating ? (
         <McpEmptyState onAdd={createServer} />
@@ -472,13 +487,13 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
           <aside className="flex w-58 shrink-0 flex-col gap-3 border-r pr-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                SERVERS
+                {t.mcp.servers}
               </span>
               <div className="flex items-center gap-1">
-                <Tooltip content="Refresh servers">
+                <Tooltip content={t.mcp.refresh}>
                   <button
                     type="button"
-                    aria-label="Refresh MCP servers"
+                    aria-label={t.mcp.refresh}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
                     onClick={() => void refresh()}
                   >
@@ -489,17 +504,16 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     )}
                   </button>
                 </Tooltip>
-                <Tooltip content="Add MCP server">
+                <AddMcpMenu onAdd={createServer}>
                   <button
                     type="button"
-                    aria-label="Add MCP server"
+                    aria-label={t.mcp.add}
                     disabled={saving || dirty || testingServerId !== null}
                     className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors disabled:pointer-events-none disabled:opacity-50"
-                    onClick={createServer}
                   >
                     <Plus className="size-4" />
                   </button>
-                </Tooltip>
+                </AddMcpMenu>
               </div>
             </div>
             <ScrollArea className="min-h-0 grow">
@@ -530,14 +544,14 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     className="bg-accent flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left"
                   >
                     <span className="truncate text-sm font-medium">
-                      Unsaved server
+                      {t.mcp.unsaved}
                     </span>
                   </button>
                 ) : null}
                 {pluginServers.length > 0 ? (
                   <>
                     <div className="text-muted-foreground mt-5 px-2 text-xs font-medium tracking-wide uppercase">
-                      MCPs in Plugins
+                      {t.mcp.pluginServers}
                     </div>
                     {pluginServers.map((server) => (
                       <button
@@ -601,7 +615,7 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
               />
             ) : (
               <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Select or add an MCP server
+                {t.mcp.selectServer}
               </div>
             )}
           </main>
@@ -612,13 +626,15 @@ export function McpPage({ runtimeId }: { runtimeId: RuntimeId }) {
         onOpenChange={(open) => {
           if (!open) setRemoveServerId(null);
         }}
-        title="Remove MCP Server"
+        title={t.mcp.removeTitle}
         description={
           serverPendingRemoval
-            ? `Remove ${serverPendingRemoval.name} from local MCP settings?`
+            ? formatMessage(t.mcp.removeDescription, {
+                name: serverPendingRemoval.name,
+              })
             : undefined
         }
-        confirmLabel="Remove"
+        confirmLabel={t.mcp.remove}
         dimBackground={false}
         onConfirm={() => void confirmRemove()}
       />
@@ -641,6 +657,7 @@ function McpServerListItem({
   onTest: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -653,7 +670,7 @@ function McpServerListItem({
         "group relative flex min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors",
         disabled
           ? "pointer-events-none opacity-50"
-          : "cursor-pointer hover:bg-accent",
+          : "hover:bg-accent cursor-pointer",
         selected && "bg-accent"
       )}
       onClick={() => {
@@ -703,12 +720,12 @@ function McpServerListItem({
         >
           <DropdownMenuItem onSelect={onTest}>
             <RefreshCw />
-            {server.connected ? "Retest" : "Connect & Test"}
+            {server.connected ? t.mcp.retest : t.mcp.connectTest}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={onRemove}>
             <Trash2 />
-            Remove
+            {t.mcp.remove}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -716,34 +733,67 @@ function McpServerListItem({
   );
 }
 
-function McpEmptyState({ onAdd }: { onAdd: () => void }) {
+function AddMcpMenu({
+  onAdd,
+  children,
+}: {
+  onAdd: (draft?: McpServerDraft) => void;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-52">
+        <DropdownMenuItem onSelect={() => onAdd()}>
+          <Plus />
+          {t.mcp.addNew}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div role="group" aria-label={t.mcp.recommended}>
+          <DropdownMenuLabel>{t.mcp.recommended}</DropdownMenuLabel>
+          {MCP_RECOMMENDATIONS.map(({ draft }) => (
+            <DropdownMenuItem key={draft.name} onSelect={() => onAdd(draft)}>
+              {draft.name}
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function McpEmptyState({ onAdd }: { onAdd: (draft?: McpServerDraft) => void }) {
+  const { t } = useI18n();
   return (
     <SettingsEmptyState
       icon={ServerCog}
       wallIcons={MCP_WALL_ICONS}
-      title="Connect tools through MCP"
-      description="Add a local command or remote endpoint, discover its tools, and make those capabilities available to your threads."
+      title={t.mcp.title}
+      description={t.mcp.description}
       actions={
-        <Button onClick={onAdd}>
-          <Plus className="size-4" />
-          Add MCP server
-        </Button>
+        <AddMcpMenu onAdd={onAdd}>
+          <Button>
+            <Plus className="size-4" />
+            {t.mcp.add}
+          </Button>
+        </AddMcpMenu>
       }
       capabilities={[
         {
           icon: ServerCog,
-          title: "Local or remote",
-          description: "Connect with stdio, HTTP, or SSE transports.",
+          title: t.mcp.localRemote,
+          description: t.mcp.localRemoteHint,
         },
         {
           icon: Sparkles,
-          title: "Discover tools",
-          description: "Test the connection and inspect exposed capabilities.",
+          title: t.mcp.discover,
+          description: t.mcp.discoverHint,
         },
         {
           icon: Waypoints,
-          title: "Use in threads",
-          description: "Choose the tools each thread can call.",
+          title: t.mcp.useInThreads,
+          description: t.mcp.useInThreadsHint,
         },
       ]}
     />
@@ -801,6 +851,17 @@ function ServerEditor({
   onDisconnect: () => void;
   onCancel: () => void;
 }) {
+  const { lang, t } = useI18n();
+  const recommendation = MCP_RECOMMENDATIONS.find(
+    ({ draft }) =>
+      draft.transport === form.transport &&
+      (draft.transport === "stdio"
+        ? draft.command === form.command &&
+          form.argsText
+            .split("\n")
+            .includes(draft.args?.find((arg) => !arg.startsWith("-")) ?? "")
+        : matchesMcpEndpoint(form.url, draft.url))
+  );
   const patch = (partial: Partial<ServerForm>) =>
     onFormChange({ ...form, ...partial });
   const savedToolItems: McpToolSummary[] =
@@ -877,10 +938,10 @@ function ServerEditor({
                   <RefreshCw />
                 )}
                 {testing
-                  ? "Cancel"
+                  ? t.mcp.cancel
                   : server.connected
-                    ? "Retest"
-                    : "Connect & Test"}
+                    ? t.mcp.retest
+                    : t.mcp.connectTest}
               </Button>
               {server.connected ? (
                 <Button
@@ -894,12 +955,37 @@ function ServerEditor({
                   ) : (
                     <Unplug />
                   )}
-                  Disconnect
+                  {t.mcp.disconnect}
                 </Button>
               ) : null}
             </>
           ) : null}
         </div>
+
+        {recommendation?.credential && !readOnly ? (
+          <div className="border-primary/20 bg-primary/5 flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3">
+            <div className="min-w-0 flex-1 basis-48">
+              <p className="text-sm font-medium">
+                {recommendation.credential.requirement === "required"
+                  ? t.mcp.apiTokenRequired
+                  : t.mcp.apiTokenOptional}
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                {_recommendationCredentialInstructions(
+                  recommendation.draft.name,
+                  recommendation.credential.instructions,
+                  lang
+                )}
+              </p>
+            </div>
+            <Button asChild size="sm" className="shrink-0">
+              <Link href={recommendation.credential.url}>
+                {t.mcp.getApiToken}
+                <ExternalLink className="size-3.5" />
+              </Link>
+            </Button>
+          </div>
+        ) : null}
 
         {formError ? (
           <div className="border-destructive/40 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
@@ -912,7 +998,17 @@ function ServerEditor({
           <ReadinessPanel server={server} liveToolsLoaded={tools.length > 0} />
         ) : null}
 
-        <Field label="Name">
+        {recommendation && !readOnly ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            {_recommendationSetupHint(
+              recommendation.draft.name,
+              recommendation.setupHint,
+              lang
+            )}
+          </p>
+        ) : null}
+
+        <Field label={t.mcp.name}>
           <Input
             value={form.name}
             aria-label="MCP server name"
@@ -923,9 +1019,9 @@ function ServerEditor({
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-sm font-medium">Use original tool names</span>
+            <span className="text-sm font-medium">{t.mcp.originalNames}</span>
             <span className="text-muted-foreground text-xs">
-              Expose tools without the MCP server prefix, for example web_fetch.
+              {t.mcp.originalNamesHint}
             </span>
           </div>
           <Switch
@@ -938,7 +1034,7 @@ function ServerEditor({
           />
         </div>
 
-        <Field label="Transport">
+        <Field label={t.mcp.transport}>
           <Select
             value={form.transport}
             disabled={readOnly}
@@ -959,26 +1055,26 @@ function ServerEditor({
 
         {form.transport === "stdio" ? (
           <>
-            <Field label="Command">
+            <Field label={t.mcp.command}>
               <Input
                 value={form.command}
                 aria-label="MCP stdio command"
-                placeholder="npx"
+                placeholder={t.mcp.commandPlaceholder}
                 readOnly={readOnly}
                 onChange={(event) => patch({ command: event.target.value })}
               />
             </Field>
-            <Field label="Args">
+            <Field label={t.mcp.args}>
               <Textarea
                 className="min-h-18"
                 value={form.argsText}
                 aria-label="MCP stdio args"
-                placeholder={"-y\n@modelcontextprotocol/server-filesystem"}
+                placeholder={t.mcp.argsPlaceholder}
                 readOnly={readOnly}
                 onChange={(event) => patch({ argsText: event.target.value })}
               />
             </Field>
-            <Field label="Working directory">
+            <Field label={t.mcp.workingDirectory}>
               <Input
                 value={form.cwd}
                 aria-label="MCP stdio working directory"
@@ -987,7 +1083,7 @@ function ServerEditor({
               />
             </Field>
             <KeyValueRows
-              label="Environment"
+              label={t.mcp.environment}
               rows={form.env}
               valueType="password"
               revealValue
@@ -999,22 +1095,22 @@ function ServerEditor({
           </>
         ) : (
           <>
-            <Field label="URL">
+            <Field label={t.mcp.url}>
               <Input
                 value={form.url}
                 aria-label="MCP remote URL"
-                placeholder="https://example.com/mcp"
+                placeholder={t.mcp.urlPlaceholder}
                 readOnly={readOnly}
                 onChange={(event) => patch({ url: event.target.value })}
               />
             </Field>
             <KeyValueRows
-              label="Headers"
+              label={t.mcp.headers}
               rows={form.headers}
               valueType="password"
               revealValue
-              namePlaceholder="Authorization"
-              valuePlaceholder="Bearer $TOKEN"
+              namePlaceholder={t.mcp.headerNamePlaceholder}
+              valuePlaceholder={t.mcp.headerValuePlaceholder}
               readOnly={readOnly}
               onChange={(headers) => patch({ headers })}
             />
@@ -1024,7 +1120,7 @@ function ServerEditor({
         {server ? (
           <div className="flex flex-col gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="text-sm font-medium">Tools</span>
+              <span className="text-sm font-medium">{t.mcp.tools}</span>
               {server.toolCount !== null ? (
                 <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
                   {server.toolCount}
@@ -1039,7 +1135,7 @@ function ServerEditor({
             <div className="flex flex-col gap-1.5">
               {toolItems.length === 0 ? (
                 <div className="text-muted-foreground px-1 py-2 text-xs">
-                  No tools loaded.
+                  {t.mcp.noTools}
                 </div>
               ) : (
                 toolItems.map((tool) => (
@@ -1064,6 +1160,7 @@ function ReadinessPanel({
   server: McpServerView;
   liveToolsLoaded: boolean;
 }) {
+  const { t } = useI18n();
   const readiness = server.readiness ?? _emptyReadiness();
   const label = getMcpReadinessLabel(readiness);
   const statusClass =
@@ -1081,7 +1178,9 @@ function ReadinessPanel({
     <div className="border-border bg-muted/30 flex flex-col gap-2 rounded-md border px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
         <StatusDot server={server} />
-        <span className={cn("text-sm font-medium", statusClass)}>{label}</span>
+        <span className={cn("text-sm font-medium", statusClass)}>
+          {_localizedReadinessLabel(label, t)}
+        </span>
         <span className="text-muted-foreground truncate text-xs">{detail}</span>
       </div>
       {server.lastError ? (
@@ -1092,27 +1191,27 @@ function ReadinessPanel({
       ) : null}
       {server.connected ? (
         <div className="text-muted-foreground text-xs">
-          Connected now in this app session.
+          {t.mcp.connectedNow}
         </div>
       ) : readiness.status === "ready" || readiness.status === "stale" ? (
         <div className="text-muted-foreground text-xs">
-          Not connected. This is the last saved test result.
+          {t.mcp.notConnected}
         </div>
       ) : null}
       {diagnostic ? (
         <div className="border-border/70 mt-1 flex flex-col gap-2 border-t pt-2">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-xs font-medium">Diagnostics</div>
+              <div className="text-xs font-medium">{t.mcp.diagnostics}</div>
               <div className="text-muted-foreground truncate text-xs">
                 {diagnostic.headline}
               </div>
             </div>
-            <Tooltip content="Copy diagnostic summary">
+            <Tooltip content={t.mcp.copyDiagnostic}>
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Copy diagnostic summary"
+                aria-label={t.mcp.copyDiagnostic}
                 onClick={() => void _copyDiagnosticSummary(diagnostic.summary)}
               >
                 <Copy className="size-3.5" />
@@ -1335,6 +1434,7 @@ function SecretValueInput({
   readOnly?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative w-full">
@@ -1348,7 +1448,11 @@ function SecretValueInput({
         onChange={(event) => onChange(event.target.value)}
       />
       {revealable ? (
-        <Tooltip content={visible ? "Hide value" : "Show value"}>
+        <Tooltip
+          content={
+            visible ? t.common.tooltips.hideValue : t.common.tooltips.showValue
+          }
+        >
           <button
             type="button"
             aria-label={`${visible ? "Hide" : "Show"} ${ariaLabel}`}
@@ -1417,4 +1521,42 @@ function _sidebarReadiness(server: McpServerView): string {
   return `${label} · ${readiness.toolCount} tool${
     readiness.toolCount === 1 ? "" : "s"
   }`;
+}
+
+function _localizedReadinessLabel(
+  label: string,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
+  switch (label.toLowerCase()) {
+    case "ready":
+      return t.mcp.ready;
+    case "stale":
+      return t.mcp.stale;
+    case "untested":
+      return t.mcp.untested;
+    default:
+      return label;
+  }
+}
+
+function _recommendationSetupHint(
+  name: string,
+  fallback: string,
+  lang: ReturnType<typeof useI18n>["lang"]
+): string {
+  if (lang !== "zh") return fallback;
+  if (name === "Amap")
+    return "使用高德地图搜索地点和规划路线，无需安装额外软件即可远程连接。";
+  return fallback;
+}
+
+function _recommendationCredentialInstructions(
+  name: string,
+  fallback: string,
+  lang: ReturnType<typeof useI18n>["lang"]
+): string {
+  if (lang !== "zh") return fallback;
+  if (name === "Amap")
+    return "请在高德开放平台控制台创建 Web 服务类型的 Key，然后在连接前将它粘贴到下方 URL 的 key= 后。";
+  return fallback;
 }

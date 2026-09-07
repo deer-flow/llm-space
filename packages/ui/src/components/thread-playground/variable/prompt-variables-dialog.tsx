@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@llm-space/ui/ui/dialog";
 
+import { usePlaygroundLabels } from "../playground-labels";
+
 import {
   PromptVariablesPanel,
   type PromptVariableSelection,
@@ -34,6 +36,7 @@ function _PromptVariablesDialog({
   onOpenChange,
 }: PromptVariablesDialogProps) {
   const { actions } = useHostServices();
+  const { dialogs } = usePlaygroundLabels();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,12 +46,8 @@ function _PromptVariablesDialog({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="shrink-0 border-b px-4 py-3">
-          <DialogTitle>Variables</DialogTitle>
-          <DialogDescription>
-            Use `{"{{variable_name}}"}` as placeholder in your prompt, messages
-            and tool results to reference the variable. e.g. `
-            {"{{current_date}}"}` will be replaced with the current date.
-          </DialogDescription>
+          <DialogTitle>{dialogs.variables.title}</DialogTitle>
+          <DialogDescription>{dialogs.variables.description}</DialogDescription>
         </DialogHeader>
         <PromptVariablesPanel
           className="min-h-0 grow"
@@ -58,12 +57,10 @@ function _PromptVariablesDialog({
         <DialogFooter className="shrink-0 border-t px-4 py-3 sm:justify-start">
           <Button
             variant="ghost"
-            onClick={() =>
-              actions.openLink(docsUrl("variables-and-templates"))
-            }
+            onClick={() => actions.openLink(docsUrl("variables-and-templates"))}
           >
             <CircleHelpIcon className="size-4" />
-            Help
+            {dialogs.variables.help}
           </Button>
         </DialogFooter>
       </DialogContent>

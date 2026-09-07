@@ -7,6 +7,7 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@llm-space/ui/ui/dialog";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStoreActions } from "../stores";
 
 import { useImageDisplay } from "./image-display-context";
@@ -29,6 +30,8 @@ function _ImageContentView({
   compact?: boolean;
   imageNumber?: number;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -68,9 +71,10 @@ function _ImageContentView({
             "text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors",
             className
           )}
-          aria-label="Open image preview"
+          aria-label={labels.openImagePreview}
         >
-          <ImageIcon className="size-3.5" />[Image #{imageNumber}]
+          <ImageIcon className="size-3.5" />
+          [Image #{imageNumber}]
         </button>
       ) : (
         <div
@@ -81,7 +85,7 @@ function _ImageContentView({
           onClick={handleOpenPreview}
           role="button"
           tabIndex={0}
-          aria-label="Open image preview"
+          aria-label={labels.openImagePreview}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
@@ -100,12 +104,12 @@ function _ImageContentView({
             )}
           />
           {!readonly && onRemove && (
-            <Tooltip content="Remove image">
+            <Tooltip content={labels.removeImage}>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 className="bg-background/80 absolute top-1 right-1 rounded-full border opacity-0 transition-opacity group-hover/image:opacity-100"
-                aria-label="Remove image"
+                aria-label={labels.removeImage}
                 onClick={handleRemove}
               >
                 <XIcon className="size-4" />

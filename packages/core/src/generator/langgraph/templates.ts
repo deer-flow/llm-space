@@ -984,7 +984,8 @@ async def get_mcp_tools():
  */
 export function planMd(
   functionTools: FunctionTool[],
-  mcpTools: McpTool[]
+  mcpTools: McpTool[],
+  hasSpawnAgent = false,
 ): string {
   const sections: string[] = [
     `# PLAN.md
@@ -999,6 +1000,12 @@ cp .env.example .env   # fill in any missing API keys
 make dev
 \`\`\``,
   ];
+
+  if (hasSpawnAgent) {
+    sections.push(
+      "## Unsupported built-in tool\n\n`spawn_agent` is not supported in Python exports. Its placeholder raises `NotImplementedError` and creates no files. Create subtask threads manually in the LLM Space desktop app.",
+    );
+  }
 
   if (functionTools.length > 0) {
     const list = functionTools
@@ -1035,7 +1042,7 @@ env vars) in \`.env\` — see \`.env.example\`. Tool metadata is in
 ${list}`);
   }
 
-  if (functionTools.length === 0 && mcpTools.length === 0) {
+  if (functionTools.length === 0 && mcpTools.length === 0 && !hasSpawnAgent) {
     sections.push("Nothing else to implement — the agent is ready to run.");
   }
 

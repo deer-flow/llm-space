@@ -4,6 +4,155 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.1] - 2026-09-07
+
+### Added
+
+- The built-in Tencent Token Hub provider connects to its OpenAI-compatible
+  endpoint, discovers `TOKENHUB_API_KEY` or `TOKEN_HUB_API_KEY`, and includes
+  current Hunyuan, DeepSeek, GLM, Kimi, MiniMax, Qwen, MiMo, and vision models.
+
+### Changed
+
+- Confirmed `@earendil-works/pi-ai` 0.85.1 as the latest registry release on
+  2026-09-07 and retained the local Responses compatibility patch.
+
+### Fixed
+
+- Custom request-header controls and Anthropic Base URL guidance in model
+  profiles now follow the selected interface language, including accessible
+  labels.
+
+## [4.18.0] - 2026-09-07
+
+This release upgrades the Pi agent runtime and completes the first broad
+internationalization pass, bringing a Chinese interface across the desktop app
+and shared Thread Playground.
+
+### Added
+
+- A Chinese interface language now covers the desktop shell, settings,
+  dialogs, and Thread Playground, with bilingual command-palette matching and
+  localized provider names.
+- The bundled cross-project Memory plugin gives agents an opt-in durable store
+  for preferences, project conventions, and decisions.
+- Search settings now include Exa, AnySearch, and Zhihu MCP providers alongside
+  the existing search integrations.
+- The built-in Aliyun Qwen provider uses the DashScope OpenAI-compatible API,
+  discovers `DASHSCOPE_API_KEY`, and includes Qwen 3.8/3.7 plus selected
+  DeepSeek, Kimi, GLM, and MiniMax models.
+- A short-drama writer example demonstrates a structured creative-writing
+  workflow in the Thread Playground.
+
+### Changed
+
+- Updated `@earendil-works/pi-ai` and `@earendil-works/pi-agent-core` to
+  0.85.1, the latest registry release checked on 2026-09-07, while retaining
+  the local Responses compatibility patch.
+
+### Fixed
+
+- Zhihu search handles server-initiated JSON-RPC requests on its SSE stream.
+
+## [4.17.0] - 2026-09-05
+
+### Added
+
+- The MCP add menu now offers alphabetized presets for Amap, Chrome DevTools,
+  Context7, ElevenLabs, GitHub, and Playwright alongside custom server setup.
+- MCP credential guidance includes a prominent Get API token link, required or
+  optional status, and provider-specific setup instructions.
+- macOS Speech built-in tools list installed voices, read text aloud with a
+  selected voice and speech rate, and stop playback without affecting other
+  applications. They require no API key and appear in the Media category on
+  macOS runtimes.
+
+### Changed
+
+- Updated the Pi model and agent libraries to 0.85.0 while retaining the local
+  Responses compatibility patch.
+
+### Fixed
+
+- Switching thread tabs selects and reveals the corresponding file in the
+  sidebar without reopening tabs or moving keyboard focus.
+- MCP credential guidance remains visible after adding a Key to a remote
+  server URL, and duplicate recommended servers receive unique names.
+
+## [4.16.0] - 2026-09-03
+
+### Added
+
+- A `spawn_agent` built-in Tool requests a manually created subtask. Calls pause
+  automatic execution and ReAct loops; creating a subtask opens its tab and
+  expands its folder without starting a run or filling in the tool response.
+- Subtasks inherit prompt templates, variables, model settings, and tools suited
+  to general work, research, or code review. Readable task names become unique
+  filenames, and missing subtask files can be created again from the tool card.
+- An `exec_code` built-in Tool runs Python, JavaScript, and TypeScript in
+  persistent sessions, retaining variables and imports between calls.
+- `calculator` and `date_difference` built-in Tools handle mathematical
+  expressions and date or time intervals, with matching Python exports.
+
+### Changed
+
+- The General Agent template now includes `exec_code` and replaces its previous
+  `agent()` function with `spawn_agent`.
+- Python exports explicitly report that manual subtask creation requires the
+  desktop app; generated tools and project plans explain this limitation.
+- Scrollbars use consistent thumb styling throughout the app.
+- The remote runtime protocol is now v5. Update the server alongside the desktop
+  app to use this version.
+
+### Fixed
+
+- Long conversations in the Performance edition keep consistent message spacing
+  when the page is zoomed.
+
+## [4.15.2] - 2026-08-29
+
+### Fixed
+
+- The Performance edition waits for Chromium's DOM-ready signal before
+  restoring page zoom, preventing second-launch startup crashes caused by
+  executing JavaScript before the CEF browser exists.
+
+## [4.15.1] - 2026-08-29
+
+### Fixed
+
+- Prompt templates that reference live skill variables refresh when the enabled
+  skill set changes instead of reusing stale whole-template snapshots. Existing
+  thread snapshots migrate automatically on their next run.
+- Message views no longer steal the scroll position when streaming starts away
+  from the bottom or after a one-shot message focus has already been consumed.
+
+## [4.15.0] - 2026-08-27
+
+### Changed
+
+- The Performance edition now supports persistent View menu zoom with
+  viewport-compensated Chromium rendering. Zoom In uses the easier `Command+=`
+  shortcut on macOS, alongside the existing Zoom Out and Reset Zoom actions.
+
+### Fixed
+
+- Leaving fullscreen restores the last normal or maximized window state instead
+  of persisting transient macOS transition bounds.
+
+## [4.14.2] - 2026-08-27
+
+### Changed
+
+- The bundled pi packages are upgraded to `0.84.3` while preserving Responses
+  native-tool replay, citations, and provider-hosted activity metadata.
+
+### Fixed
+
+- Message lists follow streaming output without fighting user scrolling, and
+  switching between standard and virtualized layouts no longer reuses stale
+  container measurements.
+
 ## [4.14.1] - 2026-08-19
 
 ### Fixed

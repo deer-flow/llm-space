@@ -14,12 +14,15 @@ import { toast } from "sonner";
 import { listPluginCommands } from "@/client/plugins";
 import type { PluginActiveTab } from "@/client/plugins";
 import { useCommands } from "@/commands";
+import { useI18n } from "@/i18n/i18n-provider";
 import { electrobun } from "@/lib/electrobun";
+import { commandLabel, commandLabels } from "@/shared/command-labels";
 import {
   COMMAND_META,
   type Command as AppCommand,
   type CommandType,
 } from "@/shared/commands";
+import { paletteLabels } from "@/shared/palette-labels";
 
 import { usePluginCommandExecution } from "./plugin-command-execution-provider";
 import {
@@ -55,6 +58,7 @@ export function CommandPalette({
   ) => Promise<void>;
 }) {
   const { executeCommand } = useCommands();
+  const { lang, t } = useI18n();
   const { runPluginCommand } = usePluginCommandExecution();
   const [pluginCommands, setPluginCommands] = useState<
     Awaited<ReturnType<typeof listPluginCommands>>
@@ -80,7 +84,9 @@ export function CommandPalette({
   const types = (Object.keys(COMMAND_META) as CommandType[]).filter(
     (type) =>
       !blacklist.includes(type) &&
-      matchesCommandText(COMMAND_META[type].label, search)
+      // Match in either language so an English query still finds a command
+      // while the UI is in Chinese, and vice versa.
+      commandLabels(type).some((label) => matchesCommandText(label, search))
   );
   const visiblePluginCommands = pluginCommands.filter((command) => {
     try {
@@ -108,18 +114,21 @@ export function CommandPalette({
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <Command shouldFilter={false}>
         <CommandInput
-          placeholder="Search commands or enter arguments..."
+          placeholder={t.palette.placeholder}
           value={search}
           onValueChange={setSearch}
         />
         <CommandList>
-          <CommandEmpty>No commands found.</CommandEmpty>
+          <CommandEmpty>{t.palette.empty}</CommandEmpty>
           {types.map((type) => (
             <CommandItem key={type} onSelect={() => run(type)}>
-              {COMMAND_META[type].label}
+              {commandLabel(type, lang)}
             </CommandItem>
           ))}
-          {onSaveTo && matchesCommandText("Save to", search) ? (
+          {onSaveTo &&
+          paletteLabels("saveTo").some((label) =>
+            matchesCommandText(label, search)
+          ) ? (
             <CommandItem
               value="Save to Thread Storage"
               onSelect={() => {
@@ -127,10 +136,13 @@ export function CommandPalette({
                 onSaveTo();
               }}
             >
-              Save to…
+              {t.palette.saveTo}
             </CommandItem>
           ) : null}
-          {onImportFrom && matchesCommandText("Import from", search) ? (
+          {onImportFrom &&
+          paletteLabels("importFrom").some((label) =>
+            matchesCommandText(label, search)
+          ) ? (
             <CommandItem
               value="Import from Thread Storage"
               onSelect={() => {
@@ -138,7 +150,7 @@ export function CommandPalette({
                 onImportFrom();
               }}
             >
-              Import from…
+              {t.palette.importFrom}
             </CommandItem>
           ) : null}
           {visiblePluginCommands.map((command) => (

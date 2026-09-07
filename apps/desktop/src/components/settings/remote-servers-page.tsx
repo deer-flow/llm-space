@@ -27,13 +27,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -47,6 +41,7 @@ import {
   trustRemoteServerHostKey,
   updateRemoteServer,
 } from "@/client/remote-servers";
+import { useI18n } from "@/i18n/i18n-provider";
 import type {
   RemoteDisconnectResult,
   RemoteHostKeyTrustRequest,
@@ -100,6 +95,7 @@ export function RemoteServersPage({
   onConnected?: (runtimeId: RuntimeId) => void;
   onDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [servers, setServers] = useState<RemoteServerView[]>([]);
   const serversRef = useRef<RemoteServerView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -135,12 +131,12 @@ export function RemoteServersPage({
 
   useEffect(() => {
     void refresh().catch((error) =>
-      toast.error("Failed to load remote servers", {
+      toast.error(t.remoteServers.loadFailed, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       })
     );
-  }, [refresh]);
+  }, [refresh, t.common.pleaseTryAgain, t.remoteServers.loadFailed]);
 
   useEffect(
     () =>
@@ -170,12 +166,12 @@ export function RemoteServersPage({
         const nextId = form.id ?? next.at(-1)?.id ?? null;
         setSelectedId(nextId);
         setForm(null);
-        toast.success("Remote server saved");
+        toast.success(t.remoteServers.saved);
         return true;
       } catch (error) {
-        toast.error("Failed to save remote server", {
+        toast.error(t.remoteServers.saveFailed, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
         return false;
       }
@@ -237,8 +233,9 @@ export function RemoteServersPage({
 
   const reportRunError = (id: string, error: unknown) => {
     const failed = serversRef.current.find((server) => server.id === id);
-    toast.error(_failureTitle(failed), {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(_failureTitle(failed, t.remoteServers.actionFailed), {
+      description:
+        error instanceof Error ? error.message : t.common.pleaseTryAgain,
     });
   };
 
@@ -262,9 +259,9 @@ export function RemoteServersPage({
             onConnected?.(connected.runtimeId);
           }
         } catch (error) {
-          toast.error("Failed to trust SSH host", {
+          toast.error(t.remoteServers.trustFailed, {
             description:
-              error instanceof Error ? error.message : "Please try again.",
+              error instanceof Error ? error.message : t.common.pleaseTryAgain,
           });
         } finally {
           setTrustBusy(false);
@@ -285,9 +282,9 @@ export function RemoteServersPage({
       );
       updateServers(next);
     } catch (error) {
-      toast.error("Failed to cancel SSH host trust", {
+      toast.error(t.remoteServers.trustCancelFailed, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     } finally {
       setTrustBusy(false);
@@ -306,153 +303,155 @@ export function RemoteServersPage({
 
   return (
     <SettingsPage
-      title="Remote Servers"
-      description="Access LLM Space workspaces—including threads, settings, and skills—hosted on remote servers over SSH. Passwords and passphrases are not stored."
+      title={t.remoteServers.title}
+      description={t.remoteServers.description}
       className={servers.length === 0 && !form ? undefined : "p-0"}
     >
       {loading && servers.length === 0 && !form ? (
         <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading remote servers
+          {t.remoteServers.loading}
         </div>
       ) : servers.length === 0 && !form ? (
         <RemoteServersEmptyState onAdd={startAdd} />
       ) : (
         <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="bg-muted/20 flex min-h-0 flex-col border-r">
-          <div className="flex h-11 items-center justify-between px-3">
-            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              SERVERS
-            </span>
-            <div className="flex gap-1">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Refresh remote servers"
-                onClick={() => void refresh()}
-              >
-                <RefreshCw className="size-4" />
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Add remote server"
-                onClick={startAdd}
-              >
-                <Plus className="size-4" />
-              </Button>
-            </div>
-          </div>
-          <Separator />
-          <div className="min-h-0 flex-1 overflow-auto p-2">
-            {servers.length > 0 ? (
-              <div className="space-y-2">
-                {servers.map((server) => (
-                  <div
-                    key={server.id}
-                    className={cn(
-                      "hover:bg-accent/70 flex w-full items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
-                      selectedId === server.id
-                        ? "border-primary/60 bg-primary/5"
-                        : "border-border bg-card/30"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      className="flex min-w-0 grow items-center gap-2 text-left"
-                      onClick={() => {
-                        setSelectedId(server.id);
-                        setForm(null);
-                      }}
-                    >
-                      <Server className="text-muted-foreground size-4 shrink-0" />
-                      <span className="min-w-0 grow">
-                        <span className="block truncate text-sm font-medium">
-                          {server.name}
-                        </span>
-                        <span className="text-muted-foreground block truncate text-xs">
-                          {server.user ? `${server.user}@` : ""}
-                          {server.host}
-                        </span>
-                      </span>
-                    </button>
-                    {server.status === "connected" ? (
-                      <span className="border-primary bg-primary/15 text-primary flex size-4 shrink-0 items-center justify-center rounded-full border">
-                        <Check className="size-3" />
-                      </span>
-                    ) : server.status === "trust-required" ? (
-                      <ShieldAlert className="size-4 shrink-0 text-amber-500" />
-                    ) : busyId === server.id ||
-                      server.status === "connecting" ? (
-                      <Loader2 className="size-4 shrink-0 animate-spin" />
-                    ) : null}
-                  </div>
-                ))}
+          <aside className="bg-muted/20 flex min-h-0 flex-col border-r">
+            <div className="flex h-11 items-center justify-between px-3">
+              <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                {t.remoteServers.servers}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={t.remoteServers.refreshAria}
+                  onClick={() => void refresh()}
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={t.remoteServers.addAria}
+                  onClick={startAdd}
+                >
+                  <Plus className="size-4" />
+                </Button>
               </div>
-            ) : null}
-          </div>
-        </aside>
-
-        <section className="min-h-0 overflow-auto p-5">
-          {form ? (
-            <RemoteServerForm
-              form={form}
-              onChange={setForm}
-              onCancel={() => setForm(null)}
-              onSave={() => void save()}
-            />
-          ) : selected ? (
-            <RemoteServerDetails
-              server={selected}
-              busy={busyId === selected.id}
-              onConnect={() =>
-                void runRemoteRuntimeActionIfAllowed({
-                  allowed: () => canConnect?.() ?? true,
-                  acquire: acquireConnect,
-                  action: () =>
-                    run(selected.id, connectRemoteServer, {
-                      closeOnConnected: true,
-                    }),
-                  onError: (error) => reportRunError(selected.id, error),
-                })
-              }
-              onDisconnect={() =>
-                void runRemoteRuntimeActionIfAllowed({
-                  allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
-                  acquire: acquireDisconnect
-                    ? () => acquireDisconnect(selected.runtimeId)
-                    : undefined,
-                  action: () => run(selected.id, disconnectRemoteServer),
-                  afterAction: () => onDisconnected?.(selected.runtimeId),
-                  onError: (error) => reportRunError(selected.id, error),
-                })
-              }
-              onEdit={() => startEdit(selected)}
-              onRemove={() =>
-                void runRemoteRuntimeActionIfAllowed({
-                  allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
-                  acquire: acquireDisconnect
-                    ? () => acquireDisconnect(selected.runtimeId)
-                    : undefined,
-                  action: () =>
-                    run(selected.id, removeRemoteServer, {
-                      selectFallback: true,
-                    }),
-                  afterAction: () => onDisconnected?.(selected.runtimeId),
-                  onError: (error) => reportRunError(selected.id, error),
-                })
-              }
-              onTrustHostKey={(request) => void trustHostKey(selected, request)}
-              onRejectHostKey={(request) =>
-                void rejectHostKey(selected, request)
-              }
-              trustBusy={trustBusy}
-            />
-          ) : (
-            <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-              Select a server or click + to add one.
             </div>
-          )}
+            <Separator />
+            <div className="min-h-0 flex-1 overflow-auto p-2">
+              {servers.length > 0 ? (
+                <div className="space-y-2">
+                  {servers.map((server) => (
+                    <div
+                      key={server.id}
+                      className={cn(
+                        "hover:bg-accent/70 flex w-full items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
+                        selectedId === server.id
+                          ? "border-primary/60 bg-primary/5"
+                          : "border-border bg-card/30"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        className="flex min-w-0 grow items-center gap-2 text-left"
+                        onClick={() => {
+                          setSelectedId(server.id);
+                          setForm(null);
+                        }}
+                      >
+                        <Server className="text-muted-foreground size-4 shrink-0" />
+                        <span className="min-w-0 grow">
+                          <span className="block truncate text-sm font-medium">
+                            {server.name}
+                          </span>
+                          <span className="text-muted-foreground block truncate text-xs">
+                            {server.user ? `${server.user}@` : ""}
+                            {server.host}
+                          </span>
+                        </span>
+                      </button>
+                      {server.status === "connected" ? (
+                        <span className="border-primary bg-primary/15 text-primary flex size-4 shrink-0 items-center justify-center rounded-full border">
+                          <Check className="size-3" />
+                        </span>
+                      ) : server.status === "trust-required" ? (
+                        <ShieldAlert className="size-4 shrink-0 text-amber-500" />
+                      ) : busyId === server.id ||
+                        server.status === "connecting" ? (
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </aside>
+
+          <section className="min-h-0 overflow-auto p-5">
+            {form ? (
+              <RemoteServerForm
+                form={form}
+                onChange={setForm}
+                onCancel={() => setForm(null)}
+                onSave={() => void save()}
+              />
+            ) : selected ? (
+              <RemoteServerDetails
+                server={selected}
+                busy={busyId === selected.id}
+                onConnect={() =>
+                  void runRemoteRuntimeActionIfAllowed({
+                    allowed: () => canConnect?.() ?? true,
+                    acquire: acquireConnect,
+                    action: () =>
+                      run(selected.id, connectRemoteServer, {
+                        closeOnConnected: true,
+                      }),
+                    onError: (error) => reportRunError(selected.id, error),
+                  })
+                }
+                onDisconnect={() =>
+                  void runRemoteRuntimeActionIfAllowed({
+                    allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
+                    acquire: acquireDisconnect
+                      ? () => acquireDisconnect(selected.runtimeId)
+                      : undefined,
+                    action: () => run(selected.id, disconnectRemoteServer),
+                    afterAction: () => onDisconnected?.(selected.runtimeId),
+                    onError: (error) => reportRunError(selected.id, error),
+                  })
+                }
+                onEdit={() => startEdit(selected)}
+                onRemove={() =>
+                  void runRemoteRuntimeActionIfAllowed({
+                    allowed: () => canDisconnect?.(selected.runtimeId) ?? true,
+                    acquire: acquireDisconnect
+                      ? () => acquireDisconnect(selected.runtimeId)
+                      : undefined,
+                    action: () =>
+                      run(selected.id, removeRemoteServer, {
+                        selectFallback: true,
+                      }),
+                    afterAction: () => onDisconnected?.(selected.runtimeId),
+                    onError: (error) => reportRunError(selected.id, error),
+                  })
+                }
+                onTrustHostKey={(request) =>
+                  void trustHostKey(selected, request)
+                }
+                onRejectHostKey={(request) =>
+                  void rejectHostKey(selected, request)
+                }
+                trustBusy={trustBusy}
+              />
+            ) : (
+              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                {t.remoteServers.selectOrAdd}
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -461,40 +460,41 @@ export function RemoteServersPage({
 }
 
 function RemoteServersEmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
     <SettingsEmptyState
       icon={Server}
       wallIcons={REMOTE_SERVER_WALL_ICONS}
-      label="No remote servers"
-      title="Bring another workspace within reach"
-      description="Connect over SSH to open a remote LLM Space workspace—threads, settings, and skills included."
+      label={t.remoteServers.emptyLabel}
+      title={t.remoteServers.emptyTitle}
+      description={t.remoteServers.emptyDescription}
       actions={
         <>
           <Button onClick={onAdd}>
             <Plus className="size-4" />
-            Add remote server
+            {t.remoteServers.addServer}
           </Button>
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-            Passwords and passphrases are never stored.
+            {t.remoteServers.passwordsNotStored}
           </p>
         </>
       }
       capabilities={[
         {
           icon: FolderSync,
-          title: "Your workspace, anywhere",
-          description: "Open remote threads, settings, and skills in place.",
+          title: t.remoteServers.anywhereTitle,
+          description: t.remoteServers.anywhereDescription,
         },
         {
           icon: Network,
-          title: "SSH-native",
-          description: "Use the secure connection already trusted by your team.",
+          title: t.remoteServers.sshNativeTitle,
+          description: t.remoteServers.sshNativeDescription,
         },
         {
           icon: ShieldCheck,
-          title: "Credentials stay yours",
-          description: "Sensitive passwords and passphrases are not persisted.",
+          title: t.remoteServers.credentialsTitle,
+          description: t.remoteServers.credentialsDescription,
         },
       ]}
     />
@@ -531,6 +531,7 @@ function RemoteServerDetails({
   onRejectHostKey: (request: RemoteHostKeyTrustRequest) => void;
   trustBusy: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
@@ -543,9 +544,12 @@ function RemoteServerDetails({
         </div>
       </div>
       <div className="grid gap-2 rounded-lg border p-3 text-sm">
-        <Info label="Status" value={server.status} />
-        <Info label="Runtime" value={server.runtimeId} />
-        <Info label="Workspace" value={_remoteWorkspacePath(server)} />
+        <Info label={t.remoteServers.status} value={server.status} />
+        <Info label={t.remoteServers.runtime} value={server.runtimeId} />
+        <Info
+          label={t.remoteServers.workspace}
+          value={_remoteWorkspacePath(server)}
+        />
       </div>
       <ConnectionFlow server={server} />
       {server.error ? (
@@ -559,7 +563,7 @@ function RemoteServerDetails({
             disabled={busy}
             onClick={onDisconnect}
           >
-            Disconnect
+            {t.remoteServers.disconnect}
           </Button>
         ) : (
           <Button
@@ -570,7 +574,9 @@ function RemoteServerDetails({
             {server.status === "connecting" ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : null}
-            {server.status === "connecting" ? "Connecting" : "Connect"}
+            {server.status === "connecting"
+              ? t.remoteServers.connecting
+              : t.remoteServers.connect}
           </Button>
         )}
         <Button
@@ -579,7 +585,7 @@ function RemoteServerDetails({
           disabled={!canEditRemoteServer(server, busy)}
           onClick={onEdit}
         >
-          Edit
+          {t.remoteServers.edit}
         </Button>
         <Button
           size="sm"
@@ -588,7 +594,7 @@ function RemoteServerDetails({
           onClick={onRemove}
         >
           <Trash2 className="size-4" />
-          Remove
+          {t.remoteServers.remove}
         </Button>
       </div>
       {server.trustRequest ? (
@@ -604,11 +610,14 @@ function RemoteServerDetails({
 }
 
 function ConnectionFlow({ server }: { server: RemoteServerView }) {
+  const { t } = useI18n();
   const steps = remoteConnectionFlow(server);
   if (steps.length === 0) return null;
   return (
     <div className="rounded-lg border p-3">
-      <div className="mb-2 text-sm font-medium">Connection flow</div>
+      <div className="mb-2 text-sm font-medium">
+        {t.remoteServers.connectionFlow}
+      </div>
       <div className="grid gap-2">
         {steps.map((step) => (
           <div key={step.stage} className="grid gap-1 text-sm">
@@ -662,6 +671,7 @@ function SshHostKeyDialog({
   onTrust: () => void;
   onReject: () => void;
 }) {
+  const { t } = useI18n();
   const [verified, setVerified] = useState(false);
   const changed = request.kind === "changed";
 
@@ -677,30 +687,40 @@ function SshHostKeyDialog({
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {changed ? "SSH host key changed" : "Trust this SSH host?"}
+            {changed
+              ? t.remoteServers.hostKeyChanged
+              : t.remoteServers.trustHost}
           </DialogTitle>
           <DialogDescription>
             {changed
-              ? "OpenSSH reports this host key changed. Continue only after you have verified this is the expected server."
-              : "LLM Space has not connected to this SSH host before. Confirm the fingerprint before continuing."}
+              ? t.remoteServers.hostKeyChangedDescription
+              : t.remoteServers.trustHostDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 shrink flex-col gap-4 overflow-y-auto">
           <div className="grid gap-2 rounded-lg border p-3 text-sm">
-            <Info label="Host" value={request.host} />
-            <Info label="Target" value={request.target} />
+            <Info label={t.remoteServers.host} value={request.host} />
+            <Info label={t.remoteServers.target} value={request.target} />
             {request.resolvedHost ? (
-              <Info label="Resolved" value={_endpoint(request)} />
+              <Info
+                label={t.remoteServers.resolved}
+                value={_endpoint(request)}
+              />
             ) : null}
-            {request.user ? <Info label="User" value={request.user} /> : null}
-            <Info label="Key type" value={request.keyType} />
-            <Info label="Fingerprint" value={request.fingerprint} />
+            {request.user ? (
+              <Info label={t.remoteServers.user} value={request.user} />
+            ) : null}
+            <Info label={t.remoteServers.keyType} value={request.keyType} />
+            <Info
+              label={t.remoteServers.fingerprint}
+              value={request.fingerprint}
+            />
             {request.knownHostsFile ? (
               <Info label="known_hosts" value={request.knownHostsFile} />
             ) : null}
             {request.knownHostsLine ? (
               <Info
-                label="Offending line"
+                label={t.remoteServers.offendingLine}
                 value={String(request.knownHostsLine)}
               />
             ) : null}
@@ -713,23 +733,22 @@ function SshHostKeyDialog({
                 checked={verified}
                 onChange={(event) => setVerified(event.target.checked)}
               />
-              <span>
-                I verified this host identity with the administrator or server
-                console.
-              </span>
+              <span>{t.remoteServers.verifyIdentity}</span>
             </label>
           ) : null}
         </div>
         <DialogFooter className="shrink-0">
           <Button variant="ghost" disabled={busy} onClick={onReject}>
-            Cancel
+            {t.remoteServers.cancel}
           </Button>
           <Button
             variant={changed ? "destructive" : "default"}
             disabled={busy || (changed && !verified)}
             onClick={onTrust}
           >
-            {changed ? "Replace key and continue" : "Trust and continue"}
+            {changed
+              ? t.remoteServers.replaceKey
+              : t.remoteServers.trustAndContinue}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -748,40 +767,40 @@ function RemoteServerForm({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <div>
         <h3 className="text-base font-medium">
-          {form.id ? "Edit server" : "Add server"}
+          {form.id ? t.remoteServers.editServer : t.remoteServers.addServer}
         </h3>
         <p className="text-muted-foreground text-sm">
-          Configure SSH details such as port, identity file, and jump host in
-          your system ~/.ssh/config.
+          {t.remoteServers.sshConfigHint}
         </p>
       </div>
       <div className="grid gap-3 rounded-lg border p-3">
         <Field
-          label="Name"
+          label={t.remoteServers.name}
           value={form.name}
           onChange={(name) => onChange({ ...form, name })}
         />
         <Field
-          label="Host"
+          label={t.remoteServers.host}
           value={form.host}
           onChange={(host) => onChange({ ...form, host })}
         />
         <Field
-          label="User"
+          label={t.remoteServers.user}
           value={form.user}
           onChange={(user) => onChange({ ...form, user })}
         />
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={onSave}>
-          {form.id ? "Update" : "Add"}
+          {form.id ? t.remoteServers.update : t.remoteServers.add}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t.remoteServers.cancel}
         </Button>
       </div>
     </div>
@@ -845,9 +864,12 @@ function _remoteWorkspacePath(server: RemoteServerView): string {
   return `${server.remoteHome.replace(/\/+$/, "")}/workspace`;
 }
 
-function _failureTitle(server: RemoteServerView | undefined): string {
+function _failureTitle(
+  server: RemoteServerView | undefined,
+  fallback: string
+): string {
   if (!server?.stageLabel || server.stage === "error") {
-    return "Remote server action failed";
+    return fallback;
   }
   return `${server.stageLabel} failed`;
 }

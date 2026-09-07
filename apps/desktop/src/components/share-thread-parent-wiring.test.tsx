@@ -13,6 +13,7 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 
 import type { CommandHandlers } from "@/commands";
+import { I18nProvider } from "@/i18n/i18n-provider";
 import type { RuntimeId } from "@/shared/runtime";
 import {
   installReactTestDom,
@@ -374,7 +375,9 @@ function _CommandShareTrigger({
 function _Providers({ children }: { children: ReactElement }) {
   return (
     <ThemeProvider>
-      <TooltipProvider>{children}</TooltipProvider>
+      <I18nProvider>
+        <TooltipProvider>{children}</TooltipProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
@@ -436,11 +439,13 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     }
 
     const tree = await _mount(
-      <CommandProvider>
-        <GithubAuthProvider>
-          <SpeculativeDialogHarness />
-        </GithubAuthProvider>
-      </CommandProvider>
+      <_Providers>
+        <CommandProvider>
+          <GithubAuthProvider>
+            <SpeculativeDialogHarness />
+          </GithubAuthProvider>
+        </CommandProvider>
+      </_Providers>
     );
     const generate = await _findButtonByText("Generate link");
     await act(async () => generate.click());
@@ -482,17 +487,23 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     const received: unknown[] = [];
     const tree = await _mount(
       <CommandProvider>
-        <_ShareCommandRegistrar
-          onShare={(args) => {
-            received.push(args);
-          }}
-        />
-        <NodeActions
-          node={{ name: "tree.json", path: "threads/tree.json", type: "file" }}
-          runtimeId="remote:tree"
-          menuOpen
-          onMenuOpenChange={() => undefined}
-        />
+        <I18nProvider>
+          <_ShareCommandRegistrar
+            onShare={(args) => {
+              received.push(args);
+            }}
+          />
+          <NodeActions
+            node={{
+              name: "tree.json",
+              path: "threads/tree.json",
+              type: "file",
+            }}
+            runtimeId="remote:tree"
+            menuOpen
+            onMenuOpenChange={() => undefined}
+          />
+        </I18nProvider>
       </CommandProvider>
     );
 

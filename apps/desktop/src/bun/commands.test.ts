@@ -14,6 +14,7 @@ await mock.module("electrobun/bun", () => ({
 }));
 
 const { executeCommandInBun } = await import("./commands");
+const { attachWindowStates } = await import("./app/window-state");
 
 function _createDependencies(openedUrls: string[]) {
   return {
@@ -72,5 +73,97 @@ describe("executeCommandInBun openLink", () => {
     } finally {
       error.mockRestore();
     }
+  });
+});
+
+describe("executeCommandInBun page zoom", () => {
+  test("uses a compensated root transform for the CEF Performance edition", () => {
+    const scripts: string[] = [];
+    const windowListeners = new Map<string, (() => void)[]>();
+    const webviewListeners = new Map<string, (() => void)[]>();
+    const window = {
+      getFrame: () => ({ x: 0, y: 0, width: 1200, height: 800 }),
+      getPageZoom: () => {
+        throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
+      },
+      isFullScreen: () => false,
+      isMaximized: () => false,
+      on: (name: string, listener: () => void) => {
+        const listeners = windowListeners.get(name) ?? [];
+        listeners.push(listener);
+        windowListeners.set(name, listeners);
+      },
+      setPageZoom: () => {
+        throw new Error("CEF must not use Electrobun's WebKit-only zoom API");
+      },
+      webview: {
+        renderer: "cef",
+        executeJavascript: (script: string) => scripts.push(script),
+        on: (name: string, listener: () => void) => {
+          const listeners = webviewListeners.get(name) ?? [];
+          listeners.push(listener);
+          webviewListeners.set(name, listeners);
+        },
+      },
+    };
+    const store = {
+      state: {
+        frame: { x: 0, y: 0, width: 1200, height: 800 },
+        isMaximized: false,
+        isFullScreen: false,
+      },
+      update: () => Promise.resolve(),
+    };
+
+    attachWindowStates(window as never, {
+      store: store as never,
+      onFullScreenChange: () => undefined,
+    });
+    for (const listener of webviewListeners.get("dom-ready") ?? []) listener();
+    scripts.length = 0;
+
+    executeCommandInBun(
+      { type: "resetZoom", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+    executeCommandInBun(
+      { type: "zoomIn", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+
+    expect(scripts).toHaveLength(2);
+    expect(scripts[1]).toContain("const zoom = 1.1");
+    expect(scripts[1]).toContain(
+      'style.setProperty("transform", `scale(${zoom})`)'
+    );
+    expect(scripts[1]).toContain(
+      'style.setProperty("width", `${100 / zoom}vw`)'
+    );
+    expect(scripts[1]).toContain(
+      'style.setProperty("height", `${100 / zoom}vh`)'
+    );
+  });
+
+  test("keeps using native page zoom for the WebKit edition", () => {
+    const zooms: number[] = [];
+    const window = {
+      setPageZoom: (zoom: number) => zooms.push(zoom),
+      webview: { renderer: "native" },
+    };
+
+    executeCommandInBun(
+      { type: "resetZoom", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+    executeCommandInBun(
+      { type: "zoomOut", args: {} },
+      window as never,
+      _createDependencies([])
+    );
+
+    expect(zooms).toEqual([1, 0.9]);
   });
 });

@@ -108,6 +108,12 @@ describe("inline run validation", () => {
     expect(store.getState().autoFocusMessageId).toBe(
       messages.at(-1)?.id ?? null
     );
+    const autoFocusMessageId = store.getState().autoFocusMessageId;
+    if (!autoFocusMessageId) {
+      throw new Error("Expected an auto-focus message");
+    }
+    store.getState().consumeAutoFocusMessage(autoFocusMessageId);
+    expect(store.getState().autoFocusMessageId).toBeNull();
   });
 
   test("clears feedback when the blocking role becomes runnable", async () => {

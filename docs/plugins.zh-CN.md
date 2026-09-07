@@ -158,6 +158,19 @@ Settings → Plugins 会按类型分组展示已发现的 Extensions，并显示
 描述只是界面文案，不是标识符。稳定 ID 仍由 Plugin 包名及声明扩展的文件名或对象
 ID 决定。
 
+### 2.4 内置默认 Plugin
+
+LLM Space 自带一个默认 Plugin——Memory 插件（`@llm-space/memory`），通过
+`memory_save`、`memory_search`、`memory_forget` 三个 Plugin Tools 和一个
+`memory` Skill，让 Agent 拥有跨项目的持久记忆。
+
+桌面应用启动时会在发现插件之前，把该插件写入
+`<home>/plugins/@llm-space/memory/`（仅当该目录不存在时）。种子写入只发生
+一次，且永远不会覆盖：如果你删除、替换或修改了这个插件，将保留你的版本。
+Agent 的记忆保存在
+`LLM_SPACE_HOME/data/plugins/@llm-space/memory/memories.jsonl`，该文件在
+插件更新后依然保留，并被所有工作区共享，因此记忆天然是跨项目的。
+
 ## 3. `package.json`
 
 最小可用 metadata：

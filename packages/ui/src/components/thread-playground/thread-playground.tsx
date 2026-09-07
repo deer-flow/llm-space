@@ -37,10 +37,7 @@ import {
   useModels,
 } from "@llm-space/ui/components/model-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
-import {
-  createShareThreadAction,
-  useHostServices,
-} from "@llm-space/ui/host";
+import { createShareThreadAction, useHostServices } from "@llm-space/ui/host";
 import { threadTitleFromPath } from "@llm-space/ui/lib/thread-file";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -63,6 +60,7 @@ import { Switch } from "@llm-space/ui/ui/switch";
 
 import { GenerateProjectButton } from "./codegen/generate-project-button";
 import { MessageListView } from "./message/message-list-view";
+import { SubagentParentPathContext } from "./message/spawn-agent-card";
 import { ThreadPlaygroundSkeleton } from "./misc/skeleton";
 import { TitleEditor, type TitleValidator } from "./misc/title-editor";
 import { ModelConfigEditor } from "./model/model-config-editor";
@@ -71,6 +69,7 @@ import {
   useGetProviderProfileId,
   useProviderProfileSelections,
 } from "./model/provider-profile-selection-provider";
+import { usePlaygroundLabels } from "./playground-labels";
 import { SystemPromptEditor } from "./prompt/system-prompt-editor";
 import { RunHistoryListView } from "./run-history-list-view";
 import { createRuntimePromptFiles } from "./runtime-prompt-files";
@@ -96,6 +95,8 @@ import { PromptVariablesListView } from "./variable/prompt-variables-list-view";
 export interface ThreadPlaygroundProps {
   className?: string;
   path: string;
+  /** Present only for a saved workspace thread that can create child files. */
+  subagentParentPath?: string;
   title?: string;
   headerDetails?: ReactNode;
   /** Extra actions rendered at the right edge of the header (always visible). */
@@ -234,13 +235,15 @@ function _ThreadPlaygroundStore({
   });
   return (
     <ThreadStoreContext.Provider value={store}>
-      {viewMounted ? (
-        <ThreadPlaygroundContent
-          runtimeId={ownerRuntimeId}
-          onApplyCompaction={onApplyCompaction}
-          {...props}
-        />
-      ) : null}
+      <SubagentParentPathContext.Provider value={props.subagentParentPath}>
+        {viewMounted ? (
+          <ThreadPlaygroundContent
+            runtimeId={ownerRuntimeId}
+            onApplyCompaction={onApplyCompaction}
+            {...props}
+          />
+        ) : null}
+      </SubagentParentPathContext.Provider>
     </ThreadStoreContext.Provider>
   );
 }
@@ -278,8 +281,7 @@ function ThreadPlaygroundContent({
     isMetaUserMessage(s.thread.context)
   );
   const canCompact = useMemo(
-    () =>
-      planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
+    () => planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
     [hasMetaUserPrompt, messages]
   );
   const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
@@ -318,6 +320,7 @@ function ThreadPlaygroundContent({
     }
   }, [abort]);
   const runHistoryPanelRef = usePanelRef();
+  const labels = usePlaygroundLabels();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
   const [generateProjectOpen, setGenerateProjectOpen] = useState(false);
@@ -371,22 +374,22 @@ function ThreadPlaygroundContent({
                 readonlyFromProps && "hidden"
               )}
             >
-              <Tooltip content="Undo last edit">
+              <Tooltip content={labels.undoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Undo last edit"
+                  aria-label={labels.undoLastEdit}
                   disabled={readonly || !undoable}
                   onClick={undo}
                 >
                   <Undo2Icon className="size-4" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Redo last edit">
+              <Tooltip content={labels.redoLastEdit}>
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  aria-label="Redo last edit"
+                  aria-label={labels.redoLastEdit}
                   disabled={readonly || !redoable}
                   onClick={redo}
                 >
@@ -394,12 +397,12 @@ function ThreadPlaygroundContent({
                 </Button>
               </Tooltip>
               <DropdownMenu>
-                <Tooltip content="More actions">
+                <Tooltip content={labels.moreActions}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon-lg"
-                      aria-label="More actions"
+                      aria-label={labels.moreActions}
                     >
                       <EllipsisIcon className="size-4" />
                     </Button>
@@ -411,23 +414,25 @@ function ThreadPlaygroundContent({
                     onSelect={toggleHistory}
                   >
                     <HistoryIcon />
-                    {historyOpen ? "Hide Run History" : "View Run History"}
+                    {historyOpen
+                      ? labels.hideRunHistory
+                      : labels.viewRunHistory}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !canCompact}
                     onSelect={() => setCompactDialogOpen(true)}
                   >
                     <FileArchiveIcon />
-                    Compact Conversation
+                    {labels.compactConversation}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={status !== "idle" || !hasModel || !generator}
                     onSelect={() => setGenerateProjectOpen(true)}
                   >
                     <SparklesIcon />
-                    <span className="flex-1">Generate Project</span>
+                    <span className="flex-1">{labels.generateProject}</span>
                     <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide uppercase">
-                      Beta
+                      {labels.betaBadge}
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -440,7 +445,7 @@ function ThreadPlaygroundContent({
                     }
                   >
                     <Share2Icon />
-                    Share Thread
+                    {labels.shareThread}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -469,10 +474,10 @@ function ThreadPlaygroundContent({
                   content={
                     <div>
                       {status === "running"
-                        ? "Stop running"
+                        ? labels.stopRunningTooltip
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run this thread"}
+                          ? labels.preparingThreadTooltip
+                          : labels.runThreadTooltip}
                     </div>
                   }
                 >
@@ -480,10 +485,10 @@ function ThreadPlaygroundContent({
                     className="border-r-primary border-none pr-1 pl-4 active:translate-y-0!"
                     aria-label={
                       status === "running"
-                        ? "Stop running thread"
+                        ? labels.stopRunningThreadAria
                         : status === "preparing"
-                          ? "Preparing thread"
-                          : "Run thread"
+                          ? labels.preparingThreadAria
+                          : labels.runThreadAria
                     }
                     disabled={
                       readonlyFromProps ||
@@ -498,10 +503,10 @@ function ThreadPlaygroundContent({
                       <PlayIcon className="size-3" />
                     )}
                     {status === "running"
-                      ? "Stop"
+                      ? labels.stopLabel
                       : status === "preparing"
-                        ? "Preparing"
-                        : "Run"}
+                        ? labels.preparingLabel
+                        : labels.runLabel}
                   </Button>
                 </Tooltip>
                 <DropdownMenu>
@@ -511,7 +516,7 @@ function ThreadPlaygroundContent({
                         "border-none pr-1.5 pl-0.5 active:translate-y-0!",
                         status === "running" && "disabled:opacity-100"
                       )}
-                      aria-label="Run settings"
+                      aria-label={labels.runSettings}
                       disabled={
                         readonlyFromProps || status !== "idle" || !hasModel
                       }
@@ -520,7 +525,7 @@ function ThreadPlaygroundContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-56">
-                    <DropdownMenuLabel>Run settings</DropdownMenuLabel>
+                    <DropdownMenuLabel>{labels.runSettings}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -529,7 +534,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Enable ReAct loop
+                      {labels.enableReActLoop}
                       <Switch
                         size="sm"
                         checked={reactLoop}
@@ -547,7 +552,7 @@ function ThreadPlaygroundContent({
                       }}
                       className="justify-between gap-6"
                     >
-                      Auto run tools
+                      {labels.autoRunTools}
                       <Switch
                         size="sm"
                         checked={effectiveAutoRunTools}
@@ -570,7 +575,7 @@ function ThreadPlaygroundContent({
                 <div className="px-3">
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Models
+                      {labels.dialogs.sections.models}
                     </div>
                     <div className="flex grow items-center">
                       <ModelConfigEditor readonly={readonly} />
@@ -578,7 +583,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Tools
+                      {labels.dialogs.sections.tools}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">
@@ -587,7 +592,7 @@ function ThreadPlaygroundContent({
                   </div>
                   <div className={"flex w-full border-b py-2"}>
                     <div className="text-muted-foreground w-20 shrink-0 text-sm">
-                      Variables
+                      {labels.dialogs.sections.variables}
                     </div>
                     {/* Cap at ~3 chip rows (h-6 chips + gap-2.5), then scroll. */}
                     <div className="flex max-h-24 grow items-start overflow-y-auto">

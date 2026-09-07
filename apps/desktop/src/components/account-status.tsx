@@ -14,6 +14,7 @@ import { useCommands } from "@/commands";
 import { useGithubAuth } from "@/components/github-auth-provider";
 import { GithubAvatar } from "@/components/github-avatar";
 import { GitHubIcon } from "@/components/github-icon";
+import { useI18n } from "@/i18n/i18n-provider";
 import type { GithubUser } from "@/shared/auth";
 
 /** The bottom-of-sidebar GitHub account widget: sign in / signing in / signed in. */
@@ -34,8 +35,9 @@ export function AccountStatus() {
 }
 
 function SignedOut({ onSignIn }: { onSignIn: () => void }) {
+  const { t } = useI18n();
   return (
-    <Tooltip content="Sign in to share your threads on the web via GitHub Gist.">
+    <Tooltip content={t.common.tooltips.signInToShare}>
       <button
         type="button"
         onClick={onSignIn}
@@ -73,6 +75,7 @@ function SignedIn({
   onSignOut: () => void;
 }) {
   const { executeCommand } = useCommands();
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -92,12 +95,12 @@ function SignedIn({
           }
         >
           <GitHubIcon />
-          Open GitHub Profile
+          {t.account.openGitHubProfile}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={onSignOut}>
           <LogOut />
-          Sign out
+          {t.account.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,4 +1,3 @@
-
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
 import { Button } from "@llm-space/ui/ui/button";
@@ -10,11 +9,19 @@ import {
   DropdownMenuTrigger,
 } from "@llm-space/ui/ui/dropdown-menu";
 
+import { usePlaygroundLabels } from "./playground-labels";
+
 /** An entry that renders as a plain divider in the menu. */
-interface SeparatorItem { type: "separator" }
+interface SeparatorItem {
+  type: "separator";
+}
 
 /** The minimum shape a selectable example item must provide to be rendered. */
-interface ExampleItem { type: string; label: string; icon: LucideIcon }
+interface ExampleItem {
+  type: string;
+  label: string;
+  icon: LucideIcon;
+}
 
 /**
  * The shared "Examples ▾" dropdown used by the system-prompt and tool editors.
@@ -31,11 +38,13 @@ export function ExamplesMenu<T extends ExampleItem>({
   onSelect: (item: T) => void;
   align?: "start" | "end";
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.examples;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm">
-          Examples
+          {labels.title}
           <ChevronDown data-icon="inline-end" />
         </Button>
       </DropdownMenuTrigger>
@@ -52,7 +61,8 @@ export function ExamplesMenu<T extends ExampleItem>({
               onSelect={() => onSelect(example)}
             >
               <Icon />
-              {example.label}
+              {labels.labels[(example as { id?: string }).id ?? ""] ??
+                example.label}
             </DropdownMenuItem>
           );
         })}

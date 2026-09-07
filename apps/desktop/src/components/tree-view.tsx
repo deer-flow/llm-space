@@ -96,8 +96,8 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
     // into internal state. Only runs when the prop changes, so it never fights
     // user clicks.
     React.useEffect(() => {
-      if (selectedId !== undefined && selectedId !== null) {
-        setSelectedItemId(selectedId);
+      if (selectedId !== undefined) {
+        setSelectedItemId(selectedId ?? undefined);
       }
     }, [selectedId]);
 

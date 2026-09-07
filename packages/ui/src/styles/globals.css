@@ -172,6 +172,18 @@
   /* {% template tag %} highlight — violet, distinct from the amber variable. */
   --cm-template-tag: oklch(0.55 0.19 300);
 
+  /* Shared by native scroll containers and the Radix ScrollArea thumb. */
+  --scrollbar-thumb: color-mix(
+    in oklab,
+    var(--muted-foreground) 30%,
+    transparent
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--muted-foreground) 55%,
+    transparent
+  );
+
   font-weight: 300;
 }
 
@@ -280,21 +292,13 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: color-mix(
-    in oklab,
-    var(--muted-foreground) 30%,
-    transparent
-  );
+  background-color: var(--scrollbar-thumb);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(
-    in oklab,
-    var(--muted-foreground) 55%,
-    transparent
-  );
+  background-color: var(--scrollbar-thumb-hover);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;

@@ -35,6 +35,10 @@ import type {
   McpServerView,
 } from "@llm-space/core";
 import type { SkillContent, SkillInfo, SkillsSettings } from "@llm-space/core";
+import type {
+  CreateSubagentThreadInput,
+  CreateSubagentThreadResult,
+} from "@llm-space/core/thread";
 import type { RPCSchema } from "electrobun";
 
 import type { AnalyticsEvent, AnalyticsStatus } from "./analytics";
@@ -565,6 +569,10 @@ export interface DesktopRPCType {
           arguments: Record<string, unknown>;
         };
         response: McpCallToolResponse;
+      };
+      createSubagentThread: {
+        params: RuntimeScopedParams & CreateSubagentThreadInput;
+        response: CreateSubagentThreadResult;
       };
       builtInListTools: {
         params: RuntimeScopedParams;

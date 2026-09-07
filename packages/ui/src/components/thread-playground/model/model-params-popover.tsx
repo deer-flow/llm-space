@@ -38,19 +38,19 @@ import {
 import { Slider } from "@llm-space/ui/ui/slider";
 import { Switch } from "@llm-space/ui/ui/switch";
 
-
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 
 import { DEFAULT_JSON_SCHEMA, JsonSchemaDialog } from "./json-schema-dialog";
 import { ModelCard } from "./model-card";
 
-const REASONING_LEVELS: { value: ReasoningLevel; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "minimal", label: "Minimal" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "xhigh", label: "X-High" },
+const REASONING_LEVELS: ReasoningLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
 ];
 
 const DEFAULT_TEMPERATURE = 1;
@@ -64,6 +64,8 @@ function ParamField({
   readonly,
   onEnabledChange,
   children,
+  enableLabel,
+  disableLabel,
 }: {
   className?: string;
   label: string;
@@ -72,6 +74,8 @@ function ParamField({
 
   onEnabledChange: (enabled: boolean) => void;
   children: ReactNode;
+  enableLabel: string;
+  disableLabel: string;
 }) {
   return (
     <div className={cn("border-t pt-3", className)}>
@@ -81,7 +85,7 @@ function ParamField({
         </span>
         <Switch
           size="sm"
-          aria-label={`${enabled ? "Disable" : "Enable"} ${label}`}
+          aria-label={`${enabled ? disableLabel : enableLabel} ${label}`}
           checked={enabled}
           disabled={readonly}
           onCheckedChange={onEnabledChange}
@@ -151,21 +155,21 @@ export function ModelParamsPopover({
   }, [draftMaxTokens, maxTokens, updateModelParams]);
 
   const { actions } = useHostServices();
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.modelParams;
   const handleConfigModelSettings = useCallback(() => {
     setPopoverOpen(false);
     actions.openSettings("models");
   }, [setPopoverOpen, actions]);
 
   return (
-    <div
-      className={cn("flex shrink-0 gap-1", readonly && "invisible")}
-    >
+    <div className={cn("flex shrink-0 gap-1", readonly && "invisible")}>
       <HoverCard>
         <HoverCardTrigger asChild>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="Show model details"
+            aria-label={labels.details}
             disabled={!model}
           >
             <InfoIcon className="size-4" />
@@ -176,13 +180,13 @@ export function ModelParamsPopover({
         </HoverCardContent>
       </HoverCard>
       <Popover onOpenChange={handleOpenChange}>
-        <Tooltip content="Configure model settings">
+        <Tooltip content={labels.configure}>
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
               disabled={readonly || !model}
               size="icon-xs"
-              aria-label="Configure model parameters"
+              aria-label={labels.configure}
               aria-expanded={popoverOpen}
             >
               <SlidersHorizontal className="size-4" />
@@ -192,13 +196,13 @@ export function ModelParamsPopover({
         <PopoverContent align="end" className="flex w-72 flex-col p-4">
           <PopoverHeader>
             <PopoverTitle className="flex items-center justify-between">
-              <div>Model settings</div>
+              <div>{labels.title}</div>
               <div>
-                <Tooltip content="Configure model settings">
+                <Tooltip content={labels.configure}>
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Open model provider settings"
+                    aria-label={labels.configure}
                     onClick={handleConfigModelSettings}
                   >
                     <SettingsIcon className="size-3.5" />
@@ -208,7 +212,9 @@ export function ModelParamsPopover({
             </PopoverTitle>
           </PopoverHeader>
           <ParamField
-            label="Temperature"
+            label={labels.temperature}
+            enableLabel={labels.enable}
+            disableLabel={labels.disable}
             enabled={hasTemperature}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -224,7 +230,7 @@ export function ModelParamsPopover({
                 </span>
               </div>
               <Slider
-                aria-label="Temperature"
+                aria-label={labels.temperature}
                 min={0}
                 max={2}
                 step={0.1}
@@ -240,7 +246,9 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Max tokens"
+            label={labels.maxTokens}
+            enableLabel={labels.enable}
+            disableLabel={labels.disable}
             enabled={hasMaxTokens}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -252,7 +260,7 @@ export function ModelParamsPopover({
             <Input
               className="mt-2 w-full font-mono"
               type="number"
-              aria-label="Max tokens"
+              aria-label={labels.maxTokens}
               min={1}
               max={maxTokensFromProps}
               value={draftMaxTokens}
@@ -276,7 +284,9 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Thinking effort"
+            label={labels.thinkingEffort}
+            enableLabel={labels.enable}
+            disableLabel={labels.disable}
             enabled={hasReasoning}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -295,14 +305,14 @@ export function ModelParamsPopover({
               <SelectTrigger
                 size="sm"
                 className="mt-2 w-full"
-                aria-label="Thinking effort"
+                aria-label={labels.thinkingEffort}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="font-mono">
-                {REASONING_LEVELS.map(({ value, label }) => (
+                {REASONING_LEVELS.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {label}
+                    {labels.reasoningLevels[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -310,7 +320,9 @@ export function ModelParamsPopover({
           </ParamField>
 
           <ParamField
-            label="Response format"
+            label={labels.responseFormat}
+            enableLabel={labels.enable}
+            disableLabel={labels.disable}
             enabled={hasResponseFormat}
             readonly={readonly}
             onEnabledChange={(enabled) => {
@@ -337,7 +349,7 @@ export function ModelParamsPopover({
               <SelectTrigger
                 size="sm"
                 className="mt-2 w-full"
-                aria-label="Response format"
+                aria-label={labels.responseFormat}
               >
                 <SelectValue />
               </SelectTrigger>
@@ -354,7 +366,7 @@ export function ModelParamsPopover({
                 disabled={readonly}
                 onClick={() => setSchemaDialogOpen(true)}
               >
-                Edit schema
+                {labels.editSchema}
               </Button>
             ) : null}
           </ParamField>
