@@ -4,6 +4,37 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.0] - 2026-09-07
+
+This release upgrades the Pi agent runtime and completes the first broad
+internationalization pass, bringing a Chinese interface across the desktop app
+and shared Thread Playground.
+
+### Added
+
+- A Chinese interface language now covers the desktop shell, settings,
+  dialogs, and Thread Playground, with bilingual command-palette matching and
+  localized provider names.
+- The bundled cross-project Memory plugin gives agents an opt-in durable store
+  for preferences, project conventions, and decisions.
+- Search settings now include Exa, AnySearch, and Zhihu MCP providers alongside
+  the existing search integrations.
+- The built-in Aliyun Qwen provider uses the DashScope OpenAI-compatible API,
+  discovers `DASHSCOPE_API_KEY`, and includes Qwen 3.8/3.7 plus selected
+  DeepSeek, Kimi, GLM, and MiniMax models.
+- A short-drama writer example demonstrates a structured creative-writing
+  workflow in the Thread Playground.
+
+### Changed
+
+- Updated `@earendil-works/pi-ai` and `@earendil-works/pi-agent-core` to
+  0.85.1, the latest registry release checked on 2026-09-07, while retaining
+  the local Responses compatibility patch.
+
+### Fixed
+
+- Zhihu search handles server-initiated JSON-RPC requests on its SSE stream.
+
 ## [4.17.0] - 2026-09-05
 
 ### Added

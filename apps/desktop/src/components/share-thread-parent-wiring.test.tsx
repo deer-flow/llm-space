@@ -439,11 +439,13 @@ describe("mounted share-thread parents preserve runtime ownership", () => {
     }
 
     const tree = await _mount(
-      <CommandProvider>
-        <GithubAuthProvider>
-          <SpeculativeDialogHarness />
-        </GithubAuthProvider>
-      </CommandProvider>
+      <_Providers>
+        <CommandProvider>
+          <GithubAuthProvider>
+            <SpeculativeDialogHarness />
+          </GithubAuthProvider>
+        </CommandProvider>
+      </_Providers>
     );
     const generate = await _findButtonByText("Generate link");
     await act(async () => generate.click());

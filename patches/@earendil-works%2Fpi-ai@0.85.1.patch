@@ -141,7 +141,7 @@ diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
 index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982962b7676 100644
 --- a/dist/api/openai-responses.js
 +++ b/dist/api/openai-responses.js
-@@ -156,6 +156,9 @@ export const streamSimple = (model, context, options) => {
+@@ -167,6 +167,9 @@ export const streamSimple = (model, context, options) => {
      };
      const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
      const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
@@ -151,7 +151,7 @@ index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982
      return stream(model, context, {
          ...base,
          reasoningEffort,
-@@ -231,11 +234,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
+@@ -241,11 +244,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
      if (options?.serviceTier !== undefined) {
          params.service_tier = options.serviceTier;
      }
