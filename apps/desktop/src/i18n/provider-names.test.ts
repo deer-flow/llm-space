@@ -12,6 +12,21 @@ describe("providerDisplayName", () => {
     ).toBe("Aliyun Qwen");
   });
 
+  test("localizes Tencent Token Hub in Chinese", () => {
+    expect(
+      providerDisplayName(
+        { id: "tencent-tokenhub", name: "Tencent Token Hub" },
+        "zh"
+      )
+    ).toBe("腾讯云 Token Hub");
+    expect(
+      providerDisplayName(
+        { id: "tencent-tokenhub", name: "Tencent Token Hub" },
+        "en"
+      )
+    ).toBe("Tencent Token Hub");
+  });
+
   test("uses the Chinese brand name for Volcengine builtins", () => {
     for (const id of ["ark", "ark-agent-plan", "ark-coding-plan"]) {
       expect(providerDisplayName({ id, name: "VolcanoEngine" }, "zh")).toBe(

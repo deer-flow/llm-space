@@ -22,6 +22,7 @@ const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<
     "minimax-cn": "MiniMax（国内）",
     moonshotai: "月之暗面",
     "moonshotai-cn": "月之暗面（国内）",
+    "tencent-tokenhub": "腾讯云 Token Hub",
     zai: "智普",
     "zai-coding-cn": "智普 Coding（国内）",
   },

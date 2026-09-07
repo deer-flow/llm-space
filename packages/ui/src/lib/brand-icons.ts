@@ -225,6 +225,7 @@ export const PROVIDER_ICON_ALIASES: Record<string, string> = {
   moonshotai: "moonshot",
   "moonshotai-cn": "moonshot",
   "openai-codex": "openai",
+  "tencent-tokenhub": "hunyuan",
   "vercel-ai-gateway": "vercel",
   zai: "zhipu",
   "zai-coding-cn": "zhipu",

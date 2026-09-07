@@ -111,15 +111,6 @@ import { ImageModelEditorDialog } from "./image-model-editor-dialog";
 import { ModelEditorDialog } from "./model-editor-dialog";
 import { SettingsPage } from "./settings-page";
 
-/**
- * Base-URL guidance for the Anthropic Messages API. Its SDK appends `/v1/...`
- * to the base URL itself, so — unlike the OpenAI-style APIs, whose SDKs expect
- * the `/v1` to be part of the base URL — a `/v1` suffix here would double up
- * into `/v1/v1/...` on every request.
- */
-const ANTHROPIC_BASE_URL_HINT =
-  "The Anthropic SDK adds /v1 to the request path itself, so enter the URL without a /v1 suffix.";
-
 function sortProviders(
   providers: ModelProviderGroup[],
   language: ReturnType<typeof useI18n>["lang"]
@@ -857,9 +848,8 @@ function ProviderEditor({
     return true;
   });
 
-  // Which base-URL convention applies (see ANTHROPIC_BASE_URL_HINT): builtin
-  // providers are recognized by their models' API; custom providers follow the
-  // live API type selection.
+  // Builtin providers are recognized by their models' API; custom providers
+  // follow the live API type selection.
   const usesAnthropicApi = isBuiltin
     ? provider.models.some((model) => model.api === "anthropic-messages")
     : apiValue === "anthropic-messages";
@@ -1230,7 +1220,7 @@ function _ProviderProfileEditor({
           />
           <div className="text-muted-foreground text-xs">
             {t.models.baseUrlRequired}
-            {usesAnthropicApi ? ` ${ANTHROPIC_BASE_URL_HINT}` : null}
+            {usesAnthropicApi ? ` ${t.models.anthropicBaseUrlHint}` : null}
           </div>
         </div>
       ) : null}
@@ -1587,27 +1577,35 @@ function _ProviderHeadersEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">Custom headers</span>
+      <span className="text-sm font-medium">{t.models.customHeaders}</span>
       {rows.map((row, index) => (
         <div key={index} className="flex items-center gap-2">
           <Input
             value={row.key}
             placeholder={t.models.headerNamePlaceholder}
-            aria-label={`${providerName} header ${index + 1} name`}
+            aria-label={formatMessage(t.models.headerNameAriaLabel, {
+              providerName,
+              index: index + 1,
+            })}
             onChange={(e) => setRow(index, { ...row, key: e.target.value })}
             onBlur={() => persist(rows)}
           />
           <Input
             value={row.value}
             placeholder={t.models.valuePlaceholder}
-            aria-label={`${providerName} header ${index + 1} value`}
+            aria-label={formatMessage(t.models.headerValueAriaLabel, {
+              providerName,
+              index: index + 1,
+            })}
             onChange={(e) => setRow(index, { ...row, value: e.target.value })}
             onBlur={() => persist(rows)}
           />
           <Tooltip content={t.common.tooltips.removeHeader}>
             <button
               type="button"
-              aria-label={`Remove header ${index + 1}`}
+              aria-label={formatMessage(t.models.removeHeaderAriaLabel, {
+                index: index + 1,
+              })}
               onClick={() => removeRow(index)}
               className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors"
             >
@@ -1623,10 +1621,10 @@ function _ProviderHeadersEditor({
         className="self-start"
         onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}
       >
-        <Plus /> Add header
+        <Plus /> {t.models.addHeader}
       </Button>
       <div className="text-muted-foreground text-xs">
-        Sent with every request made through this profile.
+        {t.models.customHeadersHint}
       </div>
     </div>
   );

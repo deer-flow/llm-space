@@ -4,6 +4,25 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.1] - 2026-09-07
+
+### Added
+
+- The built-in Tencent Token Hub provider connects to its OpenAI-compatible
+  endpoint, discovers `TOKENHUB_API_KEY` or `TOKEN_HUB_API_KEY`, and includes
+  current Hunyuan, DeepSeek, GLM, Kimi, MiniMax, Qwen, MiMo, and vision models.
+
+### Changed
+
+- Confirmed `@earendil-works/pi-ai` 0.85.1 as the latest registry release on
+  2026-09-07 and retained the local Responses compatibility patch.
+
+### Fixed
+
+- Custom request-header controls and Anthropic Base URL guidance in model
+  profiles now follow the selected interface language, including accessible
+  labels.
+
 ## [4.18.0] - 2026-09-07
 
 This release upgrades the Pi agent runtime and completes the first broad
