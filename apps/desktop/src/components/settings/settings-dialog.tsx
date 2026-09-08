@@ -10,6 +10,7 @@ import {
 } from "@llm-space/ui/ui/tabs";
 import {
   Boxes,
+  Brain,
   Cable,
   CircleUser,
   FlaskConical,
@@ -32,6 +33,7 @@ import { AccountPage } from "./account-page";
 import { ExperimentalPage } from "./experimental-page";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
+import { MemoryPage } from "./memory-page";
 import { ModelsPage } from "./models-page";
 import { NetworkPage } from "./network-page";
 import { PluginsPage } from "./plugins-page";
@@ -82,6 +84,14 @@ const PAGES = [
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <McpPage runtimeId={runtimeId} />
     ),
+  },
+  {
+    // Machine-wide store, so this page is not runtime-scoped either.
+    group: "Agent",
+    value: "memory",
+    labelKey: "memory",
+    icon: Brain,
+    Page: () => <MemoryPage />,
   },
   {
     group: "Agent",

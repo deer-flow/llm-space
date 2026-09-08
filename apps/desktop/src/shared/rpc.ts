@@ -46,6 +46,11 @@ import type { GithubAuthState } from "./auth";
 import type { Command } from "./commands";
 import type { FeatureReminder } from "./feature-reminders";
 import type {
+  MemoryListParams,
+  MemoryListResult,
+  MemoryMutationResult,
+} from "./memory";
+import type {
   RemoteDisconnectResult,
   RemoteServerDraft,
   RemoteServerStatusChangedPayload,
@@ -792,6 +797,34 @@ export interface DesktopRPCType {
       githubAuthStatus: {
         params: Record<string, never>;
         response: GithubAuthState;
+      };
+      // Browse the bundled Memory plugin's store (Settings → Memory). The
+      // store is machine-wide, so these are not runtime-scoped.
+      memoryList: {
+        params: MemoryListParams;
+        response: MemoryListResult;
+      };
+      // Delete one memory by id. Re-reads the store first so a concurrent
+      // plugin write is preserved.
+      memoryDelete: {
+        params: { id: string };
+        response: MemoryMutationResult;
+      };
+      // Edit one memory in place, keeping its id and origin.
+      memoryUpdate: {
+        params: { id: string; content: string; tags?: string[] };
+        response: MemoryMutationResult;
+      };
+      // Write all memories to an unencrypted JSON file beside the store and
+      // return its path (the renderer then reveals it).
+      memoryExport: {
+        params: Record<string, never>;
+        response: { path: string; count: number };
+      };
+      // Permanently drop the archived overflow (`memories.archive.jsonl`).
+      memoryClearArchive: {
+        params: Record<string, never>;
+        response: { removed: number };
       };
     };
     // Messages the webview SENDS and the bun side handles.
