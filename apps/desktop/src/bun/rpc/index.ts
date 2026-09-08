@@ -30,12 +30,15 @@ import type { RemoteServerManager } from "../remote";
 import type { RuntimeRouter } from "../runtime";
 import type { SkillsManager } from "../skills";
 import type { UpdaterService } from "../updates";
+import { VercelTokenStore } from "../vercel";
 
+import { createDeployVercelHandler } from "./deploy-vercel";
 import { ensureRootDir } from "./ensure-root-dir";
 import { fsReveal } from "./fs-reveal";
 import { createPromptFileRpcHandlers } from "./prompt-files";
 import { createShareThreadHandler } from "./share-thread";
 import { forwardStreamThread } from "./stream-thread-request";
+import { createVercelPreflightHandler } from "./vercel-preflight";
 
 /**
  * The stream handler references its RPC instance inside the initializer, so an
@@ -90,6 +93,7 @@ export function createMainWindowRPC({
 }: MainWindowRPCDependencies): MainWindowRPC {
   const getRuntime = runtimeRouter.get.bind(runtimeRouter);
   const promptFileRequests = createPromptFileRpcHandlers(getRuntime);
+  const vercelTokens = new VercelTokenStore();
   const rpc: MainWindowRPC = BrowserView.defineRPC<DesktopRPCType>({
     maxRequestTime: MAX_REQUEST_TIME_MS,
     handlers: {
@@ -298,6 +302,24 @@ export function createMainWindowRPC({
         // which maps it to friendly copy. Each call creates a fresh gist (no id
         // reuse), so a re-share yields a new link.
         shareThread: createShareThreadHandler({ getRuntime, gistWriter }),
+        // Vercel static deployments: the token is read from
+        // `settings/vercel.json` inside the bun process; the renderer only sees
+        // the configured flag and the deploy outcome (URL or friendly error).
+        getVercelStatus: () =>
+          Promise.resolve({ configured: vercelTokens.isConfigured() }),
+        setVercelToken: ({ token }) => {
+          vercelTokens.set(token);
+          return Promise.resolve(null);
+        },
+        removeVercelToken: () => {
+          vercelTokens.clear();
+          return Promise.resolve(null);
+        },
+        deployToVercel: createDeployVercelHandler({
+          getRuntime,
+          getToken: () => vercelTokens.getAccessToken(),
+        }),
+        vercelPreflight: createVercelPreflightHandler({ getRuntime }),
         fsReveal: async ({ path }) => {
           await fsReveal(path, { skillsManager });
           return null;

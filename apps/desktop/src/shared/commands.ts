@@ -252,6 +252,15 @@ export interface ShareThreadCommand extends GenericCommand<
 > {}
 
 /**
+ * Open the "Deploy to Vercel" dialog for a workspace folder of static files.
+ * `path` targets a directory (tree context menu). Webview only.
+ */
+export interface DeployVercelCommand extends GenericCommand<
+  "deployVercel",
+  { path: string; runtimeId?: RuntimeId }
+> {}
+
+/**
  * Open the Variables dialog for the active thread. When `variableName` is given,
  * the dialog opens focused on that variable; otherwise it opens at the default
  * selection. Webview only, and intentionally excluded from the command palette.
@@ -350,6 +359,7 @@ export type Command =
   | OpenOnboardCommand
   | RunThreadCommand
   | ShareThreadCommand
+  | DeployVercelCommand
   | OpenVariablesCommand
   | ZoomInCommand
   | ZoomOutCommand
@@ -426,6 +436,7 @@ export const COMMAND_META: Record<
   openOnboard: { label: "Onboard...", target: "webview" },
   runThread: { label: "Run Thread", target: "webview" },
   shareThread: { label: "Share...", target: "webview" },
+  deployVercel: { label: "Deploy to Vercel", target: "webview" },
   openVariables: { label: "Variables", target: "webview" },
   zoomIn: { label: "Zoom In", target: "bun" },
   zoomOut: { label: "Zoom Out", target: "bun" },

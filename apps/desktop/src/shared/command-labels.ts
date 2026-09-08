@@ -17,6 +17,7 @@ const COMMAND_LABELS_ZH: Record<CommandType, string> = {
   revealFile: "在 Finder 中显示",
   copyFile: "拷贝",
   refreshTree: "刷新",
+  deployVercel: "部署到 Vercel",
   revealInTree: "在文件树中显示",
   importFiles: "从文件导入…",
   importFromClipboard: "从剪贴板导入",
