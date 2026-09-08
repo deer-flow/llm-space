@@ -1,7 +1,8 @@
 "use client";
 
 import {
-  OPENAI_IMAGE_SIZES,
+  getOpenAIImageSizes,
+  normalizeImageSize,
   SEEDREAM_IMAGE_SIZES,
   type ImageGenerationApi,
   type ImageModelDefinition,
@@ -34,35 +35,36 @@ interface ImageModelFormState {
   icon: string;
   supportedSizes: ImageSize[];
   defaultSize: ImageSize;
+  responseFormat: "auto" | "b64_json";
 }
 
 /** Create the editable form state for a new or existing image model. */
 function _initialState(
   model: ImageModelDefinition | null | undefined,
-  sizeOptions: readonly ImageSize[]
+  api: ImageGenerationApi
 ): ImageModelFormState {
   if (model) {
-    const supportedSizes = model.supportedSizes.filter((size) =>
-      sizeOptions.includes(size)
-    );
-    const normalizedSizes =
-      supportedSizes.length > 0 ? supportedSizes : [...sizeOptions];
     return {
       id: model.id,
       name: model.name,
       icon: model.icon ?? "",
-      supportedSizes: normalizedSizes,
-      defaultSize: normalizedSizes.includes(model.defaultSize)
-        ? model.defaultSize
-        : normalizedSizes[0],
+      supportedSizes: [
+        ...new Set(
+          model.supportedSizes.map((size) => normalizeImageSize(size, api))
+        ),
+      ],
+      defaultSize: normalizeImageSize(model.defaultSize, api),
+      responseFormat: model.responseFormat ?? "auto",
     };
   }
   return {
     id: "",
     name: "",
     icon: "",
-    supportedSizes: [...sizeOptions],
-    defaultSize: sizeOptions.includes("1024x1024") ? "1024x1024" : "2K",
+    supportedSizes:
+      api === "openai-images" ? ["1024x1024"] : [...SEEDREAM_IMAGE_SIZES],
+    defaultSize: api === "openai-images" ? "1024x1024" : "2K",
+    responseFormat: "auto",
   };
 }
 
@@ -82,30 +84,38 @@ export function ImageModelEditorDialog({
   existingIds: readonly string[];
   onSave: (model: ImageModelDefinition, originalId?: string) => void;
 }) {
-  const sizeOptions =
-    api === "openai-images" ? OPENAI_IMAGE_SIZES : SEEDREAM_IMAGE_SIZES;
   const [form, setForm] = useState<ImageModelFormState>(() =>
-    _initialState(model, sizeOptions)
+    _initialState(model, api)
   );
 
   useEffect(() => {
     if (open) {
-      setForm(_initialState(model, sizeOptions));
+      setForm(_initialState(model, api));
     }
-  }, [model, open, sizeOptions]);
+  }, [model, open, api]);
 
   const id = form.id.trim();
+  const sizeOptions: readonly ImageSize[] =
+    api === "openai-images" ? getOpenAIImageSizes(id) : SEEDREAM_IMAGE_SIZES;
+  const unsupportedSizes = form.supportedSizes.filter(
+    (size) => !sizeOptions.includes(size)
+  );
+  const displayedSizes = [...sizeOptions, ...unsupportedSizes];
   const duplicateId = existingIds.some(
     (candidate) => candidate === id && candidate !== model?.id
   );
   const canSave =
-    id.length > 0 && form.supportedSizes.length > 0 && !duplicateId;
+    id.length > 0 &&
+    form.supportedSizes.length > 0 &&
+    form.supportedSizes.includes(form.defaultSize) &&
+    unsupportedSizes.length === 0 &&
+    !duplicateId;
 
   /** Keep the default size valid while the supported-size set changes. */
   const handleSizeToggle = (size: ImageSize, enabled: boolean) => {
     setForm((current) => {
       const supportedSizes = enabled
-        ? sizeOptions.filter(
+        ? displayedSizes.filter(
             (candidate) =>
               current.supportedSizes.includes(candidate) || candidate === size
           )
@@ -132,6 +142,9 @@ export function ImageModelEditorDialog({
         name: form.name.trim() || id,
         supportedSizes: form.supportedSizes,
         defaultSize: form.defaultSize,
+        ...(form.responseFormat === "b64_json"
+          ? { responseFormat: "b64_json" as const }
+          : {}),
         ...(icon ? { icon } : {}),
       },
       model?.id
@@ -210,7 +223,7 @@ export function ImageModelEditorDialog({
 
           <_Field label="Supported sizes">
             <div className="grid grid-cols-2 gap-2">
-              {sizeOptions.map((size) => (
+              {displayedSizes.map((size) => (
                 <div
                   key={size}
                   className="bg-muted/40 flex items-center justify-between rounded-md px-3 py-2 text-sm"
@@ -227,6 +240,12 @@ export function ImageModelEditorDialog({
                 </div>
               ))}
             </div>
+            {unsupportedSizes.length > 0 && (
+              <p role="alert" className="text-destructive text-xs">
+                Unsupported sizes for this model and API:{" "}
+                {unsupportedSizes.join(", ")}.
+              </p>
+            )}
           </_Field>
 
           <_Field label="Default size">
@@ -252,6 +271,32 @@ export function ImageModelEditorDialog({
               </SelectContent>
             </Select>
           </_Field>
+
+          {api === "openai-images" && (
+            <_Field label="Response format">
+              <Select
+                value={form.responseFormat}
+                onValueChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    responseFormat:
+                      value as ImageModelFormState["responseFormat"],
+                  }))
+                }
+              >
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="Image response format"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="b64_json">Base64 (b64_json)</SelectItem>
+                </SelectContent>
+              </Select>
+            </_Field>
+          )}
         </div>
 
         <DialogFooter>

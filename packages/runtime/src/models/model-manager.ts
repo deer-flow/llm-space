@@ -1170,6 +1170,14 @@ function _assertCustomImageModels(
     if (model.icon !== undefined && typeof model.icon !== "string") {
       throw new Error(`Custom ${scope} model ${model.id} has an invalid icon.`);
     }
+    if (
+      model.responseFormat !== undefined &&
+      model.responseFormat !== "b64_json"
+    ) {
+      throw new Error(
+        `Custom ${scope} model ${model.id} has an invalid response format.`
+      );
+    }
   }
 }
 
@@ -1215,6 +1223,9 @@ function _normalizeCustomImageModels(
       name,
       supportedSizes,
       defaultSize,
+      ...(candidate.responseFormat === "b64_json"
+        ? { responseFormat: "b64_json" as const }
+        : {}),
       ...(icon ? { icon } : {}),
     });
   }

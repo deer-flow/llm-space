@@ -473,6 +473,231 @@ describe("Ark image generation", () => {
     expect(calls).toBe(0);
   });
 
+  test("requests base64 for a configured gateway alias that otherwise returns a URL", async () => {
+    let requestBody: unknown;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          models: [
+            {
+              id: "dalle-prod",
+              name: "Production image model",
+              supportedSizes: ["1024x1024"],
+              defaultSize: "1024x1024",
+              responseFormat: "b64_json",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          requestBody =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          const format = (requestBody as { response_format?: unknown })
+            ?.response_format;
+          return Promise.resolve(
+            Response.json({
+              data: [
+                format === "b64_json"
+                  ? { b64_json: PNG_BASE64 }
+                  : { url: "https://images.example/generated.png" },
+              ],
+            })
+          );
+        },
+      })
+    );
+
+    expect(
+      await generate({
+        ...DEFAULT_INPUT,
+        model: "dalle-prod",
+        size: "1024x1024",
+        connection: { providerId: "gateway" },
+      })
+    ).toMatchObject({ data: PNG_BASE64, mimeType: "image/png" });
+    expect(requestBody).toEqual({
+      model: "dalle-prod",
+      prompt: DEFAULT_INPUT.prompt,
+      size: "1024x1024",
+      response_format: "b64_json",
+    });
+  });
+
+  test.each([
+    ["1024x1024", "1K"],
+    ["1K", "1024x1024"],
+    ["1024x1024", "1024x1024"],
+  ] as const)(
+    "matches standard inventory size %s with thread size %s",
+    async (inventorySize, threadSize) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            models: [
+              {
+                id: "dall-e-3",
+                name: "DALL-E 3",
+                supportedSizes: [inventorySize],
+                defaultSize: inventorySize,
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      expect(
+        await generate({
+          ...DEFAULT_INPUT,
+          model: "dall-e-3",
+          size: threadSize,
+          connection: { providerId: "gateway" },
+        })
+      ).toMatchObject({ data: PNG_BASE64, size: "1024x1024" });
+      expect(requestBody).toMatchObject({ size: "1024x1024" });
+    }
+  );
+
+  test.each(["ark-images", "openai-images-extra-body"] as const)(
+    "keeps native 1K presets for %s",
+    async (api) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            api,
+            models: [
+              {
+                id: "custom-image",
+                name: "Custom Image",
+                supportedSizes: ["1K"],
+                defaultSize: "1K",
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      await generate({
+        ...DEFAULT_INPUT,
+        model: "custom-image",
+        size: "1K",
+        connection: { providerId: "gateway" },
+      });
+      expect(requestBody).toMatchObject({ size: "1K" });
+      expect(
+        generate({
+          ...DEFAULT_INPUT,
+          model: "custom-image",
+          size: "1024x1024",
+          connection: { providerId: "gateway" },
+        })
+      ).rejects.toThrow("does not support the 1024x1024 size preset");
+    }
+  );
+
+  test.each(["gpt-image-2", "gpt-image-2-2026-04-21"])(
+    "accepts a supported landscape size for %s",
+    async (model) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            api: "openai-images",
+            models: [
+              {
+                id: model,
+                name: model,
+                supportedSizes: ["1792x1024"],
+                defaultSize: "1792x1024",
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      expect(
+        await generate({
+          ...DEFAULT_INPUT,
+          model,
+          size: "1792x1024",
+          connection: { providerId: "gateway" },
+        })
+      ).toMatchObject({ size: "1792x1024" });
+      expect(requestBody).toEqual({
+        model,
+        prompt: DEFAULT_INPUT.prompt,
+        size: "1792x1024",
+      });
+    }
+  );
+
+  test.each([
+    ["gpt-image-1", "1792x1024"],
+    ["gpt-image-1-mini", "1792x1024"],
+    ["gpt-image-1.5", "1792x1024"],
+    ["gpt-image-1-2025-04-15", "1792x1024"],
+    ["dall-e-2", "1792x1024"],
+    ["dall-e-3", "auto"],
+  ] as const)("still enforces %s size restrictions", (model, size) => {
+    let calls = 0;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: model,
+              name: model,
+              supportedSizes: [size],
+              defaultSize: size,
+            },
+          ],
+        }),
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve(Response.json({}));
+        },
+      })
+    );
+
+    expect(
+      generate({
+        ...DEFAULT_INPUT,
+        model,
+        size,
+        connection: { providerId: "gateway" },
+      })
+    ).rejects.toThrow(`${model} does not support image size ${size}`);
+    expect(calls).toBe(0);
+  });
+
   test("never falls back to the Ark key for a custom provider", async () => {
     let fallbackApiKey: string | undefined;
     const modelManager = {

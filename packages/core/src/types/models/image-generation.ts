@@ -27,6 +27,8 @@ export interface ImageModelDefinition {
   name: string;
   supportedSizes: readonly ImageSize[];
   defaultSize: ImageSize;
+  /** Explicit standard OpenAI response format for gateway model aliases. */
+  responseFormat?: "b64_json";
   /** Optional `@lobehub/icons` keyword for a user-added image model. */
   icon?: string;
 }
@@ -66,6 +68,30 @@ export type SeedreamImageModelId = (typeof SEEDREAM_IMAGE_MODELS)[number]["id"];
 
 export type ImageGenerationApi =
   "ark-images" | "openai-images" | "openai-images-extra-body";
+
+/** Only the standard OpenAI protocol treats legacy 1K as a pixel-size alias. */
+export function normalizeImageSize(
+  size: ImageSize,
+  api: ImageGenerationApi
+): ImageSize {
+  return api === "openai-images" && size === "1K" ? "1024x1024" : size;
+}
+
+/** Restrict known model generations without guessing gateway or future-model limits. */
+export function getOpenAIImageSizes(
+  modelId: string
+): readonly OpenAIImageSize[] {
+  if (modelId === "dall-e-2") {
+    return ["256x256", "512x512", "1024x1024"];
+  }
+  if (modelId === "dall-e-3") {
+    return ["1024x1024", "1792x1024", "1024x1792"];
+  }
+  if (/^gpt-image-(?:1|1-mini|1\.5)(?:-\d{4}-\d{2}-\d{2})?$/.test(modelId)) {
+    return ["auto", "1024x1024", "1536x1024", "1024x1536"];
+  }
+  return OPENAI_IMAGE_SIZES;
+}
 
 export interface ImageGenerationConfig {
   /** Request protocol. Ark defaults to its native API; custom providers use OpenAI Images. */
@@ -159,9 +185,14 @@ export function isImageSizeSupported(
   size: string,
   catalog: readonly ImageModelDefinition[] = []
 ): boolean {
+  if (!isImageSize(size)) {
+    return false;
+  }
+  const api = config.api ?? "ark-images";
   return Boolean(
     getImageModelDefinition(config, modelId, catalog)?.supportedSizes.some(
-      (supported) => supported === size
+      (supported) =>
+        normalizeImageSize(supported, api) === normalizeImageSize(size, api)
     )
   );
 }

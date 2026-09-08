@@ -3,9 +3,11 @@
 import {
   getArkImageModelDefinitions,
   getImageModelDefinitions,
-  IMAGE_SIZES,
+  isImageSize,
+  normalizeImageSize,
   type BuiltinTool,
   type GenerateImageToolConfig,
+  type ImageGenerationApi,
   type ImageSize,
   type ModelProviderGroup,
   type SeedreamImageModelDefinition,
@@ -102,7 +104,25 @@ function _enabledImageModels(
     provider.id === "ark"
       ? getArkImageModelDefinitions(config)
       : getImageModelDefinitions(config);
-  return models.filter((model) => !disabled.has(model.id));
+  const api = _imageApi(provider);
+  return models
+    .filter((model) => !disabled.has(model.id))
+    .map((model) => ({
+      ...model,
+      supportedSizes: [
+        ...new Set(
+          model.supportedSizes.map((size) => normalizeImageSize(size, api))
+        ),
+      ],
+      defaultSize: normalizeImageSize(model.defaultSize, api),
+    }));
+}
+
+function _imageApi(provider: ModelProviderGroup): ImageGenerationApi {
+  return (
+    provider.imageGeneration?.api ??
+    (provider.id === "ark" ? "ark-images" : "openai-images")
+  );
 }
 
 function _BuiltInToolImportDialog({
@@ -205,13 +225,18 @@ function _BuiltInToolImportDialog({
           (provider) => _enabledImageModels(provider).length > 0
         )?.id;
     setImageProviderId(providerId);
-    if (existing) {
-      setGenerateImageConfig(_readGenerateImageConfig(existing.config));
-      return;
-    }
     const provider = imageProviders.find(
       (candidate) => candidate.id === providerId
     );
+    if (existing) {
+      setGenerateImageConfig(
+        _readGenerateImageConfig(
+          existing.config,
+          provider ? _imageApi(provider) : "ark-images"
+        )
+      );
+      return;
+    }
     const first = provider ? _enabledImageModels(provider)[0] : undefined;
     setGenerateImageConfig(
       first
@@ -645,19 +670,20 @@ function _GenerateImageConfigFields({
 
 /** Parse persisted generate_image config without silently repairing stale ids. */
 function _readGenerateImageConfig(
-  value: Record<string, unknown> | undefined
+  value: Record<string, unknown> | undefined,
+  api: ImageGenerationApi
 ): GenerateImageToolConfig | null {
   const model = value?.model;
   const size = value?.size;
   const watermark = value?.watermark;
   if (
     typeof model !== "string" ||
-    !IMAGE_SIZES.some((candidate) => candidate === size) ||
+    !isImageSize(size) ||
     typeof watermark !== "boolean"
   ) {
     return null;
   }
-  return { model, size: size as ImageSize, watermark };
+  return { model, size: normalizeImageSize(size, api), watermark };
 }
 
 function _categoryForTool(toolName: string): BuiltInToolCategoryId {

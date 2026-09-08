@@ -9,8 +9,10 @@ import {
 import {
   getImageModelDefinition,
   getImageModelDefinitions,
+  getOpenAIImageSizes,
   isImageSize,
   isImageSizeSupported,
+  normalizeImageSize,
   OPENAI_IMAGE_SIZES,
   SEEDREAM_IMAGE_MODELS,
   type ImageGenerationApi,
@@ -119,11 +121,21 @@ export function createArkImageGenerator(
         `The configured ${providerId === "ark" ? "Ark " : ""}image model "${modelDefinition.name}" is disabled. Choose an enabled model for generate_image.`
       );
     }
-    if (!isImageSizeSupported(config, input.model, input.size, catalog)) {
+    const api =
+      config.api ?? (providerId === "ark" ? "ark-images" : "openai-images");
+    if (
+      !isImageSizeSupported(
+        { ...config, api },
+        input.model,
+        input.size,
+        catalog
+      )
+    ) {
       throw new Error(
         `${modelDefinition.name} does not support the ${input.size} size preset.`
       );
     }
+    const size = normalizeImageSize(input.size, api);
     const connection = await dependencies.resolveConnection(connectionRef);
     const apiKey = connection.apiKey;
     if (!apiKey) {
@@ -153,7 +165,7 @@ export function createArkImageGenerator(
       {
         apiKey,
         headers: connection.headers,
-        metadata: { size: input.size, watermark: input.watermark },
+        metadata: { size, watermark: input.watermark },
         signal: input.signal,
       }
     )) as ArkAssistantImages;
@@ -168,7 +180,7 @@ export function createArkImageGenerator(
       data: image.data,
       mimeType: image.mimeType,
       model: generated.generatedModel ?? input.model,
-      size: generated.generatedSize ?? input.size,
+      size: generated.generatedSize ?? size,
     };
   };
 }
@@ -236,7 +248,14 @@ function _createImagesProvider({
     models,
     api: {
       generateImages: (model, context, options) =>
-        _generateImages(model, context.input, options, fetch, api),
+        _generateImages(
+          model,
+          context.input,
+          options,
+          fetch,
+          api,
+          getImageModelDefinition(config, model.id, catalog)?.responseFormat
+        ),
     },
   });
 }
@@ -247,7 +266,8 @@ async function _generateImages(
   input: { type: string; text?: string }[],
   options: ImagesOptions | undefined,
   fetch: FetchLike,
-  api: ImageGenerationApi
+  api: ImageGenerationApi,
+  responseFormat: ImageModelDefinition["responseFormat"]
 ): Promise<ArkAssistantImages> {
   const label =
     api === "ark-images" ? "Ark image generation" : "Image generation";
@@ -284,7 +304,7 @@ async function _generateImages(
               return_base64: true,
               extra_body: { response_format: "b64_json" },
             }
-          : _openAIImagesPayload(model.id, metadata.size)),
+          : _openAIImagesPayload(model.id, metadata.size, responseFormat)),
     };
     const transformed = await options.onPayload?.(payload, model);
     if (transformed !== undefined) {
@@ -352,12 +372,15 @@ async function _generateImages(
 /** Build only parameters accepted by the selected standard OpenAI image model. */
 function _openAIImagesPayload(
   modelId: string,
-  configuredSize: ImageSize
+  configuredSize: ImageSize,
+  responseFormat: ImageModelDefinition["responseFormat"]
 ): { size: OpenAIImageSize; response_format?: "b64_json" } {
   const size = _openAIImageSize(modelId, configuredSize);
   return {
     size,
-    ...(_isDallEModel(modelId) ? { response_format: "b64_json" as const } : {}),
+    ...(responseFormat === "b64_json" || _isDallEModel(modelId)
+      ? { response_format: "b64_json" as const }
+      : {}),
   };
 }
 
@@ -366,27 +389,14 @@ function _openAIImageSize(
   modelId: string,
   configuredSize: ImageSize
 ): OpenAIImageSize {
-  const size = configuredSize === "1K" ? "1024x1024" : configuredSize;
+  const size = normalizeImageSize(configuredSize, "openai-images");
   if (!(OPENAI_IMAGE_SIZES as readonly string[]).includes(size)) {
     throw new Error(
       `OpenAI Images requires an explicit pixel size; configure ${modelId} with an OpenAI-compatible size instead of ${configuredSize}.`
     );
   }
-  if (modelId === "dall-e-2") {
-    const supported = ["256x256", "512x512", "1024x1024"];
-    if (!supported.includes(size)) {
-      throw new Error(`dall-e-2 does not support image size ${size}.`);
-    }
-  } else if (modelId === "dall-e-3") {
-    const supported = ["1024x1024", "1792x1024", "1024x1792"];
-    if (!supported.includes(size)) {
-      throw new Error(`dall-e-3 does not support image size ${size}.`);
-    }
-  } else if (modelId.startsWith("gpt-image-")) {
-    const supported = ["auto", "1024x1024", "1536x1024", "1024x1536"];
-    if (!supported.includes(size)) {
-      throw new Error(`${modelId} does not support image size ${size}.`);
-    }
+  if (!(getOpenAIImageSizes(modelId) as readonly string[]).includes(size)) {
+    throw new Error(`${modelId} does not support image size ${size}.`);
   }
   return size as OpenAIImageSize;
 }
