@@ -232,6 +232,13 @@ export function createThreadStore(
      */
     getReactLoop?: () => boolean;
     /**
+     * Whether full access mode is enabled: auto-run executes every tool call,
+     * including bash commands flagged destructive, without pausing. Opt-in via
+     * Experimental settings (with a one-time risk acknowledgement); off by
+     * default. Read fresh at run time. Defaults to `false`.
+     */
+    getFullAccessMode?: () => boolean;
+    /**
      * Execute an MCP or built-in tool call, returning structured model-facing
      * content. Only used by the auto-run-tools path; manual tool runs go through
      * the UI's own runner. Injected so the store stays decoupled from the RPC
@@ -568,6 +575,7 @@ export function createThreadStore(
           toolCall: ToolCall;
           tool: McpTool | BuiltinTool | PluginTool;
         }[] = [];
+        const fullAccessMode = options.getFullAccessMode?.() ?? false;
         for (const toolCall of toolCalls) {
           const tool = toolsByName.get(toolCall.input.name);
           if (!tool || !isExecutableTool(tool)) {
@@ -576,8 +584,13 @@ export function createThreadStore(
           // A destructive `bash` command must never be auto-executed, even under
           // "auto run tools" or the ReAct loop — treat it like a `terminate`
           // tool: stop the loop and leave it pending for the user to review and
-          // run by hand.
-          if (tool.type === "builtin" && tool.name === "bash") {
+          // run by hand. Full access mode is the deliberate opt-out: the user
+          // acknowledged the risk and accepted that every tool runs unattended.
+          if (
+            tool.type === "builtin" &&
+            tool.name === "bash" &&
+            !fullAccessMode
+          ) {
             const command = (toolCall.input.arguments as { command?: unknown })
               ?.command;
             if (
@@ -1172,6 +1185,13 @@ export function createThreadStore(
             streamingMessage: null,
             executingToolCallIds: [],
           });
+          // Persistent reminder (dismissible) that this run may execute
+          // anything without pausing — see the full access mode acknowledgement.
+          if (options.getFullAccessMode?.()) {
+            toast.warning(
+              "Full access mode is on — tools, including commands flagged destructive, run without confirmation."
+            );
+          }
 
           // Commit the truncation while running so it folds into the run's
           // single undo step instead of becoming its own snapshot.

@@ -264,6 +264,14 @@ const APP_MESSAGES = {
       title: "Experimental",
       description:
         "Configure preview features that are still under development.",
+      fullAccess: "Full access mode",
+      fullAccessHint:
+        "Tools — including bash commands flagged as destructive — run automatically without pausing for confirmation. Only enable this in an environment you can afford to lose (your dev machine, a VM, or a container). You can turn it off here at any time.",
+      fullAccessDialogTitle: "Enable full access mode?",
+      fullAccessDialogDescription:
+        "In this mode the agent executes every tool without confirmation, including irreversible actions such as deleting files, wiping disks, running sudo, or executing remote scripts. These actions are decided by the model and can be wrong. Any data loss or system damage is your own responsibility. It is recommended to enable this only in a disposable environment. You can turn it off in settings at any time.",
+      fullAccessConfirm: "I understand, enable",
+      fullAccessCancel: "Cancel",
       tracing: "Tracing",
       tracingHint:
         "Enable to connect Langfuse or create a manual project for JSON exports.",
@@ -893,6 +901,14 @@ const APP_MESSAGES = {
     experimental: {
       title: "实验性",
       description: "配置仍在开发中的预览功能。",
+      fullAccess: "完全访问模式",
+      fullAccessHint:
+        "所有工具——包括被判定为危险的 bash 命令——都会自动执行，不再暂停等待确认。请仅在可承受损失的环境（本机开发机、虚拟机或容器）中开启；可随时在这里关闭。",
+      fullAccessDialogTitle: "开启完全访问模式？",
+      fullAccessDialogDescription:
+        "开启后，Agent 将不经确认自动执行任何工具，包括删除文件、格式化磁盘、使用 sudo、执行远程脚本等不可逆操作。这些操作由模型决定，可能出错，由此造成的任何数据丢失或系统损坏由你自行承担。建议仅在可丢弃的环境中开启；可随时在设置中关闭。",
+      fullAccessConfirm: "我已了解，开启",
+      fullAccessCancel: "取消",
       tracing: "Tracing",
       tracingHint: "启用后可连接 Langfuse，或创建用于 JSON 导出的手动项目。",
       reactScan: "React Scan",

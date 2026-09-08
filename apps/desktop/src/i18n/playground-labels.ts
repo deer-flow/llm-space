@@ -38,6 +38,7 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
     runSettings: "Run settings",
     enableReActLoop: "Enable ReAct loop",
     autoRunTools: "Auto run tools",
+    fullAccessBadge: "Full access",
     dialogs: {
       add: "Add",
       remove: "Remove",
@@ -453,6 +454,7 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
     runSettings: "运行设置",
     enableReActLoop: "启用 ReAct 循环",
     autoRunTools: "自动运行工具",
+    fullAccessBadge: "完全访问",
     dialogs: {
       add: "添加",
       remove: "移除",
