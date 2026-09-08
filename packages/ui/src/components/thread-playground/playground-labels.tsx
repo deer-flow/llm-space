@@ -229,6 +229,11 @@ export interface PlaygroundLabels {
       previewText: string;
       noText: string;
     };
+    /** Collapsed cross-message process group headers. */
+    processGroups: {
+      lastTool: (name: string) => string;
+      errors: (count: number) => string;
+    };
     messages: {
       user: string;
       assistant: string;
@@ -632,6 +637,10 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
       runFromMessage: "Run from this message",
       previewText: "Preview text content",
       noText: "No text content",
+    },
+    processGroups: {
+      lastTool: (name) => `Last: ${name}`,
+      errors: (count) => `${count} failed`,
     },
     messages: {
       user: "User",

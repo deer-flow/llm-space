@@ -42,10 +42,7 @@ import {
   useThreadStoreActions,
 } from "../stores";
 
-import {
-  type DisplayMessage,
-  resolveDisplayMessages,
-} from "./display-messages";
+import { resolveDisplayRows } from "./display-messages";
 import {
   ImageDisplayProvider,
   type ImageDisplayContextValue,
@@ -54,6 +51,8 @@ import { MessageListItem } from "./message-list-item";
 import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
 import { followMessageViewportBottom } from "./message-scroll-stability";
+import { ProcessGroupHeader } from "./process-group-header";
+import { type DisplayRow, useCollapseProcessGroups } from "./process-groups";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
 import { measureVirtualRowHeight } from "./virtual-row-measurement";
 
@@ -133,6 +132,10 @@ export function MessageListView({
   const collapsedMessageIds = useThreadStore(
     (state) => state.collapsedMessageIds
   );
+  const expandedProcessGroupIds = useThreadStore(
+    (state) => state.expandedProcessGroupIds
+  );
+  const collapseProcessGroups = useCollapseProcessGroups();
   const autoFocusMessageId = useThreadStore(
     (state) => state.autoFocusMessageId
   );
@@ -160,31 +163,64 @@ export function MessageListView({
     [messagesFromProps, storeMessages]
   );
   const readonly = readonlyFromProps || isSnapshotView;
+  // Groups wrap only once a run has settled: while running/preparing the
+  // in-flight process steps stay expanded so streaming doesn't jump.
+  const groupingEnabled = collapseProcessGroups && status === "idle";
   const displayRows = useMemo(
     () =>
-      isSnapshotView
-        ? messages.map((message) => ({ message, streaming: false }))
-        : resolveDisplayMessages(
-            messages,
-            streamingMessageId,
-            status === "running"
-          ),
-    [isSnapshotView, messages, status, streamingMessageId]
+      resolveDisplayRows(
+        messages,
+        isSnapshotView ? null : streamingMessageId,
+        isSnapshotView ? false : status === "running",
+        {
+          groupingEnabled,
+          expandedGroupIds: expandedProcessGroupIds,
+        }
+      ),
+    [
+      expandedProcessGroupIds,
+      groupingEnabled,
+      isSnapshotView,
+      messages,
+      status,
+      streamingMessageId,
+    ]
   );
-  const displayMessages = useMemo(
-    () => displayRows.map((row) => row.message),
+  // Navigator anchors: a collapsed group is represented by its first member.
+  const navigatorMessages = useMemo(
+    () =>
+      displayRows.map((row) =>
+        row.kind === "processGroup" ? row.group.messages[0] : row.message
+      ),
     [displayRows]
   );
   const messageIds = useMemo(
     () => messages.map((message) => message.id),
     [messages]
   );
+  // Map a message id to its displayed row index — collapsed groups remove
+  // member rows, so raw message indices no longer match display indices.
+  const displayIndexByMessageId = useMemo(() => {
+    const map = new Map<string, number>();
+    displayRows.forEach((row, index) => {
+      if (row.kind === "message") {
+        map.set(row.message.id, index);
+      } else {
+        for (const member of row.group.messages) {
+          if (!map.has(member.id)) {
+            map.set(member.id, index);
+          }
+        }
+      }
+    });
+    return map;
+  }, [displayRows]);
   const autoFocusMessageIndex = autoFocusMessageId
-    ? messages.findIndex((message) => message.id === autoFocusMessageId)
+    ? (displayIndexByMessageId.get(autoFocusMessageId) ?? -1)
     : -1;
   const validationMessageId = runValidationIssue?.messageId ?? null;
   const validationMessageIndex = validationMessageId
-    ? messages.findIndex((message) => message.id === validationMessageId)
+    ? (displayIndexByMessageId.get(validationMessageId) ?? -1)
     : -1;
   const collapsedMessageIdSet = useMemo(
     () => new Set(collapsedMessageIds),
@@ -193,8 +229,16 @@ export function MessageListView({
   const shouldVirtualize =
     displayRows.length > MESSAGE_VIRTUALIZATION_THRESHOLD;
   const getMessageKey = useCallback(
-    (index: number) => displayMessages[index]?.id ?? index,
-    [displayMessages]
+    (index: number) => {
+      const row = displayRows[index];
+      if (!row) {
+        return index;
+      }
+      return row.kind === "processGroup"
+        ? `group:${row.group.id}`
+        : row.message.id;
+    },
+    [displayRows]
   );
   const getScrollElement = useCallback(
     () =>
@@ -203,20 +247,29 @@ export function MessageListView({
       ) ?? null,
     []
   );
-  const estimateMessageSize = useCallback(
+  const estimateRowSize = useCallback(
     (index: number) => {
-      const message = displayMessages[index];
-      return message
-        ? _estimateMessageHeight(message, collapsedMessageIdSet.has(message.id))
-        : 240;
+      const row = displayRows[index];
+      if (!row) {
+        return 240;
+      }
+      if (row.kind === "processGroup") {
+        // A collapsed group is a single fixed header row; an expanded group's
+        // header is measured like any other row.
+        return MESSAGE_HEIGHT_CACHE.get(`${row.group.id}:group`) ?? 56;
+      }
+      return _estimateMessageHeight(
+        row.message,
+        collapsedMessageIdSet.has(row.message.id)
+      );
     },
-    [collapsedMessageIdSet, displayMessages]
+    [collapsedMessageIdSet, displayRows]
   );
   // TanStack Virtual exposes a mutable imperative controller by design.
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: shouldVirtualize ? displayRows.length : 0,
-    estimateSize: estimateMessageSize,
+    estimateSize: estimateRowSize,
     getItemKey: getMessageKey,
     getScrollElement,
     overscan: MESSAGE_OVERSCAN,
@@ -227,13 +280,15 @@ export function MessageListView({
     measureElement: (element, entry) => {
       const height = measureVirtualRowHeight(element, entry);
       const index = Number(element.getAttribute("data-index"));
-      const message = displayMessages[index];
-      if (message && height > 0) {
+      const row = displayRows[index];
+      if (row && height > 0) {
         _rememberMessageHeight(
-          _messageHeightCacheKey(
-            message,
-            collapsedMessageIdSet.has(message.id)
-          ),
+          row.kind === "processGroup"
+            ? `${row.group.id}:group`
+            : _messageHeightCacheKey(
+                row.message,
+                collapsedMessageIdSet.has(row.message.id)
+              ),
           height
         );
       }
@@ -437,7 +492,7 @@ export function MessageListView({
   }, [validationMessageId, validationMessageIndex, scrollToMessageIndex]);
 
   const virtualItems = virtualizer.getVirtualItems();
-  const showNavigator = displayMessages.length > 1;
+  const showNavigator = navigatorMessages.length > 1;
 
   return (
     <div className={cn("relative size-full", className)}>
@@ -486,7 +541,10 @@ export function MessageListView({
                           context={contextFromProps}
                           readonly={readonly}
                           autoFocusMessageId={autoFocusMessageId}
-                          collapsed={collapsedMessageIdSet.has(row.message.id)}
+                          collapsed={
+                            row.kind === "message" &&
+                            collapsedMessageIdSet.has(row.message.id)
+                          }
                           runValidationIssue={runValidationIssue}
                         />
                       );
@@ -496,13 +554,20 @@ export function MessageListView({
                   <div key="standard" className="w-full pt-3">
                     {displayRows.map((row, index) => (
                       <MessageRow
-                        key={row.message.id}
+                        key={
+                          row.kind === "processGroup"
+                            ? `group-header:${row.group.id}`
+                            : row.message.id
+                        }
                         index={index}
                         row={row}
                         context={contextFromProps}
                         readonly={readonly}
                         autoFocusMessageId={autoFocusMessageId}
-                        collapsed={collapsedMessageIdSet.has(row.message.id)}
+                        collapsed={
+                          row.kind === "message" &&
+                          collapsedMessageIdSet.has(row.message.id)
+                        }
                         runValidationIssue={runValidationIssue}
                       />
                     ))}
@@ -563,7 +628,7 @@ export function MessageListView({
       {showNavigator ? (
         <MessageNavigator
           activeIndex={activeMessageIndex}
-          messages={displayMessages}
+          messages={navigatorMessages}
           onJump={jumpToMessage}
         />
       ) : null}
@@ -585,7 +650,7 @@ function MessageRow({
   measureRef?: Ref<HTMLDivElement>;
   virtualized?: boolean;
   index: number;
-  row: DisplayMessage;
+  row: DisplayRow;
   context?: ThreadContext;
   readonly: boolean;
   autoFocusMessageId: string | null;
@@ -602,7 +667,11 @@ function MessageRow({
       data-index={index}
       data-message-row-index={index}
     >
-      {row.streaming ? (
+      {row.kind === "processGroup" ? (
+        <div className="pb-3.5">
+          <ProcessGroupHeader group={row.group} collapsed={row.collapsed} />
+        </div>
+      ) : row.streaming ? (
         <StreamingMessageRow message={row.message} />
       ) : (
         <SortableMessageRow

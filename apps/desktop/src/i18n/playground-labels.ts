@@ -253,6 +253,10 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         previewText: "Preview text content",
         noText: "No text content",
       },
+      processGroups: {
+        lastTool: (name) => `Last: ${name}`,
+        errors: (count) => `${count} failed`,
+      },
       messages: {
         user: "User",
         assistant: "Assistant",
@@ -663,6 +667,10 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         runFromMessage: "从此消息继续运行",
         previewText: "预览文本内容",
         noText: "没有文本内容",
+      },
+      processGroups: {
+        lastTool: (name) => `最后：${name}`,
+        errors: (count) => `${count} 步失败`,
       },
       messages: {
         user: "用户",
