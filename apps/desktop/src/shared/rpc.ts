@@ -1,5 +1,5 @@
 import type {
-  ArkImageGenerationConfig,
+  ImageGenerationConfig,
   AgentEvent,
   AgentStreamRequest,
   BuiltinTool,
@@ -208,7 +208,7 @@ export interface DesktopRPCType {
             | "openai-responses"
             | null;
           icon?: string | null;
-          imageGeneration?: ArkImageGenerationConfig;
+          imageGeneration?: ImageGenerationConfig;
         };
         response: ModelProviderGroup[];
       };

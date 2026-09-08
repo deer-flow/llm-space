@@ -12,12 +12,16 @@ import {
 import {
   DEFAULT_ARK_IMAGE_GENERATION_CONFIG,
   getArkImageModelDefinitions,
+  getMiniMaxImageModelDefinitions,
+  type ImageGenerationConfig,
+  MINIMAX_IMAGE_MODELS,
   ModelConfig,
   SEEDREAM_IMAGE_MODELS,
   SEEDREAM_IMAGE_SIZES,
   type ArkImageGenerationConfig,
   type CustomModel,
   type ModelProviderGroup,
+  type MiniMaxImageGenerationConfig,
   type ProviderConnectionRef,
   type ProviderProfile,
   type ProviderProfilePatch,
@@ -98,6 +102,9 @@ const ARK_IMAGE_GENERATION_FILE_SCHEMA = z.object({
   models: z.array(ARK_IMAGE_MODEL_FILE_SCHEMA).optional(),
   disabledModels: z.array(z.string()).optional(),
 });
+const MINIMAX_IMAGE_GENERATION_FILE_SCHEMA = z.object({
+  disabledModels: z.array(z.string()).optional(),
+});
 const ProviderConfigFileSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -113,7 +120,12 @@ const ProviderConfigFileSchema = z.object({
   disabledModels: z.array(z.string()).optional(),
   models: z.array(CustomModelFileSchema).optional(),
   customModels: z.array(z.string()).optional(),
-  imageGeneration: ARK_IMAGE_GENERATION_FILE_SCHEMA.optional(),
+  imageGeneration: z
+    .union([
+      ARK_IMAGE_GENERATION_FILE_SCHEMA,
+      MINIMAX_IMAGE_GENERATION_FILE_SCHEMA,
+    ])
+    .optional(),
 });
 const ModelsConfigFileSchema = z.object({
   providers: z.array(ProviderConfigFileSchema),
@@ -154,7 +166,7 @@ export class ModelManager {
     // renderer always sees which models are user-added, then persist any change.
     const providersChanged = this._normalizeCustomProviders();
     const modelsChanged = this._normalizeCustomModels();
-    const imageGenerationChanged = this._normalizeArkImageGeneration();
+    const imageGenerationChanged = this._normalizeImageGeneration();
     const profilesChanged = this._normalizeProviderProfiles();
     if (
       providersChanged ||
@@ -334,7 +346,7 @@ export class ModelManager {
       name?: string | null;
       api?: CustomProviderApi | null;
       icon?: string | null;
-      imageGeneration?: ArkImageGenerationConfig;
+      imageGeneration?: ImageGenerationConfig;
     }
   ): void {
     const entry = this._config.providers.find(
@@ -356,12 +368,19 @@ export class ModelManager {
       else entry.icon = icon;
     }
     if (imageGeneration !== undefined) {
-      if (providerId !== "ark" || entry.builtin !== true) {
+      if (
+        (providerId !== "ark" && providerId !== "minimax") ||
+        entry.builtin !== true
+      ) {
         throw new Error(
-          "Image generation can only be configured on the builtin Ark provider."
+          "Image generation can only be configured on a supported builtin provider."
         );
       }
-      _assertArkImageGenerationConfig(imageGeneration);
+      if (providerId === "minimax") {
+        _assertMiniMaxImageGenerationConfig(imageGeneration);
+      } else {
+        _assertArkImageGenerationConfig(imageGeneration);
+      }
       entry.imageGeneration = { ...imageGeneration };
     }
     // Rebuild the registry so a cleared baseUrl restores the model's default
@@ -534,6 +553,16 @@ export class ModelManager {
   getArkImageGenerationConfig(): ArkImageGenerationConfig | undefined {
     const config = this._config.providers.find(
       (entry) => entry.id === "ark" && entry.builtin === true
+    )?.imageGeneration;
+    return config ? { ...(config as ArkImageGenerationConfig) } : undefined;
+  }
+
+  /** The saved MiniMax image-model inventory, or undefined without MiniMax. */
+  getMiniMaxImageGenerationConfig():
+    | MiniMaxImageGenerationConfig
+    | undefined {
+    const config = this._config.providers.find(
+      (entry) => entry.id === "minimax" && entry.builtin === true
     )?.imageGeneration;
     return config ? { ...config } : undefined;
   }
@@ -888,21 +917,27 @@ export class ModelManager {
    * This keeps upgrades readable without treating image models as chat models
    * or rejecting the whole settings file.
    */
-  private _normalizeArkImageGeneration(): boolean {
-    const entry = this._config.providers.find(
-      (provider) => provider.id === "ark" && provider.builtin === true
-    );
-    if (!entry) {
-      return false;
+  private _normalizeImageGeneration(): boolean {
+    let changed = false;
+    for (const entry of this._config.providers) {
+      if (entry.builtin !== true) {
+        continue;
+      }
+      const normalized =
+        entry.id === "ark"
+          ? _normalizeArkImageGenerationConfig(entry.imageGeneration)
+          : entry.id === "minimax"
+            ? _normalizeMiniMaxImageGenerationConfig(entry.imageGeneration)
+            : undefined;
+      if (
+        normalized !== undefined &&
+        JSON.stringify(entry.imageGeneration) !== JSON.stringify(normalized)
+      ) {
+        entry.imageGeneration = normalized;
+        changed = true;
+      }
     }
-    const normalized = _normalizeArkImageGenerationConfig(
-      entry.imageGeneration
-    );
-    if (JSON.stringify(entry.imageGeneration) === JSON.stringify(normalized)) {
-      return false;
-    }
-    entry.imageGeneration = normalized;
-    return true;
+    return changed;
   }
 
   /**
@@ -1077,6 +1112,24 @@ function _assertArkImageGenerationConfig(
   }
 }
 
+/** Validate renderer-supplied MiniMax image settings before persisting them. */
+function _assertMiniMaxImageGenerationConfig(
+  config: ImageGenerationConfig
+): void {
+  const disabledModels = config.disabledModels ?? [];
+  const modelIds = new Set<string>(
+    MINIMAX_IMAGE_MODELS.map((model) => model.id)
+  );
+  if (
+    disabledModels.some((modelId) => !modelIds.has(modelId)) ||
+    new Set(disabledModels).size !== disabledModels.length
+  ) {
+    throw new Error(
+      "Disabled MiniMax image models must reference unique model ids."
+    );
+  }
+}
+
 /** Normalize untrusted JSON from older or manually edited settings files. */
 function _normalizeArkImageGenerationConfig(
   value: unknown
@@ -1106,6 +1159,30 @@ function _normalizeArkImageGenerationConfig(
     ...(models.length > 0 ? { models } : {}),
     ...(disabledModels.length > 0 ? { disabledModels } : {}),
   };
+}
+
+/** Repair MiniMax image settings loaded from user-edited JSON. */
+function _normalizeMiniMaxImageGenerationConfig(
+  value: unknown
+): MiniMaxImageGenerationConfig {
+  const candidate =
+    value && typeof value === "object"
+      ? (value as Partial<MiniMaxImageGenerationConfig>)
+      : {};
+  const modelIds = new Set(
+    getMiniMaxImageModelDefinitions({}).map((model) => model.id)
+  );
+  const disabledModels = Array.isArray(candidate.disabledModels)
+    ? [
+        ...new Set(
+          candidate.disabledModels.filter(
+            (modelId): modelId is string =>
+              typeof modelId === "string" && modelIds.has(modelId)
+          )
+        ),
+      ]
+    : [];
+  return disabledModels.length > 0 ? { disabledModels } : {};
 }
 
 /** Reject invalid custom model definitions supplied through renderer RPC. */

@@ -8,5 +8,6 @@ export { ExecCodeSessionManager, execCodeTool } from "./exec-code";
 export {
   createMediaBuiltInTools,
   generateImageTool,
+  generateMiniMaxImageTool,
   type MediaBuiltInToolsDependencies,
 } from "./media";

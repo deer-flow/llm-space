@@ -1,5 +1,5 @@
 import type {
-  ArkImageGenerationConfig,
+  ImageGenerationConfig,
   AgentEvent,
   BuiltinTool,
   CustomModel,
@@ -315,7 +315,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
-    imageGeneration?: ArkImageGenerationConfig;
+    imageGeneration?: ImageGenerationConfig;
   }) {
     return this._rpc<ModelProviderGroup[]>("models.updateProvider", input);
   }

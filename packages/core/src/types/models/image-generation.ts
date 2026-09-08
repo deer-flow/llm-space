@@ -105,3 +105,76 @@ export function isArkImageSizeSupported(
     )
   );
 }
+
+export const MINIMAX_IMAGE_ASPECT_RATIOS = [
+  "1:1",
+  "16:9",
+  "4:3",
+  "3:2",
+  "2:3",
+  "3:4",
+  "9:16",
+  "21:9",
+] as const;
+
+export type MiniMaxImageAspectRatio =
+  (typeof MINIMAX_IMAGE_ASPECT_RATIOS)[number];
+
+export interface MiniMaxImageModelDefinition {
+  id: string;
+  name: string;
+  supportedAspectRatios: readonly MiniMaxImageAspectRatio[];
+  defaultAspectRatio: MiniMaxImageAspectRatio;
+}
+
+/** Curated MiniMax catalog available to settings and the built-in tool. */
+export const MINIMAX_IMAGE_MODELS = [
+  {
+    id: "image-01",
+    name: "Image 01",
+    supportedAspectRatios: MINIMAX_IMAGE_ASPECT_RATIOS,
+    defaultAspectRatio: "1:1",
+  },
+  {
+    id: "image-01-live",
+    name: "Image 01 Live",
+    supportedAspectRatios: MINIMAX_IMAGE_ASPECT_RATIOS,
+    defaultAspectRatio: "1:1",
+  },
+] as const satisfies readonly MiniMaxImageModelDefinition[];
+
+export interface MiniMaxImageGenerationConfig {
+  /** Image-model ids disabled in Settings. Absent means every model is enabled. */
+  disabledModels?: string[];
+}
+
+export type ImageGenerationConfig =
+  | ArkImageGenerationConfig
+  | MiniMaxImageGenerationConfig;
+
+/** Resolve a curated MiniMax image model by id. */
+export function getMiniMaxImageModelDefinition(
+  modelId: string
+): MiniMaxImageModelDefinition | undefined {
+  return MINIMAX_IMAGE_MODELS.find((model) => model.id === modelId);
+}
+
+/** Return the curated MiniMax image catalog. */
+export function getMiniMaxImageModelDefinitions(
+  config: MiniMaxImageGenerationConfig
+): readonly MiniMaxImageModelDefinition[] {
+  void config;
+  return MINIMAX_IMAGE_MODELS;
+}
+
+/** Whether a MiniMax model supports the selected aspect ratio. */
+export function isMiniMaxImageAspectRatioSupported(
+  modelId: string,
+  aspectRatio: string
+): boolean {
+  return Boolean(
+    getMiniMaxImageModelDefinition(modelId)?.supportedAspectRatios.some(
+      (supported) => supported === aspectRatio
+    )
+  );
+}
