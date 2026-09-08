@@ -33,6 +33,7 @@
     "@radix-ui/react-slot": "^1.3.3",
     "@sinm/react-chrome-tabs": "^2.6.3",
     "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-virtual": "catalog:",
     "@uiw/codemirror-theme-basic": "^4.25.10",
     "@uiw/codemirror-theme-github": "^4.25.10",
     "@uiw/codemirror-theme-monokai": "^4.25.10",
