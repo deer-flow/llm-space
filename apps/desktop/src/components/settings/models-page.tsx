@@ -7,9 +7,9 @@ import {
   type CustomModel,
   type ImageGenerationApi,
   type ImageGenerationConfig,
+  type ImageModelDefinition,
   type ModelProviderGroup,
   type ProviderProfile,
-  type SeedreamImageModelDefinition,
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Link } from "@llm-space/ui/components/link";
@@ -1222,6 +1222,8 @@ function _ImageGenerationEditor({
 }) {
   const updateProvider = useUpdateProvider();
   const config = provider.imageGeneration ?? {};
+  const imageApi =
+    config.api ?? (provider.id === "ark" ? "ark-images" : "openai-images");
   const models =
     provider.id === "ark"
       ? getArkImageModelDefinitions(config)
@@ -1234,8 +1236,9 @@ function _ImageGenerationEditor({
   );
   const [modelListRef] = useAutoAnimation<HTMLDivElement>();
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingModel, setEditingModel] =
-    useState<SeedreamImageModelDefinition | null>(null);
+  const [editingModel, setEditingModel] = useState<ImageModelDefinition | null>(
+    null
+  );
 
   const visibleModels = models.filter((model) => {
     if (modelView === "enabled") return !disabledModels.has(model.id);
@@ -1275,7 +1278,7 @@ function _ImageGenerationEditor({
 
   /** Add or replace a custom image model and preserve its disabled state. */
   const handleSaveCustomModel = (
-    model: SeedreamImageModelDefinition,
+    model: ImageModelDefinition,
     originalId?: string
   ) => {
     const custom = (config.models ?? []).filter(
@@ -1314,7 +1317,7 @@ function _ImageGenerationEditor({
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Image API type</span>
           <Select
-            value={config.api ?? "openai-images"}
+            value={imageApi}
             onValueChange={(api) =>
               update({ ...config, api: api as ImageGenerationApi })
             }
@@ -1326,6 +1329,7 @@ function _ImageGenerationEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="ark-images">Ark Images</SelectItem>
               <SelectItem value="openai-images">OpenAI Images</SelectItem>
               <SelectItem value="openai-images-extra-body">
                 OpenAI Images with extra_body
@@ -1430,6 +1434,7 @@ function _ImageGenerationEditor({
       <ImageModelEditorDialog
         open={editorOpen}
         onOpenChange={setEditorOpen}
+        api={imageApi}
         model={editingModel}
         existingIds={models.map((model) => model.id)}
         onSave={handleSaveCustomModel}
@@ -1449,7 +1454,7 @@ function _ImageModelListItem({
   onDelete,
 }: {
   providerName: string;
-  model: SeedreamImageModelDefinition;
+  model: ImageModelDefinition;
   enabled: boolean;
   isCustom: boolean;
   onToggle: (enabled: boolean) => void;

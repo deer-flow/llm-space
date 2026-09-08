@@ -344,6 +344,135 @@ describe("Ark image generation", () => {
     });
   });
 
+  test("uses standard OpenAI sizes and omits response_format for GPT Image", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "gpt-image-1",
+              name: "GPT Image 1",
+              supportedSizes: ["1024x1024"],
+              defaultSize: "1024x1024",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          const parsed: unknown =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          requestBody =
+            parsed && typeof parsed === "object"
+              ? (parsed as Record<string, unknown>)
+              : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "gpt-image-1",
+              data: [{ b64_json: PNG_BASE64, size: "1024x1024" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "gpt-image-1",
+      size: "1024x1024",
+      watermark: false,
+      connection: { providerId: "openai-images" },
+    });
+
+    expect(requestBody).toEqual({
+      model: "gpt-image-1",
+      prompt: "A red circle",
+      size: "1024x1024",
+    });
+  });
+
+  test("requests base64 explicitly for DALL-E and migrates legacy 1K", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "dall-e-3",
+              name: "DALL-E 3",
+              supportedSizes: ["1K"],
+              defaultSize: "1K",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          const parsed: unknown =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          requestBody =
+            parsed && typeof parsed === "object"
+              ? (parsed as Record<string, unknown>)
+              : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "dall-e-3",
+              data: [{ b64_json: PNG_BASE64, size: "1024x1024" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "dall-e-3",
+      size: "1K",
+      watermark: false,
+      connection: { providerId: "openai-images" },
+    });
+
+    expect(requestBody).toEqual({
+      model: "dall-e-3",
+      prompt: "A red circle",
+      response_format: "b64_json",
+      size: "1024x1024",
+    });
+  });
+
+  test("rejects ambiguous non-1K presets in standard OpenAI mode", async () => {
+    let calls = 0;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "gpt-image-1",
+              name: "GPT Image 1",
+              supportedSizes: ["2K"],
+              defaultSize: "2K",
+            },
+          ],
+        }),
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve(Response.json({}));
+        },
+      })
+    );
+
+    expect(
+      generate({
+        prompt: "A red circle",
+        model: "gpt-image-1",
+        size: "2K",
+        watermark: false,
+        connection: { providerId: "openai-images" },
+      })
+    ).rejects.toThrow("requires an explicit pixel size");
+    expect(calls).toBe(0);
+  });
+
   test("never falls back to the Ark key for a custom provider", async () => {
     let fallbackApiKey: string | undefined;
     const modelManager = {

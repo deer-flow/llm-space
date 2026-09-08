@@ -3,12 +3,12 @@
 import {
   getArkImageModelDefinitions,
   getImageModelDefinitions,
-  SEEDREAM_IMAGE_SIZES,
+  IMAGE_SIZES,
   type BuiltinTool,
   type GenerateImageToolConfig,
+  type ImageSize,
   type ModelProviderGroup,
   type SeedreamImageModelDefinition,
-  type SeedreamImageSize,
 } from "@llm-space/core";
 import {
   CloudSunIcon,
@@ -595,7 +595,7 @@ function _GenerateImageConfigFields({
           disabled={!selectedModel}
           onValueChange={(size) => {
             if (config) {
-              onChange({ ...config, size: size as SeedreamImageSize });
+              onChange({ ...config, size: size as ImageSize });
             }
           }}
         >
@@ -652,12 +652,12 @@ function _readGenerateImageConfig(
   const watermark = value?.watermark;
   if (
     typeof model !== "string" ||
-    !SEEDREAM_IMAGE_SIZES.some((candidate) => candidate === size) ||
+    !IMAGE_SIZES.some((candidate) => candidate === size) ||
     typeof watermark !== "boolean"
   ) {
     return null;
   }
-  return { model, size: size as SeedreamImageSize, watermark };
+  return { model, size: size as ImageSize, watermark };
 }
 
 function _categoryForTool(toolName: string): BuiltInToolCategoryId {

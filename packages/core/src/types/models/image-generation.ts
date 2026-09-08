@@ -2,11 +2,31 @@ export const SEEDREAM_IMAGE_SIZES = ["1K", "2K", "3K", "4K"] as const;
 
 export type SeedreamImageSize = (typeof SEEDREAM_IMAGE_SIZES)[number];
 
+export const OPENAI_IMAGE_SIZES = [
+  "auto",
+  "256x256",
+  "512x512",
+  "1024x1024",
+  "1536x1024",
+  "1024x1536",
+  "1792x1024",
+  "1024x1792",
+] as const;
+
+export type OpenAIImageSize = (typeof OPENAI_IMAGE_SIZES)[number];
+
+export const IMAGE_SIZES = [
+  ...SEEDREAM_IMAGE_SIZES,
+  ...OPENAI_IMAGE_SIZES,
+] as const;
+
+export type ImageSize = (typeof IMAGE_SIZES)[number];
+
 export interface ImageModelDefinition {
   id: string;
   name: string;
-  supportedSizes: readonly SeedreamImageSize[];
-  defaultSize: SeedreamImageSize;
+  supportedSizes: readonly ImageSize[];
+  defaultSize: ImageSize;
   /** Optional `@lobehub/icons` keyword for a user-added image model. */
   icon?: string;
 }
@@ -62,7 +82,7 @@ export type ArkImageGenerationConfig = ImageGenerationConfig;
 /** Per-Thread configuration owned by one `generate_image` tool instance. */
 export interface GenerateImageToolConfig {
   model: string;
-  size: SeedreamImageSize;
+  size: ImageSize;
   watermark: boolean;
 }
 
@@ -143,5 +163,13 @@ export function isImageSizeSupported(
     getImageModelDefinition(config, modelId, catalog)?.supportedSizes.some(
       (supported) => supported === size
     )
+  );
+}
+
+/** Narrow untrusted values to a supported provider image-size option. */
+export function isImageSize(value: unknown): value is ImageSize {
+  return (
+    typeof value === "string" &&
+    (IMAGE_SIZES as readonly string[]).includes(value)
   );
 }

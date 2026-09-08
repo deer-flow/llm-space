@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  OPENAI_IMAGE_SIZES,
   SEEDREAM_IMAGE_SIZES,
-  type SeedreamImageModelDefinition,
-  type SeedreamImageSize,
+  type ImageGenerationApi,
+  type ImageModelDefinition,
+  type ImageSize,
 } from "@llm-space/core";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
@@ -30,54 +32,67 @@ interface ImageModelFormState {
   id: string;
   name: string;
   icon: string;
-  supportedSizes: SeedreamImageSize[];
-  defaultSize: SeedreamImageSize;
+  supportedSizes: ImageSize[];
+  defaultSize: ImageSize;
 }
 
 /** Create the editable form state for a new or existing image model. */
 function _initialState(
-  model: SeedreamImageModelDefinition | null | undefined
+  model: ImageModelDefinition | null | undefined,
+  sizeOptions: readonly ImageSize[]
 ): ImageModelFormState {
-  return model
-    ? {
-        id: model.id,
-        name: model.name,
-        icon: model.icon ?? "",
-        supportedSizes: [...model.supportedSizes],
-        defaultSize: model.defaultSize,
-      }
-    : {
-        id: "",
-        name: "",
-        icon: "",
-        supportedSizes: [...SEEDREAM_IMAGE_SIZES],
-        defaultSize: "2K",
-      };
+  if (model) {
+    const supportedSizes = model.supportedSizes.filter((size) =>
+      sizeOptions.includes(size)
+    );
+    const normalizedSizes =
+      supportedSizes.length > 0 ? supportedSizes : [...sizeOptions];
+    return {
+      id: model.id,
+      name: model.name,
+      icon: model.icon ?? "",
+      supportedSizes: normalizedSizes,
+      defaultSize: normalizedSizes.includes(model.defaultSize)
+        ? model.defaultSize
+        : normalizedSizes[0],
+    };
+  }
+  return {
+    id: "",
+    name: "",
+    icon: "",
+    supportedSizes: [...sizeOptions],
+    defaultSize: sizeOptions.includes("1024x1024") ? "1024x1024" : "2K",
+  };
 }
 
 /** Add or edit one provider-owned custom image model definition. */
 export function ImageModelEditorDialog({
   open,
   onOpenChange,
+  api,
   model,
   existingIds,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  model?: SeedreamImageModelDefinition | null;
+  api: ImageGenerationApi;
+  model?: ImageModelDefinition | null;
   existingIds: readonly string[];
-  onSave: (model: SeedreamImageModelDefinition, originalId?: string) => void;
+  onSave: (model: ImageModelDefinition, originalId?: string) => void;
 }) {
+  const sizeOptions =
+    api === "openai-images" ? OPENAI_IMAGE_SIZES : SEEDREAM_IMAGE_SIZES;
   const [form, setForm] = useState<ImageModelFormState>(() =>
-    _initialState(model)
+    _initialState(model, sizeOptions)
   );
 
   useEffect(() => {
     if (open) {
-      setForm(_initialState(model));
+      setForm(_initialState(model, sizeOptions));
     }
-  }, [model, open]);
+  }, [model, open, sizeOptions]);
 
   const id = form.id.trim();
   const duplicateId = existingIds.some(
@@ -87,10 +102,10 @@ export function ImageModelEditorDialog({
     id.length > 0 && form.supportedSizes.length > 0 && !duplicateId;
 
   /** Keep the default size valid while the supported-size set changes. */
-  const handleSizeToggle = (size: SeedreamImageSize, enabled: boolean) => {
+  const handleSizeToggle = (size: ImageSize, enabled: boolean) => {
     setForm((current) => {
       const supportedSizes = enabled
-        ? SEEDREAM_IMAGE_SIZES.filter(
+        ? sizeOptions.filter(
             (candidate) =>
               current.supportedSizes.includes(candidate) || candidate === size
           )
@@ -195,7 +210,7 @@ export function ImageModelEditorDialog({
 
           <_Field label="Supported sizes">
             <div className="grid grid-cols-2 gap-2">
-              {SEEDREAM_IMAGE_SIZES.map((size) => (
+              {sizeOptions.map((size) => (
                 <div
                   key={size}
                   className="bg-muted/40 flex items-center justify-between rounded-md px-3 py-2 text-sm"
@@ -221,7 +236,7 @@ export function ImageModelEditorDialog({
               onValueChange={(value) =>
                 setForm((current) => ({
                   ...current,
-                  defaultSize: value as SeedreamImageSize,
+                  defaultSize: value as ImageSize,
                 }))
               }
             >

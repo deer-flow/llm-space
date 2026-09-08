@@ -395,9 +395,7 @@ describe("ModelManager provider-owned image generation", () => {
 
     const manager = new ModelManager({ settingsDir });
 
-    expect(manager.getImageGenerationConfig("fixture-images")).toEqual({
-      api: "openai-images",
-    });
+    expect(manager.getImageGenerationConfig("fixture-images")).toEqual({});
     expect(manager.getImageGenerationConfig("openai")).toBeUndefined();
     expect(manager.getProfiles("fixture-images")[0]?.baseUrl).toBe(
       "https://images.example/v1"
@@ -468,7 +466,6 @@ describe("ModelManager provider-owned image generation", () => {
 
     const reloaded = new ModelManager({ settingsDir });
     expect(reloaded.getImageGenerationConfig("agnes")).toEqual({
-      api: "openai-images",
       models: [
         {
           id: "agnes-image-2.5-flash",
@@ -482,5 +479,43 @@ describe("ModelManager provider-owned image generation", () => {
       .getProviders()
       .find((candidate) => candidate.id === "agnes");
     expect(provider?.getModels()).toEqual([]);
+  });
+
+  test("preserves an explicit Ark image protocol on a custom provider", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addCustomProvider({
+      id: "ark-gateway",
+      name: "Ark Gateway",
+      baseUrl: "https://gateway.example/v3",
+    });
+    manager.updateProvider("ark-gateway", {
+      imageGeneration: {
+        api: "ark-images",
+        models: [
+          {
+            id: "custom-seedream",
+            name: "Custom Seedream",
+            supportedSizes: ["1K", "2K"],
+            defaultSize: "1K",
+          },
+        ],
+      },
+    });
+
+    const reloaded = new ModelManager({ settingsDir });
+
+    expect(reloaded.getImageGenerationConfig("ark-gateway")).toMatchObject({
+      api: "ark-images",
+    });
+    const persisted = JSON.parse(
+      await readFile(path.join(settingsDir, "models.json"), "utf8")
+    ) as {
+      providers: { id: string; imageGeneration?: { api?: string } }[];
+    };
+    expect(
+      persisted.providers.find((provider) => provider.id === "ark-gateway")
+        ?.imageGeneration?.api
+    ).toBe("ark-images");
   });
 });

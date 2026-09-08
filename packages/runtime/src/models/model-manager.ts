@@ -12,9 +12,9 @@ import {
 import {
   DEFAULT_ARK_IMAGE_GENERATION_CONFIG,
   getImageModelDefinitions,
+  isImageSize,
   ModelConfig,
   SEEDREAM_IMAGE_MODELS,
-  SEEDREAM_IMAGE_SIZES,
   type CustomModel,
   type ImageGenerationConfig,
   type ModelProviderGroup,
@@ -22,7 +22,6 @@ import {
   type ProviderProfile,
   type ProviderProfilePatch,
   type SeedreamImageModelDefinition,
-  type SeedreamImageSize,
   uuid,
 } from "@llm-space/core";
 import {
@@ -1121,7 +1120,7 @@ function _normalizeImageGenerationConfig(
       ]
     : [];
   return {
-    ...(api !== "ark-images" ? { api } : {}),
+    ...(api !== defaultApi ? { api } : {}),
     ...(models.length > 0 ? { models } : {}),
     ...(disabledModels.length > 0 ? { disabledModels } : {}),
   };
@@ -1160,7 +1159,7 @@ function _assertCustomImageModels(
     if (
       !Array.isArray(sizes) ||
       sizes.length === 0 ||
-      sizes.some((size) => !_isSeedreamImageSize(size)) ||
+      sizes.some((size) => !isImageSize(size)) ||
       new Set(sizes).size !== sizes.length ||
       !sizes.includes(model.defaultSize)
     ) {
@@ -1196,13 +1195,13 @@ function _normalizeCustomImageModels(
       continue;
     }
     const supportedSizes = Array.isArray(candidate.supportedSizes)
-      ? [...new Set(candidate.supportedSizes.filter(_isSeedreamImageSize))]
+      ? [...new Set(candidate.supportedSizes.filter(isImageSize))]
       : [];
     if (supportedSizes.length === 0) {
       continue;
     }
     const defaultSize =
-      _isSeedreamImageSize(candidate.defaultSize) &&
+      isImageSize(candidate.defaultSize) &&
       supportedSizes.includes(candidate.defaultSize)
         ? candidate.defaultSize
         : supportedSizes[0];
@@ -1220,12 +1219,4 @@ function _normalizeCustomImageModels(
     });
   }
   return models;
-}
-
-/** Narrow unknown persisted values to Ark's supported size presets. */
-function _isSeedreamImageSize(value: unknown): value is SeedreamImageSize {
-  return (
-    typeof value === "string" &&
-    (SEEDREAM_IMAGE_SIZES as readonly string[]).includes(value)
-  );
 }

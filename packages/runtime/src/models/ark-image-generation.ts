@@ -9,13 +9,16 @@ import {
 import {
   getImageModelDefinition,
   getImageModelDefinitions,
+  isImageSize,
   isImageSizeSupported,
+  OPENAI_IMAGE_SIZES,
   SEEDREAM_IMAGE_MODELS,
   type ImageGenerationApi,
   type ImageGenerationConfig,
   type ImageModelDefinition,
+  type ImageSize,
+  type OpenAIImageSize,
   type ProviderConnectionRef,
-  type SeedreamImageSize,
 } from "@llm-space/core";
 
 import type { ModelManager, ResolvedProviderConnection } from "./model-manager";
@@ -39,7 +42,7 @@ export interface ArkImageGenerationDependencies {
 export interface ArkImageGenerationInput {
   prompt: string;
   model: string;
-  size: SeedreamImageSize;
+  size: ImageSize;
   watermark: boolean;
   connection?: ProviderConnectionRef;
   signal?: AbortSignal;
@@ -57,8 +60,8 @@ interface ArkAssistantImages extends AssistantImages {
   generatedSize?: string;
 }
 
-interface ArkImagesMetadata {
-  size: SeedreamImageSize;
+interface ImageGenerationMetadata {
+  size: ImageSize;
   watermark: boolean;
 }
 
@@ -264,23 +267,24 @@ async function _generateImages(
       .filter((item) => item.type === "text" && typeof item.text === "string")
       .map((item) => item.text)
       .join("\n");
-    const metadata = _arkMetadata(options.metadata);
+    const metadata = _imageMetadata(options.metadata);
     let payload: unknown = {
       model: model.id,
       prompt,
-      size: metadata.size,
       ...(api === "ark-images"
         ? {
+            size: metadata.size,
             response_format: "b64_json",
             watermark: metadata.watermark,
             stream: false,
           }
         : api === "openai-images-extra-body"
           ? {
+              size: metadata.size,
               return_base64: true,
               extra_body: { response_format: "b64_json" },
             }
-          : { response_format: "b64_json" }),
+          : _openAIImagesPayload(model.id, metadata.size)),
     };
     const transformed = await options.onPayload?.(payload, model);
     if (transformed !== undefined) {
@@ -345,6 +349,52 @@ async function _generateImages(
   }
 }
 
+/** Build only parameters accepted by the selected standard OpenAI image model. */
+function _openAIImagesPayload(
+  modelId: string,
+  configuredSize: ImageSize
+): { size: OpenAIImageSize; response_format?: "b64_json" } {
+  const size = _openAIImageSize(modelId, configuredSize);
+  return {
+    size,
+    ...(_isDallEModel(modelId) ? { response_format: "b64_json" as const } : {}),
+  };
+}
+
+/** Validate standard protocol sizes, with a narrow migration for legacy 1K configs. */
+function _openAIImageSize(
+  modelId: string,
+  configuredSize: ImageSize
+): OpenAIImageSize {
+  const size = configuredSize === "1K" ? "1024x1024" : configuredSize;
+  if (!(OPENAI_IMAGE_SIZES as readonly string[]).includes(size)) {
+    throw new Error(
+      `OpenAI Images requires an explicit pixel size; configure ${modelId} with an OpenAI-compatible size instead of ${configuredSize}.`
+    );
+  }
+  if (modelId === "dall-e-2") {
+    const supported = ["256x256", "512x512", "1024x1024"];
+    if (!supported.includes(size)) {
+      throw new Error(`dall-e-2 does not support image size ${size}.`);
+    }
+  } else if (modelId === "dall-e-3") {
+    const supported = ["1024x1024", "1792x1024", "1024x1792"];
+    if (!supported.includes(size)) {
+      throw new Error(`dall-e-3 does not support image size ${size}.`);
+    }
+  } else if (modelId.startsWith("gpt-image-")) {
+    const supported = ["auto", "1024x1024", "1536x1024", "1024x1536"];
+    if (!supported.includes(size)) {
+      throw new Error(`${modelId} does not support image size ${size}.`);
+    }
+  }
+  return size as OpenAIImageSize;
+}
+
+function _isDallEModel(modelId: string): boolean {
+  return modelId === "dall-e-2" || modelId === "dall-e-3";
+}
+
 /** Read JSON without exposing a provider's raw body in malformed-response errors. */
 async function _readImageResponse(
   response: Response,
@@ -386,15 +436,15 @@ function _providerError(
 }
 
 /** Resolve and validate the provider-specific options carried in pi metadata. */
-function _arkMetadata(
+function _imageMetadata(
   metadata: Record<string, unknown> | undefined
-): ArkImagesMetadata {
+): ImageGenerationMetadata {
   const size = metadata?.size;
-  if (size !== "1K" && size !== "2K" && size !== "3K" && size !== "4K") {
-    throw new Error("Ark image generation size metadata is invalid.");
+  if (!isImageSize(size)) {
+    throw new Error("Image generation size metadata is invalid.");
   }
   if (typeof metadata?.watermark !== "boolean") {
-    throw new Error("Ark image generation watermark metadata is invalid.");
+    throw new Error("Image generation watermark metadata is invalid.");
   }
   return { size, watermark: metadata.watermark };
 }
