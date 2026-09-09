@@ -17,6 +17,7 @@ import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStoreActions } from "../stores";
 
 import { AddImagesMenu } from "./add-images-menu";
@@ -36,6 +37,12 @@ function _MessageListItemHeader({
   collapsed?: boolean;
   dragHandleProps?: MessageDragHandleProps;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.toolCalls;
+  const messageLabels = dialogs.messages;
+  const tooltipLabels = dialogs.tooltips;
+  const roleLabel =
+    message.role === "user" ? messageLabels.user : messageLabels.assistant;
   const { run, removeMessage, toggleMessageRole, toggleMessageCollapsed } =
     useThreadStoreActions();
   // `presentational` is the web shared-viewer flag (never set in desktop). Use
@@ -45,6 +52,7 @@ function _MessageListItemHeader({
   const textContent = useMemo(() => getMessageText(message), [message]);
   const hasTextContent = textContent.trim().length > 0;
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [addImagesMenuOpen, setAddImagesMenuOpen] = useState(false);
   // An assistant message with tool calls is runnable (running continues from the
   // tool results) once every call has a response — mirroring ToolStepContinuation's
   // Run, which is also gated on `canContinue`.
@@ -116,12 +124,12 @@ function _MessageListItemHeader({
         className
       )}
     >
-      <Tooltip content="Drag to reorder">
+      <Tooltip content={messageLabels.dragToReorder}>
         <div
           ref={dragHandleProps?.setActivatorNodeRef}
           {...dragHandleProps?.attributes}
           {...dragHandleProps?.listeners}
-          aria-label={`${message.role === "user" ? "User" : "Assistant"} message drag handle`}
+          aria-label={messageLabels.dragHandle(roleLabel)}
           className={cn(
             // A small grab affordance near the top edge, centered (out of
             // flow, so nothing else moves). `z-20` keeps it above the
@@ -138,12 +146,12 @@ function _MessageListItemHeader({
       </Tooltip>
       <div className="flex min-w-0 items-center gap-2">
         <div className="shrink-0">
-          <Tooltip content="Toggle role">
+          <Tooltip content={tooltipLabels.toggleRole}>
             <Button
               className="px-2"
               variant="outline"
               size="sm"
-              aria-label={`Change message role from ${message.role}`}
+              aria-label={tooltipLabels.toggleRole}
               disabled={readonly}
               onClick={handleToggleMessageRole}
             >
@@ -151,12 +159,12 @@ function _MessageListItemHeader({
                 {message.role === "user" ? (
                   <>
                     <UserIcon className="size-3" />
-                    <div>User</div>
+                    <div>{messageLabels.user}</div>
                   </>
                 ) : (
                   <>
                     <BotIcon className="size-3" />
-                    <div>Assistant</div>
+                    <div>{messageLabels.assistant}</div>
                   </>
                 )}
               </div>
@@ -191,16 +199,18 @@ function _MessageListItemHeader({
           "flex shrink-0 items-center opacity-0",
           // Reveal on hover while editing (desktop) or in the web viewer; a
           // desktop readonly snapshot keeps the cluster hidden as before.
-          (!readonly || presentational) && "group-hover:opacity-100"
+          (!readonly || presentational) && "group-hover:opacity-100",
+          // Radix renders a dropdown in a portal, so moving the pointer into
+          // it ends the message-row hover. Keep the originating toolbar
+          // visible for the lifetime of the image menu instead.
+          addImagesMenuOpen && "opacity-100"
         )}
       >
-        <Tooltip
-          content={hasTextContent ? "Preview text content" : "No text content"}
-        >
+        <Tooltip content={hasTextContent ? labels.previewText : labels.noText}>
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Preview text content"
+            aria-label={labels.previewText}
             disabled={!hasTextContent}
             onClick={handleOpenPreview}
           >
@@ -208,7 +218,11 @@ function _MessageListItemHeader({
           </Button>
         </Tooltip>
         {message.role === "user" && !presentational && (
-          <AddImagesMenu messageId={message.id} disabled={readonly} />
+          <AddImagesMenu
+            messageId={message.id}
+            disabled={readonly}
+            onOpenChange={setAddImagesMenuOpen}
+          />
         )}
         {showRun && !presentational && (
           <Tooltip content={runTooltip}>
@@ -224,11 +238,11 @@ function _MessageListItemHeader({
           </Tooltip>
         )}
         {!presentational && (
-          <Tooltip content="Remove message">
+          <Tooltip content={tooltipLabels.removeMessage}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Remove message"
+              aria-label={tooltipLabels.removeMessage}
               disabled={readonly}
               onClick={handleRemove}
             >
@@ -240,7 +254,11 @@ function _MessageListItemHeader({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={collapsed ? "Expand message" : "Collapse message"}
+            aria-label={
+              collapsed
+                ? tooltipLabels.expandMessage
+                : tooltipLabels.collapseMessage
+            }
             aria-expanded={!collapsed}
             disabled={readonly}
             onClick={handleToggleMessageCollapse}
@@ -256,7 +274,7 @@ function _MessageListItemHeader({
       </div>
       <PreviewDialog
         open={previewOpen}
-        title={`${message.role === "user" ? "User" : "Assistant"} message text`}
+        title={messageLabels.text(roleLabel)}
         value={textContent}
         onOpenChange={setPreviewOpen}
       />

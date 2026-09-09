@@ -44,6 +44,7 @@ import {
 import { Switch } from "@llm-space/ui/ui/switch";
 
 import { ProviderProfileSelector } from "../model/provider-profile-selector";
+import { usePlaygroundLabels } from "../playground-labels";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 import { sortToolsByName } from "./sort-tools-by-name";
@@ -60,13 +61,6 @@ interface BuiltInToolCategory {
   label: string;
   icon: LucideIcon;
 }
-
-const BUILT_IN_TOOL_CATEGORIES: BuiltInToolCategory[] = [
-  { id: "fileSystem", label: "File system", icon: FilesIcon },
-  { id: "web", label: "Web", icon: GlobeIcon },
-  { id: "media", label: "Media", icon: ImageIcon },
-  { id: "misc", label: "Misc", icon: CloudSunIcon },
-];
 
 const FILE_SYSTEM_TOOL_NAMES = new Set([
   "read",
@@ -146,6 +140,17 @@ function _BuiltInToolImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.builtIn;
+  const categories = useMemo<BuiltInToolCategory[]>(
+    () => [
+      { id: "fileSystem", label: labels.fileSystem, icon: FilesIcon },
+      { id: "web", label: labels.web, icon: GlobeIcon },
+      { id: "media", label: labels.media, icon: ImageIcon },
+      { id: "misc", label: labels.misc, icon: CloudSunIcon },
+    ],
+    [labels]
+  );
   const [tools, setTools] = useState<BuiltinTool[]>([]);
   const [query, setQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] =
@@ -175,12 +180,12 @@ function _BuiltInToolImportDialog({
     try {
       setTools(await builtinTools.list({ runtimeId }));
     } catch (error) {
-      toast.error("Failed to load built-in tools", {
+      toast.error(labels.loadFailed, {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     }
-  }, [builtinTools, runtimeId]);
+  }, [builtinTools, labels.loadFailed, runtimeId]);
 
   useEffect(() => {
     if (!open) {
@@ -298,8 +303,8 @@ function _BuiltInToolImportDialog({
       (candidate) => candidate.id === generateImageConfig?.model
     );
     if (!model || !generateImageConfig) {
-      toast.error("Choose an enabled image model", {
-        description: "Enable an image model in Settings, then select it here.",
+      toast.error(labels.chooseImageModel, {
+        description: labels.chooseImageModelHint,
       });
       return;
     }
@@ -325,7 +330,7 @@ function _BuiltInToolImportDialog({
   }, [tools, query]);
   const toolsByCategory = useMemo(() => {
     const result = new Map<BuiltInToolCategoryId, BuiltinTool[]>(
-      BUILT_IN_TOOL_CATEGORIES.map((category) => [category.id, []])
+      categories.map((category) => [category.id, []])
     );
     for (const tool of filteredTools) {
       result.get(_categoryForTool(tool.name))!.push(tool);
@@ -338,7 +343,7 @@ function _BuiltInToolImportDialog({
       );
     }
     return result;
-  }, [filteredTools]);
+  }, [categories, filteredTools]);
   const selectedTools = toolsByCategory.get(selectedCategoryId) ?? [];
 
   return (
@@ -356,10 +361,8 @@ function _BuiltInToolImportDialog({
         }}
       >
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add built-in tools</DialogTitle>
-          <DialogDescription>
-            Choose built-in tools to make available in this thread.
-          </DialogDescription>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside className="flex w-44 shrink-0 flex-col gap-2 border-r p-3">
@@ -368,13 +371,13 @@ function _BuiltInToolImportDialog({
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools"
-                aria-label="Search tools"
+                placeholder={dialogs.searchTools}
+                aria-label={dialogs.searchTools}
                 className="h-8 pl-7 text-xs"
               />
             </div>
             <div className="flex flex-col gap-1">
-              {BUILT_IN_TOOL_CATEGORIES.map((category) => {
+              {categories.map((category) => {
                 const CategoryIcon = category.icon;
                 const categoryTools = toolsByCategory.get(category.id) ?? [];
                 const selected = category.id === selectedCategoryId;
@@ -424,9 +427,7 @@ function _BuiltInToolImportDialog({
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {selectedTools.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-6 text-center text-sm">
-                  {query.trim()
-                    ? "No tools match your search."
-                    : "No built-in tools in this category."}
+                  {query.trim() ? labels.emptySearch : labels.emptyCategory}
                 </div>
               ) : (
                 selectedTools.map((tool) => {
@@ -495,7 +496,7 @@ function _BuiltInToolImportDialog({
                         className="mt-0.5"
                         checked={exists}
                         disabled={!exists && !canAdd}
-                        aria-label={`${exists ? "Remove" : "Add"} ${tool.name}`}
+                        aria-label={`${exists ? dialogs.remove : dialogs.add} ${tool.name}`}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
                         }
@@ -534,6 +535,8 @@ function _GenerateImageConfigFields({
   onProviderChange: (providerId: string) => void;
   onChange: (config: GenerateImageToolConfig) => void;
 }) {
+  const { dialogs, providerDisplayName } = usePlaygroundLabels();
+  const labels = dialogs.builtIn;
   const handleModelChange = (modelId: string) => {
     const model = enabledModels.find((candidate) => candidate.id === modelId);
     if (!model) {
@@ -559,19 +562,19 @@ function _GenerateImageConfigFields({
       )}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Provider</span>
+        <span className="text-muted-foreground text-xs">{labels.provider}</span>
         <Select value={providerId} onValueChange={onProviderChange}>
           <SelectTrigger
             className="w-full"
             size="sm"
-            aria-label="Generate image provider"
+            aria-label={labels.imageProviderAria}
           >
-            <SelectValue placeholder="Choose provider" />
+            <SelectValue placeholder={labels.chooseProvider} />
           </SelectTrigger>
           <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {providers.map((provider) => (
               <SelectItem key={provider.id} value={provider.id}>
-                {provider.name}
+                {providerDisplayName(provider)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -579,7 +582,7 @@ function _GenerateImageConfigFields({
       </div>
 
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Model</span>
+        <span className="text-muted-foreground text-xs">{labels.model}</span>
         <Select
           value={selectedModel?.id}
           disabled={enabledModels.length === 0}
@@ -588,9 +591,9 @@ function _GenerateImageConfigFields({
           <SelectTrigger
             className="w-full"
             size="sm"
-            aria-label="Generate image model"
+            aria-label={labels.imageModelAria}
           >
-            <SelectValue placeholder="Choose model" />
+            <SelectValue placeholder={labels.chooseModel} />
           </SelectTrigger>
           <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
             {enabledModels.map((model) => (
@@ -604,7 +607,9 @@ function _GenerateImageConfigFields({
 
       {showProfileSelector && providerId ? (
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-muted-foreground text-xs">Profile</span>
+          <span className="text-muted-foreground text-xs">
+            {labels.profile}
+          </span>
           <ProviderProfileSelector
             providerId={providerId}
             className="max-w-none"
@@ -614,7 +619,9 @@ function _GenerateImageConfigFields({
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Default size</span>
+        <span className="text-muted-foreground text-xs">
+          {labels.defaultSize}
+        </span>
         <Select
           value={selectedModel ? config?.size : undefined}
           disabled={!selectedModel}
@@ -624,7 +631,7 @@ function _GenerateImageConfigFields({
             }
           }}
         >
-          <SelectTrigger size="sm" aria-label="Default image size">
+          <SelectTrigger size="sm" aria-label={labels.imageSizeAria}>
             <SelectValue placeholder="Size" />
           </SelectTrigger>
           <SelectContent onPointerDownOutside={(e) => e.preventDefault()}>
@@ -638,13 +645,15 @@ function _GenerateImageConfigFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Watermark</span>
+        <span className="text-muted-foreground text-xs">
+          {labels.watermark}
+        </span>
         <div className="flex h-7 items-center justify-between gap-2">
           <Switch
             size="sm"
             checked={config?.watermark ?? true}
             disabled={!selectedModel || !config}
-            aria-label="Add AI-generated watermark"
+            aria-label={labels.imageWatermarkAria}
             onCheckedChange={(watermark) => {
               if (config) {
                 onChange({ ...config, watermark });
@@ -656,12 +665,11 @@ function _GenerateImageConfigFields({
 
       {enabledModels.length === 0 ? (
         <p className="text-destructive col-span-full text-xs">
-          Enable an image model for this provider in Settings before adding this
-          tool.
+          {labels.noImageModels}
         </p>
       ) : !config || !selectedModel ? (
         <p className="text-destructive col-span-full text-xs">
-          Choose an enabled image model for this tool.
+          {labels.chooseImageModel}
         </p>
       ) : null}
     </div>

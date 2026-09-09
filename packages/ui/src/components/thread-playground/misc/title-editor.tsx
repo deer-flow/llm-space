@@ -1,4 +1,3 @@
-
 import { PencilIcon } from "lucide-react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 
@@ -10,6 +9,8 @@ import {
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Input } from "@llm-space/ui/ui/input";
+
+import { usePlaygroundLabels } from "../playground-labels";
 
 export type TitleValidator = (value: string) => FileStemValidationResult;
 
@@ -26,6 +27,8 @@ function _TitleEditor({
   onRename?: (title: string) => Promise<boolean>;
   validateTitle?: TitleValidator;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.tooltips;
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +104,7 @@ function _TitleEditor({
         <Input
           ref={inputRef}
           autoFocus
-          aria-label="Thread title"
+          aria-label={labels.threadTitle}
           aria-invalid={!validation.valid || !!error}
           aria-describedby="thread-title-error"
           className="h-8 border-transparent bg-transparent! text-sm font-medium shadow-none focus-visible:ring-0"
@@ -145,7 +148,7 @@ function _TitleEditor({
         className="min-w-0 truncate text-sm font-medium"
         role="button"
         tabIndex={0}
-        aria-label="Edit thread title"
+        aria-label={labels.editTitle}
         onClick={startEditing}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -154,7 +157,7 @@ function _TitleEditor({
           }
         }}
       >
-        <Tooltip content="Click to edit title">
+        <Tooltip content={labels.clickToEditTitle}>
           {title ? (
             <span>{title}</span>
           ) : (
@@ -163,11 +166,11 @@ function _TitleEditor({
         </Tooltip>
       </div>
       <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
-        <Tooltip content="Edit title">
+        <Tooltip content={labels.editTitle}>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="Edit thread title"
+            aria-label={labels.editTitle}
             onClick={startEditing}
           >
             <PencilIcon className="size-3" />

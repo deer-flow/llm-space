@@ -35,6 +35,7 @@ import { Button } from "@llm-space/ui/ui/button";
 import { ScrollArea } from "@llm-space/ui/ui/scroll-area";
 import { ShineBorder } from "@llm-space/ui/ui/shine-border";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import {
   type RunValidationIssue,
   useThreadStore,
@@ -123,6 +124,7 @@ export function MessageListView({
   /** Keep measured heights while an ancestor is hidden. */
   measurementsFrozen?: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const isSnapshotView = messagesFromProps !== undefined;
   const status = useThreadStore((state) => state.status);
   const streamingMessageId = useThreadStore(
@@ -205,10 +207,7 @@ export function MessageListView({
     (index: number) => {
       const message = displayMessages[index];
       return message
-        ? _estimateMessageHeight(
-            message,
-            collapsedMessageIdSet.has(message.id)
-          )
+        ? _estimateMessageHeight(message, collapsedMessageIdSet.has(message.id))
         : 240;
     },
     [collapsedMessageIdSet, displayMessages]
@@ -540,7 +539,7 @@ export function MessageListView({
                 }
               >
                 <PlusIcon className="size-4" />
-                Add message
+                {dialogs.messages.add}
               </Button>
               {addMessageSuggested && !dragging && !readonly ? (
                 <>

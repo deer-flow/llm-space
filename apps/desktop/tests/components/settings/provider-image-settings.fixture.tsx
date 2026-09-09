@@ -21,6 +21,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { createArkImageGenerator } from "../../../../../packages/runtime/src/models/ark-image-generation";
 import { ModelManager } from "../../../../../packages/runtime/src/models/model-manager";
+import { I18nProvider } from "../../../src/i18n/i18n-provider";
 import {
   installReactTestDom,
   TestEvent,
@@ -183,7 +184,9 @@ async function _mount(element: ReactElement) {
   DOM.document.body.appendChild(container);
   const root = createRoot(container as unknown as Element);
   MOUNTS.push({ root, container });
-  await act(() => Promise.resolve(root.render(element)));
+  await act(() =>
+    Promise.resolve(root.render(<I18nProvider>{element}</I18nProvider>))
+  );
   return container;
 }
 
@@ -264,12 +267,10 @@ async function _toolDialog(existing?: BuiltinTool) {
 test("editing a legacy model preserves its size, and new and old threads generate after reload", async () => {
   const { container, saved } = await _edit(LEGACY_MODEL);
   expect(
-    _find(container, "[aria-label=Model default size]").getAttribute(
-      "data-value"
-    )
+    _find(container, "[aria-label=Default size]").getAttribute("data-value")
   ).toBe("1024x1024");
   expect(container.querySelector("[aria-label=Support auto]")).toBeNull();
-  const name = _find(container, "[aria-label=Image model name]");
+  const name = _find(container, "[aria-label=Model name]");
   await act(async () => {
     name.value = "Renamed";
     name.dispatchEvent(new TestEvent("input"));

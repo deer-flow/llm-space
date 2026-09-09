@@ -25,12 +25,9 @@ import metaToolPrompt from "../examples/meta-tool.md?raw";
 import { DEFAULT_TOOL, TOOL_EXAMPLES } from "../examples/tools";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
-import {
-  useThreadStore,
-  useThreadStoreActions,
-} from "../stores/thread-store";
+import { usePlaygroundLabels } from "../playground-labels";
+import { useThreadStore, useThreadStoreActions } from "../stores/thread-store";
 import { useStreamText } from "../use-stream-text";
-
 
 export function ToolEditorDialog({
   open,
@@ -43,6 +40,8 @@ export function ToolEditorDialog({
   tool: FunctionTool | null;
 }) {
   const { addTool, updateTool } = useThreadStoreActions();
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.toolEditor;
   const threadModel = useThreadStore((s) => s.thread.model);
   const [text, setText] = useState("");
   const [originalName, setOriginalName] = useState<string | null>(null);
@@ -142,21 +141,17 @@ export function ToolEditorDialog({
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {originalName ? "Edit tool" : "Add function tool"}
+            {originalName ? labels.editFunction : labels.addFunction}
           </DialogTitle>
-          <DialogDescription>
-            A function tool consists of a name, description, and parameters.
-            Parameters are defined using JSON Schema. Since the tool is
-            customized, you need to provide a response at runtime.
-          </DialogDescription>
+          <DialogDescription>{labels.functionDescription}</DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">Definition</div>
+            <div className="text-sm font-medium">{labels.definition}</div>
             <div className="flex items-center gap-2">
               <GeneratePopoverButton
-                placeholder="Describe what your function does (or paste your function declaration code), and we'll generate a definition."
+                placeholder={labels.generateFunctionPlaceholder}
                 onGenerate={handleGenerate}
               />
               <ExamplesMenu
@@ -177,9 +172,11 @@ export function ToolEditorDialog({
 
         <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {dialogs.cancel}
           </Button>
-          <Button onClick={handleSave}>{tool ? "Save" : "Create"}</Button>
+          <Button onClick={handleSave}>
+            {tool ? dialogs.save : dialogs.create}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

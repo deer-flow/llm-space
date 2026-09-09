@@ -17,7 +17,7 @@ import React, { memo, useCallback, useMemo } from "react";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 
-
+import { usePlaygroundLabels } from "../playground-labels";
 
 import { getBuiltInToolIcon } from "./built-in-tool-icon";
 
@@ -34,6 +34,7 @@ function _ToolListItem({
 
   onRemove: (tool: Tool) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
   const providerHosted = isProviderHostedTool(tool);
   const parameters = providerHosted ? undefined : tool.parameters;
   const keys = useMemo(
@@ -55,10 +56,9 @@ function _ToolListItem({
     },
     [onRemove, tool]
   );
-  const ToolIcon =
-    providerHosted
-      ? CloudIcon
-      : tool.type === "mcp"
+  const ToolIcon = providerHosted
+    ? CloudIcon
+    : tool.type === "mcp"
       ? CableIcon
       : tool.type === "builtin"
         ? getBuiltInToolIcon(tool)
@@ -82,29 +82,29 @@ function _ToolListItem({
               </pre>
             </div>
           ) : (
-          <div>
-            <div className="font-mono">
-              <span className="text-primary font-bold">{displayName}</span>
-              <span>(</span>
-              <span className="whitespace-pre-wrap">
-                {keys.length > 0
-                  ? "{\n" +
-                    keys
-                      .map((key) =>
-                        required.includes(key) ? `  ${key}` : `  [${key}]`
-                      )
-                      .join(", \n") +
-                    "\n}"
-                  : ""}
-              </span>
-              <span>)</span>
-            </div>
-            {tool.description && (
-              <div className="pt-2 text-xs whitespace-pre-wrap opacity-60">
-                {tool.description}
+            <div>
+              <div className="font-mono">
+                <span className="text-primary font-bold">{displayName}</span>
+                <span>(</span>
+                <span className="whitespace-pre-wrap">
+                  {keys.length > 0
+                    ? "{\n" +
+                      keys
+                        .map((key) =>
+                          required.includes(key) ? `  ${key}` : `  [${key}]`
+                        )
+                        .join(", \n") +
+                      "\n}"
+                    : ""}
+                </span>
+                <span>)</span>
               </div>
-            )}
-          </div>
+              {tool.description && (
+                <div className="pt-2 text-xs whitespace-pre-wrap opacity-60">
+                  {tool.description}
+                </div>
+              )}
+            </div>
           )
         }
       >
@@ -125,11 +125,11 @@ function _ToolListItem({
           </button>
         </span>
       </Tooltip>
-      <Tooltip content="Remove tool">
+      <Tooltip content={dialogs.tooltips.removeTool}>
         <button
           type="button"
           disabled={readonly}
-          aria-label={`Remove ${displayName} tool`}
+          aria-label={dialogs.tooltips.removeTool}
           className={cn(
             "text-muted-foreground hover:text-accent-foreground focus-visible:ring-ring/30 inline-flex h-full items-center rounded-r-md pr-1 pl-1 outline-none hover:opacity-100 focus-visible:ring-2",
             readonly ? "opacity-0!" : "opacity-0 group-hover/tool:opacity-100"

@@ -6,12 +6,11 @@ import { CodeEditor } from "@llm-space/ui/components/code-editor";
 import { useHostServices } from "@llm-space/ui/host";
 import { cn } from "@llm-space/ui/lib/utils";
 
-
-
 import metaPrompt from "../examples/meta-prompt.md?raw";
 import { PROMPT_EXAMPLES, resolveSeed } from "../examples/prompts";
 import { ExamplesMenu } from "../examples-menu";
 import { GeneratePopoverButton } from "../generate-popover-button";
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
 import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
@@ -27,6 +26,7 @@ function _SystemPromptEditor({
   readonly,
   onStreamingChange,
 }: SystemPromptEditorProps) {
+  const { dialogs } = usePlaygroundLabels();
   const systemPrompt = useThreadStore(
     (s) => s.thread.context?.systemPrompt ?? ""
   );
@@ -115,11 +115,13 @@ function _SystemPromptEditor({
   return (
     <div className={cn("flex size-full flex-col", className)}>
       <div className="flex shrink-0 items-center justify-between py-2">
-        <div className="text-muted-foreground text-sm">System prompt</div>
+        <div className="text-muted-foreground text-sm">
+          {dialogs.sections.systemPrompt}
+        </div>
         {!presentational && (
           <div className="flex items-center gap-2">
             <GeneratePopoverButton
-              placeholder="Describe the assistant you want (its role, tone, and rules), and we'll generate a system prompt."
+              placeholder={dialogs.toolEditor.generateSystemPromptPlaceholder}
               onGenerate={handleGenerate}
             />
             <ExamplesMenu
@@ -138,7 +140,7 @@ function _SystemPromptEditor({
         value={systemPrompt ?? ""}
         language="markdown"
         readonly={readonly || streaming}
-        placeholder="Enter system prompt here"
+        placeholder={dialogs.toolEditor.systemPromptPlaceholder}
         extraExtensions={variableExtension}
         onChange={handleChange}
       />

@@ -33,6 +33,7 @@ import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import { Input } from "@llm-space/ui/ui/input";
 
+import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
 
@@ -62,6 +63,8 @@ function _ToolCallListItem({
   readonly?: boolean;
   streaming: boolean;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.toolCallCard;
   const { fidelity } = useRenderingFidelity();
   const { presentational } = useHostServices();
   const { updateToolCallOutputText } = useThreadStoreActions();
@@ -120,11 +123,11 @@ function _ToolCallListItem({
         if (canContinue) {
           onContinue();
         } else {
-          toast.error("Add tool responses before continuing");
+          toast.error(labels.addResponses);
         }
       }
     },
-    [canContinue, onContinue]
+    [canContinue, labels.addResponses, onContinue]
   );
   const handleCall = useCallback(async () => {
     if (readonly || !executable) {
@@ -137,22 +140,26 @@ function _ToolCallListItem({
         if (outcome.isFirecrawlLimit) {
           openFirecrawlLimitDialog();
         } else {
-          toast.error(`Failed to call ${toolCall.input.name}()`);
+          toast.error(labels.callFailed(toolCall.input.name));
         }
       }
     } finally {
       setCalling(false);
     }
-  }, [executable, readonly, runToolCall, toolCall]);
+  }, [executable, labels, readonly, runToolCall, toolCall]);
   const handleCopyArguments = useCallback(async () => {
     const text = formatJson(toolCall.input.arguments);
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Arguments copied");
+      toast.success(labels.argumentsCopied);
     } catch {
-      toast.error("Failed to copy arguments");
+      toast.error(labels.copyArgumentsFailed);
     }
-  }, [toolCall.input.arguments]);
+  }, [
+    labels.argumentsCopied,
+    labels.copyArgumentsFailed,
+    toolCall.input.arguments,
+  ]);
   return (
     <div className="bg-foreground/4 flex w-full flex-col gap-2 rounded-md px-3 pt-2 pb-3">
       <div className="relative flex min-w-0 items-start">
@@ -161,7 +168,7 @@ function _ToolCallListItem({
           streaming={streaming && toolCall.output === undefined}
         />
         <div className="absolute top-0 right-0 flex items-center">
-          <Tooltip content="Preview arguments">
+          <Tooltip content={labels.previewArguments}>
             <Button
               className="invisible shrink-0 group-hover/message:visible"
               size="icon"
@@ -171,7 +178,7 @@ function _ToolCallListItem({
               <EyeIcon className="size-3" />
             </Button>
           </Tooltip>
-          <Tooltip content="Copy arguments">
+          <Tooltip content={labels.copyArguments}>
             <Button
               className="invisible shrink-0 group-hover/message:visible"
               size="icon"
@@ -182,7 +189,7 @@ function _ToolCallListItem({
             </Button>
           </Tooltip>
           {executable && !presentational ? (
-            <Tooltip content={isCalling ? "Calling tool" : "Call this tool"}>
+            <Tooltip content={isCalling ? labels.calling : labels.call}>
               <Button
                 className={cn(
                   "shrink-0",
@@ -206,7 +213,7 @@ function _ToolCallListItem({
       <hr />
       <div className="flex w-full flex-col gap-1">
         <div className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 text-xs">
-          <Tooltip content="Preview response">
+          <Tooltip content={labels.previewResponse}>
             <Button
               className="invisible shrink-0 group-hover/message:visible"
               size="xs"
@@ -227,7 +234,7 @@ function _ToolCallListItem({
                 onClick={toggleError}
               >
                 <AlertCircleIcon />
-                {isError ? "Clear error" : "Mark as error"}
+                {isError ? labels.clearError : labels.markError}
               </Button>
             </div>
           )}

@@ -23,6 +23,8 @@ import {
 } from "@llm-space/ui/ui/dialog";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { usePlaygroundLabels } from "../playground-labels";
+
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
 function _McpToolImportDialog({
@@ -44,6 +46,8 @@ function _McpToolImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.mcp;
   const { actions, mcp } = useHostServices();
   const [servers, setServers] = useState<McpServerView[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<string>("");
@@ -77,14 +81,14 @@ function _McpToolImportDialog({
             : (next[0]?.id ?? "")
       );
     } catch (error) {
-      toast.error("Failed to load MCP servers", {
+      toast.error(labels.loadServersFailed, {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
       setLoadingServers(false);
     }
-  }, [initialServerId, mcp, runtimeId]);
+  }, [initialServerId, labels.loadServersFailed, mcp, runtimeId]);
 
   const refreshTools = useCallback(
     async (serverId: string) => {
@@ -104,7 +108,7 @@ function _McpToolImportDialog({
       } catch (error) {
         setTools([]);
         await refreshServers();
-        toast.error("Failed to load MCP tools", {
+        toast.error(labels.loadToolsFailed, {
           description:
             error instanceof Error ? error.message : "Please try again.",
         });
@@ -112,7 +116,7 @@ function _McpToolImportDialog({
         setLoadingTools(false);
       }
     },
-    [mcp, refreshServers, runtimeId]
+    [labels.loadToolsFailed, mcp, refreshServers, runtimeId]
   );
 
   useEffect(() => {
@@ -201,17 +205,15 @@ function _McpToolImportDialog({
         }}
       >
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add MCP tools</DialogTitle>
-          <DialogDescription>
-            Choose a server, then add one or more MCP tools to this thread.
-          </DialogDescription>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside className="flex w-44 shrink-0 flex-col border-r p-3">
             <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
               {servers.length === 0 ? (
                 <div className="text-muted-foreground px-2 py-6 text-center text-xs">
-                  {loadingServers ? "Loading…" : "No servers"}
+                  {loadingServers ? labels.loading : labels.noServers}
                 </div>
               ) : (
                 servers.map((server) => {
@@ -281,16 +283,16 @@ function _McpToolImportDialog({
               onClick={openMcpSettings}
             >
               <Settings2 className="size-3.5" />
-              Configure MCP
+              {labels.configure}
             </Button>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden pl-4">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {servers.length === 0 ? (
                 <div className="text-muted-foreground flex flex-col items-center gap-3 px-3 py-8 text-center text-sm">
-                  <span>No MCP servers configured.</span>
+                  <span>{labels.noServersConfigured}</span>
                   <Button size="sm" variant="outline" onClick={openMcpSettings}>
-                    Open settings
+                    {labels.openSettings}
                   </Button>
                 </div>
               ) : tools.length === 0 ? (
@@ -301,7 +303,7 @@ function _McpToolImportDialog({
                     )}
                   >
                     {errorText ??
-                      `${_serverReadinessLabel(selectedServer)} · no tools loaded`}
+                      `${_serverReadinessLabel(selectedServer)} · ${labels.noToolsLoaded}`}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button
@@ -315,10 +317,10 @@ function _McpToolImportDialog({
                       ) : (
                         <RefreshCw className="size-4" />
                       )}
-                      Test server
+                      {labels.testServer}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={openMcpSettings}>
-                      Open settings
+                      {labels.openSettings}
                     </Button>
                   </div>
                 </div>
@@ -373,7 +375,7 @@ function _McpToolImportDialog({
                       <Switch
                         checked={exists}
                         disabled={!tool.available}
-                        aria-label={`${exists ? "Remove" : "Add"} ${tool.directName}`}
+                        aria-label={`${exists ? dialogs.remove : dialogs.add} ${tool.directName}`}
                         onCheckedChange={(checked) =>
                           handleToggleTool(tool, checked)
                         }

@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 
 import { getDefaultRuntime } from "@/client/remote-servers";
 import { createElectrobunModelClient } from "@/host/host-services";
+import { useI18n } from "@/i18n/i18n-provider";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -42,21 +43,21 @@ const PAGES = [
   {
     group: "App",
     value: "general",
-    label: "General",
+    labelKey: "general",
     icon: SlidersHorizontal,
     Page: () => <GeneralPage />,
   },
   {
     group: "App",
     value: "account",
-    label: "Account",
+    labelKey: "account",
     icon: CircleUser,
     Page: () => <AccountPage />,
   },
   {
     group: "Agent",
     value: "models",
-    label: "Models",
+    labelKey: "models",
     icon: Boxes,
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <ModelProvider client={createElectrobunModelClient(runtimeId)}>
@@ -67,7 +68,7 @@ const PAGES = [
   {
     group: "Agent",
     value: "skills",
-    label: "Skills",
+    labelKey: "skills",
     icon: Sparkles,
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <SkillsPage runtimeId={runtimeId} />
@@ -76,7 +77,7 @@ const PAGES = [
   {
     group: "Agent",
     value: "mcp",
-    label: "MCP Servers",
+    labelKey: "mcp",
     icon: Cable,
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <McpPage runtimeId={runtimeId} />
@@ -85,7 +86,7 @@ const PAGES = [
   {
     group: "Agent",
     value: "search",
-    label: "Web Search",
+    labelKey: "search",
     icon: Search,
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <SearchPage runtimeId={runtimeId} />
@@ -94,7 +95,7 @@ const PAGES = [
   {
     group: "App",
     value: "plugins",
-    label: "Plugins",
+    labelKey: "plugins",
     icon: Puzzle,
     Page: ({ selectedPluginId }: { selectedPluginId?: string }) => (
       <PluginsPage preferredPluginId={selectedPluginId} />
@@ -103,7 +104,7 @@ const PAGES = [
   {
     group: "Connections",
     value: "remote",
-    label: "Remote Servers",
+    labelKey: "remote",
     icon: Server,
     Page: ({
       canConnect,
@@ -133,7 +134,7 @@ const PAGES = [
   {
     group: "Connections",
     value: "network",
-    label: "Network",
+    labelKey: "network",
     icon: Network,
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <NetworkPage runtimeId={runtimeId} />
@@ -142,13 +143,20 @@ const PAGES = [
   {
     group: null,
     value: "experimental",
-    label: "Experimental",
+    labelKey: "experimental",
     icon: FlaskConical,
     Page: () => <ExperimentalPage />,
   },
 ] as const;
 
 const PAGE_GROUPS = ["App", "Agent", "Connections"] as const;
+
+/** Group headers are data too: "App" / "Agent" / "Connections" localize. */
+const PAGE_GROUP_LABEL_KEYS = {
+  App: "app",
+  Agent: "agent",
+  Connections: "connections",
+} as const;
 
 export function SettingsDialog({
   open,
@@ -175,6 +183,7 @@ export function SettingsDialog({
   onRemoteConnected?: (runtimeId: RuntimeId) => void;
   onRemoteDisconnected?: (runtimeId: RuntimeId) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [runtimeId, setRuntimeId] = useState<RuntimeId>("local");
 
   useEffect(() => {
@@ -211,7 +220,9 @@ export function SettingsDialog({
         >
           <aside className="bg-muted/30 flex w-50 shrink-0 flex-col gap-2 border-r p-3">
             <header>
-              <div className="text-base font-medium">Settings</div>
+              <div className="text-base font-medium">
+                {t.settingsDialog.title}
+              </div>
             </header>
             <TabsList className="h-fit w-full flex-col gap-0 bg-transparent p-0">
               {PAGE_GROUPS.map((group) => (
@@ -221,18 +232,18 @@ export function SettingsDialog({
                   role="presentation"
                 >
                   <div className="text-muted-foreground/70 dark:text-muted-foreground/50 px-2 pb-1 text-[10px] font-medium">
-                    {group}
+                    {t.settingsDialog.groups[PAGE_GROUP_LABEL_KEYS[group]]}
                   </div>
                   <div className="flex flex-col gap-0.5" role="presentation">
                     {PAGES.filter((page) => page.group === group).map(
-                      ({ value, label, icon: Icon }) => (
+                      ({ value, labelKey, icon: Icon }) => (
                         <TabsTrigger
                           key={value}
                           value={value}
                           className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full pl-5 dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
                         >
                           <Icon />
-                          {label}
+                          {t.settingsDialog.pages[labelKey]}
                         </TabsTrigger>
                       )
                     )}
@@ -241,14 +252,14 @@ export function SettingsDialog({
               ))}
               <div className="w-full border-t pt-2" role="presentation">
                 {PAGES.filter((page) => page.group === null).map(
-                  ({ value, label, icon: Icon }) => (
+                  ({ value, labelKey, icon: Icon }) => (
                     <TabsTrigger
                       key={value}
                       value={value}
                       className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
                     >
                       <Icon />
-                      {label}
+                      {t.settingsDialog.pages[labelKey]}
                     </TabsTrigger>
                   )
                 )}

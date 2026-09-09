@@ -43,18 +43,18 @@ import {
   type TreeDataItem,
   type TreeRenderItemParams,
 } from "@/components/tree-view";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { useFullScreen } from "@/lib/use-full-screen";
 import type { RuntimeId } from "@/shared/runtime";
+
 
 import type { AcquireFileMutation } from "./file-mutation-guard";
 import { NodeActions, RootActions } from "./node-actions";
 import { useFileSystemTree, type MoveConflict } from "./use-file-system-tree";
 
-/** What the OS calls its trash, for the delete-confirmation copy. */
-const TRASH_NAME =
-  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent)
-    ? "Recycle Bin"
-    : "Trash";
+const _isWindows =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
 
 /** The special workspace folder that deep-link shared-thread imports land in. */
 const SHARED_DIR = "shared";
@@ -104,6 +104,8 @@ function _FileSystemTreeView({
 }) {
   const fullScreen = useFullScreen();
   const seedHost = useHostServices();
+  const { t } = useI18n();
+  const trashName = _isWindows ? t.fileTree.recycleBinName : t.fileTree.trashName;
   const mutationReconciliation = useMemo(
     () => ({ onMove, onRemove }),
     [onMove, onRemove]
@@ -554,9 +556,9 @@ function _FileSystemTreeView({
         ) : data.length === 0 ? (
           <Empty className="h-full">
             <EmptyHeader>
-              <EmptyTitle>No Threads Yet</EmptyTitle>
+              <EmptyTitle>{t.fileTree.emptyTitle}</EmptyTitle>
               <EmptyDescription>
-                Create a thread to get started.
+                {t.fileTree.emptyDescription}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -583,13 +585,15 @@ function _FileSystemTreeView({
         }}
         title={
           <>
-            Move &ldquo;
+            {t.fileTree.moveTitlePrefix}
             {deleting ? basename(deleting).replace(/\.json$/, "") : ""}
-            &rdquo; to the {TRASH_NAME}?
+            {t.fileTree.moveTitleMiddle}
+            {trashName}
+            {t.fileTree.moveTitleSuffix}
           </>
         }
-        description={`You can restore it from the ${TRASH_NAME} later.`}
-        confirmLabel={`Move to ${TRASH_NAME}`}
+        description={`${t.fileTree.moveDescriptionPrefix}${trashName}${t.fileTree.moveDescriptionSuffix}`}
+        confirmLabel={`${t.fileTree.moveConfirmPrefix}${trashName}`}
         onConfirm={() => {
           const path = deleting;
           setDeleting(null);
@@ -610,23 +614,26 @@ function _FileSystemTreeView({
         }}
         title={
           <>
-            Replace &ldquo;
+            {t.fileTree.replaceTitlePrefix}
             {overwriteConflict
               ? overwriteConflict.isDir
                 ? overwriteConflict.name
                 : overwriteConflict.name.replace(/\.json$/, "")
               : ""}
-            &rdquo;?
+            {t.fileTree.replaceTitleSuffix}
           </>
         }
         description={
           overwriteConflict
-            ? `${overwriteConflict.isDir ? "A folder" : "A thread"} with this name already exists here. Replacing it moves the existing ${
-                overwriteConflict.isDir ? "folder" : "thread"
-              } to the ${TRASH_NAME}.`
+            ? formatMessage(
+                overwriteConflict.isDir
+                  ? t.fileTree.replaceDescriptionFolder
+                  : t.fileTree.replaceDescriptionThread,
+                { trash: trashName }
+              )
             : undefined
         }
-        confirmLabel="Replace"
+        confirmLabel={t.fileTree.replace}
         onConfirm={() => {
           overwriteConflict?.resolve(true);
           setOverwriteConflict(null);

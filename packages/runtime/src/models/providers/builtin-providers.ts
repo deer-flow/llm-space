@@ -17,6 +17,7 @@ import { xiaomiProvider } from "@earendil-works/pi-ai/providers/xiaomi";
 import { zaiProvider } from "@earendil-works/pi-ai/providers/zai";
 import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
 
+import { aliyunQwenProvider } from "./aliyun-qwen";
 import { arkProvider } from "./ark";
 import { arkAgentPlanProvider } from "./ark-agent-plan";
 import { arkCodingPlanProvider } from "./ark-coding-plan";
@@ -24,6 +25,7 @@ import { deepseekProvider } from "./deepseek";
 import { minimaxProvider } from "./minimax";
 import { minimaxCnProvider } from "./minimax-cn";
 import { openaiCodexProvider } from "./openai-codex";
+import { tencentTokenHubProvider } from "./tencent-tokenhub";
 
 /** Static, non-`Provider` metadata for a builtin provider. */
 export interface BuiltinProviderMeta {
@@ -39,6 +41,7 @@ export const BUILTIN_PROVIDER_META: Record<string, BuiltinProviderMeta> = {
   "amazon-bedrock": { websiteLink: "https://aws.amazon.com/bedrock/" },
   "ant-ling": { websiteLink: "https://www.ant-ling.com/" },
   anthropic: { websiteLink: "https://claude.com/platform/api" },
+  "aliyun-qwen": { websiteLink: "https://www.aliyun.com/product/bailian" },
   ark: { websiteLink: "https://www.volcengine.com/product/ark" },
   "ark-agent-plan": {
     websiteLink:
@@ -64,6 +67,9 @@ export const BUILTIN_PROVIDER_META: Record<string, BuiltinProviderMeta> = {
   openai: { websiteLink: "https://openai.com" },
   "openai-codex": { websiteLink: "https://openai.com/codex" },
   openrouter: { websiteLink: "https://openrouter.ai" },
+  "tencent-tokenhub": {
+    websiteLink: "https://cloud.tencent.com/product/tokenhub",
+  },
   "vercel-ai-gateway": { websiteLink: "https://vercel.com/ai-gateway" },
   xai: { websiteLink: "https://x.ai" },
   xiaomi: { websiteLink: "https://mimo.xiaomi.com/zh" },
@@ -73,6 +79,7 @@ export const BUILTIN_PROVIDER_META: Record<string, BuiltinProviderMeta> = {
 
 /** Factory for each builtin provider, keyed by provider id. */
 export const BUILTIN_PROVIDERS: Record<string, Provider> = {
+  "aliyun-qwen": aliyunQwenProvider(),
   "amazon-bedrock": amazonBedrockProvider(),
   "ant-ling": antLingProvider(),
   anthropic: anthropicProvider(),
@@ -92,6 +99,7 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   openai: openaiProvider(),
   "openai-codex": openaiCodexProvider(),
   openrouter: openrouterProvider(),
+  "tencent-tokenhub": tencentTokenHubProvider(),
   "vercel-ai-gateway": vercelAIGatewayProvider(),
   xai: xaiProvider(),
   xiaomi: xiaomiProvider(),

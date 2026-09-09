@@ -5,14 +5,20 @@ import type { Command } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 import { buildShareThreadCommand } from "@/shared/share";
 
-/** The file-tree consumer that binds a selected path to its owning runtime. */
+/**
+ * The file-tree consumer that binds a selected path to its owning runtime.
+ * Hook-free by design (tests invoke it directly); the label arrives from the
+ * localized parent menu.
+ */
 export function ShareThreadMenuItem({
   path,
   runtimeId,
+  label,
   executeCommand,
 }: {
   path: string;
   runtimeId: RuntimeId;
+  label: string;
   executeCommand: (command: Command) => void;
 }) {
   return (
@@ -20,7 +26,7 @@ export function ShareThreadMenuItem({
       onSelect={() => executeCommand(buildShareThreadCommand(path, runtimeId))}
     >
       <Share2 />
-      Share...
+      {label}
     </DropdownMenuItem>
   );
 }

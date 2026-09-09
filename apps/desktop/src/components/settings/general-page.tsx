@@ -39,8 +39,10 @@ import { toast } from "sonner";
 import { getAnalyticsSettings, setAnalyticsSettings } from "@/client/analytics";
 import { getWorkspacePath } from "@/client/paths";
 import { useCommands } from "@/commands";
+import { useI18n } from "@/i18n/i18n-provider";
 import { electrobun } from "@/lib/electrobun";
 import { DEFAULT_ANALYTICS_SETTINGS } from "@/shared/analytics";
+import { APP_LANGUAGES, type AppLanguage } from "@/shared/language";
 import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
@@ -107,6 +109,7 @@ function RowLabel({ title, hint }: { title: string; hint?: string }) {
  * falls back to the first available model.
  */
 function DefaultModelSelect() {
+  const { t } = useI18n();
   const providers = useModels();
   const defaultModel = useDefaultModel();
   const setDefaultModel = useSetDefaultModel();
@@ -148,11 +151,13 @@ function DefaultModelSelect() {
 
   return (
     <Select value={value} onValueChange={handleChange}>
-      <SelectTrigger className="w-64" aria-label="Default model">
+      <SelectTrigger className="w-64" aria-label={t.general.defaultModelAria}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={AUTO_DEFAULT_MODEL}>Automatic</SelectItem>
+        <SelectItem value={AUTO_DEFAULT_MODEL}>
+          {t.general.defaultModelAutomatic}
+        </SelectItem>
         {groups.length > 0 ? <SelectSeparator /> : null}
         {groups.map((group) => (
           <SelectGroup key={group.id}>
@@ -187,6 +192,7 @@ function DefaultModelSelect() {
  * exactly what is (and isn't) collected.
  */
 function AnalyticsRow() {
+  const { t } = useI18n();
   const [enabled, setEnabled] = useState(DEFAULT_ANALYTICS_SETTINGS.enabled);
   const [available, setAvailable] = useState(true);
 
@@ -206,28 +212,31 @@ function AnalyticsRow() {
     };
   }, []);
 
-  const handleChange = useCallback(async (next: boolean) => {
-    setEnabled(next); // Optimistic; the RPC echoes the input, so no reconcile.
-    try {
-      await setAnalyticsSettings(next);
-    } catch (error) {
-      setEnabled(!next);
-      toast.error("Failed to update analytics setting", {
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
-    }
-  }, []);
+  const handleChange = useCallback(
+    async (next: boolean) => {
+      setEnabled(next); // Optimistic; the RPC echoes the input, so no reconcile.
+      try {
+        await setAnalyticsSettings(next);
+      } catch (error) {
+        setEnabled(!next);
+        toast.error(t.general.analytics.failed, {
+          description:
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
+        });
+      }
+    },
+    [t]
+  );
 
   return (
     <SettingsRow
       label={
         <span className="flex flex-col gap-0.5">
-          Share anonymous usage analytics
+          {t.general.analytics.title}
           <span className="text-muted-foreground text-xs">
             {available
-              ? "Helps improve the app. Only anonymous actions are sent - never your prompts, messages, or API keys."
-              : "Telemetry is turned off in this build or environment. Nothing is sent."}
+              ? t.general.analytics.hint
+              : t.general.analytics.disabledHint}
           </span>
         </span>
       }
@@ -236,7 +245,7 @@ function AnalyticsRow() {
         checked={available && enabled}
         disabled={!available}
         onCheckedChange={(next) => void handleChange(next)}
-        aria-label="Share anonymous usage analytics"
+        aria-label={t.general.analytics.title}
       />
     </SettingsRow>
   );
@@ -267,9 +276,7 @@ function WorkspaceFolderLink() {
   return (
     <button
       type="button"
-      onClick={() =>
-        executeCommand({ type: "openWorkspaceFolder", args: {} })
-      }
+      onClick={() => executeCommand({ type: "openWorkspaceFolder", args: {} })}
       className="text-primary max-w-[50%] cursor-pointer truncate font-mono text-sm underline underline-offset-2 hover:opacity-80"
       title={path}
     >
@@ -292,6 +299,7 @@ function useUpdateMode(): [UpdateMode, (mode: UpdateMode) => void] {
 }
 
 export function GeneralPage() {
+  const { lang, setLang, t } = useI18n();
   const { theme, setTheme } = useTheme();
   const { executeCommand } = useCommands();
   const { fidelity, setFidelity } = useRenderingFidelity();
@@ -303,48 +311,56 @@ export function GeneralPage() {
     setPrimaryColor,
   } = usePrimaryColor();
   const showResetPrimaryColor = primaryColor !== DEFAULT_PRIMARY;
+  const handleLanguageChange = (next: AppLanguage) => {
+    if (next === lang) return;
+    setLang(next);
+  };
   return (
     <SettingsPage
-      title="General"
-      description="Customize appearance, defaults, privacy, and updates."
+      title={t.general.title}
+      description={t.general.description}
       className="overflow-y-auto"
     >
       <div className="flex flex-col gap-7 pb-2">
-        <SettingsSection title="Appearance">
+        <SettingsSection title={t.general.appearance}>
           <SettingsRow
             label={
               <RowLabel
-                title="Language"
-                hint="English only for now — more languages are coming."
+                title={t.general.language}
+                hint={t.general.languageHint}
               />
             }
           >
-            <Select defaultValue="en-US" disabled>
-              <SelectTrigger className="w-32" aria-label="Language">
+            <Select
+              value={lang}
+              onValueChange={(v) => handleLanguageChange(v as AppLanguage)}
+            >
+              <SelectTrigger className="w-32" aria-label={t.general.language}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="en-US">English (US)</SelectItem>
+                {APP_LANGUAGES.map((language) => (
+                  <SelectItem key={language.code} value={language.code}>
+                    {language.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </SettingsRow>
 
           <SettingsRow
             label={
-              <RowLabel
-                title="Theme"
-                hint="Match your system setting, or force light or dark."
-              />
+              <RowLabel title={t.general.theme} hint={t.general.themeHint} />
             }
           >
             <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
-              <SelectTrigger className="w-32" aria-label="Theme">
+              <SelectTrigger className="w-32" aria-label={t.general.theme}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="light">{t.general.themeLight}</SelectItem>
+                <SelectItem value="dark">{t.general.themeDark}</SelectItem>
+                <SelectItem value="system">{t.general.themeSystem}</SelectItem>
               </SelectContent>
             </Select>
           </SettingsRow>
@@ -352,8 +368,8 @@ export function GeneralPage() {
           <SettingsRow
             label={
               <RowLabel
-                title="Primary color"
-                hint="The accent color for buttons, links, and highlights."
+                title={t.general.primaryColor}
+                hint={t.general.primaryColorHint}
               />
             }
           >
@@ -364,7 +380,7 @@ export function GeneralPage() {
                   variant="secondary"
                   onClick={resetPrimaryColor}
                 >
-                  Reset
+                  {t.general.reset}
                 </Button>
               ) : null}
               <PrimaryColorPicker
@@ -378,8 +394,8 @@ export function GeneralPage() {
           <SettingsRow
             label={
               <RowLabel
-                title="Rendering"
-                hint="Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads."
+                title={t.general.rendering}
+                hint={t.general.renderingHint}
               />
             }
           >
@@ -387,23 +403,23 @@ export function GeneralPage() {
               value={fidelity}
               onValueChange={(v) => setFidelity(v as RenderingFidelity)}
             >
-              <SelectTrigger className="w-32" aria-label="Rendering fidelity">
+              <SelectTrigger className="w-32" aria-label={t.general.rendering}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rich">Full</SelectItem>
-                <SelectItem value="lite">Fast</SelectItem>
+                <SelectItem value="rich">{t.general.renderingFull}</SelectItem>
+                <SelectItem value="lite">{t.general.renderingFast}</SelectItem>
               </SelectContent>
             </Select>
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Defaults">
+        <SettingsSection title={t.general.defaults}>
           <SettingsRow
             label={
               <RowLabel
-                title="Default model"
-                hint="Used for new threads, and when a thread's model is no longer available."
+                title={t.general.defaultModel}
+                hint={t.general.defaultModelHint}
               />
             }
           >
@@ -411,12 +427,12 @@ export function GeneralPage() {
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Data & privacy">
+        <SettingsSection title={t.general.dataPrivacy}>
           <SettingsRow
             label={
               <RowLabel
-                title="Workspace folder"
-                hint="Where your threads are stored on disk."
+                title={t.general.workspaceFolder}
+                hint={t.general.workspaceFolderHint}
               />
             }
           >
@@ -426,12 +442,12 @@ export function GeneralPage() {
           <AnalyticsRow />
         </SettingsSection>
 
-        <SettingsSection title="Updates">
+        <SettingsSection title={t.general.updates}>
           <SettingsRow
             label={
               <RowLabel
-                title="Software updates"
-                hint="Automatic downloads updates in the background and prompts you to restart."
+                title={t.general.softwareUpdates}
+                hint={t.general.softwareUpdatesHint}
               />
             }
           >
@@ -440,13 +456,20 @@ export function GeneralPage() {
                 value={updateMode}
                 onValueChange={(v) => setUpdateMode(v as UpdateMode)}
               >
-                <SelectTrigger className="w-40" aria-label="Software updates">
+                <SelectTrigger
+                  className="w-40"
+                  aria-label={t.general.softwareUpdatesAria}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="automatic">Automatic</SelectItem>
-                  <SelectItem value="manual">Check manually</SelectItem>
-                  <SelectItem value="off">Off</SelectItem>
+                  <SelectItem value="automatic">
+                    {t.general.automatic}
+                  </SelectItem>
+                  <SelectItem value="manual">
+                    {t.general.checkManually}
+                  </SelectItem>
+                  <SelectItem value="off">{t.general.off}</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -455,7 +478,7 @@ export function GeneralPage() {
                   executeCommand({ type: "checkForUpdates", args: {} })
                 }
               >
-                Check now
+                {t.general.checkNow}
               </Button>
             </div>
           </SettingsRow>

@@ -180,12 +180,17 @@ Performance DMG URLs and real byte sizes, push the change to `main`, and wait
 for the triggered Pages deployment to succeed. This website handoff is a
 required release step; do not leave it for the user to remember or request.
 
-If `@earendil-works/pi-ai` is still at version `0.83.0` when preparing a
-release, check the npm registry for a newer official version and verify whether
-upstream has fixed Responses tool-call ID replay for non-OpenAI providers. Do
-not ship the local dependency patch without checking first. If an official
-release contains the fix, upgrade the dependency and remove the local patch
-before releasing.
+Before **every release**, query the npm registry for the latest official
+`@earendil-works/pi-ai` version (for example,
+`bun pm view @earendil-works/pi-ai version`) and compare it with the version in
+the root dependency catalog and lockfile. Do not rely on a previous release's
+registry check. Record the checked registry version in the release work or
+release notes. If a newer version exists, inspect its changes and upgrade the
+Pi packages together when compatible before continuing the release. Also verify
+whether upstream now includes the behavior carried by the local Pi patch,
+especially Responses tool-call ID replay for non-OpenAI providers; remove the
+patch only after the upstream package is verified to contain every required
+fix.
 
 **Two editions ship from every tag.** The regular one drives the system WebView; the **Performance** edition embeds Chromium (CEF). `LLM_SPACE_DESKTOP_RENDERER=cef` is the only switch — `electrobun.config.ts` forks the app name (`LLM Space Performance`), the identifier (`…llm-space.performance`) and the update feed off it, so the two install side by side in `/Applications` and update independently. They deliberately **share `~/.llm-space`** (`getLlmSpaceHomePath()` is name-independent), so switching editions keeps threads and settings. Two things make this work and will silently break if touched: (1) each edition needs its **own rolling update release** (`updates` / `updates-performance`) — `update.json` is named `{channel}-{os}-{arch}-update.json` with no app name, so a shared release would have them overwrite each other; hence the release workflow downloads the two editions' artifacts into **separate directories** rather than `merge-multiple` into one. (2) CEF must **not** get a `remote-debugging-port` in shipped builds — `chromiumFlags` is only set when `LLM_SPACE_DESKTOP_CDP_PORT` is explicitly passed (which `dev:cef` does, and CI never does); an always-on CDP port would let any local process drive the renderer. Build the Performance edition locally with `mise run pack:perf`.
 
@@ -253,6 +258,8 @@ Prefer dropping new images into the existing `src/mainview/public/images/` folde
 - **Empty states**: every list or collection view must define an intentional empty state. Prefer the shared `Empty`, `EmptyHeader`, `EmptyMedia`, `EmptyTitle`, `EmptyDescription`, and `EmptyContent` primitives from `@llm-space/ui/ui/empty` over ad hoc centered text or blank space. Include a concise explanation and, when useful, the primary action that helps the user populate or recover the list; also handle filtered/search results that contain no matches.
 - **Menus and commands**: every cross-boundary action is a `Command` (`shared/commands.ts`); its `type` is camelCase. Labels in `COMMAND_META`, native menus (`bun/app/menu.ts`), context menus, dropdown menus, and similar menu-like surfaces are **Title Case** ("Add New Method", "New File", "Close Tab"). Route everything through `executeCommand` rather than calling handlers directly.
 - **General UI copy**: ordinary buttons, headings, helper text, empty states, dialogs, and other non-menu labels use sentence case ("Add new method", "Start from example", "No tools yet").
+- **Internationalization**: all user-facing UI copy must go through the app's i18n layer, including new or changed buttons, headings, helper text, empty states, dialogs, toasts, menus, command labels, placeholders, validation messages, accessibility labels, and tooltips. Do not introduce new inline user-facing English strings. Keep every shipped locale structurally complete when adding or changing message keys, and make localized search/filter surfaces match both the canonical English copy and the active locale where users may search in either language.
+- **Never localize model-facing or user-authored content**: tool names and tool descriptions, system/developer/user prompts, prompt templates, message contents, model output, skill/MCP instructions, identifiers, protocol values, persisted data, and imported or user-authored text must remain byte-for-byte semantically unchanged by UI locale selection. Translate only presentation-layer labels around that content. Do not pass localized UI strings into agent requests, tool definitions, prompt rendering, execution, persistence, export, or serialization paths.
 
 ### Performance
 

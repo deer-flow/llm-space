@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@llm-space/core/server";
 
 import {
+  attachFullScreenSync,
   attachWindowStatePersistence,
   attachWindowStates,
   setPageZoom,
@@ -185,6 +186,24 @@ describe("window state persistence", () => {
       isMaximized: true,
       isFullScreen: false,
     });
+  });
+});
+
+describe("fullscreen state sync", () => {
+  test("observes a macOS fullscreen flag that changes after resize", async () => {
+    const win = new FakeWindow({ x: 100, y: 80, width: 1280, height: 800 });
+    const changes: boolean[] = [];
+
+    attachFullScreenSync(win as never, (fullScreen) => {
+      changes.push(fullScreen);
+    }, [1]);
+
+    // Native resize can arrive before Electrobun updates isFullScreen().
+    win.emit("resize");
+    win.fullScreen = true;
+    await waitForTimers();
+
+    expect(changes).toEqual([false, true]);
   });
 });
 

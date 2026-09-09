@@ -5,6 +5,7 @@ import {
   BookOpenTextIcon,
   BotIcon,
   BrainCircuitIcon,
+  ClapperboardIcon,
   FileIcon,
   ImageIcon,
   LanguagesIcon,
@@ -31,6 +32,7 @@ import deepWikiPrompt from "./deep-wiki.md?raw";
 import generalAgentPrompt from "./general-agent.md?raw";
 import metaImagePrompt from "./meta-image-prompt.md?raw";
 import metaPromptWithTools from "./meta-prompt-with-tools.md?raw";
+import shortDramaWriterPrompt from "./short-drama-writer.md?raw";
 import { TOOL_EXAMPLES } from "./tools";
 import translationPrompt from "./translation.md?raw";
 
@@ -264,6 +266,19 @@ export const PROMPT_EXAMPLES: readonly PromptExampleItem[] = [
     description: "Memory compaction prompt for keeping useful context concise.",
     content: compactMemoryPrompt,
     icon: BrainCircuitIcon,
+  },
+  {
+    type: "example",
+    id: "short-drama-writer",
+    label: "Short Drama Writer",
+    fileStem: "short-drama-writer",
+    description:
+      "Creates high-conflict, fast-paced short-drama stories as production-ready JSON.",
+    content: shortDramaWriterPrompt,
+    messages: userPrompt(
+      "Write a short drama about a woman who discovers that her fiancé is her father's secret business rival."
+    ),
+    icon: ClapperboardIcon,
   },
   { type: "separator" },
   {

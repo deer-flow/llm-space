@@ -41,6 +41,8 @@ import {
   setPluginSkillHidden,
   setSkillHidden,
 } from "@/client/skills";
+import { useI18n } from "@/i18n/i18n-provider";
+import { formatMessage } from "@/i18n/messages";
 import { electrobun } from "@/lib/electrobun";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -53,31 +55,38 @@ const _isWindows =
  * The OS file manager's name, for the "Reveal in …" menu label. Windows calls
  * it Explorer; macOS (and our Linux fallback) say Finder.
  */
-const REVEAL_LABEL = _isWindows ? "Reveal in Explorer" : "Reveal in Finder";
-
 /** Reveal a discovery folder in the OS file manager, toasting if it's gone. */
-async function revealDiscoveryPath(path: string) {
+async function revealDiscoveryPath(
+  path: string,
+  failedReveal: string,
+  pleaseTryAgain: string
+) {
   try {
     await fsReveal(path);
   } catch (error) {
-    toast.error("Failed to reveal folder", {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(failedReveal, {
+      description: error instanceof Error ? error.message : pleaseTryAgain,
     });
   }
 }
 
 /** Open a skill directory in the OS file manager. */
-async function openSkillFolder(skill: SkillInfo) {
+async function openSkillFolder(
+  skill: SkillInfo,
+  failedOpen: string,
+  pleaseTryAgain: string
+) {
   try {
     await fsReveal(skill.path);
   } catch (error) {
-    toast.error("Failed to open skill folder", {
-      description: error instanceof Error ? error.message : "Please try again.",
+    toast.error(failedOpen, {
+      description: error instanceof Error ? error.message : pleaseTryAgain,
     });
   }
 }
 
 export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<SkillsSettings>({
     discoveryPaths: [],
   });
@@ -166,25 +175,25 @@ export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
       setSettings(next);
       setSelectedSourceId(`folder:${path}`);
     } catch (error) {
-      toast.error("Failed to add folder", {
+      toast.error(t.skills.failedAdd, {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t.common.pleaseTryAgain,
       });
     }
-  }, [runtimeId]);
+  }, [runtimeId, t]);
 
   const handleRemove = useCallback(
     async (path: string) => {
       try {
         setSettings(await removeSkillsPath(path, runtimeId));
       } catch (error) {
-        toast.error("Failed to remove folder", {
+        toast.error(t.skills.failedRemove, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       }
     },
-    [runtimeId]
+    [runtimeId, t]
   );
 
   const handleSetAll = useCallback(
@@ -194,16 +203,13 @@ export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
         // Refetch the skills pane so its switches reflect the bulk change.
         setReloadToken((token) => token + 1);
       } catch (error) {
-        toast.error(
-          hidden ? "Failed to disable skills" : "Failed to enable skills",
-          {
-            description:
-              error instanceof Error ? error.message : "Please try again.",
-          }
-        );
+        toast.error(hidden ? t.skills.failedDisable : t.skills.failedEnable, {
+          description:
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
+        });
       }
     },
-    [runtimeId]
+    [runtimeId, t]
   );
 
   const handleSetAllPlugin = useCallback(
@@ -216,25 +222,24 @@ export function SkillsPage({ runtimeId }: { runtimeId: RuntimeId }) {
           )
         );
       } catch (error) {
-        toast.error(
-          hidden ? "Failed to disable skills" : "Failed to enable skills",
-          {
-            description:
-              error instanceof Error ? error.message : "Please try again.",
-          }
-        );
+        toast.error(hidden ? t.skills.failedDisable : t.skills.failedEnable, {
+          description:
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
+        });
       }
     },
-    [runtimeId]
+    [runtimeId, t]
   );
 
   return (
     <SettingsPage
       className="flex size-full min-h-0"
-      title="Skills"
+      title={t.skills.title}
       description={
         <>
-          These settings only apply to the built-in <code>skill()</code> tool.
+          {t.skills.descriptionPrefix}
+          <code>skill()</code>
+          {t.skills.descriptionSuffix}
         </>
       }
     >
@@ -287,19 +292,19 @@ function PathList({
   onEnableAllPlugin: (pluginId: string) => void;
   onDisableAllPlugin: (pluginId: string) => void;
 }) {
+  const { t } = useI18n();
   const [listRef] = useAutoAnimation<HTMLDivElement>();
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
       <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        FOLDERS
+        {t.skills.folders}
       </span>
 
       <ScrollArea className="min-h-0 grow">
         {paths.length === 0 && pluginGroups.length === 0 ? (
           <div className="text-muted-foreground px-2 py-6 text-center text-xs text-balance">
-            No folders yet. Click the &quot;Add folder&quot; button below to get
-            started.
+            {t.skills.noFolders}
           </div>
         ) : (
           <div ref={listRef} className="flex flex-col gap-1 pr-2">
@@ -332,7 +337,7 @@ function PathList({
 
       <Button variant="outline" className="w-full" onClick={onAdd}>
         <Plus />
-        Add folder
+        {t.skills.addFolder}
       </Button>
     </div>
   );
@@ -355,13 +360,17 @@ function PluginSourceListItem({
   onEnableAll: () => void;
   onDisableAll: () => void;
 }) {
+  const { t } = useI18n();
+  const revealLabel = formatMessage(t.skills.revealIn, {
+    app: _isWindows ? "Explorer" : "Finder",
+  });
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Select skills from plugin ${pluginId}`}
+      aria-label={`${t.skills.title}: ${pluginId}`}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -377,10 +386,13 @@ function PluginSourceListItem({
       <Puzzle className="text-muted-foreground size-4 shrink-0" />
       <span className="min-w-0 grow">
         <span className="block truncate" title={pluginId}>
-          Plugin · {pluginId}
+          {formatMessage(t.skills.pluginSource, { pluginId })}
         </span>
         <span className="text-muted-foreground block truncate text-[11px] font-normal">
-          {skillCount} {skillCount === 1 ? "skill" : "skills"}
+          {formatMessage(
+            skillCount === 1 ? t.skills.skillSingular : t.skills.skillCount,
+            { count: skillCount }
+          )}
         </span>
       </span>
 
@@ -409,21 +421,27 @@ function PluginSourceListItem({
           {sourcePath && (
             <>
               <DropdownMenuItem
-                onSelect={() => void revealDiscoveryPath(sourcePath)}
+                onSelect={() =>
+                  void revealDiscoveryPath(
+                    sourcePath,
+                    t.skills.failedReveal,
+                    t.common.pleaseTryAgain
+                  )
+                }
               >
                 <FolderOpen />
-                {REVEAL_LABEL}
+                {revealLabel}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
           <DropdownMenuItem onSelect={onEnableAll}>
             <CheckCheck />
-            Enable all skills
+            {t.skills.enableAll}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onDisableAll}>
             <Ban />
-            Disable all skills
+            {t.skills.disableAll}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -455,6 +473,10 @@ function PathListItem({
   onEnableAll: () => void;
   onDisableAll: () => void;
 }) {
+  const { t } = useI18n();
+  const revealLabel = formatMessage(t.skills.revealIn, {
+    app: _isWindows ? "Explorer" : "Finder",
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -499,18 +521,26 @@ function PathListItem({
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuItem onSelect={() => void revealDiscoveryPath(path)}>
+          <DropdownMenuItem
+            onSelect={() =>
+              void revealDiscoveryPath(
+                path,
+                t.skills.failedReveal,
+                t.common.pleaseTryAgain
+              )
+            }
+          >
             <FolderOpen />
-            {REVEAL_LABEL}
+            {revealLabel}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => onEnableAll()}>
             <CheckCheck />
-            Enable all skills
+            {t.skills.enableAll}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onDisableAll()}>
             <Ban />
-            Disable all skills
+            {t.skills.disableAll}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -518,7 +548,7 @@ function PathListItem({
             onSelect={() => setConfirmOpen(true)}
           >
             <Trash2 />
-            Remove {path}
+            {t.skills.remove}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -526,9 +556,9 @@ function PathListItem({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Remove folder?"
-        description={`This removes "${path}" from your skill discovery folders. You can add it back later.`}
-        confirmLabel="Remove"
+        title={t.skills.removeFolder}
+        description={formatMessage(t.skills.removeFolderDescription, { path })}
+        confirmLabel={t.skills.remove}
         dimBackground={false}
         onConfirm={() => {
           setConfirmOpen(false);
@@ -548,6 +578,7 @@ function PathSkills({
   plugin: { pluginId: string; skills: SkillInfo[] } | null;
   runtimeId: RuntimeId;
 }) {
+  const { t } = useI18n();
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
   const [listRef] = useAutoAnimation<HTMLDivElement>();
 
@@ -607,20 +638,26 @@ function PathSkills({
               )
             : prev
         );
-        toast.error("Failed to update skill", {
+        toast.error(t.skills.failedUpdate, {
           description:
-            error instanceof Error ? error.message : "Please try again.",
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       }
     },
-    [path, plugin, runtimeId]
+    [
+      path,
+      plugin,
+      runtimeId,
+      t.common.pleaseTryAgain,
+      t.skills.failedUpdate,
+    ]
   );
 
   const content = useMemo(() => {
     if (!path && !plugin) {
       return (
         <div className="text-muted-foreground flex size-full items-center justify-center text-sm">
-          Select or add a source from the left sidebar
+          {t.skills.selectSource}
         </div>
       );
     }
@@ -628,14 +665,14 @@ function PathSkills({
       return (
         <div className="text-muted-foreground flex items-center gap-2 px-1 py-6 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading skills…
+          {t.skills.loading}
         </div>
       );
     }
     if (skills.length === 0) {
       return (
         <div className="text-muted-foreground px-1 py-6 text-sm">
-          No skills found in this source.
+          {t.skills.noneFound}
         </div>
       );
     }
@@ -647,7 +684,13 @@ function PathSkills({
             name={skill.name}
             description={skill.description}
             checked={skill.enabled}
-            onTitleClick={() => void openSkillFolder(skill)}
+            onTitleClick={() =>
+              void openSkillFolder(
+                skill,
+                t.skills.failedOpen,
+                t.common.pleaseTryAgain
+              )
+            }
             onCheckedChange={(enabled) =>
               void handleToggle(skill.name, enabled)
             }
@@ -655,7 +698,18 @@ function PathSkills({
         ))}
       </div>
     );
-  }, [handleToggle, listRef, path, plugin, skills]);
+  }, [
+    handleToggle,
+    listRef,
+    path,
+    plugin,
+    skills,
+    t.common.pleaseTryAgain,
+    t.skills.failedOpen,
+    t.skills.loading,
+    t.skills.noneFound,
+    t.skills.selectSource,
+  ]);
 
   return (
     <div className="flex min-w-0 grow flex-col">
@@ -663,8 +717,9 @@ function PathSkills({
         <div className="flex flex-col gap-2 pr-4 pl-6">
           {plugin && (
             <div className="text-muted-foreground pb-1 text-xs">
-              Managed by the{" "}
-              <span className="text-foreground">{plugin.pluginId}</span> plugin.
+              {formatMessage(t.skills.managedByPlugin, {
+                pluginId: plugin.pluginId,
+              })}
             </div>
           )}
           {content}

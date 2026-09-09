@@ -12,7 +12,7 @@ export interface McpRecommendation {
   };
 }
 
-// Keep the menu alphabetized and local package versions pinned for reproducibility.
+// Keep the menu alphabetized. npx presets use -y for unattended startup.
 export const MCP_RECOMMENDATIONS: McpRecommendation[] = [
   {
     draft: {
@@ -34,11 +34,11 @@ export const MCP_RECOMMENDATIONS: McpRecommendation[] = [
     draft: {
       name: "Chrome DevTools",
       transport: "stdio",
-      command: "bunx",
-      args: ["chrome-devtools-mcp@1.8.0", "--no-usage-statistics"],
+      command: "npx",
+      args: ["-y", "chrome-devtools-mcp@1.8.0", "--no-usage-statistics"],
     },
     setupHint:
-      "Requires Bun, Node.js LTS, and Google Chrome on the selected runtime. The first connection downloads the server package.",
+      "Requires Node.js LTS, npm, and Google Chrome on the selected runtime. The first connection downloads the server package.",
   },
   {
     draft: {
@@ -94,11 +94,11 @@ export const MCP_RECOMMENDATIONS: McpRecommendation[] = [
     draft: {
       name: "Playwright",
       transport: "stdio",
-      command: "bunx",
-      args: ["@playwright/mcp@0.0.80", "--browser", "chrome"],
+      command: "npx",
+      args: ["-y", "@playwright/mcp@latest", "--browser", "chrome"],
     },
     setupHint:
-      "Requires Bun, Node.js, and Google Chrome on the selected runtime. The first connection downloads the server package.",
+      "Requires Node.js, npm, and Google Chrome on the selected runtime. The first connection downloads the server package.",
   },
 ];
 

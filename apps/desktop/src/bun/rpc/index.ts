@@ -1,7 +1,4 @@
-import {
-  resolveUserPath,
-  userDirectoryExists,
-} from "@llm-space/core/server";
+import { resolveUserPath, userDirectoryExists } from "@llm-space/core/server";
 import type { GistThreadWriter } from "@llm-space/core/storage";
 import {
   installPluginZip,
@@ -62,6 +59,7 @@ export interface MainWindowRPCDependencies {
   gistWriter: GistThreadWriter;
   homePath: string;
   localStorageManager: LocalStorageManager;
+  onLocalStorageSet?: (key: string, value: string) => void;
   runtimeRouter: RuntimeRouter;
   remoteServerManager: RemoteServerManager;
   skillsManager: SkillsManager;
@@ -82,6 +80,7 @@ export function createMainWindowRPC({
   gistWriter,
   homePath,
   localStorageManager,
+  onLocalStorageSet,
   runtimeRouter,
   remoteServerManager,
   skillsManager,
@@ -206,6 +205,7 @@ export function createMainWindowRPC({
         localStorageSet: ({ key, value }) => {
           _assertLocalStorageKey(key);
           localStorageManager.setItem(key, value);
+          onLocalStorageSet?.(key, value);
           return Promise.resolve(null);
         },
         localStorageRemove: ({ key }) => {

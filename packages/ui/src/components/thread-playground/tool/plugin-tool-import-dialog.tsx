@@ -17,6 +17,8 @@ import {
 import { Input } from "@llm-space/ui/ui/input";
 import { Switch } from "@llm-space/ui/ui/switch";
 
+import { usePlaygroundLabels } from "../playground-labels";
+
 import { sortToolsByName } from "./sort-tools-by-name";
 import { ToolImportSidebarActions } from "./tool-import-sidebar-actions";
 
@@ -37,6 +39,8 @@ export function PluginToolImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { dialogs } = usePlaygroundLabels();
+  const labels = dialogs.plugins;
   const { pluginTools } = useHostServices();
   const [tools, setTools] = useState<PluginTool[]>([]);
   const [query, setQuery] = useState("");
@@ -52,12 +56,12 @@ export function PluginToolImportDialog({
           : (next[0]?.pluginId ?? null)
       );
     } catch (error) {
-      toast.error("Failed to load Plugin Tools", {
+      toast.error(labels.loadFailed, {
         description:
           error instanceof Error ? error.message : "Please try again.",
       });
     }
-  }, [pluginTools, runtimeId]);
+  }, [labels.loadFailed, pluginTools, runtimeId]);
 
   useEffect(() => {
     if (open) void loadTools();
@@ -91,10 +95,8 @@ export function PluginToolImportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[600px] max-h-[calc(100vh-4rem)] w-[min(800px,calc(100vw-2rem))] max-w-none! flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Add Plugin Tools</DialogTitle>
-          <DialogDescription>
-            Choose tools from locally installed Plugins for this thread.
-          </DialogDescription>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside className="flex w-52 shrink-0 flex-col gap-2 border-r p-3">
@@ -103,8 +105,8 @@ export function PluginToolImportDialog({
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools"
-                aria-label="Search Plugin Tools"
+                placeholder={dialogs.searchTools}
+                aria-label={labels.searchAria}
                 className="h-8 pl-7 text-xs"
               />
             </div>
@@ -152,13 +154,11 @@ export function PluginToolImportDialog({
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
             {runtimeId && runtimeId !== "local" ? (
               <div className="text-muted-foreground py-8 text-center text-sm">
-                Plugin Tools are available only in the local runtime.
+                {labels.localOnly}
               </div>
             ) : selectedTools.length === 0 ? (
               <div className="text-muted-foreground py-8 text-center text-sm">
-                {query.trim()
-                  ? "No Plugin Tools match your search."
-                  : "No Plugin Tools are available."}
+                {query.trim() ? labels.emptySearch : labels.empty}
               </div>
             ) : (
               selectedTools.map((tool) => {
@@ -177,7 +177,7 @@ export function PluginToolImportDialog({
                     </div>
                     <Switch
                       checked={enabled}
-                      aria-label={`${enabled ? "Remove" : "Add"} ${tool.name}`}
+                      aria-label={`${enabled ? dialogs.remove : dialogs.add} ${tool.name}`}
                       onCheckedChange={(checked) =>
                         checked ? onAdd(tool) : onRemove(tool)
                       }
