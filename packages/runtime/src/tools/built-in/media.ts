@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 
 import {
-  SEEDREAM_IMAGE_SIZES,
+  IMAGE_SIZES,
   type BuiltinTool,
   type GenerateImageToolConfig,
+  type ImageSize,
   type ProviderConnectionRef,
-  type SeedreamImageSize,
 } from "@llm-space/core";
 import { expandHomePath } from "@llm-space/core/server";
 
@@ -18,7 +18,7 @@ export interface MediaBuiltInToolsDependencies {
   generateImage(input: {
     prompt: string;
     model: string;
-    size: SeedreamImageSize;
+    size: ImageSize;
     watermark: boolean;
     connection?: ProviderConnectionRef;
   }): Promise<{
@@ -33,9 +33,8 @@ export const generateImageTool: BuiltinTool = {
   type: "builtin",
   name: "generate_image",
   icon: "image",
-  connection: { providerId: "ark" },
   description:
-    "Generate one image with this tool's selected Ark image model. Use the configured default size unless the user requests a supported 1K, 2K, 3K, or 4K preset.",
+    "Generate one image with this tool's selected provider and image model. Use the configured default size unless the user requests another size supported by that model.",
   strict: true,
   parameters: {
     type: "object",
@@ -48,7 +47,7 @@ export const generateImageTool: BuiltinTool = {
       },
       size: {
         type: "string",
-        enum: [...SEEDREAM_IMAGE_SIZES],
+        enum: [...IMAGE_SIZES],
         description:
           "Optional resolution preset. Omit it to use the configured default; unsupported presets for the configured model return an error.",
       },
@@ -81,16 +80,16 @@ export function createMediaBuiltInTools(
         const size = args.size;
         if (
           size !== undefined &&
-          !SEEDREAM_IMAGE_SIZES.some((candidate) => candidate === size)
+          !IMAGE_SIZES.some((candidate) => candidate === size)
         ) {
-          throw new Error("size must be one of 1K, 2K, 3K, or 4K.");
+          throw new Error("size must be a supported image size.");
         }
         const outputDirectory = args.output_directory;
         const config = _generateImageConfig(configValue);
         const result = await dependencies.generateImage({
           prompt,
           model: config.model,
-          size: (size as SeedreamImageSize | undefined) ?? config.size,
+          size: (size as ImageSize | undefined) ?? config.size,
           watermark: config.watermark,
           connection: context.connection,
         });
@@ -225,7 +224,7 @@ function _generateImageConfig(
       "Choose an enabled image model for generate_image in Add built-in tools."
     );
   }
-  if (!SEEDREAM_IMAGE_SIZES.some((candidate) => candidate === size)) {
+  if (!IMAGE_SIZES.some((candidate) => candidate === size)) {
     throw new Error(
       "Choose a valid default size for generate_image in Add built-in tools."
     );
@@ -235,5 +234,5 @@ function _generateImageConfig(
       "Choose a watermark policy for generate_image in Add built-in tools."
     );
   }
-  return { model, size: size as SeedreamImageSize, watermark };
+  return { model, size: size as ImageSize, watermark };
 }

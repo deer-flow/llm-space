@@ -4,6 +4,8 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import type { ImageModelDefinition } from "@llm-space/core";
+
 import { ModelManager } from "../../src/models/model-manager";
 
 const TEMP_DIRS: string[] = [];
@@ -365,5 +367,226 @@ describe("ModelManager provider profiles", () => {
         )
       ).apiKey
     ).toBeUndefined();
+  });
+});
+
+describe("ModelManager provider-owned image generation", () => {
+  test("preserves an alias response format through save and reload", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addCustomProvider({
+      id: "gateway",
+      name: "Gateway",
+      baseUrl: "https://images.example/v1",
+    });
+    const model: ImageModelDefinition = {
+      id: "dalle-prod",
+      name: "Production image model",
+      supportedSizes: ["1024x1024"],
+      defaultSize: "1024x1024",
+      responseFormat: "b64_json",
+    };
+
+    manager.updateProvider("gateway", {
+      imageGeneration: { api: "openai-images", models: [model] },
+    });
+
+    const reloaded = new ModelManager({ settingsDir });
+    expect(reloaded.getImageGenerationConfig("gateway")?.models).toEqual([
+      model,
+    ]);
+    expect(
+      _parsePersistedProviders(
+        await readFile(path.join(settingsDir, "models.json"), "utf8")
+      ).providers[0].imageGeneration
+    ).toEqual({ models: [model] });
+
+    expect(() =>
+      reloaded.updateProvider("gateway", {
+        imageGeneration: {
+          models: [
+            {
+              ...model,
+              responseFormat: "url",
+            } as unknown as ImageModelDefinition,
+          ],
+        },
+      })
+    ).toThrow("invalid response format");
+  });
+
+  test("drops an invalid persisted response format without discarding the model", async () => {
+    const model: ImageModelDefinition = {
+      id: "custom-image",
+      name: "Custom Image",
+      supportedSizes: ["1024x1024"],
+      defaultSize: "1024x1024",
+    };
+    const settingsDir = await _settingsDir({
+      providers: [
+        {
+          id: "gateway",
+          name: "Gateway",
+          imageGeneration: {
+            models: [{ ...model, responseFormat: "url" }],
+          },
+        },
+      ],
+    });
+
+    const manager = new ModelManager({ settingsDir });
+    expect(manager.getImageGenerationConfig("gateway")?.models).toEqual([
+      model,
+    ]);
+  });
+
+  test("repairs a damaged image inventory without discarding providers", async () => {
+    const settingsDir = await _settingsDir({
+      providers: [
+        {
+          id: "fixture-images",
+          name: "Fixture Images",
+          baseUrl: "https://images.example/v1",
+          imageGeneration: {
+            api: "openai-images",
+            models: "damaged",
+            disabledModels: ["missing"],
+          },
+        },
+        {
+          id: "openai",
+          builtin: true,
+          imageGeneration: {
+            api: "openai-images",
+            models: [],
+          },
+        },
+      ],
+    });
+
+    const manager = new ModelManager({ settingsDir });
+
+    expect(manager.getImageGenerationConfig("fixture-images")).toEqual({});
+    expect(manager.getImageGenerationConfig("openai")).toBeUndefined();
+    expect(manager.getProfiles("fixture-images")[0]?.baseUrl).toBe(
+      "https://images.example/v1"
+    );
+    const persisted = JSON.parse(
+      await readFile(path.join(settingsDir, "models.json"), "utf8")
+    ) as {
+      providers: {
+        id: string;
+        imageGeneration?: unknown;
+      }[];
+    };
+    expect(persisted.providers.map((provider) => provider.id)).toEqual([
+      "fixture-images",
+      "openai",
+    ]);
+    expect(
+      persisted.providers.find((provider) => provider.id === "openai")
+        ?.imageGeneration
+    ).toBeUndefined();
+  });
+
+  test("rejects image configuration on non-Ark built-in providers", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addBuiltInProvider({ id: "openai" });
+
+    expect(() =>
+      manager.updateProvider("openai", {
+        imageGeneration: {
+          api: "openai-images",
+          models: [
+            {
+              id: "unsupported-builtin-image",
+              name: "Unsupported Builtin Image",
+              supportedSizes: ["1K"],
+              defaultSize: "1K",
+            },
+          ],
+        },
+      })
+    ).toThrow(
+      "Image generation can only be configured on Ark or a custom provider"
+    );
+  });
+
+  test("persists an image-only custom provider without registering chat models", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addCustomProvider({
+      id: "agnes",
+      name: "Agnes",
+      baseUrl: "https://api.agnes-ai.cn/v1",
+    });
+    manager.updateProvider("agnes", {
+      imageGeneration: {
+        api: "openai-images",
+        models: [
+          {
+            id: "agnes-image-2.5-flash",
+            name: "Agnes Image 2.5 Flash",
+            supportedSizes: ["1K", "2K", "3K", "4K"],
+            defaultSize: "2K",
+          },
+        ],
+      },
+    });
+
+    const reloaded = new ModelManager({ settingsDir });
+    expect(reloaded.getImageGenerationConfig("agnes")).toEqual({
+      models: [
+        {
+          id: "agnes-image-2.5-flash",
+          name: "Agnes Image 2.5 Flash",
+          supportedSizes: ["1K", "2K", "3K", "4K"],
+          defaultSize: "2K",
+        },
+      ],
+    });
+    const provider = (await reloaded.getAvailableModels())
+      .getProviders()
+      .find((candidate) => candidate.id === "agnes");
+    expect(provider?.getModels()).toEqual([]);
+  });
+
+  test("preserves an explicit Ark image protocol on a custom provider", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addCustomProvider({
+      id: "ark-gateway",
+      name: "Ark Gateway",
+      baseUrl: "https://gateway.example/v3",
+    });
+    manager.updateProvider("ark-gateway", {
+      imageGeneration: {
+        api: "ark-images",
+        models: [
+          {
+            id: "custom-seedream",
+            name: "Custom Seedream",
+            supportedSizes: ["1K", "2K"],
+            defaultSize: "1K",
+          },
+        ],
+      },
+    });
+
+    const reloaded = new ModelManager({ settingsDir });
+
+    expect(reloaded.getImageGenerationConfig("ark-gateway")).toMatchObject({
+      api: "ark-images",
+    });
+    const persisted = JSON.parse(
+      await readFile(path.join(settingsDir, "models.json"), "utf8")
+    ) as {
+      providers: { id: string; imageGeneration?: { api?: string } }[];
+    };
+    expect(
+      persisted.providers.find((provider) => provider.id === "ark-gateway")
+        ?.imageGeneration?.api
+    ).toBe("ark-images");
   });
 });

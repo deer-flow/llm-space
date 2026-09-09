@@ -467,6 +467,11 @@ const APP_MESSAGES = {
         'Use "${ENV_NAME}" to reference environment variables. e.g. "$OPENAI_API_KEY"',
       officialEnvVariableHelp:
         "Leave it blank to use the official {name} environment variable",
+      imageApiType: "Image API type",
+      imageApiAriaLabel: "{name} image API type",
+      arkImagesApi: "Ark Images",
+      openAIImagesApi: "OpenAI Images",
+      openAIImagesExtraBodyApi: "OpenAI Images with extra_body",
       imageModels: "Image models",
       reasoningSupported: "Reasoning supported",
       deepseekThinking: "Use DeepSeek thinking format",
@@ -487,6 +492,12 @@ const APP_MESSAGES = {
       supportedSizes: "Supported sizes",
       defaultSize: "Default size",
       supportSize: "Support {size}",
+      unsupportedImageSizes:
+        "Unsupported sizes for this model and API: {sizes}.",
+      responseFormat: "Response format",
+      imageResponseFormat: "Image response format",
+      automaticResponseFormat: "Auto",
+      base64ResponseFormat: "Base64 (b64_json)",
     },
     mcp: {
       title: "MCP",
@@ -1086,6 +1097,11 @@ const APP_MESSAGES = {
       envReferenceHelp:
         '使用 "${ENV_NAME}" 引用环境变量，例如 "$OPENAI_API_KEY"。',
       officialEnvVariableHelp: "留空将使用官方的 {name} 环境变量",
+      imageApiType: "图像 API 类型",
+      imageApiAriaLabel: "{name} 图像 API 类型",
+      arkImagesApi: "Ark Images",
+      openAIImagesApi: "OpenAI Images",
+      openAIImagesExtraBodyApi: "OpenAI Images（extra_body）",
       imageModels: "图像模型",
       reasoningSupported: "支持推理",
       deepseekThinking: "使用 DeepSeek 思考格式",
@@ -1105,6 +1121,11 @@ const APP_MESSAGES = {
       supportedSizes: "支持的尺寸",
       defaultSize: "默认尺寸",
       supportSize: "支持 {size}",
+      unsupportedImageSizes: "此模型和 API 不支持以下尺寸：{sizes}。",
+      responseFormat: "响应格式",
+      imageResponseFormat: "图像响应格式",
+      automaticResponseFormat: "自动",
+      base64ResponseFormat: "Base64（b64_json）",
     },
     mcp: {
       title: "MCP",
