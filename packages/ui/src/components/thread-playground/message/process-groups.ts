@@ -12,10 +12,11 @@ import {
  * list. A group is a consecutive run of assistant process steps (see
  * `isProcessMessage`: tool-carrying messages, with or without commentary
  * text, plus text-free thinking/provider-hosted-activity messages) closed by
- * a terminator: a user message or an assistant message whose text is the
- * result. A trailing member run with no result after it (e.g. an aborted
- * run) is deliberately never grouped: there is no result to prioritise and
- * the user needs to see the failure site.
+ * the run's result: an assistant message whose text answers the request. A
+ * user message ends the candidate span but does NOT qualify it — steps from an
+ * interrupted or abandoned run (no final answer was produced) stay expanded
+ * with their failure context visible, exactly like a trailing run at the end
+ * of the list.
  *
  * This is a view concept: grouping never touches the stored thread messages,
  * drag-reorder indices, or persistence.
@@ -104,8 +105,10 @@ function _summarizeGroup(
 
 /**
  * Find every groupable run of process messages. A run is only returned when
- * it is closed by a terminator — a user message or an assistant message with a
- * text body (the result). Runs ending at the list's end stay ungrouped.
+ * it is closed by the run's result — an assistant message with a text body.
+ * Anything else (a user message, an empty assistant message) ends the
+ * candidate span without grouping it, and runs reaching the end of the list
+ * stay ungrouped.
  */
 export function findProcessGroupSpans(
   messages: readonly Message[]
@@ -123,12 +126,11 @@ export function findProcessGroupSpans(
     if (start === -1) {
       continue;
     }
-    // A non-member message closes the run; the group is only kept when the
-    // closer is a user message or an assistant message with a result body.
-    const isTerminator =
-      message.role === "user" ||
-      (message.role === "assistant" && _hasTextBody(message));
-    if (isTerminator) {
+    // A non-member message closes the run. Only a result (assistant text)
+    // makes it eligible to collapse; a user message following unfinished
+    // steps keeps those steps expanded as failure context.
+    const isResult = message.role === "assistant" && _hasTextBody(message);
+    if (isResult) {
       spans.push({
         start,
         end: index,
@@ -145,6 +147,27 @@ export function findProcessGroupSpans(
 export type DisplayRow =
   | { kind: "message"; message: Message; streaming: boolean }
   | { kind: "processGroup"; group: ProcessGroup; collapsed: boolean };
+
+/**
+ * The collapsed group hiding `messageId`, if any. Used to reveal a group
+ * before scrolling to (or focusing) a target inside it — autofocus and
+ * run-validation targets must never stay unmounted behind their header row.
+ */
+export function findCollapsedGroupIdForMessage(
+  rows: readonly DisplayRow[],
+  messageId: string
+): string | null {
+  for (const row of rows) {
+    if (
+      row.kind === "processGroup" &&
+      row.collapsed &&
+      row.group.messages.some((message) => message.id === messageId)
+    ) {
+      return row.group.id;
+    }
+  }
+  return null;
+}
 
 // --- User preference --------------------------------------------------------
 

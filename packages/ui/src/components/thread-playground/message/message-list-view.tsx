@@ -52,7 +52,11 @@ import { resolveMessageMove } from "./message-move";
 import { MessageNavigator } from "./message-navigator";
 import { followMessageViewportBottom } from "./message-scroll-stability";
 import { ProcessGroupHeader } from "./process-group-header";
-import { type DisplayRow, useCollapseProcessGroups } from "./process-groups";
+import {
+  type DisplayRow,
+  findCollapsedGroupIdForMessage,
+  useCollapseProcessGroups,
+} from "./process-groups";
 import { findCenteredVirtualItemIndex } from "./virtual-item-center";
 import { measureVirtualRowHeight } from "./virtual-row-measurement";
 
@@ -150,6 +154,7 @@ export function MessageListView({
     consumeAutoFocusMessage,
     moveMessage,
     resolveRunValidationIssue,
+    toggleProcessGroupExpanded,
   } = useThreadStoreActions();
   const [dragging, setDragging] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
@@ -163,9 +168,12 @@ export function MessageListView({
     [messagesFromProps, storeMessages]
   );
   const readonly = readonlyFromProps || isSnapshotView;
-  // Groups wrap only once a run has settled: while running/preparing the
-  // in-flight process steps stay expanded so streaming doesn't jump.
-  const groupingEnabled = collapseProcessGroups && status === "idle";
+  // Grouping is purely structural: a group only wraps steps that ended with a
+  // result, so a new run's in-flight steps (a trailing, unterminated span)
+  // never collapse, while older completed groups stay collapsed across the
+  // run. Disabling grouping wholesale while running would re-expand every
+  // historical group and shift the reading position mid-conversation.
+  const groupingEnabled = collapseProcessGroups;
   const displayRows = useMemo(
     () =>
       resolveDisplayRows(
@@ -198,19 +206,15 @@ export function MessageListView({
     () => messages.map((message) => message.id),
     [messages]
   );
-  // Map a message id to its displayed row index — collapsed groups remove
-  // member rows, so raw message indices no longer match display indices.
+  // Map a message id to its displayed row index. Only rows that are actually
+  // rendered are mapped: a member hidden inside a collapsed group has no row
+  // index, and its targets are revealed by the expansion effect below before
+  // anything scrolls to them.
   const displayIndexByMessageId = useMemo(() => {
     const map = new Map<string, number>();
     displayRows.forEach((row, index) => {
       if (row.kind === "message") {
         map.set(row.message.id, index);
-      } else {
-        for (const member of row.group.messages) {
-          if (!map.has(member.id)) {
-            map.set(member.id, index);
-          }
-        }
       }
     });
     return map;
@@ -472,6 +476,27 @@ export function MessageListView({
     }
     return followMessageViewportBottom(viewport, content);
   }, [getScrollElement, status]);
+  // A validation error or a freshly-inserted message can target a member
+  // hidden inside a collapsed group. Reveal the group first; the scroll /
+  // autofocus effects below then run once the target row actually mounts
+  // (its display index resolves), instead of stopping at the header.
+  useEffect(() => {
+    const groupIds = new Set<string>();
+    for (const messageId of [validationMessageId, autoFocusMessageId]) {
+      if (!messageId) {
+        continue;
+      }
+      const groupId = findCollapsedGroupIdForMessage(displayRows, messageId);
+      if (groupId) {
+        groupIds.add(groupId);
+      }
+    }
+    // Toggle once per group: the two targets can hide in the same group, and
+    // a double toggle would cancel out and loop.
+    for (const groupId of groupIds) {
+      toggleProcessGroupExpanded(groupId);
+    }
+  }, [autoFocusMessageId, displayRows, toggleProcessGroupExpanded, validationMessageId]);
   useEffect(() => {
     if (!autoFocusMessageId || autoFocusMessageIndex < 0) {
       return;

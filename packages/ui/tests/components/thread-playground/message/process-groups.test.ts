@@ -4,6 +4,7 @@ import type { AssistantMessage, Message } from "@llm-space/core";
 
 import { resolveDisplayRows } from "../../../../src/components/thread-playground/message/display-messages";
 import {
+  findCollapsedGroupIdForMessage,
   findProcessGroupSpans,
   isProcessMessage,
 } from "../../../../src/components/thread-playground/message/process-groups";
@@ -91,14 +92,29 @@ describe("findProcessGroupSpans", () => {
     expect(spans[0].group.lastToolName).toBe("web_search");
   });
 
-  test("closes a group on a following user message", () => {
+  test("a user message ends the span without collapsing unfinished steps", () => {
+    // Interrupted run: the model called a tool, the run never produced a
+    // result, and the user moved on with a follow-up. The steps stay
+    // expanded as failure context.
     const messages = [
       processMessage("p1", { toolCalls: [toolCall("t1", "bash")] }),
       user("u2"),
     ];
+    expect(findProcessGroupSpans(messages)).toEqual([]);
+  });
+
+  test("a later successful run groups without pulling in the interrupted one", () => {
+    const messages = [
+      processMessage("p1", { toolCalls: [toolCall("t1", "bash")] }),
+      user("u2", "actually, try again"),
+      processMessage("p2", { toolCalls: [toolCall("t2", "bash")] }),
+      assistantWithText("result"),
+    ];
     const spans = findProcessGroupSpans(messages);
     expect(spans).toHaveLength(1);
-    expect(spans[0].group.id).toBe("p1");
+    expect(spans[0].start).toBe(2);
+    expect(spans[0].end).toBe(3);
+    expect(spans[0].group.id).toBe("p2");
   });
 
   test("never groups a trailing run without a result", () => {
@@ -172,16 +188,33 @@ describe("resolveDisplayRows", () => {
     expect(rows[4]).toMatchObject({ kind: "message" });
   });
 
-  test("renders plain rows while running or when grouping is disabled", () => {
+  test("renders plain rows when grouping is disabled", () => {
     for (const options of [{ groupingEnabled: false }, undefined] as const) {
       const rows = resolveDisplayRows(messages, null, false, options);
       expect(rows).toHaveLength(4);
       expect(rows.every((row) => row.kind === "message")).toBe(true);
     }
-    const running = resolveDisplayRows(messages, "p2", true, {
+  });
+
+  test("keeps older groups collapsed while a new run is in flight", () => {
+    // Regression (PR #166 review): starting a run must not re-expand the
+    // whole conversation. The completed first run collapses to its header;
+    // the new run's user message and streaming assistant render normally.
+    const conversation = [
+      user("u1"),
+      processMessage("p1", { toolCalls: [toolCall("t1", "web_search")] }),
+      assistantWithText("r1"),
+      user("u2", "and another thing"),
+    ];
+    const rows = resolveDisplayRows(conversation, null, true, {
       groupingEnabled: true,
     });
-    expect(running.every((row) => row.kind === "message")).toBe(true);
+    // user + collapsed group + result + user + live streaming row
+    expect(rows).toHaveLength(5);
+    expect(rows[1]).toMatchObject({ kind: "processGroup", collapsed: true });
+    expect(rows[2]).toMatchObject({ kind: "message" });
+    expect(rows[3]).toMatchObject({ kind: "message" });
+    expect(rows[4]).toMatchObject({ kind: "message", streaming: true });
   });
 
   test("never wraps the live streaming preview row", () => {
@@ -192,6 +225,34 @@ describe("resolveDisplayRows", () => {
       { groupingEnabled: true }
     );
     expect(rows.every((row) => row.kind === "message")).toBe(true);
+  });
+});
+
+describe("findCollapsedGroupIdForMessage", () => {
+  const conversation = [
+    user("u1"),
+    processMessage("p1", { toolCalls: [toolCall("t1", "bash")] }),
+    assistantWithText("r1"),
+  ];
+
+  test("finds the collapsed group hiding a member", () => {
+    const rows = resolveDisplayRows(conversation, null, false, {
+      groupingEnabled: true,
+    });
+    expect(findCollapsedGroupIdForMessage(rows, "p1")).toBe("p1");
+  });
+
+  test("returns null for visible rows and expanded groups", () => {
+    const rows = resolveDisplayRows(conversation, null, false, {
+      groupingEnabled: true,
+    });
+    expect(findCollapsedGroupIdForMessage(rows, "u1")).toBeNull();
+    expect(findCollapsedGroupIdForMessage(rows, "r1")).toBeNull();
+    const expanded = resolveDisplayRows(conversation, null, false, {
+      groupingEnabled: true,
+      expandedGroupIds: ["p1"],
+    });
+    expect(findCollapsedGroupIdForMessage(expanded, "p1")).toBeNull();
   });
 });
 
