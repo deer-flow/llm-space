@@ -300,18 +300,16 @@ export function createMainWindowRPC({
         // reuse), so a re-share yields a new link.
         shareThread: createShareThreadHandler({ getRuntime, gistWriter }),
         // Machine-wide memory store: not runtime-scoped, and every mutation
-        // re-reads before writing so a concurrent plugin write survives.
+        // locks before reading/writing to serialize with plugin mutations.
         memoryList: ({ query, project, limit, offset }) =>
           Promise.resolve(
             memoryStore.listMemories({ query, project, limit, offset })
           ),
-        memoryDelete: ({ id }) =>
-          Promise.resolve(memoryStore.deleteMemory(id)),
+        memoryDelete: ({ id }) => Promise.resolve(memoryStore.deleteMemory(id)),
         memoryUpdate: ({ id, content, tags }) =>
           Promise.resolve(memoryStore.updateMemory({ id, content, tags })),
         memoryExport: () => Promise.resolve(memoryStore.exportMemories()),
-        memoryClearArchive: () =>
-          Promise.resolve(memoryStore.clearArchive()),
+        memoryClearArchive: () => Promise.resolve(memoryStore.clearArchive()),
         fsReveal: async ({ path }) => {
           await fsReveal(path, { skillsManager });
           return null;

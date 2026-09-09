@@ -13,10 +13,7 @@ import { pathToFileURL } from "node:url";
 
 import type { PluginToolExtension } from "@llm-space/core";
 
-import {
-  MEMORY_PLUGIN_FILES,
-  MEMORY_PLUGIN_ID,
-} from "./memory-plugin-files";
+import { MEMORY_PLUGIN_FILES, MEMORY_PLUGIN_ID } from "./memory-plugin-files";
 import { seedDefaultPlugins } from "./seed";
 
 type PluginToolContextLike = Parameters<PluginToolExtension["execute"]>[0];
@@ -24,7 +21,10 @@ type PluginToolContextLike = Parameters<PluginToolExtension["execute"]>[0];
 /** The runner-facing surface of a seeded plugin tool module. */
 interface PluginToolLike {
   name: string;
-  execute(context: PluginToolContextLike, args: Record<string, unknown>): unknown;
+  execute(
+    context: PluginToolContextLike,
+    args: Record<string, unknown>
+  ): unknown;
 }
 
 interface StoredRecord {
@@ -197,7 +197,7 @@ describe("seedDefaultPlugins", () => {
     }
   });
 
-  test("restores a missing bundled file when the install is untouched", () => {
+  test("preserves an installation with a deleted bundled file", () => {
     const pluginsDir = _makeTempDir();
     try {
       seedDefaultPlugins(pluginsDir);
@@ -205,7 +205,7 @@ describe("seedDefaultPlugins", () => {
       const target = path.join(pluginRoot, "config.schema.json");
       rmSync(target);
       seedDefaultPlugins(pluginsDir);
-      expect(existsSync(target)).toBe(true);
+      expect(existsSync(target)).toBe(false);
     } finally {
       rmSync(pluginsDir, { recursive: true, force: true });
     }
@@ -226,9 +226,7 @@ describe("memory plugin tools", () => {
         "tools"
       );
       const stamp = Date.now();
-      const loadTool = async (
-        fileName: string
-      ): Promise<PluginToolLike> => {
+      const loadTool = async (fileName: string): Promise<PluginToolLike> => {
         const module = (await import(
           pathToFileURL(path.join(toolsDir, fileName)).href + "?t=" + stamp
         )) as unknown as { default: new () => PluginToolLike };

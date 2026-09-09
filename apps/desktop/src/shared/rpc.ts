@@ -804,8 +804,7 @@ export interface DesktopRPCType {
         params: MemoryListParams;
         response: MemoryListResult;
       };
-      // Delete one memory by id. Re-reads the store first so a concurrent
-      // plugin write is preserved.
+      // Delete one memory by id under the shared desktop/plugin store lock.
       memoryDelete: {
         params: { id: string };
         response: MemoryMutationResult;

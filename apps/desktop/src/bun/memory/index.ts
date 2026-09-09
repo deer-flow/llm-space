@@ -6,8 +6,8 @@
  * This module deliberately keeps its own path resolution instead of importing
  * the plugin sources: those run inside the isolated plugin subprocess, where
  * `@llm-space/core` resolution is not guaranteed for runtime values. Both
- * sides write through the same atomic `.tmp` + rename routine, and every
- * mutation here re-reads first so a concurrent plugin write is not clobbered.
+ * sides acquire the same process-shared lock before reading and modifying
+ * records, then atomically replace the JSONL file.
  */
 
 import {
@@ -28,6 +28,8 @@ import type {
   MemoryMutationResult,
   MemoryRecordView,
 } from "../../shared/memory";
+
+import { withMemoryStoreLock } from "./store-lock";
 
 /** Mirrors the bundled plugin's `MAX_TOTAL_MEMORIES`. */
 const MAX_TOTAL_MEMORIES = 1000;
@@ -126,9 +128,7 @@ function normalizeForSearch(value: string): string {
   return value.normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").trim();
 }
 
-export function listMemories(
-  params: MemoryListParams = {}
-): MemoryListResult {
+export function listMemories(params: MemoryListParams = {}): MemoryListResult {
   const records = readRecords();
   const query = normalizeForSearch(params.query ?? "");
   const project = typeof params.project === "string" ? params.project : "";
@@ -169,6 +169,10 @@ export function listMemories(
 }
 
 export function deleteMemory(id: string): MemoryMutationResult {
+  return withMemoryStoreLock(memoryDir(), () => _deleteMemory(id));
+}
+
+function _deleteMemory(id: string): MemoryMutationResult {
   const records = readRecords();
   const next = records.filter((record) => record.id !== id);
   if (next.length === records.length) {
@@ -179,6 +183,14 @@ export function deleteMemory(id: string): MemoryMutationResult {
 }
 
 export function updateMemory(params: {
+  id: string;
+  content: string;
+  tags?: string[];
+}): MemoryMutationResult {
+  return withMemoryStoreLock(memoryDir(), () => _updateMemory(params));
+}
+
+function _updateMemory(params: {
   id: string;
   content: string;
   tags?: string[];
@@ -212,7 +224,9 @@ export function exportMemories(): { path: string; count: number } {
   const records = readRecords().map(toView);
   const target = path.join(
     memoryDir(),
-    "memories-export-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json"
+    "memories-export-" +
+      new Date().toISOString().replace(/[:.]/g, "-") +
+      ".json"
   );
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, JSON.stringify(records, null, 2) + "\n", "utf8");
@@ -220,7 +234,9 @@ export function exportMemories(): { path: string; count: number } {
 }
 
 export function clearArchive(): { removed: number } {
-  const removed = countArchive();
-  rmSync(archivePath(), { force: true });
-  return { removed };
+  return withMemoryStoreLock(memoryDir(), () => {
+    const removed = countArchive();
+    rmSync(archivePath(), { force: true });
+    return { removed };
+  });
 }

@@ -38,9 +38,9 @@ function markerPath(pluginRoot: string): string {
 
 function readMarker(pluginRoot: string): HashMap | null {
   try {
-    const parsed = JSON.parse(
-      readFileSync(markerPath(pluginRoot), "utf8")
-    ) as { files?: HashMap };
+    const parsed = JSON.parse(readFileSync(markerPath(pluginRoot), "utf8")) as {
+      files?: HashMap;
+    };
     const files = parsed?.files;
     return files && typeof files === "object" ? files : null;
   } catch {
@@ -116,25 +116,20 @@ export function seedDefaultPlugins(pluginsDir?: string): void {
     return;
   }
 
-  if (!onDisk) {
-    // A file is missing; only rewrite when our marker says we own this copy.
-    if (readMarker(pluginRoot)) {
-      writePluginFiles(pluginRoot);
-      writeMarker(pluginRoot, desired);
-    }
-    return;
-  }
-
   const marker = readMarker(pluginRoot);
-  const untouchedSinceLastSeed = marker
-    ? matchesKnownHashes(marker, onDisk)
-    : false;
-  const untouchedLegacyInstall = matchesKnownHashes(
-    LEGACY_MEMORY_PLUGIN_HASHES,
-    onDisk
-  );
-
-  if (untouchedSinceLastSeed || untouchedLegacyInstall) {
+  const known = marker ?? LEGACY_MEMORY_PLUGIN_HASHES;
+  // Check the files owned by the installed version. New bundle files cannot
+  // exist in an older install; missing/edited old files are user changes.
+  const previous = hashesOnDisk(pluginRoot, Object.keys(known));
+  const newFilesAreSafe = Object.keys(desired).every((file) => {
+    if (file in known) return true;
+    const target = path.join(pluginRoot, ...file.split("/"));
+    return (
+      !existsSync(target) ||
+      sha256(readFileSync(target, "utf8")) === desired[file]
+    );
+  });
+  if (previous && matchesKnownHashes(known, previous) && newFilesAreSafe) {
     writePluginFiles(pluginRoot);
     writeMarker(pluginRoot, desired);
   }

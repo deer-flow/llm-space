@@ -36,7 +36,7 @@ export interface MemoryPluginFile {
 
 const PACKAGE_JSON = `{
   "name": "${MEMORY_PLUGIN_ID}",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "displayName": "Memory",
   "description": "Built-in cross-project memory. Gives the agent tools to save durable facts, preferences, and decisions, and to recall them in any project and language.",
@@ -96,7 +96,8 @@ const CONFIG_SCHEMA_JSON = `{
 // The tokenizer is shared too: it is script-agnostic (Unicode property based)
 // so Japanese, Korean, Chinese, Cyrillic, Arabic and every other script are
 // searchable, instead of only Latin words plus CJK ideographs.
-const STORE_HELPERS = String.raw`import fs from "node:fs";
+const STORE_HELPERS = String.raw`import { Database } from "bun:sqlite";
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -133,6 +134,19 @@ function dataFilePath(): string {
 
 function archiveFilePath(): string {
   return dataFilePath().replace(/memories\.jsonl$/, "memories.archive.jsonl");
+}
+
+/** Same cross-process lock as the desktop's memory/store-lock.ts. */
+function withMemoryStoreLock<T>(mutate: () => T): T {
+  const directory = path.dirname(dataFilePath());
+  fs.mkdirSync(directory, { recursive: true });
+  const db = new Database(path.join(directory, "memories.lock.sqlite"));
+  try {
+    db.exec("PRAGMA busy_timeout = 5000");
+    return db.transaction(mutate).immediate();
+  } finally {
+    db.close();
+  }
 }
 
 function readRecords(): MemoryRecord[] {
@@ -182,24 +196,14 @@ function appendArchive(records: MemoryRecord[]): void {
   const body = records
     .map((record) => JSON.stringify({ ...record, archivedAt: stamp }))
     .join("\n");
-  fs.appendFileSync(file, body + "\n", "utf8");
-  trimArchive();
-}
-
-function trimArchive(): void {
-  const file = archiveFilePath();
-  if (!fs.existsSync(file)) {
-    return;
-  }
-  const lines = fs
-    .readFileSync(file, "utf8")
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const lines = (existing + "\n" + body)
     .split("\n")
     .filter((line) => line.trim().length > 0);
-  if (lines.length <= MAX_ARCHIVED_MEMORIES) {
-    return;
-  }
-  const kept = lines.slice(lines.length - MAX_ARCHIVED_MEMORIES);
-  fs.writeFileSync(file, kept.join("\n") + "\n", "utf8");
+  const kept = lines.slice(-MAX_ARCHIVED_MEMORIES);
+  const temporary = file + ".tmp";
+  fs.writeFileSync(temporary, kept.join("\n") + "\n", "utf8");
+  fs.renameSync(temporary, file);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,6 +476,10 @@ export default class MemorySaveTool implements PluginToolExtension {
     context: PluginToolContext,
     args: Record<string, unknown>
   ): JsonValue {
+    return withMemoryStoreLock(() => this._save(context, args));
+  }
+
+  private _save(context: PluginToolContext, args: Record<string, unknown>): JsonValue {
     const settings = settingsOf(context);
     const content = typeof args.content === "string" ? args.content.trim() : "";
     if (!content) {
@@ -555,6 +563,19 @@ export default class MemorySaveTool implements PluginToolExtension {
         evicted.push(oldest);
       }
     }
+    // Archive first: failed archival must leave the original store intact.
+    let archived = false;
+    if (evicted.length > 0 && settings.archiveEnabled) {
+      try {
+        appendArchive(evicted);
+        archived = true;
+      } catch {
+        return {
+          saved: false,
+          error: "Could not archive old memories. Nothing was removed from the active store; retry after fixing the archive location.",
+        };
+      }
+    }
     writeRecords(records);
 
     const warnAt = Math.floor(MAX_TOTAL_MEMORIES * 0.9);
@@ -574,15 +595,6 @@ export default class MemorySaveTool implements PluginToolExtension {
     }
 
     if (evicted.length > 0) {
-      let archived = false;
-      if (settings.archiveEnabled) {
-        try {
-          appendArchive(evicted);
-          archived = true;
-        } catch {
-          archived = false;
-        }
-      }
       notifyUser(
         context,
         "Memory store reached its " +
@@ -795,6 +807,10 @@ export default class MemoryForgetTool implements PluginToolExtension {
     context: PluginToolContext,
     args: Record<string, unknown>
   ): JsonValue {
+    return withMemoryStoreLock(() => this._forget(context, args));
+  }
+
+  private _forget(context: PluginToolContext, args: Record<string, unknown>): JsonValue {
     void context;
     const id = typeof args.id === "string" ? args.id.trim() : "";
     if (!id) {
