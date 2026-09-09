@@ -113,7 +113,7 @@ describe("built-in tools module", () => {
     expect(
       tools.listTools().find((tool) => tool.name === "generate_image")
         ?.connection
-    ).toEqual({ providerId: "ark" });
+    ).toBeUndefined();
     expect(
       await tools.call({
         name: "skill",

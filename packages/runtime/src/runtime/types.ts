@@ -1,7 +1,7 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
-  ArkImageGenerationConfig,
+  ImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
@@ -29,7 +29,6 @@ import type {
   CreateSubagentThreadInput,
   CreateSubagentThreadResult,
 } from "@llm-space/core/thread";
-
 
 import type {
   TraceConnectedProjectInput,
@@ -119,7 +118,7 @@ export interface RuntimeClient {
     api?:
       "anthropic-messages" | "openai-completions" | "openai-responses" | null;
     icon?: string | null;
-    imageGeneration?: ArkImageGenerationConfig;
+    imageGeneration?: ImageGenerationConfig;
   }): Promise<ModelProviderGroup[]>;
   setModelEnabled(input: {
     providerId: string;
@@ -154,7 +153,7 @@ export interface RuntimeClient {
   }): Promise<ModelProviderGroup[]>;
 
   createSubagentThread(
-    input: CreateSubagentThreadInput,
+    input: CreateSubagentThreadInput
   ): Promise<CreateSubagentThreadResult>;
 
   fsLs(path: string): Promise<FileNode[]>;
@@ -168,10 +167,7 @@ export interface RuntimeClient {
     path: string,
     run: ThreadRunSnapshot & { id: string }
   ): Promise<ThreadRunReference>;
-  fsReadRunSnapshot(
-    path: string,
-    snapshotRef: string
-  ): Promise<ThreadSnapshot>;
+  fsReadRunSnapshot(path: string, snapshotRef: string): Promise<ThreadSnapshot>;
   fsRealpath(path: string): Promise<string>;
   /** Read arbitrary prompt text (`~` expands on this runtime). */
   readTextFile(path: string): Promise<string>;

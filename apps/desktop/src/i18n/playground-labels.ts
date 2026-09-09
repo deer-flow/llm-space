@@ -139,7 +139,10 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         loadFailed: "Failed to load built-in tools",
         chooseImageModel: "Choose an enabled image model",
         chooseImageModelHint:
-          "Enable an Ark image model in Settings, then select it here.",
+          "Enable an image model in Settings, then select it here.",
+        provider: "Provider",
+        chooseProvider: "Choose provider",
+        imageProviderAria: "Generate image provider",
         model: "Model",
         profile: "Profile",
         defaultSize: "Default size",
@@ -149,7 +152,7 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         imageSizeAria: "Default image size",
         imageWatermarkAria: "Add AI-generated watermark",
         noImageModels:
-          "Enable an Ark image model in Settings before adding this tool.",
+          "Enable an image model for this provider in Settings before adding this tool.",
       },
       mcp: {
         title: "Add MCP tools",
@@ -551,8 +554,10 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         emptyCategory: "此分类中没有内置工具。",
         loadFailed: "加载内置工具失败",
         chooseImageModel: "请选择已启用的图像模型",
-        chooseImageModelHint:
-          "请先在设置中启用 Ark 图像模型，然后在这里选择它。",
+        chooseImageModelHint: "请先在设置中启用图像模型，然后在这里选择它。",
+        provider: "提供商",
+        chooseProvider: "选择提供商",
+        imageProviderAria: "生成图像的提供商",
         model: "模型",
         profile: "配置档",
         defaultSize: "默认尺寸",
@@ -561,7 +566,7 @@ export const PLAYGROUND_LABELS: Record<AppLanguage, PlaygroundLabels> = {
         chooseModel: "选择模型",
         imageSizeAria: "默认图像尺寸",
         imageWatermarkAria: "添加 AI 生成水印",
-        noImageModels: "请先在设置中启用 Ark 图像模型，再添加此工具。",
+        noImageModels: "请先在设置中为此提供商启用图像模型，再添加此工具。",
       },
       mcp: {
         title: "添加 MCP 工具",

@@ -133,6 +133,9 @@ export interface PlaygroundLabels {
       loadFailed: string;
       chooseImageModel: string;
       chooseImageModelHint: string;
+      provider: string;
+      chooseProvider: string;
+      imageProviderAria: string;
       model: string;
       profile: string;
       defaultSize: string;
@@ -519,7 +522,10 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
       loadFailed: "Failed to load built-in tools",
       chooseImageModel: "Choose an enabled image model",
       chooseImageModelHint:
-        "Enable an Ark image model in Settings, then select it here.",
+        "Enable an image model in Settings, then select it here.",
+      provider: "Provider",
+      chooseProvider: "Choose provider",
+      imageProviderAria: "Generate image provider",
       model: "Model",
       profile: "Profile",
       defaultSize: "Default size",
@@ -529,7 +535,7 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
       imageSizeAria: "Default image size",
       imageWatermarkAria: "Add AI-generated watermark",
       noImageModels:
-        "Enable an Ark image model in Settings before adding this tool.",
+        "Enable an image model for this provider in Settings before adding this tool.",
     },
     mcp: {
       title: "Add MCP tools",
