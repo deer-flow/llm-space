@@ -3,7 +3,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { edit, glob, grep, ls, present_files, read, tree, write } from "../../../src/tools/built-in/fs";
+import {
+  bash,
+  edit,
+  glob,
+  grep,
+  ls,
+  present_files,
+  read,
+  tree,
+  write,
+} from "../../../src/tools/built-in/fs";
 
 const testDirectories: string[] = [];
 
@@ -84,5 +94,54 @@ describe("filesystem built-in paths", () => {
     expect(await tree(homeDirectory)).toContain("└── example.txt");
     expect(await grep("target", homeDirectory)).toContain(absolutePath);
     expect(await glob("*.txt", homeDirectory, "/unused")).toBe(absolutePath);
+  });
+});
+
+describe("subprocess and glob output caps", () => {
+  test("bash truncates stdout past the cap with a marker", async () => {
+    const { stdout, exitCode } = await bash("seq 1 60000", os.tmpdir());
+
+    expect(exitCode).toBe(0);
+    expect(stdout.length).toBeLessThan(280_000);
+    expect(stdout).toContain(
+      "[truncated at 262144 bytes; redirect output to a file and read ranges with the read tool]"
+    );
+  });
+
+  test("bash truncates stderr past the cap with a marker", async () => {
+    const { stderr, exitCode } = await bash("seq 1 60000 >&2", os.tmpdir());
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("[truncated at 262144 bytes");
+    expect(stderr.length).toBeLessThan(280_000);
+  });
+
+  test("bash keeps short output byte-identical", async () => {
+    const { stdout, stderr, exitCode } = await bash(
+      "printf out; printf err >&2; exit 3",
+      os.tmpdir()
+    );
+
+    expect(stdout).toBe("out");
+    expect(stderr).toBe("err");
+    expect(exitCode).toBe(3);
+  });
+
+  test("glob caps results and reports the total", async () => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "llm-space-glob-cap-")
+    );
+    testDirectories.push(directory);
+    for (let i = 0; i < 205; i++) {
+      await fs.writeFile(path.join(directory, `file-${i}.txt`), "x", "utf8");
+    }
+
+    const result = await glob("*.txt", directory, "/unused");
+    const lines = result.split("\n");
+
+    expect(lines).toHaveLength(201);
+    expect(lines[200]).toBe(
+      "... [showing first 200 of 205 matches; narrow the pattern or target directory]"
+    );
   });
 });
