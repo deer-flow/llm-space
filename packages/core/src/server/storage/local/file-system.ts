@@ -110,7 +110,17 @@ export class LocalFileSystem implements FileSystem, ThreadStorage {
   }
 
   async cp(src: string, dest: string): Promise<void> {
-    await fs.cp(this._resolve(src), this._resolve(dest), { recursive: true });
+    await fs.cp(this._resolve(src), this._resolve(dest), {
+      recursive: true,
+      // Bun's filtered copy needs this explicitly to preserve overwrite behavior.
+      force: true,
+      filter: (source, destination) => {
+        // Recursive copies visit descendants that the top-level check cannot see.
+        this._resolve(path.relative(this.root, source));
+        this._resolve(path.relative(this.root, destination));
+        return true;
+      },
+    });
     await this._transferRunHistory(src, dest, "copy");
   }
 
