@@ -84,6 +84,8 @@ describe("assistant message timing", () => {
     const savedRun = store.getState().runHistory[0];
     if (!savedRun?.thread) throw new Error("Expected inline run snapshot");
     expect(savedRun.thread.context?.messages?.at(-1)).toEqual(assistant);
+    expect(savedRun.thread.model).toEqual({ provider: "test", id: "test" });
+    expect(store.getState().thread.model).toBeUndefined();
   });
 
   test("archives a completed run before publishing idle state", async () => {

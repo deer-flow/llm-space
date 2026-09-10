@@ -174,7 +174,7 @@ describe("public headless thread workflow", () => {
     expect(runs?.[0]?.thread?.context?.snapshot).toEqual(rendered.snapshot);
   });
 
-  test("keeps frozen prompt bytes across later runs", async () => {
+  test("refreshes the current date across later runs without changing prior snapshots", async () => {
     const context: NonNullable<Thread["context"]> = {
       systemPrompt: "Date: {{current_date}}",
       variables: {
@@ -185,13 +185,15 @@ describe("public headless thread workflow", () => {
       context,
       now: () => new Date(2026, 6, 12, 9, 30),
     });
+    const firstSnapshot = structuredClone(first.snapshot);
     const second = await renderThreadPromptVariables({
       context: { ...context, snapshot: first.snapshot },
       now: () => new Date(2027, 0, 1, 9, 30),
     });
 
     expect(first.context.systemPrompt).toBe("Date: 2026-07-12");
-    expect(second.context.systemPrompt).toBe("Date: 2026-07-12");
+    expect(second.context.systemPrompt).toBe("Date: 2027-01-01");
+    expect(first.snapshot).toEqual(firstSnapshot);
   });
 
   test("normalizes legacy variable configuration", () => {
