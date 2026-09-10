@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 import type { BuiltinTool } from "@llm-space/core";
 import type { SkillContent } from "@llm-space/core";
@@ -947,27 +948,25 @@ function _run(
             timedOut = true;
             child.kill("SIGKILL");
           }, timeoutMs);
-    // Collect into Buffers so the cap is enforced on bytes, not UTF-16 code
-    // units; once a stream crosses it, detach the listener and resume() so the
-    // child never blocks on a full pipe while we discard the rest.
+    // Retain only the capped prefix, but keep consuming both pipes so the
+    // child can finish. Reaching the cap is not truncation until more arrives.
     const collect = (stream: NodeJS.ReadableStream) => {
-      let chunks = Buffer.alloc(0);
+      const chunks: Buffer[] = [];
+      let bytes = 0;
       let truncated = false;
       stream.on("data", (chunk: Buffer) => {
-        if (truncated) {
-          return;
+        if (truncated) return;
+        const remaining = maxOutputBytes === undefined
+          ? chunk.length
+          : maxOutputBytes - bytes;
+        const kept = Math.min(remaining, chunk.length);
+        if (kept > 0) {
+          chunks.push(Buffer.from(chunk.subarray(0, kept)));
+          bytes += kept;
         }
-        chunks = Buffer.concat([chunks, chunk]);
-        if (
-          maxOutputBytes !== undefined &&
-          chunks.length >= maxOutputBytes
-        ) {
-          truncated = true;
-          stream.removeAllListeners("data");
-          stream.resume();
-        }
+        truncated = chunk.length > remaining;
       });
-      return () => ({ chunks, truncated });
+      return () => ({ chunks: Buffer.concat(chunks, bytes), truncated });
     };
     const stdoutChunks = collect(child.stdout);
     const stderrChunks = collect(child.stderr);
@@ -977,9 +976,10 @@ function _run(
         : `\n... [truncated at ${maxOutputBytes} bytes; redirect output to a file and read ranges with the read tool]`;
     const capped = (collected: () => { chunks: Buffer; truncated: boolean }) => {
       const { chunks, truncated } = collected();
-      // Slice on a UTF-8 code-point boundary so the marker can't split one.
-      const text = chunks.subarray(0, maxOutputBytes).toString("utf8");
-      return truncated ? text + suffix : text;
+      // Do not flush an incomplete final UTF-8 character when we cut output.
+      const decoder = new StringDecoder("utf8");
+      const text = decoder.write(chunks);
+      return truncated ? text + suffix : text + decoder.end();
     };
     child.on("error", (error) => {
       if (timer) clearTimeout(timer);

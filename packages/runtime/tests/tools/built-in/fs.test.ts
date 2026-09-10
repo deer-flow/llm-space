@@ -127,6 +127,65 @@ describe("subprocess and glob output caps", () => {
     expect(exitCode).toBe(3);
   });
 
+  const cap = 256 * 1024;
+  const marker = `\n... [truncated at ${cap} bytes; redirect output to a file and read ranges with the read tool]`;
+
+  for (const stream of ["stdout", "stderr"] as const) {
+    for (const size of [cap - 1, cap, cap + 1]) {
+      test(`${stream} handles ${size} bytes at the cap boundary`, async () => {
+        const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-cap-"));
+        testDirectories.push(directory);
+        await fs.writeFile(path.join(directory, "input"), "a".repeat(size));
+        const result = await bash(
+          `cat input${stream === "stderr" ? " >&2" : ""}`,
+          directory
+        );
+        expect(result.exitCode).toBe(0);
+        expect(result[stream]).toBe(
+          "a".repeat(Math.min(size, cap)) + (size > cap ? marker : "")
+        );
+      });
+    }
+    for (const character of ["é", "中", "😀"]) {
+      for (let keptBytes = 1; keptBytes <= Buffer.byteLength(character); keptBytes++) {
+        test(`${stream} preserves UTF-8 with ${keptBytes} bytes of ${character} at the boundary`, async () => {
+          const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-utf8-"));
+          testDirectories.push(directory);
+          const prefix = "a".repeat(cap - keptBytes);
+          await fs.writeFile(path.join(directory, "input"), prefix + character + "tail");
+          const result = await bash(
+            `cat input${stream === "stderr" ? " >&2" : ""}`,
+            directory
+          );
+          const expected = prefix + (keptBytes === Buffer.byteLength(character) ? character : "");
+          expect(result.exitCode).toBe(0);
+          expect(result[stream]).toBe(expected + marker);
+          expect(Buffer.byteLength(expected)).toBeLessThanOrEqual(cap);
+        });
+      }
+    }
+  }
+
+  test("bash drains both streams after truncation and preserves the exit code", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-drain-"));
+    testDirectories.push(directory);
+    await fs.writeFile(path.join(directory, "input"), "x".repeat(4 * 1024 * 1024));
+    const result = await bash("cat input & cat input >&2 & wait; exit 7", directory, 5000);
+    expect(result.exitCode).toBe(7);
+    expect(result.stdout).toBe("x".repeat(cap) + marker);
+    expect(result.stderr).toBe("x".repeat(cap) + marker);
+  });
+
+  test("grep caps multibyte matching output", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-grep-cap-"));
+    testDirectories.push(directory);
+    await fs.writeFile(path.join(directory, "input"), "中文匹配\n".repeat(40000));
+    const result = await grep("匹配", directory);
+    expect(result.endsWith(marker)).toBe(true);
+    expect(result).not.toContain("\ufffd");
+    expect(Buffer.byteLength(result.slice(0, -marker.length))).toBeLessThanOrEqual(cap);
+  });
+
   test("glob caps results and reports the total", async () => {
     const directory = await fs.mkdtemp(
       path.join(os.tmpdir(), "llm-space-glob-cap-")
