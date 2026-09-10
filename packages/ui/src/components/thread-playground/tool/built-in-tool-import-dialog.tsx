@@ -140,7 +140,7 @@ function _BuiltInToolImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { dialogs } = usePlaygroundLabels();
+  const { dialogs, builtInToolDescriptions } = usePlaygroundLabels();
   const labels = dialogs.builtIn;
   const categories = useMemo<BuiltInToolCategory[]>(
     () => [
@@ -325,9 +325,10 @@ function _BuiltInToolImportDialog({
     return tools.filter(
       (tool) =>
         tool.name.toLowerCase().includes(q) ||
-        (tool.description?.toLowerCase().includes(q) ?? false)
+        (tool.description?.toLowerCase().includes(q) ?? false) ||
+        (builtInToolDescriptions[tool.name]?.toLowerCase().includes(q) ?? false)
     );
-  }, [tools, query]);
+  }, [tools, query, builtInToolDescriptions]);
   const toolsByCategory = useMemo(() => {
     const result = new Map<BuiltInToolCategoryId, BuiltinTool[]>(
       categories.map((category) => [category.id, []])
@@ -431,6 +432,8 @@ function _BuiltInToolImportDialog({
                 </div>
               ) : (
                 selectedTools.map((tool) => {
+                  const description =
+                    builtInToolDescriptions[tool.name] ?? tool.description;
                   const exists = existingToolNames.has(tool.name);
                   const ToolIcon = getBuiltInToolIcon(tool);
                   const highlighted = highlightedToolName === tool.name;
@@ -465,16 +468,16 @@ function _BuiltInToolImportDialog({
                         <div className="truncate font-mono text-sm">
                           {tool.name}
                         </div>
-                        {tool.description ? (
+                        {description ? (
                           <div
                             className={cn(
-                              "line-clamp-2 text-xs",
+                              "mt-1.5 line-clamp-2 text-xs",
                               highlighted
                                 ? "text-primary/80"
                                 : "text-muted-foreground"
                             )}
                           >
-                            {tool.description}
+                            {description}
                           </div>
                         ) : null}
                         {tool.name === "generate_image" && (

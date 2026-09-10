@@ -34,7 +34,13 @@ function _ToolListItem({
 
   onRemove: (tool: Tool) => void;
 }) {
-  const { dialogs } = usePlaygroundLabels();
+  const { dialogs, builtInToolDescriptions } = usePlaygroundLabels();
+  const description =
+    tool.type === "builtin"
+      ? (builtInToolDescriptions[tool.name] ?? tool.description)
+      : isProviderHostedTool(tool)
+        ? undefined
+        : tool.description;
   const providerHosted = isProviderHostedTool(tool);
   const parameters = providerHosted ? undefined : tool.parameters;
   const keys = useMemo(
@@ -99,9 +105,9 @@ function _ToolListItem({
                 </span>
                 <span>)</span>
               </div>
-              {tool.description && (
+              {description && (
                 <div className="pt-2 text-xs whitespace-pre-wrap opacity-60">
-                  {tool.description}
+                  {description}
                 </div>
               )}
             </div>

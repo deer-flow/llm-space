@@ -10,10 +10,12 @@ import { createContext, useContext, type ReactNode } from "react";
  * message tree through {@link PlaygroundLabelsProvider}.
  *
  * Boundary: these are UI chrome only. Model-facing strings — tool names and
- * descriptions, system prompts, generated code, and thread content — are
+ * definitions, system prompts, generated code, and thread content — are
  * deliberately not part of this type and must not be localized.
  */
 export interface PlaygroundLabels {
+  /** UI-only summaries keyed by built-in name; missing entries use the English definition. */
+  builtInToolDescriptions: Readonly<Record<string, string | undefined>>;
   /** Localize a provider name for presentation without changing its identity. */
   providerDisplayName: (provider: { id: string; name: string }) => string;
   /** Tooltip + aria-label of the "More actions" dropdown trigger. */
@@ -399,6 +401,7 @@ export function identityProviderDisplayName(provider: {
 }
 
 export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
+  builtInToolDescriptions: {},
   providerDisplayName: identityProviderDisplayName,
   moreActions: "More actions",
   viewRunHistory: "View Run History",
