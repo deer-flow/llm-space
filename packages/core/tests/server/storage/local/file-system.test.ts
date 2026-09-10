@@ -116,6 +116,28 @@ describe("LocalFileSystem.mv", () => {
   });
 });
 
+describe("LocalFileSystem path confinement", () => {
+  test("rejects absolute paths", async () => {
+    const fileSystem = await _createFileSystem();
+
+    expect(fileSystem.ls("/outside")).rejects.toThrow(
+      "Path must be relative to the storage root"
+    );
+  });
+
+  test("rejects symlinks that point outside the workspace", async () => {
+    const workspace = await _createWorkspace();
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-outside-"));
+    TEMP_DIRS.push(outside);
+    await fs.writeFile(path.join(outside, "secret.json"), '{"title":"outside"}');
+    await fs.symlink(outside, workspace.fileSystem.realpath("link"));
+
+    expect(workspace.fileSystem.read("link/secret.json")).rejects.toThrow(
+      "Symbolic links are not allowed in storage paths"
+    );
+  });
+});
+
 describe("LocalFileSystem.write", () => {
   test("writes a new formatted thread file", async () => {
     const fileSystem = await _createFileSystem();
