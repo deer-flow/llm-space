@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
 import {
   ArrowRightIcon,
@@ -19,14 +20,122 @@ import {
   SparklesIcon,
   Undo2Icon,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
+import { getVercelStatus, removeVercelToken, setVercelToken } from "@/client/vercel";
 import { useGithubAuth } from "@/components/github-auth-provider";
 import { GithubAvatar } from "@/components/github-avatar";
 import { GitHubIcon } from "@/components/github-icon";
 import { useI18n } from "@/i18n/i18n-provider";
 import type { GithubUser } from "@/shared/auth";
 
+import { ApiKeyField } from "./api-key-field";
 import { SettingsPage } from "./settings-page";
+
+/**
+ * Vercel deploy-token section (Settings → Account). The renderer only ever
+ * sees whether a token is configured; the token itself is persisted bun-side
+ * (`settings/vercel.json`) and never displayed again after saving.
+ */
+function VercelTokenSection() {
+  const { t } = useI18n();
+  const [token, setToken] = useState("");
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getVercelStatus()
+      .then((status) => {
+        if (!cancelled) setConfigured(status.configured);
+      })
+      .catch(() => {
+        if (!cancelled) setConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    if (!token.trim()) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await setVercelToken(token.trim());
+      setConfigured(true);
+      setToken("");
+      toast.success(t.vercel.saved);
+    } catch (error) {
+      toast.error(t.vercel.saveFailed, {
+        description: error instanceof Error ? error.message : t.common.pleaseTryAgain,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setBusy(true);
+    try {
+      await removeVercelToken();
+      setConfigured(false);
+      setToken("");
+      toast.success(t.vercel.removed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-card flex flex-col gap-3 rounded-2xl border px-6 py-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col">
+          <h3 className="font-heading text-base font-medium">{t.vercel.accountTitle}</h3>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            {t.vercel.accountDescription}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+            configured
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "text-muted-foreground border-border"
+          )}
+        >
+          {configured ? t.vercel.configured : t.vercel.notConfigured}
+        </span>
+      </div>
+      <ApiKeyField
+        label={t.vercel.tokenLabel}
+        description={t.vercel.tokenHint}
+        type="password"
+        placeholder={t.vercel.tokenPlaceholder}
+        value={token}
+        onChange={(event) => setToken(event.target.value)}
+        autoComplete="off"
+      />
+      <div className="flex items-center gap-2">
+        <Button size="sm" disabled={busy || !token.trim()} onClick={() => void handleSave()}>
+          {t.vercel.save}
+        </Button>
+        {configured ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void handleRemove()}
+          >
+            {t.vercel.remove}
+          </Button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 export function AccountPage() {
   const { t } = useI18n();
@@ -62,6 +171,7 @@ export function AccountPage() {
       ) : (
         <_AccountOverview onSignIn={signIn} />
       )}
+      <VercelTokenSection />
     </SettingsPage>
   );
 }

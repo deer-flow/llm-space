@@ -70,6 +70,11 @@ import type {
   TraceWorkbenchResponse,
 } from "./traces";
 import type { UpdateMode, UpdateStatusChangedPayload } from "./updates";
+import type {
+  DeployVercelRpcResult,
+  VercelPreflightResult,
+  VercelStatus,
+} from "./vercel";
 
 /** A webview→bun request to start streaming an agent run. */
 export interface StreamThreadRequestPayload extends RuntimeScopedParams {
@@ -824,6 +829,37 @@ export interface DesktopRPCType {
       memoryClearArchive: {
         params: Record<string, never>;
         response: { removed: number };
+      };
+      // Whether a Vercel deploy token is configured (`settings/vercel.json`).
+      // The token itself never leaves the bun process.
+      getVercelStatus: {
+        params: Record<string, never>;
+        response: VercelStatus;
+      };
+      // Save (or replace) the Vercel token. Takes the raw token once; the
+      // response is only an ack.
+      setVercelToken: {
+        params: { token: string };
+        response: null;
+      };
+      // Forget the stored Vercel token.
+      removeVercelToken: {
+        params: Record<string, never>;
+        response: null;
+      };
+      // Deploy a workspace folder of static files (must contain index.html) to
+      // Vercel and wait for it to become ready. The deployment URL is public;
+      // callers must surface that before invoking. Errors return `{ok:false}`
+      // with renderer-friendly copy instead of throwing.
+      deployToVercel: {
+        params: RuntimeScopedParams & { path: string };
+        response: DeployVercelRpcResult;
+      };
+      // Validate a folder for deployment (index.html, limits) without
+      // uploading. Lets the deploy dialog disable Deploy with a reason up front.
+      vercelPreflight: {
+        params: RuntimeScopedParams & { path: string };
+        response: VercelPreflightResult;
       };
     };
     // Messages the webview SENDS and the bun side handles.

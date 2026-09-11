@@ -279,6 +279,42 @@ const APP_MESSAGES = {
       later: "Later",
       reload: "Reload",
     },
+    vercel: {
+      dialogTitle: "Deploy to Vercel",
+      folderLabel: "Target",
+      publicWarning:
+        "This deployment will be publicly accessible on the internet. Make sure the folder contains no secrets, API keys, or private data before deploying.",
+      tokenMissingHint:
+        "A Vercel access token is needed to deploy. Configure one in Settings → Account.",
+      configureToken: "Configure Vercel token",
+      deploy: "Deploy",
+      deploying: "Deploying…",
+      deployHint:
+        "Files are collected and uploaded by the app; this can take a minute.",
+      checking: "Checking folder…",
+      filesSummary: "{count} files · {size}",
+      preflightFailed: "This folder can't be deployed",
+      successTitle: "Deployment ready",
+      copyUrl: "Copy URL",
+      copied: "Copied",
+      openInBrowser: "Open in browser",
+      failedTitle: "Deployment failed",
+      retry: "Retry",
+      accountTitle: "Vercel",
+      accountDescription:
+        "Connect a Vercel token to deploy static folders from your workspace and share the public link.",
+      tokenLabel: "Vercel access token",
+      tokenPlaceholder: "Paste your Vercel access token",
+      tokenHint:
+        "Create a token at vercel.com/account/tokens with a limited scope. It is stored locally (settings/vercel.json, 0600) and never displayed again.",
+      save: "Save",
+      remove: "Remove",
+      saved: "Vercel token saved",
+      removed: "Vercel token removed",
+      saveFailed: "Failed to save the Vercel token",
+      configured: "Configured",
+      notConfigured: "Not configured",
+    },
     apiKeyField: {
       getKey: "Get API key",
       showAria: "Show {label}",
@@ -327,6 +363,7 @@ const APP_MESSAGES = {
         "A folder with this name already exists here. Replacing it moves the existing folder to the {trash}.",
       replaceDescriptionThread:
         "A thread with this name already exists here. Replacing it moves the existing thread to the {trash}.",
+      deployToVercel: "Deploy to Vercel",
     },
     tabBar: {
       refresh: "Refresh",
@@ -949,6 +986,41 @@ const APP_MESSAGES = {
       later: "稍后",
       reload: "重新加载",
     },
+    vercel: {
+      dialogTitle: "部署到 Vercel",
+      folderLabel: "目标",
+      publicWarning:
+        "部署完成后将在互联网上公开可访问。请先确认文件夹中不包含密钥、API Key 或任何隐私数据。",
+      tokenMissingHint:
+        "部署需要 Vercel 访问令牌。请先在「设置 → 账户」中配置。",
+      configureToken: "配置 Vercel 令牌",
+      deploy: "部署",
+      deploying: "部署中…",
+      deployHint: "应用会收集并上传文件，可能需要一分钟。",
+      checking: "正在检查文件夹…",
+      filesSummary: "{count} 个文件 · {size}",
+      preflightFailed: "此文件夹无法部署",
+      successTitle: "部署完成",
+      copyUrl: "复制链接",
+      copied: "已复制",
+      openInBrowser: "在浏览器中打开",
+      failedTitle: "部署失败",
+      retry: "重试",
+      accountTitle: "Vercel",
+      accountDescription:
+        "连接 Vercel 令牌后，可一键把工作区中的静态文件夹部署到 Vercel 并分享公开链接。",
+      tokenLabel: "Vercel 访问令牌",
+      tokenPlaceholder: "粘贴你的 Vercel 访问令牌",
+      tokenHint:
+        "请到 vercel.com/account/tokens 创建受限范围的令牌。令牌只保存在本机（settings/vercel.json，0600 权限），之后不会再显示。",
+      save: "保存",
+      remove: "移除",
+      saved: "Vercel 令牌已保存",
+      removed: "已移除 Vercel 令牌",
+      saveFailed: "保存 Vercel 令牌失败",
+      configured: "已配置",
+      notConfigured: "未配置",
+    },
     apiKeyField: {
       getKey: "获取 API Key",
       showAria: "显示 {label}",
@@ -996,6 +1068,7 @@ const APP_MESSAGES = {
         "此处已存在同名文件夹。替换会将现有文件夹移到{trash}。",
       replaceDescriptionThread:
         "此处已存在同名 Thread。替换会将现有 Thread 移到{trash}。",
+      deployToVercel: "部署到 Vercel",
     },
     tabBar: {
       refresh: "刷新",
