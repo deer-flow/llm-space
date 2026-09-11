@@ -45,6 +45,8 @@ export interface PlaygroundLabels {
   runSettings: string;
   enableReActLoop: string;
   autoRunTools: string;
+  /** The persistent warning badge shown while full access mode is enabled. */
+  fullAccessBadge: string;
   dialogs: {
     add: string;
     remove: string;
@@ -424,6 +426,7 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
   runSettings: "Run settings",
   enableReActLoop: "Enable ReAct loop",
   autoRunTools: "Auto run tools",
+  fullAccessBadge: "Full access",
   dialogs: {
     add: "Add",
     remove: "Remove",
