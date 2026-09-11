@@ -14,7 +14,6 @@ import {
 } from "../../src/thread/prompt-variables";
 import type { ThreadContext } from "../../src/types";
 
-
 function context(systemPrompt: string, extra?: Partial<ThreadContext>) {
   return {
     systemPrompt,
@@ -354,9 +353,7 @@ describe("renderThreadPromptVariables — template output freeze", () => {
         },
       }
     );
-    const skills = [
-      { name: "same", description: "Same skill", path: "/same" },
-    ];
+    const skills = [{ name: "same", description: "Same skill", path: "/same" }];
     const first = await renderThreadPromptVariables({
       context: base,
       loadSkills: () => Promise.resolve(skills),
@@ -375,6 +372,108 @@ describe("renderThreadPromptVariables — template output freeze", () => {
 });
 
 describe("renderThreadPromptVariables — currentDate freshness", () => {
+  test("tracks nested include dates, reuses same-day bytes, and migrates legacy snapshots", async () => {
+    const base = context('{{@include("/outer.md")}}', {
+      variables: { current_date: { type: "currentDate", format: "iso-date" } },
+    });
+    let reads = 0;
+    const loadFile = async (path: string) => {
+      reads++;
+      return path === "/outer.md"
+        ? '{{@include("/inner.md")}}'
+        : "Today: {{current_date}}";
+    };
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadFile,
+      now: () => new Date(2026, 7, 29, 8),
+    });
+    const same = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      loadFile,
+      now: () => new Date(2026, 7, 29, 22),
+    });
+    expect(same.snapshot).toEqual(first.snapshot);
+    expect(reads).toBe(2);
+    const next = await renderThreadPromptVariables({
+      context: { ...base, snapshot: same.snapshot },
+      loadFile,
+      now: () => new Date(2026, 7, 30, 8),
+    });
+    expect(next.context.systemPrompt).toBe("Today: 2026-08-30");
+    expect(reads).toBe(4);
+    const legacy = structuredClone(first.snapshot!);
+    delete legacy.variables![SYSTEM_PROMPT_PLACE_KEY]![
+      "\0includedDateVariables"
+    ];
+    delete legacy.variables![SYSTEM_PROMPT_PLACE_KEY]!["\0dateFingerprint"];
+    const migrated = await renderThreadPromptVariables({
+      context: { ...base, snapshot: legacy },
+      loadFile,
+      now: () => new Date(2026, 7, 30, 8),
+    });
+    expect(migrated.context.systemPrompt).toBe("Today: 2026-08-30");
+  });
+
+  test("includes without date dependencies remain frozen across days", async () => {
+    const base = context('{{@include("/prompt.md")}}', {
+      variables: { current_date: { type: "currentDate", format: "iso-date" } },
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadFile: file("Original"),
+      now: () => new Date(2026, 7, 29),
+    });
+    const next = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      loadFile: file("Changed"),
+      now: () => new Date(2026, 7, 30),
+    });
+    expect(next.context.systemPrompt).toBe("Original");
+    expect(next.snapshot).toEqual(first.snapshot);
+  });
+
+  test("shares one clock reading across asynchronous templates, fingerprints, and simple messages", async () => {
+    let time = new Date(2026, 7, 29, 23, 59, 59);
+    let clockReads = 0;
+    const base = context('{{@include("/slow.md")}}', {
+      variables: { current_date: { type: "currentDate", format: "iso-date" } },
+      messages: [
+        {
+          id: "template",
+          role: "user",
+          content: [{ type: "text", text: "{{current_date | upper}}" }],
+        },
+        {
+          id: "simple",
+          role: "user",
+          content: [{ type: "text", text: "{{current_date}}" }],
+        },
+      ],
+    });
+    const first = await renderThreadPromptVariables({
+      context: base,
+      loadFile: async () => {
+        time = new Date(2026, 7, 30, 0, 0, 1);
+        return "Loaded";
+      },
+      now: () => {
+        clockReads++;
+        return time;
+      },
+    });
+    expect(clockReads).toBe(1);
+    for (const message of first.context.messages!)
+      expect(message.content).toEqual([{ type: "text", text: "2026-08-29" }]);
+    const next = await renderThreadPromptVariables({
+      context: { ...base, snapshot: first.snapshot },
+      loadFile: file("Loaded"),
+      now: () => new Date(2026, 7, 30, 10),
+    });
+    for (const message of next.context.messages!)
+      expect(message.content).toEqual([{ type: "text", text: "2026-08-30" }]);
+  });
+
   test("template reuses frozen output within the same day", async () => {
     const base = context("Today: {% if true %}{{current_date}}{% endif %}", {
       variables: {

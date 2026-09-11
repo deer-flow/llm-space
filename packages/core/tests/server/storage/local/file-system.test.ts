@@ -179,25 +179,103 @@ describe("LocalFileSystem path confinement", () => {
     }
   }
 
-  test("rejects absolute paths", async () => {
-    const fileSystem = await _createFileSystem();
+  const operations: Record<
+    string,
+    (storage: LocalFileSystem, resource: string) => unknown
+  > = {
+    ls: (storage, resource) => storage.ls(resource),
+    read: (storage, resource) => storage.read(resource),
+    write: (storage, resource) => storage.write(resource, { title: "Changed" }),
+    mkdir: (storage, resource) => storage.mkdir(resource),
+    rm: (storage, resource) => storage.rm(resource),
+    "copy source": (storage, resource) => storage.cp(resource, "copy.json"),
+    "copy destination": (storage, resource) =>
+      storage.cp("safe.json", resource),
+    "move source": (storage, resource) => storage.mv(resource, "moved.json"),
+    "move destination": (storage, resource) =>
+      storage.mv("safe.json", resource),
+    realpath: (storage, resource) => storage.realpath(resource),
+    archiveRun: (storage, resource) =>
+      storage.archiveRun(resource, _legacyRun("run")),
+    readRunSnapshot: (storage, resource) =>
+      storage.readRunSnapshot(resource, "run.json"),
+  };
 
-    expect(fileSystem.ls("/outside")).rejects.toThrow(
-      "Path must be relative to the storage root"
-    );
-  });
+  for (const [name, operation] of Object.entries(operations)) {
+    test(`${name} rejects POSIX and Windows absolute paths`, async () => {
+      const storage = await _createFileSystem();
+      await storage.write("safe.json", { title: "Safe" });
+      for (const resource of [
+        "/outside.json",
+        "C:/outside.json",
+        "//server/share/file.json",
+      ]) {
+        const result = await Promise.resolve()
+          .then(() => operation(storage, resource))
+          .then(
+            () => undefined,
+            (error: unknown) => error
+          );
+        expect(result).toBeInstanceOf(Error);
+        expect((result as Error).message).toContain(
+          "Path must be relative to the storage root"
+        );
+      }
+      expect(await storage.read("safe.json")).toMatchObject({ title: "Safe" });
+      expect((await storage.ls("")).map((node) => node.name)).toEqual([
+        "safe.json",
+      ]);
+    });
 
-  test("rejects symlinks that point outside the workspace", async () => {
-    const workspace = await _createWorkspace();
-    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-outside-"));
-    TEMP_DIRS.push(outside);
-    await fs.writeFile(path.join(outside, "secret.json"), '{"title":"outside"}');
-    await fs.symlink(outside, workspace.fileSystem.realpath("link"));
-
-    expect(workspace.fileSystem.read("link/secret.json")).rejects.toThrow(
-      "Symbolic links are not allowed in storage paths"
-    );
-  });
+    for (const target of ["outside", "inside", "missing"] as const) {
+      test(`${name} rejects ${target} symlink components without changing files`, async () => {
+        const storage = await _createFileSystem();
+        const root = storage.realpath("");
+        const outside = await fs.mkdtemp(
+          path.join(os.tmpdir(), "llm-space-outside-")
+        );
+        TEMP_DIRS.push(outside);
+        await storage.write("safe.json", { title: "Safe" });
+        await fs.writeFile(
+          path.join(outside, "safe.json"),
+          '{"title":"Outside"}'
+        );
+        await fs.symlink(
+          target === "outside"
+            ? outside
+            : target === "inside"
+              ? root
+              : path.join(outside, "missing"),
+          path.join(root, "link")
+        );
+        // Check both the link itself and a path through it (including new files).
+        for (const resource of [
+          "link",
+          "link/safe.json",
+          "link/new/file.json",
+        ]) {
+          const result = await Promise.resolve()
+            .then(() => operation(storage, resource))
+            .then(
+              () => undefined,
+              (error: unknown) => error
+            );
+          expect(result).toBeInstanceOf(Error);
+          expect((result as Error).message).toContain(
+            "Symbolic links are not allowed in storage paths"
+          );
+        }
+        expect(await storage.read("safe.json")).toMatchObject({
+          title: "Safe",
+        });
+        expect(await fs.readFile(path.join(outside, "safe.json"), "utf8")).toBe(
+          '{"title":"Outside"}'
+        );
+        expect(await fs.readdir(outside)).toEqual(["safe.json"]);
+        expect((await fs.readdir(root)).sort()).toEqual(["link", "safe.json"]);
+      });
+    }
+  }
 });
 
 describe("LocalFileSystem.write", () => {
