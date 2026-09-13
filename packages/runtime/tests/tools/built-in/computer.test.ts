@@ -16,6 +16,20 @@ interface RecordedInvocation {
 interface FakeComputerOptions {
   /** Written to the temp path `screencapture` "created". */
   screenshotBytes?: Uint8Array;
+  /** Logical main-display size reported to the scale note; null to disable. */
+  screenPoints?: { width: number; height: number } | null;
+}
+
+/** A minimal PNG whose IHDR advertises the given pixel dimensions. */
+function _pngBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(32);
+  for (let index = 0; index < 8; index += 1) {
+    bytes[index] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index]!;
+  }
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return bytes;
 }
 
 function _fakeDependencies(options: FakeComputerOptions = {}): {
@@ -47,6 +61,11 @@ function _fakeDependencies(options: FakeComputerOptions = {}): {
       const filePath = path.join("/tmp", `fake-${counter}${extension}`);
       tempPaths.push(filePath);
       return filePath;
+    },
+    async screenPoints() {
+      return options.screenPoints === undefined
+        ? { width: 1710, height: 1107 }
+        : options.screenPoints;
     },
   };
   return { deps, invocations, tempPaths, removed };
@@ -84,9 +103,10 @@ describe("computer built-in tools", () => {
   });
 
   describe("computer_screenshot", () => {
-    test("captures the full screen and returns image content", async () => {
+    test("captures the full screen and reports the pixel-to-point scale", async () => {
       const { deps, invocations, tempPaths, removed } = _fakeDependencies({
-        screenshotBytes: new Uint8Array([9, 9, 9]),
+        screenshotBytes: _pngBytes(3420, 2214),
+        screenPoints: { width: 1710, height: 1107 },
       });
       const result = (await _tool("computer_screenshot", deps)!.execute({})) as {
         content: { type: string; mimeType?: string; data?: string; text?: string }[];
@@ -99,14 +119,38 @@ describe("computer built-in tools", () => {
       expect(result.content[0]).toEqual({
         type: "image",
         mimeType: "image/png",
-        data: Buffer.from([9, 9, 9]).toString("base64"),
+        data: Buffer.from(_pngBytes(3420, 2214)).toString("base64"),
       });
-      expect(result.content[1]).toMatchObject({
-        type: "text",
-        text: "Captured the full screen.",
-      });
+      const note = result.content[1].text!;
+      expect(note).toContain("Captured the full screen.");
+      // Retina math: 3420px over 1710pt -> 2x, and the note must say so.
+      expect(note).toContain("3420x2214 px");
+      expect(note).toContain("(2x points)");
+      expect(note).toContain("divide image pixel coordinates by 2");
       // The temporary capture file is always cleaned up.
       expect(removed).toEqual(tempPaths);
+    });
+
+    test("still returns the image when the PNG is unparseable or the screen size is unknown", async () => {
+      const unparseable = _fakeDependencies({
+        screenshotBytes: new Uint8Array([9, 9, 9]),
+      });
+      const resultA = (await _tool("computer_screenshot", unparseable.deps)!
+        .execute({})) as {
+        content: { type: string; text?: string }[];
+      };
+      expect(resultA.content[1].text).toBe("Captured the full screen.");
+
+      const noScreen = _fakeDependencies({
+        screenshotBytes: _pngBytes(3420, 2214),
+        screenPoints: null,
+      });
+      const resultB = (await _tool("computer_screenshot", noScreen.deps)!
+        .execute({})) as {
+        content: { type: string; text?: string }[];
+      };
+      expect(resultB.content[1].text).toContain("3420x2214 px");
+      expect(resultB.content[1].text).toContain("may differ from image pixels");
     });
 
     test("forwards a region and the cursor flag", async () => {
@@ -199,7 +243,7 @@ describe("computer built-in tools", () => {
         { x: 1, y: 2, button: "middle" },
         { x: 1, y: 2, clickCount: 3 },
         { y: 2 },
-        { x: 1.5, y: 2 },
+        { x: -1, y: 2 },
       ]) {
         let rejection: unknown;
         try {
@@ -209,6 +253,14 @@ describe("computer built-in tools", () => {
         }
         expect(rejection).toBeInstanceOf(Error);
       }
+    });
+
+    test("accepts fractional point coordinates from pixel conversion", async () => {
+      const { deps, invocations } = _fakeDependencies();
+      await _tool("computer_click", deps)!.execute({ x: 855.5, y: 1106.25 });
+      expect(invocations).toHaveLength(1);
+      expect(invocations[0].command).toBe("/usr/bin/osascript");
+      expect(invocations[0].args[3]).toContain("$.CGPointMake(855.5, 1106.25)");
     });
   });
 
@@ -330,7 +382,7 @@ describe("computer built-in tools", () => {
 
     test("rejects unknown modifiers and unknown named keys", async () => {
       const { deps } = _fakeDependencies();
-      for (const key of ["hyper+c", "capslock", "cmd+hyperlock"]) {
+      for (const key of ["hyper+c", "capslock", "cmd+hyperlock", "fn+c"]) {
         let rejection: unknown;
         try {
           await _tool("computer_key", deps)!.execute({ key });

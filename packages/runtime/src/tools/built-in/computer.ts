@@ -26,9 +26,18 @@ export interface ComputerDependencies {
   readFile(filePath: string): Promise<Uint8Array>;
   removeFile(filePath: string): Promise<void>;
   temporaryPath(extension: string): string;
+  /**
+   * The main display's logical size in points, or null when it cannot be
+   * determined. Paired with the captured image's pixel size this yields the
+   * pixel-to-point scale the model must divide by before clicking.
+   */
+  screenPoints(): Promise<{ width: number; height: number } | null>;
 }
 
 let screenshotCounter = 0;
+
+/** Cached main-display size; the resolution rarely changes between captures. */
+let cachedScreenPoints: { width: number; height: number } | null = null;
 
 export const defaultComputerDependencies: ComputerDependencies = {
   async run(command, args) {
@@ -37,6 +46,33 @@ export const defaultComputerDependencies: ComputerDependencies = {
       maxBuffer: 1024 * 1024,
     });
     return stdout;
+  },
+  async screenPoints() {
+    if (cachedScreenPoints) {
+      return cachedScreenPoints;
+    }
+    try {
+      const { stdout } = await execFileAsync(
+        OSASCRIPT,
+        [
+          "-l",
+          "JavaScript",
+          "-e",
+          "ObjC.import('CoreGraphics');" +
+            "const d = $.CGMainDisplayID();" +
+            "$.CGDisplayBounds(d).size.width + 'x' + $.CGDisplayBounds(d).size.height",
+        ],
+        { timeout: COMMAND_TIMEOUT_MS, maxBuffer: 1024 }
+      );
+      const parsed = _parseScreenPoints(stdout);
+      if (parsed) {
+        cachedScreenPoints = parsed;
+        return cachedScreenPoints;
+      }
+    } catch {
+      // Fall through: the capture still works without scale information.
+    }
+    return null;
   },
   readFile: (filePath) => readFile(filePath),
   removeFile: (filePath) => unlink(filePath),
@@ -133,6 +169,71 @@ const event = $.CGEventCreateScrollWheelEvent($(), $.kCGScrollEventUnitLine, ${w
 $.CGEventPost($.kCGHIDEventTap, event);`;
 }
 
+// -- image helpers --------------------------------------------------------------
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/**
+ * Read a PNG's pixel dimensions straight from the IHDR chunk (bytes 16-23),
+ * without spawning an image tool or pulling in a decoder.
+ */
+function _pngSize(
+  bytes: Uint8Array
+): { width: number; height: number } | null {
+  if (bytes.length < 24) {
+    return null;
+  }
+  for (let index = 0; index < PNG_SIGNATURE.length; index += 1) {
+    if (bytes[index] !== PNG_SIGNATURE[index]) {
+      return null;
+    }
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  if (width === 0 || height === 0) {
+    return null;
+  }
+  return { width, height };
+}
+
+/**
+ * Describe how image pixels map to the point space the input tools use, so the
+ * model can convert coordinates it reads off a Retina (2x) capture.
+ * `logicalWidth` is the capture's width in points: the screen width for a
+ * full capture, or the requested region width.
+ */
+function _scaleNote(
+  imageSize: { width: number; height: number } | null,
+  logicalWidth: number | null
+): string {
+  if (!imageSize) {
+    return "";
+  }
+  if (logicalWidth && logicalWidth > 0 && imageSize.width >= logicalWidth) {
+    const scale = Math.round((imageSize.width / logicalWidth) * 100) / 100;
+    return (
+      ` Image: ${imageSize.width}x${imageSize.height} px (${scale}x points).` +
+      ` computer_click and computer_screenshot regions use points: divide image pixel coordinates by ${scale}.`
+    );
+  }
+  return (
+    ` Image: ${imageSize.width}x${imageSize.height} px. Input tools use points,` +
+    " which may differ from image pixels on Retina displays."
+  );
+}
+
+/** Parse the JXA probe's "WxH" stdout into a point size. */
+function _parseScreenPoints(
+  stdout: string
+): { width: number; height: number } | null {
+  const match = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(stdout.trim());
+  if (!match) {
+    return null;
+  }
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 // -- keyboard ------------------------------------------------------------------
 
 /** macOS key codes for named special keys (`key code N`). */
@@ -176,7 +277,6 @@ const MODIFIER_NAMES: Record<string, string> = {
   option: "option",
   opt: "option",
   shift: "shift",
-  fn: "fn",
 };
 
 // -- argument helpers ----------------------------------------------------------
@@ -190,12 +290,9 @@ function _requireNumber(
   if (
     typeof value !== "number" ||
     !Number.isFinite(value) ||
-    value < min ||
-    (min === 0 && !Number.isInteger(value))
+    value < min
   ) {
-    throw new Error(
-      `${key} must be ${min > 0 ? `a number >= ${min}` : "a non-negative integer"}.`
-    );
+    throw new Error(`${key} must be a number >= ${min}.`);
   }
   return value;
 }
@@ -239,12 +336,14 @@ function _computerScreenshotTool(deps: ComputerDependencies): ToolEntry {
   async function execute(args: Record<string, unknown>): Promise<unknown> {
     const captureArgs = ["-x"];
     let note = "Captured the full screen.";
+    let regionWidth: number | null = null;
     if (args.region !== undefined) {
       const region = args.region as Record<string, unknown>;
       const x = _requireNumber(region, "x");
       const y = _requireNumber(region, "y");
       const width = _requireNumber(region, "width", 1);
       const height = _requireNumber(region, "height", 1);
+      regionWidth = width;
       captureArgs.push(`-R${x},${y},${width},${height}`);
       note = `Captured a ${width}x${height} region at (${x}, ${y}).`;
     }
@@ -256,13 +355,16 @@ function _computerScreenshotTool(deps: ComputerDependencies): ToolEntry {
     await deps.run(SCREENCAPURE, captureArgs);
     try {
       const png = await deps.readFile(filePath);
+      const logicalWidth =
+        regionWidth ?? ((await deps.screenPoints())?.width ?? null);
+      const scaleNote = _scaleNote(_pngSize(png), logicalWidth);
       return createToolCallResponse([
         {
           type: "image",
           mimeType: "image/png",
           data: Buffer.from(png).toString("base64"),
         },
-        { type: "text", text: note },
+        { type: "text", text: note + scaleNote },
       ]);
     } finally {
       await deps.removeFile(filePath).catch(() => undefined);
@@ -277,7 +379,7 @@ function _computerClickTool(deps: ComputerDependencies): ToolEntry {
     name: "computer_click",
     icon: "mouse-pointer",
     description:
-      "Click the mouse at a screen coordinate. Supports left, right, and double clicks. Take a screenshot first to pick coordinates.",
+      "Click the mouse at a screen coordinate in points. Supports left, right, and double clicks. Take a screenshot first: it reports the pixel-to-point scale to divide its pixel coordinates by.",
     strict: true,
     parameters: {
       type: "object",
@@ -285,11 +387,13 @@ function _computerClickTool(deps: ComputerDependencies): ToolEntry {
       properties: {
         x: {
           type: "number",
-          description: "Horizontal position, in points from the left edge.",
+          description:
+            "Horizontal position in points from the left edge of the main display.",
         },
         y: {
           type: "number",
-          description: "Vertical position, in points from the top edge.",
+          description:
+            "Vertical position in points from the top edge of the main display.",
         },
         button: {
           type: "string",
