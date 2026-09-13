@@ -100,7 +100,16 @@ describe("built-in tools module", () => {
       "present_files",
       "generate_image",
       ...(process.platform === "darwin"
-        ? ["list_voices", "speak", "stop_speaking"]
+        ? [
+            "list_voices",
+            "speak",
+            "stop_speaking",
+            "computer_screenshot",
+            "computer_click",
+            "computer_scroll",
+            "computer_type",
+            "computer_key",
+          ]
         : []),
       "spawn_agent",
       "todo_write",
