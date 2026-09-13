@@ -91,9 +91,12 @@ function _hasLiteralSecret(
   if (!search) {
     return false;
   }
-  return [search.firecrawlApiKey, search.tavilyApiKey, search.braveApiKey].some(
-    (v) => v && !v.startsWith("$")
-  );
+  return [
+    search.firecrawlApiKey,
+    search.tavilyApiKey,
+    search.braveApiKey,
+    search.serplyApiKey,
+  ].some((v) => v && !v.startsWith("$"));
 }
 
 /**

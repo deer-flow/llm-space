@@ -457,6 +457,7 @@ export function GenerateProjectButton({
             exaApiKey: resolveKey(search.exaApiKey),
             anysearchApiKey: resolveKey(search.anysearchApiKey),
             zhihuAccessSecret: resolveKey(search.zhihuAccessSecret),
+            serplyApiKey: resolveKey(search.serplyApiKey),
           }
         : undefined;
 
