@@ -14,6 +14,10 @@ import {
   type RenderingFidelity,
   type Theme,
 } from "@llm-space/ui/components/theme-provider";
+import {
+  setCollapseProcessGroups,
+  useCollapseProcessGroups,
+} from "@llm-space/ui/components/thread-playground/message/process-groups";
 import { ModelAvatar } from "@llm-space/ui/components/thread-playground/model-avatar";
 import { Button } from "@llm-space/ui/ui/button";
 import {
@@ -47,6 +51,7 @@ import { DEFAULT_UPDATE_MODE, type UpdateMode } from "@/shared/updates";
 
 import { PrimaryColorPicker } from "./primary-color-picker";
 import { SettingsPage } from "./settings-page";
+import { SettingsToggleRow } from "./settings-toggle-row";
 
 /** Sentinel value for the "Automatic (first available model)" option. */
 const AUTO_DEFAULT_MODEL = "__auto__";
@@ -298,6 +303,23 @@ function useUpdateMode(): [UpdateMode, (mode: UpdateMode) => void] {
   return [mode, change];
 }
 
+/**
+ * Opt into collapsing each finished run's intermediate steps (thinking, tool
+ * calls) into one expandable row once the result arrives. On by default.
+ */
+function CollapseProcessGroupsRow() {
+  const { t } = useI18n();
+  const collapse = useCollapseProcessGroups();
+  return (
+    <SettingsToggleRow
+      title={t.general.collapseProcessGroups}
+      hint={t.general.collapseProcessGroupsHint}
+      checked={collapse}
+      onCheckedChange={setCollapseProcessGroups}
+    />
+  );
+}
+
 export function GeneralPage() {
   const { lang, setLang, t } = useI18n();
   const { theme, setTheme } = useTheme();
@@ -425,6 +447,10 @@ export function GeneralPage() {
           >
             <DefaultModelSelect />
           </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title={t.general.conversations}>
+          <CollapseProcessGroupsRow />
         </SettingsSection>
 
         <SettingsSection title={t.general.dataPrivacy}>

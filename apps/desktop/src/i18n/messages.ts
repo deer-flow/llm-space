@@ -160,6 +160,10 @@ const APP_MESSAGES = {
         "Used for new threads, and when a thread's model is no longer available.",
       defaultModelAutomatic: "Automatic",
       defaultModelAria: "Default model",
+      conversations: "Messages",
+      collapseProcessGroups: "Collapse process steps",
+      collapseProcessGroupsHint:
+        "After a run finishes, collapse its intermediate steps (thinking and tool calls) into one expandable row so the result comes first.",
       dataPrivacy: "Data & privacy",
       workspaceFolder: "Workspace folder",
       workspaceFolderHint: "Where your threads are stored on disk.",
@@ -844,6 +848,10 @@ const APP_MESSAGES = {
       defaultModelHint: "用于新建 Thread，以及 Thread 原有模型不可用时。",
       defaultModelAutomatic: "自动",
       defaultModelAria: "默认模型",
+      conversations: "消息",
+      collapseProcessGroups: "自动折叠过程步骤",
+      collapseProcessGroupsHint:
+        "运行结束后，将中间过程（思考和工具调用）折叠为可展开的一栏，优先展示结果。",
       dataPrivacy: "数据与隐私",
       workspaceFolder: "工作区文件夹",
       workspaceFolderHint: "Thread 在磁盘上的存储位置。",
