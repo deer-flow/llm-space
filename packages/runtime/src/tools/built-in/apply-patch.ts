@@ -181,7 +181,8 @@ function _parsePatch(patchText: string): FilePatch[] {
             isEndOfFile = true;
             break;
           }
-          const marker = line[0];
+          // Like Codex, read a bare empty line as an empty context line.
+          const marker = line === "" ? " " : line[0];
           const content = line.slice(1);
           if (marker === " ") {
             oldLines.push(content);
@@ -243,19 +244,25 @@ function _applyHunks(
       replacements.push([lines.length, 0, hunk.newLines]);
       continue;
     }
-    const position = _findSequence(
-      lines,
-      hunk.oldLines,
-      lineIndex,
-      hunk.isEndOfFile
-    );
+    let oldLines = hunk.oldLines;
+    let newLines = hunk.newLines;
+    let position = _findSequence(lines, oldLines, lineIndex, hunk.isEndOfFile);
+    if (position < 0 && oldLines.at(-1) === "") {
+      // A trailing empty context line stands for the final newline, which the
+      // split above does not keep as a line. Retry without it, as Codex does.
+      oldLines = oldLines.slice(0, -1);
+      if (newLines.at(-1) === "") {
+        newLines = newLines.slice(0, -1);
+      }
+      position = _findSequence(lines, oldLines, lineIndex, hunk.isEndOfFile);
+    }
     if (position < 0) {
       throw new Error(
         `Failed to find expected lines in ${filePath}:\n${hunk.oldLines.join("\n")}`
       );
     }
-    replacements.push([position, hunk.oldLines.length, hunk.newLines]);
-    lineIndex = position + hunk.oldLines.length;
+    replacements.push([position, oldLines.length, newLines]);
+    lineIndex = position + oldLines.length;
   }
 
   for (const [position, oldLength, newLines] of replacements.reverse()) {
