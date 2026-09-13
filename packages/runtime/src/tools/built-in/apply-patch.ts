@@ -258,6 +258,9 @@ function _applyHunks(
     lineIndex = position + hunk.oldLines.length;
   }
 
+  // Insertion-only hunks target the end of the file regardless of their order
+  // in the patch, so apply every replacement from the bottom up by position.
+  replacements.sort((left, right) => left[0] - right[0]);
   for (const [position, oldLength, newLines] of replacements.reverse()) {
     lines.splice(position, oldLength, ...newLines);
   }
