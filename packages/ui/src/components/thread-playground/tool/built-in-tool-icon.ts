@@ -2,6 +2,7 @@ import {
   BotIcon,
   CalculatorIcon,
   CalendarClockIcon,
+  CameraIcon,
   Code2Icon,
   CircleHelpIcon,
   CloudSunIcon,
@@ -15,7 +16,10 @@ import {
   FolderTreeIcon,
   GlobeIcon,
   ImageIcon,
+  KeyboardIcon,
   ListTodoIcon,
+  MouseIcon,
+  MousePointer2Icon,
   ListTreeIcon,
   PackageCheckIcon,
   SearchIcon,
@@ -29,6 +33,7 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
   bot: BotIcon,
   calculator: CalculatorIcon,
   "calendar-clock": CalendarClockIcon,
+  camera: CameraIcon,
   "code-2": Code2Icon,
   "file-text": FileTextIcon,
   "file-output": FileOutputIcon,
@@ -47,6 +52,9 @@ const ICON_BY_KEY: Record<string, LucideIcon> = {
   files: FilesIcon,
   "list-todo": ListTodoIcon,
   image: ImageIcon,
+  keyboard: KeyboardIcon,
+  mouse: MouseIcon,
+  "mouse-pointer": MousePointer2Icon,
 };
 
 /** Fallback for tools persisted before the `icon` field existed. */
@@ -72,6 +80,11 @@ const ICON_KEY_BY_NAME: Record<string, string> = {
   todo_write: "list-todo",
   ask_user_question: "circle-help",
   generate_image: "image",
+  computer_screenshot: "camera",
+  computer_click: "mouse-pointer",
+  computer_scroll: "mouse",
+  computer_type: "keyboard",
+  computer_key: "keyboard",
 };
 
 /**

@@ -1,6 +1,7 @@
 import type { RuntimeModule } from "../runtime-module";
 
 import { calculatorBuiltInTools } from "./calculator";
+import { createComputerBuiltInTools } from "./computer";
 import { dateDifferenceBuiltInTools } from "./date-difference";
 import {
   createExecCodeBuiltInTools,
@@ -46,6 +47,10 @@ export function createBuiltInToolsModule(
         tools.register({
           id: "llm-space.built-in-tools.speech",
           entries: createSpeechBuiltInTools(speech),
+        });
+        tools.register({
+          id: "llm-space.built-in-tools.computer",
+          entries: createComputerBuiltInTools(),
         });
       }
       tools.register({
