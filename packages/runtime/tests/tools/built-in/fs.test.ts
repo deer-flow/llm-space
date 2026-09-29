@@ -39,6 +39,26 @@ describe("filesystem built-in paths", () => {
     expect(await fs.readFile(absolutePath, "utf8")).toBe("after");
   });
 
+  test("edit writes $ sequences in new_string literally", async () => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "llm-space-fs-test-")
+    );
+    testDirectories.push(directory);
+    const newString = "echo $$HOME $& $' $`";
+    const allPath = path.join(directory, "all.mk");
+    const singlePath = path.join(directory, "single.mk");
+
+    await write(allPath, "run:\n\techo OLD\n");
+    await edit(allPath, "echo OLD", newString, true);
+    expect(await fs.readFile(allPath, "utf8")).toBe(`run:\n\t${newString}\n`);
+
+    await write(singlePath, "run:\n\techo OLD\n");
+    await edit(singlePath, "echo OLD", newString);
+    expect(await fs.readFile(singlePath, "utf8")).toBe(
+      `run:\n\t${newString}\n`
+    );
+  });
+
   test("write and edit expand a leading home shortcut", async () => {
     const directory = await fs.mkdtemp(
       path.join(os.homedir(), ".llm-space-fs-test-")

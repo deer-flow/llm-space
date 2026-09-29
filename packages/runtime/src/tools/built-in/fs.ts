@@ -309,7 +309,8 @@ export async function edit(
   }
   const updated = replaceAll
     ? content.split(oldString).join(newString)
-    : content.replace(oldString, newString);
+    : // A replacer function keeps `$$`, `$&`, `` $` `` and `$'` literal.
+      content.replace(oldString, () => newString);
   await fs.writeFile(filePath, updated, "utf8");
   const totalReplaced = replaceAll ? occurrences : 1;
   return `Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? "" : "s"} in ${filePath}`;
