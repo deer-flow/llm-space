@@ -163,6 +163,25 @@ describe("apply_patch built-in", () => {
     expect(await fs.readFile(filePath, "utf8")).toBe("first\nsecond\n");
   });
 
+  test("keeps insertion-only hunks at the end when a later hunk grows the file", async () => {
+    const workspace = await createWorkspace();
+    const filePath = path.join(workspace, "example.txt");
+    const original = "alpha\nbeta\ngamma\ndelta\n";
+    const expected = "alpha\nbeta one\nbeta two\ngamma\ndelta\nomega\n";
+    const insertion = "@@\n+omega";
+    const edit = "@@\n alpha\n-beta\n+beta one\n+beta two\n gamma";
+    const patch = (...hunks: string[]) =>
+      `*** Begin Patch\n*** Update File: example.txt\n${hunks.join("\n")}\n*** End Patch`;
+
+    await fs.writeFile(filePath, original, "utf8");
+    await applyPatch(patch(edit, insertion), workspace);
+    expect(await fs.readFile(filePath, "utf8")).toBe(expected);
+
+    await fs.writeFile(filePath, original, "utf8");
+    await applyPatch(patch(insertion, edit), workspace);
+    expect(await fs.readFile(filePath, "utf8")).toBe(expected);
+  });
+
   test("can remove the complete contents of a file", async () => {
     const workspace = await createWorkspace();
     const filePath = path.join(workspace, "example.txt");
