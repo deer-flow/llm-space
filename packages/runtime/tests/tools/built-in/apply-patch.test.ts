@@ -146,6 +146,65 @@ describe("apply_patch built-in", () => {
     );
   });
 
+  test("treats bare blank lines in update hunks as empty context", async () => {
+    const workspace = await createWorkspace();
+    await fs.writeFile(
+      path.join(workspace, "main.py"),
+      "import os\n\ndef main():\n    return 1\n"
+    );
+    await fs.writeFile(path.join(workspace, "other.txt"), "beta\n");
+
+    // Models and editors often drop the leading space from blank context lines
+    // and separate file sections with an empty line. Codex accepts both.
+    await applyPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: main.py",
+        "@@",
+        " import os",
+        "",
+        " def main():",
+        "-    return 1",
+        "+    return 2",
+        "",
+        "*** Update File: other.txt",
+        "@@",
+        "-beta",
+        "+BETA",
+        "*** End Patch",
+      ].join("\n"),
+      workspace
+    );
+
+    expect(await fs.readFile(path.join(workspace, "main.py"), "utf8")).toBe(
+      "import os\n\ndef main():\n    return 2\n"
+    );
+    expect(await fs.readFile(path.join(workspace, "other.txt"), "utf8")).toBe(
+      "BETA\n"
+    );
+  });
+
+  test("still rejects non-blank hunk lines without a diff marker", async () => {
+    const workspace = await createWorkspace();
+    const filePath = path.join(workspace, "example.txt");
+    await fs.writeFile(filePath, "one\ntwo\n");
+
+    expect(
+      applyPatch(
+        [
+          "*** Begin Patch",
+          "*** Update File: example.txt",
+          "@@",
+          " one",
+          "two",
+          "*** End Patch",
+        ].join("\n"),
+        workspace
+      )
+    ).rejects.toThrow("Invalid hunk line");
+    expect(await fs.readFile(filePath, "utf8")).toBe("one\ntwo\n");
+  });
+
   test("appends insertion-only hunks and normalizes a final newline", async () => {
     const workspace = await createWorkspace();
     const filePath = path.join(workspace, "example.txt");
