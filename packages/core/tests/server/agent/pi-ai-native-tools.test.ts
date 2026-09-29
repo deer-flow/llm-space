@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import type {
-  AssistantMessage,
-  Context,
-  Model,
-  ToolResultMessage,
+import {
+  normalizeContext,
+  type AssistantMessage,
+  type Context,
+  type Model,
+  type ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import { streamSimple as streamCodexResponses } from "@earendil-works/pi-ai/api/openai-codex-responses";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-responses";
@@ -242,14 +243,14 @@ describe("pi-ai Responses native tools bridge", () => {
 
     await streamSimple(
       DEEPSEEK_MODEL,
-      {
+      normalizeContext({
         messages: [
           { role: "user", content: "Find LLM Space", timestamp: Date.now() },
           assistant,
           toolResult,
         ],
         tools: [FUNCTION_TOOL],
-      },
+      }),
       { apiKey: "test-key" }
     ).result();
 
@@ -282,12 +283,12 @@ describe("pi-ai Responses native tools bridge", () => {
 
     const result = await streamCodexResponses(
       CODEX_MODEL,
-      {
+      normalizeContext({
         messages: [
           { role: "user", content: "Find LLM Space", timestamp: Date.now() },
         ],
         tools: [],
-      },
+      }),
       {
         apiKey: `header.${jwtPayload}.signature`,
         transport: "sse",
@@ -311,7 +312,7 @@ describe("pi-ai Responses native tools bridge", () => {
       ],
       tools: [FUNCTION_TOOL],
     };
-    const first = await streamSimple(MODEL, firstContext, {
+    const first = await streamSimple(MODEL, normalizeContext(firstContext), {
       apiKey: "test-key",
       responseApiNativeTools: [
         { type: "web_search", search_context_size: "high" },
@@ -361,10 +362,10 @@ describe("pi-ai Responses native tools bridge", () => {
     };
     await streamSimple(
       MODEL,
-      {
+      normalizeContext({
         messages: [...firstContext.messages, nativeFirst, toolResult],
         tools: [FUNCTION_TOOL],
-      },
+      }),
       { apiKey: "test-key" }
     ).result();
 

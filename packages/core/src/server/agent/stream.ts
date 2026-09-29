@@ -4,7 +4,14 @@ import {
   type AgentMessage,
   type AgentTool,
 } from "@earendil-works/pi-agent-core";
-import type { Api, Message, Model, Models, Tool } from "@earendil-works/pi-ai";
+import {
+  normalizeContext,
+  type Api,
+  type Message,
+  type Model,
+  type Models,
+  type Tool,
+} from "@earendil-works/pi-ai";
 
 import { RUN_LAST_MESSAGE_ERROR } from "../../client/run-eligibility";
 import type { AgentStreamRequest } from "../../types/agent";
@@ -97,8 +104,7 @@ export async function* streamAgent(
 
   const agentStream = agentLoopContinue(
     {
-      systemPrompt: request.context.systemPrompt ?? "",
-      messages: request.context.messages,
+      messages: normalizeContext(request.context).messages,
       tools: _convertToAgentTools(request.context.tools, { stepByStep: true }),
     },
     {
@@ -204,6 +210,7 @@ function _appendTools(
 function _convertToLlm(messages: AgentMessage[]): Message[] {
   return messages.filter(
     (message) =>
+      message.role === "system" ||
       message.role === "user" ||
       message.role === "assistant" ||
       message.role === "toolResult"
