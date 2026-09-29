@@ -93,6 +93,65 @@ describe("DeerFlowJsonlThreadParser", () => {
     }
   });
 
+  test("keeps the error status of tool results", async () => {
+    const result = await new DeerFlowJsonlThreadParser().parseDetailed(
+      _jsonl(
+        {
+          event_type: "llm.human.input",
+          category: "message",
+          content: { type: "human", content: "Read both files" },
+        },
+        {
+          event_type: "llm.ai.response",
+          category: "message",
+          content: {
+            type: "ai",
+            content: "",
+            tool_calls: [
+              { id: "call-ok", name: "read_file", args: { path: "a.txt" } },
+              { id: "call-error", name: "read_file", args: { path: "b.txt" } },
+            ],
+          },
+        },
+        {
+          event_type: "llm.tool.result",
+          category: "message",
+          content: {
+            type: "tool",
+            tool_call_id: "call-ok",
+            content: "alpha",
+            status: "success",
+          },
+        },
+        {
+          event_type: "llm.tool.result",
+          category: "message",
+          content: {
+            type: "tool",
+            tool_call_id: "call-error",
+            content: "Error: file not found",
+            status: "error",
+          },
+        }
+      )
+    );
+
+    expect(result.status).toBe("parsed");
+    if (result.status === "parsed") {
+      const assistant = result.thread.context?.messages?.[1];
+      expect(assistant?.role).toBe("assistant");
+      if (assistant?.role === "assistant") {
+        expect(assistant.toolCalls?.[0]?.output).toEqual({
+          content: [{ type: "text", text: "alpha" }],
+        });
+        expect(assistant.toolCalls?.[1]?.output).toEqual({
+          content: [{ type: "text", text: "Error: file not found" }],
+          isError: true,
+        });
+      }
+    }
+  });
+
   test("skips internal DeerFlow messages", async () => {
     const result = await new DeerFlowJsonlThreadParser().parseDetailed(
       _jsonl(
