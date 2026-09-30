@@ -1,0 +1,113 @@
+{
+  "success": true,
+  "outcome": "passed",
+  "repairable": true,
+  "terminalViolations": [],
+  "terminalBlockingSummary": null,
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.22.00.00.00",
+    "version_source": "skill-release-manifest.json",
+    "runtime_skill_dir": "/Users/bytedance/.trae-cn/builtin/design/default/skills/solo-design",
+    "recorded_at": null,
+    "expected_version": "2026.07.22.00.00.00",
+    "status": "manifest_fallback",
+    "read_status": "ok",
+    "reason": "runtime-orchestration-summary.json missing skillProvenance; used skill-release-manifest.json"
+  },
+  "operatingMode": "free-explore",
+  "renderBlockingErrorCount": 0,
+  "softWarningCount": 3,
+  "renderBlockingErrors": [],
+  "errorSignatures": [],
+  "softWarnings": [
+    "[orchestration-summary] runtime-orchestration-summary.json is missing. Canvas validation can still pass, but quality-context checks (operatingMode, visualNorthStar, compositionPattern, continuityAnchors, miniProgramStyle) are degraded.",
+    "[html-quality] index.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] index.html: free-explore pages must not use secondary/accent brand variables. Use the single primary hue, neutral tints, or --state-success/warning/error/info for real semantic states."
+  ],
+  "repairPlanHints": [
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "index.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    }
+  ],
+  "repairActionTable": [],
+  "errorCount": 0,
+  "warningCount": 3,
+  "errors": [],
+  "warnings": [
+    "[orchestration-summary] runtime-orchestration-summary.json is missing. Canvas validation can still pass, but quality-context checks (operatingMode, visualNorthStar, compositionPattern, continuityAnchors, miniProgramStyle) are degraded.",
+    "[html-quality] index.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] index.html: free-explore pages must not use secondary/accent brand variables. Use the single primary hue, neutral tints, or --state-success/warning/error/info for real semantic states."
+  ],
+  "validationRunDisciplineStatus": {
+    "declared": false,
+    "restoreMode": false,
+    "maxFullValidationRuns": null,
+    "validationHistoryCount": 0,
+    "repairLedgerCount": 0,
+    "softWarningsTriggerRepair": null,
+    "terminalState": null,
+    "nextAction": null,
+    "violations": [],
+    "success": true
+  },
+  "terminalState": null,
+  "nextCheck": {
+    "type": "finish-readiness",
+    "command": "node '/Users/bytedance/.trae-cn/builtin/design/default/skills/solo-design/shared-runtime/deterministic-tooling/validate-finish-readiness.mjs' '/Users/bytedance/Documents/trae_projects/llm-space/llm-space-learning-wiki/design' --check=all",
+    "fullValidationAllowed": false,
+    "reason": "workspace validation passed; run complete finish readiness before final delivery"
+  },
+  "repairBatch": [],
+  "repairContextPacket": {
+    "schema_version": "1.0",
+    "purpose": "small-context repair packet; read this before full validation-report.json",
+    "success": true,
+    "terminalState": null,
+    "skillProvenance": {
+      "name": "solo-design",
+      "version": "2026.07.22.00.00.00",
+      "version_source": "skill-release-manifest.json",
+      "runtime_skill_dir": "/Users/bytedance/.trae-cn/builtin/design/default/skills/solo-design",
+      "recorded_at": null,
+      "expected_version": "2026.07.22.00.00.00",
+      "status": "manifest_fallback",
+      "read_status": "ok",
+      "reason": "runtime-orchestration-summary.json missing skillProvenance; used skill-release-manifest.json"
+    },
+    "renderBlockingErrorCount": 0,
+    "softWarningCount": 3,
+    "renderBlockingErrors": [],
+    "repairActionTable": [],
+    "nextCheck": {
+      "type": "finish-readiness",
+      "command": "node '/Users/bytedance/.trae-cn/builtin/design/default/skills/solo-design/shared-runtime/deterministic-tooling/validate-finish-readiness.mjs' '/Users/bytedance/Documents/trae_projects/llm-space/llm-space-learning-wiki/design' --check=all",
+      "fullValidationAllowed": false,
+      "reason": "workspace validation passed; run complete finish readiness before final delivery"
+    },
+    "forbidden": [
+      "do not read validator source",
+      "do not rerun full validation when nextCheck.fullValidationAllowed=false",
+      "do not start preview/browser unless user explicitly asks",
+      "do not hand-edit repair ledger fields"
+    ]
+  },
+  "projectFileHashes": {
+    ".design": "77ef728c9ee1c02c8312a69dd1e0f7ab9358952ec39c3410032b23095d4b78d1",
+    "pages/index.html": "a8c051c2de67bf80f1cdc9750f5017280e1f5d4a1bafc8cbea5b0289d6e08c85"
+  },
+  "designDir": "/Users/bytedance/Documents/trae_projects/llm-space/llm-space-learning-wiki/design",
+  "expectedPages": 1,
+  "requireInteractions": null,
+  "checkedAt": "2026-08-07T05:20:34.999Z"
+}
