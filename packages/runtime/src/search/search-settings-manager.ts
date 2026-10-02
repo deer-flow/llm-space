@@ -19,6 +19,7 @@ const VALID_PROVIDERS: readonly SearchProviderId[] = [
   "exa",
   "anysearch",
   "zhihu",
+  "serply",
 ];
 
 const SearchSettingsFileSchema = z.object({
@@ -29,6 +30,7 @@ const SearchSettingsFileSchema = z.object({
   exaApiKey: z.string().optional(),
   anysearchApiKey: z.string().optional(),
   zhihuAccessSecret: z.string().optional(),
+  serplyApiKey: z.string().optional(),
 });
 
 /**
@@ -106,6 +108,10 @@ export class SearchSettingsManager {
         typeof input.zhihuAccessSecret === "string"
           ? input.zhihuAccessSecret
           : DEFAULT_SEARCH_SETTINGS.zhihuAccessSecret,
+      serplyApiKey:
+        typeof input.serplyApiKey === "string"
+          ? input.serplyApiKey
+          : DEFAULT_SEARCH_SETTINGS.serplyApiKey,
     };
   }
 }

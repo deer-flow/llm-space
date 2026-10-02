@@ -54,6 +54,7 @@ function createRuntime(): RuntimeClient {
       exaApiKey: "",
       anysearchApiKey: "",
       zhihuAccessSecret: "",
+      serplyApiKey: "",
     }),
     getNetworkSettings: () => ({
       enabled: false,
