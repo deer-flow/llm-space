@@ -1,9 +1,13 @@
 import { Layout } from "./layout";
 import { Page } from "./page";
 
-export function App() {
+export function App({
+  totalMemoryBytes,
+}: {
+  totalMemoryBytes: number | null;
+}) {
   return (
-    <Layout>
+    <Layout totalMemoryBytes={totalMemoryBytes}>
       <Page />
     </Layout>
   );
