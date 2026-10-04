@@ -59,6 +59,23 @@ describe("filesystem built-in paths", () => {
     );
   });
 
+  test("edit rejects an empty old_string and leaves the file alone", async () => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "llm-space-fs-test-")
+    );
+    testDirectories.push(directory);
+    const filePath = path.join(directory, "notes.txt");
+
+    await write(filePath, "abc\n");
+    expect(edit(filePath, "", "X", true)).rejects.toThrow(
+      "old_string must not be empty"
+    );
+    expect(edit(filePath, "", "X")).rejects.toThrow(
+      "old_string must not be empty"
+    );
+    expect(await fs.readFile(filePath, "utf8")).toBe("abc\n");
+  });
+
   test("write and edit expand a leading home shortcut", async () => {
     const directory = await fs.mkdtemp(
       path.join(os.homedir(), ".llm-space-fs-test-")
