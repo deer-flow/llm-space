@@ -12,6 +12,8 @@ export const LOCAL_STORAGE_KEYS = {
   renderingFidelity: "llm-space-rendering-fidelity",
   autoRunTools: "llm-space-auto-run-tools",
   reactLoop: "llm-space-react-loop",
+  fullAccessMode: "llm-space-full-access",
+  fullAccessAcknowledged: "llm-space-full-access-acknowledged",
   messageStatsSummaryMode: "llm-space-message-stats-summary-mode",
   language: "llm-space-language",
   landingLanguage: "llm-space-lang",

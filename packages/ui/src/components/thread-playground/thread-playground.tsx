@@ -78,6 +78,7 @@ import {
   canUndo,
   createThreadStore,
   getAutoRunTools,
+  getFullAccessMode,
   getReactLoop,
   ThreadStoreContext,
   useRunMode,
@@ -214,6 +215,7 @@ function _ThreadPlaygroundStore({
         ),
       getAutoRunTools,
       getReactLoop,
+      getFullAccessMode,
       getProfileId,
       runtimeId: ownerRuntimeId,
       executeTool: toolExecutor ?? undefined,
@@ -284,8 +286,13 @@ function ThreadPlaygroundContent({
     () => planCompaction(messages, 0, { hasMetaUserPrompt }).turnCount >= 2,
     [hasMetaUserPrompt, messages]
   );
-  const { effectiveAutoRunTools, reactLoop, setAutoRunTools, setReactLoop } =
-    useRunMode();
+  const {
+    effectiveAutoRunTools,
+    reactLoop,
+    fullAccessMode,
+    setAutoRunTools,
+    setReactLoop,
+  } = useRunMode();
   const { run, abort, undo, redo, syncTitle } = useThreadStoreActions();
   const [systemPromptStreaming, setSystemPromptStreaming] = useState(false);
   const title = useMemo(
@@ -464,6 +471,18 @@ function ThreadPlaygroundContent({
               />
             </div>
             <div className="flex items-center gap-1 px-3">
+              {/* Persistent warning badge while full access mode is on, so the
+                  user never forgets tools run without confirmation. */}
+              {fullAccessMode && !readonlyFromProps ? (
+                <Tooltip content={labels.fullAccessBadge}>
+                  <span
+                    className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-xs font-medium text-amber-500 dark:text-amber-400"
+                    role="status"
+                  >
+                    {labels.fullAccessBadge}
+                  </span>
+                </Tooltip>
+              ) : null}
               <ButtonGroup
                 className={cn(
                   "transition-transform active:translate-y-px",
