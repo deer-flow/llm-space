@@ -31,6 +31,21 @@ async function _settingsDir(config: unknown): Promise<string> {
   return settingsDir;
 }
 
+test("Pi upgrade preserves saved Azure provider and model references", async () => {
+  const id = "azure-openai-responses";
+  const settingsDir = await _settingsDir({
+    providers: [{ id, builtin: true, apiKey: "test-key" }],
+  });
+  const manager = new ModelManager({ settingsDir });
+  const registry = await manager.getAvailableModels();
+  const models = registry.getModels(id);
+  expect(models.length).toBeGreaterThan(0);
+  expect(models.every((model) => model.provider === id)).toBe(true);
+  expect(registry.getModel(id, models[0].id)).toBeDefined();
+  expect(await manager.getApiKey(id)).toBe("test-key");
+  expect(manager.getWebsiteLink(id)).toContain("azure.microsoft.com");
+});
+
 describe("ModelManager Ark image generation", () => {
   test("migrates legacy provider defaults to image inventory only", async () => {
     const settingsDir = await _settingsDir({

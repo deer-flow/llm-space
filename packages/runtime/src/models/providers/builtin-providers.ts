@@ -86,7 +86,7 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   ark: arkProvider(),
   "ark-agent-plan": arkAgentPlanProvider(),
   "ark-coding-plan": arkCodingPlanProvider(),
-  azure: azureProvider(),
+  "azure-openai-responses": legacyAzureProvider(),
   deepseek: deepseekProvider(),
   google: googleProvider(),
   groq: groqProvider(),
@@ -106,3 +106,16 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   zai: zaiProvider(),
   "zai-coding-cn": zaiCodingCnProvider(),
 };
+
+/** Keep saved provider references stable across Pi's Azure provider rename. */
+function legacyAzureProvider(): Provider {
+  const provider = azureProvider();
+  const id = "azure-openai-responses";
+  const models = provider.getModels().map((model) => ({ ...model, provider: id }));
+  return {
+    ...provider,
+    id,
+    getModels: () => models,
+    getAllModels: () => models,
+  };
+}
