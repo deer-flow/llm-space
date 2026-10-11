@@ -1,0 +1,221 @@
+diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
+--- a/dist/api/openai-responses-shared.js
++++ b/dist/api/openai-responses-shared.js
+@@ -74,7 +74,7 @@
+     };
+     const normalizeToolCallId = (id, _targetModel, source) => {
+         if (!allowedToolCallProviders.has(model.provider))
+-            return normalizeIdPart(id);
++            return normalizeIdPart(id.split("|")[0]);
+         if (!id.includes("|"))
+             return normalizeIdPart(id);
+         const [callId, itemId] = id.split("|");
+@@ -169,6 +169,11 @@
+         else if (msg.role === "assistant") {
+             const output = [];
+             const assistantMsg = msg;
++            if (Array.isArray(assistantMsg.responseOutputItems)) {
++                messages.push(...structuredClone(assistantMsg.responseOutputItems));
++                msgIndex++;
++                continue;
++            }
+             const isSameProviderAndApi = assistantMsg.provider === model.provider && assistantMsg.api === model.api;
+             const isSameModel = isSameProviderAndApi && assistantMsg.model === model.id;
+             const isDifferentModel = isSameProviderAndApi && assistantMsg.model !== model.id;
+@@ -321,6 +326,7 @@
+ export async function processResponsesStream(openaiStream, output, stream, model, options) {
+     let sawTerminalResponseEvent = false;
+     const outputSlots = new Map();
++    const streamedOutputItems = new Map();
+     const reasoningBlocksById = new Map();
+     const applyMessagePhaseStopReason = (item) => {
+         if (item.type === "message" && item.phase === "final_answer") {
+@@ -431,9 +437,66 @@
+             });
+         }
+     };
++    const normalizeSources = (item) => {
++        const candidates = Array.isArray(item?.sources)
++            ? item.sources
++            : Array.isArray(item?.action?.sources)
++                ? item.action.sources
++                : [];
++        return candidates.flatMap((source) => typeof source?.url === "string"
++            ? [{ url: source.url, ...(typeof source.title === "string" ? { title: source.title } : {}) }]
++            : []);
++    };
++    const normalizeNativeActivity = (item) => {
++        const sources = normalizeSources(item);
++        return {
++            ...(typeof item.id === "string" ? { id: item.id } : {}),
++            type: typeof item.type === "string" ? item.type : "unknown",
++            ...(typeof item.status === "string" ? { status: item.status } : {}),
++            ...(item.action && typeof item.action === "object" && !Array.isArray(item.action)
++                ? { action: structuredClone(item.action) }
++                : {}),
++            ...(item.result !== undefined ? { result: structuredClone(item.result) } : {}),
++            ...(sources.length > 0 ? { sources } : {}),
++            raw: structuredClone(item),
++        };
++    };
++    const normalizeAnnotations = (annotations) => (annotations ?? []).flatMap((annotation) => {
++        if (!annotation || typeof annotation !== "object")
++            return [];
++        return [{
++                type: typeof annotation.type === "string" ? annotation.type : "unknown",
++                ...(typeof annotation.url === "string" ? { url: annotation.url } : {}),
++                ...(typeof annotation.title === "string" ? { title: annotation.title } : {}),
++                ...(typeof annotation.start_index === "number" ? { startIndex: annotation.start_index } : {}),
++                ...(typeof annotation.end_index === "number" ? { endIndex: annotation.end_index } : {}),
++                raw: structuredClone(annotation),
++            }];
++    });
+     const finalizeResponse = (response) => {
+         sawTerminalResponseEvent = true;
+-        backfillReasoningSignatures(response.output ?? []);
++        const responseOutputByIndex = new Map(streamedOutputItems);
++        const streamedIndexById = new Map([...streamedOutputItems.entries()].flatMap(([outputIndex, item]) => typeof item?.id === "string" ? [[item.id, outputIndex]] : []));
++        let nextOutputIndex = responseOutputByIndex.size === 0
++            ? 0
++            : Math.max(...responseOutputByIndex.keys()) + 1;
++        for (const [terminalIndex, item] of (response.output ?? []).entries()) {
++            const streamedIndex = typeof item?.id === "string" ? streamedIndexById.get(item.id) : undefined;
++            const outputIndex = streamedIndex ??
++                (responseOutputByIndex.has(terminalIndex) ? nextOutputIndex++ : terminalIndex);
++            responseOutputByIndex.set(outputIndex, structuredClone(item));
++        }
++        const responseOutput = [...responseOutputByIndex.entries()]
++            .sort(([leftIndex], [rightIndex]) => leftIndex - rightIndex)
++            .map(([, item]) => item);
++        backfillReasoningSignatures(responseOutput);
++        output.responseOutputItems = responseOutput;
++        const nativeToolActivities = responseOutput
++            .filter((item) => !["reasoning", "message", "function_call", "custom_tool_call"].includes(item.type))
++            .map(normalizeNativeActivity);
++        if (nativeToolActivities.length > 0) {
++            output.nativeToolActivities = nativeToolActivities;
++        }
+         if (response?.id) {
+             output.responseId = response.id;
+         }
+@@ -481,6 +544,7 @@
+             output.responseId = event.response.id;
+         }
+         else if (event.type === "response.output_item.added") {
++            streamedOutputItems.set(event.output_index, structuredClone(event.item));
+             createSlot(event.output_index, event.item);
+         }
+         else if (event.type === "response.reasoning_summary_text.delta") {
+@@ -578,6 +642,7 @@
+         }
+         else if (event.type === "response.output_item.done") {
+             const item = event.item;
++            streamedOutputItems.set(event.output_index, structuredClone(item));
+             applyMessagePhaseStopReason(item);
+             const slot = getOrCreateSlot(event.output_index, item);
+             if (item.type === "reasoning" && slot?.type === "thinking") {
+@@ -596,6 +661,9 @@
+             }
+             else if (item.type === "message" && slot?.type === "text") {
+                 slot.block.text = item.content?.map((c) => (c.type === "output_text" ? c.text : c.refusal)).join("") || "";
++                slot.block.annotations = item.content
++                    ?.filter((content) => content.type === "output_text")
++                    .flatMap((content) => normalizeAnnotations(content.annotations));
+                 slot.block.textSignature = encodeTextSignatureV1(item.id, item.phase ?? undefined);
+                 stream.push({
+                     type: "text_end",
+diff --git a/dist/api/openai-responses.d.ts b/dist/api/openai-responses.d.ts
+--- a/dist/api/openai-responses.d.ts
++++ b/dist/api/openai-responses.d.ts
+@@ -5,6 +5,7 @@
+     reasoningSummary?: "auto" | "detailed" | "concise" | null;
+     serviceTier?: ResponseCreateParamsStreaming["service_tier"];
+     toolChoice?: ResponseCreateParamsStreaming["tool_choice"];
++    responseApiNativeTools?: readonly Record<string, unknown>[];
+ }
+ /**
+  * Generate function for OpenAI Responses API
+diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
+--- a/dist/api/openai-responses.js
++++ b/dist/api/openai-responses.js
+@@ -182,6 +182,9 @@
+     };
+     const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
+     const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
++    if (options?.responseApiNativeTools?.length) {
++        base.responseApiNativeTools = options.responseApiNativeTools;
++    }
+     return stream(model, context, {
+         ...base,
+         reasoningEffort,
+@@ -254,11 +257,13 @@
+     if (options?.serviceTier !== undefined) {
+         params.service_tier = options.serviceTier;
+     }
+-    if (transcriptTools.requestTools.length > 0) {
+-        params.tools = convertResponsesTools(transcriptTools.requestTools, {
+-            supportsStrictMode: compat.supportsStrictMode,
+-            supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
+-        });
++    const immediateTools = convertResponsesTools(transcriptTools.requestTools, {
++        supportsStrictMode: compat.supportsStrictMode,
++        supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
++    });
++    const nativeTools = options?.responseApiNativeTools ?? [];
++    if (immediateTools.length > 0 || nativeTools.length > 0) {
++        params.tools = [...immediateTools, ...nativeTools];
+     }
+     if (options?.toolChoice !== undefined) {
+         params.tool_choice = options.toolChoice;
+diff --git a/dist/types.d.ts b/dist/types.d.ts
+--- a/dist/types.d.ts
++++ b/dist/types.d.ts
+@@ -251,6 +251,8 @@
+     };
+     /** Custom token budgets for thinking levels (token-based providers only) */
+     thinkingBudgets?: ThinkingBudgets;
++    /** Raw provider-hosted tool definitions forwarded only by Responses adapters. */
++    responseApiNativeTools?: readonly Record<string, unknown>[];
+ }
+ export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (model: Model<TApi>, context: TranscriptContext, options?: TOptions) => AssistantMessageEventStream;
+ export type ImagesFunction<TOptions extends ImagesOptions = ImagesOptions> = (model: ImageModel<ImageApi>, context: ImagesContext, options?: TOptions) => Promise<AssistantImages>;
+@@ -264,7 +266,30 @@
+     type: "text";
+     text: string;
+     textSignature?: string;
++    annotations?: TextAnnotation[];
+ }
++export interface TextAnnotation {
++    type: string;
++    url?: string;
++    title?: string;
++    startIndex?: number;
++    endIndex?: number;
++    raw: Record<string, any>;
++}
++export interface NativeToolSource {
++    url: string;
++    title?: string;
++}
++export interface NativeToolActivity {
++    id?: string;
++    type: string;
++    status?: string;
++    action?: Record<string, any>;
++    result?: any;
++    sources?: NativeToolSource[];
++    raw: Record<string, any>;
++}
++export type ResponseOutputItem = Record<string, any>;
+ export interface ThinkingContent {
+     type: "thinking";
+     thinking: string;
+@@ -389,6 +414,8 @@
+     deferred?: DeferredHandle;
+     errorMessage?: string;
+     rawStopReason?: string;
++    nativeToolActivities?: NativeToolActivity[];
++    responseOutputItems?: ResponseOutputItem[];
+     /**
+      * Provider indication of whether the model explicitly ended its turn.
+      * Preserved for debugging and does not currently affect agent control flow.

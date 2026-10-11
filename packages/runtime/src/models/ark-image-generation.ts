@@ -1,9 +1,9 @@
 import {
-  createImagesModels,
-  createImagesProvider,
+  createModels,
+  createProvider,
   envApiKeyAuth,
   type AssistantImages,
-  type ImagesModel,
+  type ImageModel,
   type ImagesOptions,
 } from "@earendil-works/pi-ai";
 import {
@@ -144,7 +144,7 @@ export function createArkImageGenerator(
       );
     }
 
-    const imagesModels = createImagesModels();
+    const imagesModels = createModels();
     imagesModels.setProvider(
       _createImagesProvider({
         providerId,
@@ -155,7 +155,7 @@ export function createArkImageGenerator(
         fetch: fetchImpl,
       })
     );
-    const model = imagesModels.getModel(providerId, input.model);
+    const model = imagesModels.getModelOfType("image", providerId, input.model);
     if (!model) {
       throw new Error(`Unsupported image model: ${input.model}`);
     }
@@ -223,12 +223,13 @@ function _createImagesProvider({
   }
   const api =
     config.api ?? (providerId === "ark" ? "ark-images" : "openai-images");
-  const models: ImagesModel<typeof ARK_IMAGES_API>[] = getImageModelDefinitions(
+  const models: ImageModel<typeof ARK_IMAGES_API>[] = getImageModelDefinitions(
     config,
     catalog
   ).map((definition) => ({
     id: definition.id,
     name: definition.name,
+    type: "image",
     api: ARK_IMAGES_API,
     provider: providerId,
     baseUrl,
@@ -241,28 +242,30 @@ function _createImagesProvider({
       cacheWrite: 0,
     },
   }));
-  return createImagesProvider({
+  return createProvider({
     id: providerId,
     name: providerId,
     auth: { apiKey: envApiKeyAuth("ARK_API_KEY", ["ARK_API_KEY"]) },
     models,
-    api: {
-      generateImages: (model, context, options) =>
-        _generateImages(
-          model,
-          context.input,
-          options,
-          fetch,
-          api,
-          getImageModelDefinition(config, model.id, catalog)?.responseFormat
-        ),
+    images: {
+      [ARK_IMAGES_API]: {
+        generateImages: (model, context, options) =>
+          _generateImages(
+            model,
+            context.input,
+            options,
+            fetch,
+            api,
+            getImageModelDefinition(config, model.id, catalog)?.responseFormat
+          ),
+      },
     },
   });
 }
 
 /** Execute one synchronous image request and normalize it to pi image content. */
 async function _generateImages(
-  model: ImagesModel<string>,
+  model: ImageModel<string>,
   input: { type: string; text?: string }[],
   options: ImagesOptions | undefined,
   fetch: FetchLike,
