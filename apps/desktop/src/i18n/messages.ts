@@ -149,11 +149,26 @@ const APP_MESSAGES = {
       primaryColor: "Primary color",
       primaryColorHint: "The accent color for buttons, links, and highlights.",
       reset: "Reset",
-      rendering: "Rendering",
+      performance: "Performance",
+      rendering: "Message rendering",
       renderingHint:
-        "Full renders messages with full editors. Fast shows them as plain text for smoother scrolling on large threads.",
+        "Full keeps every message editor mounted. On Demand uses lightweight syntax highlighting and activates an editor after focus, so placing the caret may require a second click. Fast uses plain text for the lowest overhead.",
       renderingFull: "Full",
+      renderingOnDemand: "On Demand",
       renderingFast: "Fast",
+      virtualization: "Virtualization",
+      virtualizationHint:
+        "Reduces mounted message rows in long conversations. Fast scrolling can briefly show blank space.",
+      virtualizationAutoHint:
+        "Current threshold: {threshold} messages (Full baseline {baseline} × {multiplier}). Fast scrolling can briefly show blank space.",
+      virtualizationThresholdAria: "Virtualization threshold",
+      virtualizationOff: "Off",
+      virtualizationAuto: "Auto",
+      virtualizationCustom: "Custom",
+      virtualizationOn: "On",
+      viewCache: "View cache",
+      viewCacheHint:
+        "Maximum recently used Thread and Trace views kept mounted, including the active view. Background sessions keep running after a view is released.",
       defaults: "Defaults",
       defaultModel: "Default model",
       defaultModelHint:
@@ -844,11 +859,26 @@ const APP_MESSAGES = {
       primaryColor: "主题色",
       primaryColorHint: "按钮、链接和高亮所使用的强调色。",
       reset: "重置",
-      rendering: "渲染",
+      performance: "性能",
+      rendering: "消息渲染",
       renderingHint:
-        "“完整”使用完整编辑器渲染消息；“流畅”以纯文本显示，大 Thread 滚动更顺畅。",
+        "“完整”始终挂载消息编辑器；“按需”使用轻量语法高亮，聚焦后才激活编辑器，因此定位光标可能需要再次点击；“流畅”使用纯文本以获得最低开销。",
       renderingFull: "完整",
+      renderingOnDemand: "按需",
       renderingFast: "流畅",
+      virtualization: "虚拟化",
+      virtualizationHint:
+        "减少长对话中挂载的消息行。快速滚动时可能短暂出现空白区域。",
+      virtualizationAutoHint:
+        "当前阈值：{threshold} 条消息（完整模式基准 {baseline} × {multiplier}）。快速滚动时可能短暂出现空白区域。",
+      virtualizationThresholdAria: "虚拟化阈值",
+      virtualizationOff: "关闭",
+      virtualizationAuto: "自动",
+      virtualizationCustom: "自定义",
+      virtualizationOn: "开启",
+      viewCache: "视图缓存",
+      viewCacheHint:
+        "最多保留最近使用的 Thread 和 Trace 视图（包含当前视图）。视图卸载后，后台会话仍会继续运行。",
       defaults: "默认值",
       defaultModel: "默认模型",
       defaultModelHint: "用于新建 Thread，以及 Thread 原有模型不可用时。",

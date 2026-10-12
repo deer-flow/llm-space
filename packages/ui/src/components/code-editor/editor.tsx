@@ -10,6 +10,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,9 @@ import {
 import { cn } from "../../lib/utils";
 import { useTheme } from "../theme-provider";
 
+import { useRegisterEditorCommit } from "./editor-commit-scope";
+import type { EditorEnhancement } from "./editor-enhancement";
+import { compileCodeMirrorEnhancements } from "./editor-enhancement-codemirror";
 import { createExtensions } from "./extensions";
 import * as themes from "./themes";
 
@@ -56,6 +60,8 @@ export interface CodeEditorProps {
    * no longer scales with message count.
    */
   plain?: boolean;
+  /** Explicit rendering strategy for repeated editors. */
+  renderMode?: "full" | "on-demand" | "plain";
   language?: "markdown" | "json";
   /**
    * The value is a live streaming preview: syntax highlighting is skipped
@@ -73,7 +79,16 @@ export interface CodeEditorProps {
    * (Lite) fallback. Pass a stable reference to avoid reconfiguring the editor.
    */
   extraExtensions?: Extension[];
+  /**
+   * Semantic editor features shared by Full and On Demand renderers. Visual
+   * enhancements compile to both backends; CodeMirror-only enhancements are
+   * installed only while the full editor is mounted. Keep this array stable.
+   */
+  enhancements?: readonly EditorEnhancement[];
   onChange?: (value: string) => void;
+  /** Called once the requested autofocus has reached the real editing surface. */
+  onAutoFocusComplete?: () => void;
+  onBlur?: () => void;
   onKeyDown?: (e: KeyboardEvent) => void;
   onPaste?: (e: ClipboardEvent) => void;
 }
@@ -90,8 +105,11 @@ function _CodeEditor(
     value,
     streaming,
     readonly,
+    enhancements,
     extraExtensions,
     onChange,
+    onAutoFocusComplete,
+    onBlur,
     onKeyDown,
     onPaste,
   }: CodeEditorProps,
@@ -99,9 +117,21 @@ function _CodeEditor(
 ) {
   const { resolvedTheme } = useTheme();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
+  const autoFocusCompletedRef = useRef(false);
   const draftRef = useRef(value);
   const committedRef = useRef(value);
   const isFocusedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!autoFocus) {
+      autoFocusCompletedRef.current = false;
+      return;
+    }
+    const view = cmRef.current?.view;
+    if (!view || autoFocusCompletedRef.current) return;
+    view.focus();
+    autoFocusCompletedRef.current = true;
+    onAutoFocusComplete?.();
+  }, [autoFocus, onAutoFocusComplete]);
   // CodeMirror owns the document while the user types; `syncedValue` only
   // changes when we push an *external* update in (the effect below), so a
   // keystroke never re-renders React or trips react-codemirror's value diff.
@@ -183,6 +213,7 @@ function _CodeEditor(
       committedRef.current = draftRef.current;
     }
   }, [onChange]);
+  useRegisterEditorCommit(commit);
 
   const insertText = useCallback(
     (text: string) => {
@@ -231,7 +262,8 @@ function _CodeEditor(
   const handleBlur = useCallback(() => {
     isFocusedRef.current = false;
     commit();
-  }, [commit]);
+    onBlur?.();
+  }, [commit, onBlur]);
 
   const handleFocus = useCallback(() => {
     isFocusedRef.current = true;
@@ -270,9 +302,10 @@ function _CodeEditor(
   const extensions = useMemo(
     () => [
       ...createExtensions(streaming ? "none" : detectedLanguage),
+      ...compileCodeMirrorEnhancements(enhancements ?? []),
       ...(extraExtensions ?? []),
     ],
-    [detectedLanguage, extraExtensions, streaming]
+    [detectedLanguage, enhancements, extraExtensions, streaming]
   );
   return (
     <div

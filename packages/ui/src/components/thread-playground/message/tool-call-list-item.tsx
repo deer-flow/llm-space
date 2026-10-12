@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 import {
   CodeEditor,
+  type CodeEditorRenderMode,
   type CodeEditorProps,
 } from "@llm-space/ui/components/code-editor";
 import { openFirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
@@ -35,7 +36,7 @@ import { Input } from "@llm-space/ui/ui/input";
 
 import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores";
-import { usePromptVariableExtensionForContext } from "../variable/use-prompt-variable-extension";
+import { usePromptSyntaxEnhancementsForContext } from "../variable/use-prompt-syntax-enhancements";
 
 import { ImageContentView } from "./image-content-view";
 import { SpawnAgentCard } from "./spawn-agent-card";
@@ -66,10 +67,16 @@ function _ToolCallListItem({
   const { dialogs } = usePlaygroundLabels();
   const labels = dialogs.toolCallCard;
   const { fidelity } = useRenderingFidelity();
+  const editorRenderMode: CodeEditorRenderMode =
+    fidelity === "rich"
+      ? "full"
+      : fidelity === "on-demand"
+        ? "on-demand"
+        : "plain";
   const { presentational } = useHostServices();
   const { updateToolCallOutputText } = useThreadStoreActions();
   const { resolveTool, runToolCall } = useToolCallRunner(messageId);
-  const variableExtension = usePromptVariableExtensionForContext(
+  const promptSyntaxEnhancements = usePromptSyntaxEnhancementsForContext(
     createToolResultPromptVariablePlaceKey(messageId, toolCall.id),
     context
   );
@@ -261,10 +268,10 @@ function _ToolCallListItem({
         )}
         <ToolCallResponseEditor
           input={toolCall.input}
-          plain={fidelity === "lite"}
+          renderMode={editorRenderMode}
           readonly={readonly || isCalling}
           value={outputText}
-          extraExtensions={variableExtension}
+          enhancements={promptSyntaxEnhancements}
           onChange={handleOutputChange}
           onKeyDown={handleKeyDown}
         />
@@ -299,18 +306,18 @@ function formatJson(value: unknown): string {
  */
 function _ToolCallResponseEditor({
   input,
-  plain,
+  renderMode,
   value,
   readonly,
-  extraExtensions,
+  enhancements,
   onChange,
   onKeyDown,
 }: {
   input: ToolCallInput;
-  plain: boolean;
+  renderMode: CodeEditorRenderMode;
   value: string;
   readonly: boolean;
-  extraExtensions: CodeEditorProps["extraExtensions"];
+  enhancements: CodeEditorProps["enhancements"];
   onChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent) => void;
 }) {
@@ -345,11 +352,11 @@ function _ToolCallResponseEditor({
       hideBorder
       hideFocusRing
       scrollOnFocus
-      plain={plain}
+      renderMode={renderMode}
       placeholder={`Enter the response of ${input.name}()`}
       readonly={readonly}
       value={value}
-      extraExtensions={extraExtensions}
+      enhancements={enhancements}
       onChange={onChange}
       onKeyDown={onKeyDown}
     />

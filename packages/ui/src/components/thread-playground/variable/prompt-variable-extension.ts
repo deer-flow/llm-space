@@ -3,23 +3,33 @@ import {
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  type CompletionSource,
 } from "@codemirror/autocomplete";
 import { type Extension } from "@codemirror/state";
 import {
-  Decoration,
   EditorView,
   hoverTooltip,
-  MatchDecorator,
   tooltips,
-  ViewPlugin,
-  type DecorationSet,
   type Tooltip,
-  type ViewUpdate,
 } from "@codemirror/view";
 import type {
   PromptVariableCompletion,
   VariableResolution,
 } from "@llm-space/core/thread";
+
+export const PROMPT_VARIABLE_PATTERN =
+  String.raw`\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}`;
+export const PROMPT_TEMPLATE_TAG_PATTERN = String.raw`\{%[-+]?[\s\S]*?[-+]?%\}`;
+
+export const PROMPT_VARIABLE_STYLE = {
+  color: "var(--cm-variable)",
+  fontWeight: "500",
+} as const;
+
+export const PROMPT_TEMPLATE_TAG_STYLE = {
+  color: "var(--cm-template-tag)",
+  fontWeight: "500",
+} as const;
 
 /**
  * Resolves a `{{name}}` to its display value. May return synchronously (date /
@@ -33,7 +43,7 @@ export type PromptVariableResolver = (
 /** Lists the variables offered by `{{`-triggered autocompletion. */
 export type PromptVariableLister = () => PromptVariableCompletion[];
 
-export interface PromptVariableExtensionOptions {
+export interface PromptSyntaxEditingOptions {
   resolve: PromptVariableResolver;
   listVariables: PromptVariableLister;
   /**
@@ -50,57 +60,11 @@ function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
-// Syntactic only — a well-formed `{{name}}` with optional inner whitespace. The
-// `g` flag is required by MatchDecorator. Highlighting never consults the
-// variable table, so this stays a pure, viewport-bounded scan.
-const PLACEHOLDER_RE = /\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}/g;
-// A Jinja/Nunjucks tag `{% … %}` (with optional whitespace-control `-`/`+`),
-// highlighted as one unit — purely syntactic, viewport-bounded like above.
-const TEMPLATE_TAG_RE = /\{%[-+]?[\s\S]*?[-+]?%\}/g;
-const placeholderMark = Decoration.mark({ class: "cm-prompt-variable" });
-const templateTagMark = Decoration.mark({ class: "cm-template-tag" });
-
-const matcher = new MatchDecorator({
-  regexp: PLACEHOLDER_RE,
-  decoration: placeholderMark,
-});
-const templateTagMatcher = new MatchDecorator({
-  regexp: TEMPLATE_TAG_RE,
-  decoration: templateTagMark,
-});
-
-// Build a viewport-bounded highlighter from a MatchDecorator. Only visible
-// ranges are scanned and existing decorations map through edits, so cost never
-// scales with document length.
-function _createHighlighter(decorator: MatchDecorator): ViewPlugin<{
-  decorations: DecorationSet;
-}> {
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet;
-      constructor(view: EditorView) {
-        this.decorations = decorator.createDeco(view);
-      }
-      update(update: ViewUpdate) {
-        this.decorations = decorator.updateDeco(update, this.decorations);
-      }
-    },
-    { decorations: (plugin) => plugin.decorations }
-  );
-}
-
-const placeholderHighlighter = _createHighlighter(matcher);
-const templateTagHighlighter = _createHighlighter(templateTagMatcher);
+// Hover recognition is syntactic only — a well-formed `{{name}}` with optional
+// inner whitespace. Visual matching is owned by the declarative enhancement.
+const PLACEHOLDER_RE = new RegExp(PROMPT_VARIABLE_PATTERN, "g");
 
 const theme = EditorView.theme({
-  ".cm-prompt-variable": {
-    color: "var(--cm-variable)",
-    fontWeight: "500",
-  },
-  ".cm-template-tag": {
-    color: "var(--cm-template-tag)",
-    fontWeight: "500",
-  },
   ".cm-prompt-variable-tooltip": {
     minWidth: "260px",
     maxWidth: "360px",
@@ -414,8 +378,10 @@ const TEMPLATE_TAGS: {
   { label: "endraw", detail: "Close raw", insert: "{% endraw %}", caret: 12 },
 ];
 
-function createVariableCompletion(list: PromptVariableLister): Extension {
-  const source = (context: CompletionContext): CompletionResult | null => {
+export function createPromptCompletionSource(
+  list: PromptVariableLister
+): CompletionSource {
+  return (context: CompletionContext): CompletionResult | null => {
     // Macro completion: only `@include(path)` is offered, per design. The `@`
     // form can't match the variable trigger below, so the two never overlap.
     const macroBefore = context.matchBefore(MACRO_TRIGGER_RE);
@@ -486,6 +452,10 @@ function createVariableCompletion(list: PromptVariableLister): Extension {
     options.push(includeCompletion);
     return { from, options, filter: true };
   };
+}
+
+function createVariableCompletion(list: PromptVariableLister): Extension {
+  const source = createPromptCompletionSource(list);
   return autocompletion({
     override: [source],
     // Replace the default icon column with our own variable (braces) icon.
@@ -494,14 +464,12 @@ function createVariableCompletion(list: PromptVariableLister): Extension {
   });
 }
 
-export function createPromptVariableExtension({
+export function createPromptSyntaxEditingExtensions({
   resolve,
   listVariables,
   onInspect,
-}: PromptVariableExtensionOptions): Extension[] {
+}: PromptSyntaxEditingOptions): Extension[] {
   return [
-    placeholderHighlighter,
-    templateTagHighlighter,
     createHoverTooltip(resolve, onInspect),
     createVariableCompletion(listVariables),
     // Render tooltips (hover + the completion dropdown) under document.body so
