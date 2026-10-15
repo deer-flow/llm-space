@@ -199,6 +199,7 @@ describe("RemoteRuntimeClient", () => {
           exaApiKey: "",
           anysearchApiKey: "",
           zhihuAccessSecret: "",
+          serplyApiKey: "",
         });
       }
     );

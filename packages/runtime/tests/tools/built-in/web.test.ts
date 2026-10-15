@@ -47,6 +47,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -87,6 +88,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -130,6 +132,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -178,6 +181,253 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
+      }),
+    }).find((entry) => entry.tool.name === "web_fetch");
+
+    const result = await fetchTool?.execute({ url: "https://example.com" });
+
+    expect(request).toBeDefined();
+    if (!request) throw new Error("Firecrawl request was not captured");
+    expect(request.url).toBe("https://api.firecrawl.dev/v2/scrape");
+    expect(request.headers.get("Authorization")).toBe("Bearer firecrawl-key");
+    expect(result).toEqual({
+      url: "https://example.com",
+      title: "Example",
+      content: "# Example",
+      metadata: { title: "Example" },
+    });
+  });
+});
+
+describe("Serply provider", () => {
+  const serplySettings = () => ({
+    provider: "serply" as const,
+    braveApiKey: "",
+    firecrawlApiKey: "",
+    tavilyApiKey: "",
+    exaApiKey: "",
+    anysearchApiKey: "",
+    zhihuAccessSecret: "",
+    serplyApiKey: "serply-key",
+  });
+
+  test("uses the official endpoint, auth header, and normalized result shape", async () => {
+    let request: { url: URL; headers: Headers } | undefined;
+    globalThis.fetch = ((input, init) => {
+      request = {
+        url:
+          input instanceof URL
+            ? input
+            : typeof input === "string"
+              ? new URL(input)
+              : new URL(input.url),
+        headers: new Headers(init?.headers),
+      };
+      return Promise.resolve(
+        Response.json({
+          results: [
+            {
+              title: "LLM Space",
+              link: "https://example.com/llm-space",
+              description: "A prompt and agent workbench.",
+              position: 1,
+              result_type: "organic",
+            },
+          ],
+        })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: serplySettings,
+    }).find((entry) => entry.tool.name === "web_search");
+
+    const result = await search?.execute({
+      query: "LLM Space",
+      limit: 5,
+      includeContent: true,
+    });
+
+    expect(request).toBeDefined();
+    if (!request) throw new Error("Serply request was not captured");
+    expect(request.url.origin + request.url.pathname).toBe(
+      "https://api.serply.io/v1/search/"
+    );
+    expect(request.url.searchParams.get("q")).toBe("LLM Space");
+    expect(request.url.searchParams.get("num")).toBe("5");
+    expect(request.headers.get("X-Api-Key")).toBe("serply-key");
+    expect(result).toEqual([
+      {
+        title: "LLM Space",
+        url: "https://example.com/llm-space",
+        snippet: "A prompt and agent workbench.",
+        content: "A prompt and agent workbench.",
+      },
+    ]);
+  });
+
+  test("caps the requested page at ten and enforces the limit on the response", async () => {
+    let request: { url: URL } | undefined;
+    globalThis.fetch = ((input) => {
+      request = {
+        url:
+          input instanceof URL
+            ? input
+            : typeof input === "string"
+              ? new URL(input)
+              : new URL(input.url),
+      };
+      // Answer with more rows than were asked for: `num` is a request hint the
+      // API is free to ignore, so the provider has to trim the response.
+      return Promise.resolve(
+        Response.json({
+          results: Array.from({ length: 14 }, (_, index) => ({
+            title: `Result ${index + 1}`,
+            link: `https://example.com/${index + 1}`,
+            description: `Snippet ${index + 1}`,
+          })),
+        })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: serplySettings,
+    }).find((entry) => entry.tool.name === "web_search");
+
+    const result = await search?.execute({ query: "LLM Space", limit: 50 });
+
+    expect(request?.url.searchParams.get("num")).toBe("10");
+    expect(result).toHaveLength(10);
+    expect((result as { url: string }[])[9]?.url).toBe(
+      "https://example.com/10"
+    );
+  });
+
+  test("requires a configured Serply API key", async () => {
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => ({
+        ...serplySettings(),
+        serplyApiKey: "$SERPLY_API_KEY",
+      }),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toContain(
+      "Serply API key is not configured"
+    );
+  });
+
+  test("surfaces error details returned by Serply", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(
+        Response.json({ detail: "Invalid API key" }, { status: 401 })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: serplySettings,
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe("Invalid API key");
+  });
+
+  test("keeps the HTTP status when the response is not JSON", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      // What a CDN in front of the API returns when it answers instead of Serply.
+      return Promise.resolve(
+        new Response("<html><body>502 Bad Gateway</body></html>", {
+          status: 502,
+          headers: { "Content-Type": "text/html" },
+        })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: serplySettings,
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe("web_search failed: 502");
+  });
+
+  test("reports an unparseable success response instead of returning nothing", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(
+        new Response("not json", {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: serplySettings,
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toContain("non-JSON response (200)");
+  });
+
+  test("delegates web_fetch to Firecrawl", async () => {
+    let request: { url: string; headers: Headers } | undefined;
+    globalThis.fetch = ((input, init) => {
+      request = {
+        url:
+          input instanceof URL
+            ? input.toString()
+            : typeof input === "string"
+              ? input
+              : input.url,
+        headers: new Headers(init?.headers),
+      };
+      return Promise.resolve(
+        Response.json({
+          success: true,
+          data: { markdown: "# Example", metadata: { title: "Example" } },
+        })
+      );
+    }) as typeof fetch;
+
+    const fetchTool = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => ({
+        ...serplySettings(),
+        firecrawlApiKey: "firecrawl-key",
       }),
     }).find((entry) => entry.tool.name === "web_fetch");
 
@@ -202,6 +452,7 @@ const NEW_SETTINGS_FIELDS = {
   exaApiKey: "",
   anysearchApiKey: "",
   zhihuAccessSecret: "",
+  serplyApiKey: "",
 };
 
 interface RpcCallBody {
@@ -430,6 +681,7 @@ describe("Zhihu MCP provider", () => {
         tavilyApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",
+        serplyApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -512,6 +764,7 @@ describe("Zhihu MCP provider", () => {
         tavilyApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "zhihu-secret",
+        serplyApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 

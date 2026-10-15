@@ -6,6 +6,7 @@ from langchain.tools import tool
 FIRECRAWL_BASE_URL = "https://api.firecrawl.dev"
 TAVILY_BASE_URL = "https://api.tavily.com"
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
+SERPLY_SEARCH_URL = "https://api.serply.io/v1/search/"
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -133,6 +134,58 @@ def _brave_search(query: str, limit: int, include_content: bool) -> list[dict]:
     return results
 
 
+def _serply_search(query: str, limit: int, include_content: bool) -> list[dict]:
+    """Serply web search, returning Google SERP results. Requires ``SERPLY_API_KEY``."""
+    api_key = os.environ.get("SERPLY_API_KEY")
+    if not api_key:
+        raise RuntimeError("Serply API key is not configured. Set SERPLY_API_KEY.")
+
+    # One request reads a single result page and a page carries at most ten
+    # organic results, so num is clamped rather than silently truncated by the
+    # API. A page crowded with non-organic blocks can return fewer, so the
+    # count is a ceiling, not a guarantee.
+    count = max(1, min(10, limit))
+    res = requests.get(
+        SERPLY_SEARCH_URL,
+        headers={"Accept": "application/json", "X-Api-Key": api_key},
+        params={"q": query, "num": str(count)},
+    )
+
+    # Serply reports errors as JSON, but it sits behind a CDN that can answer
+    # with an HTML page instead; parsing blind would bury the status code under
+    # a decode error.
+    try:
+        json_body = res.json()
+    except ValueError:
+        json_body = None
+
+    if not res.ok:
+        detail = (json_body or {}).get("detail") or (json_body or {}).get("message")
+        raise RuntimeError(detail or f"web_search failed: {res.status_code}")
+    if json_body is None:
+        raise RuntimeError(
+            f"web_search failed: Serply returned a non-JSON response ({res.status_code})."
+        )
+
+    results = []
+    # num is a request hint, so hold the response to the caller's limit too.
+    for item in (json_body.get("results") or [])[:count]:
+        description = item.get("description")
+        results.append(
+            {
+                "title": item.get("title") or "Untitled",
+                "url": item.get("link") or "",
+                "snippet": description,
+                # A SERP row carries one snippet and no page body, so
+                # include_content has no longer text to offer here.
+                "content": _truncate_text(description, 2_000)
+                if include_content and description
+                else None,
+            }
+        )
+    return results
+
+
 @tool
 def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list[dict]:
     """Search the web and return LLM-friendly results.
@@ -140,7 +193,7 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
     Search the web and return LLM-friendly results.
 
     The backend is chosen by the ``SEARCH_PROVIDER`` environment variable
-    (``firecrawl`` by default, or ``tavily``/``brave``).
+    (``firecrawl`` by default, or ``tavily``/``brave``/``serply``).
 
     Args:
         query: The search query string to look up on the web.
@@ -153,4 +206,6 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
         return _tavily_search(query, limit, includeContent)
     if provider == "brave":
         return _brave_search(query, limit, includeContent)
+    if provider == "serply":
+        return _serply_search(query, limit, includeContent)
     return _firecrawl_search(query, limit, includeContent)

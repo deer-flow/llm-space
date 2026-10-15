@@ -5,7 +5,8 @@ export type SearchProviderId =
   | "tavily"
   | "exa"
   | "anysearch"
-  | "zhihu";
+  | "zhihu"
+  | "serply";
 
 /**
  * User-configured search settings, persisted to `settings/search.json`. API keys
@@ -15,7 +16,8 @@ export type SearchProviderId =
  *
  * `exa` and `anysearch` are MCP-backed providers whose keys are optional (both
  * work anonymously with lower rate limits); `zhihu` is Zhihu's official MCP
- * search and requires an access secret from the Zhihu developer console.
+ * search and requires an access secret from the Zhihu developer console;
+ * `serply` returns Google SERP results and requires a key.
  */
 export interface SearchSettings {
   provider: SearchProviderId;
@@ -25,6 +27,7 @@ export interface SearchSettings {
   exaApiKey: string;
   anysearchApiKey: string;
   zhihuAccessSecret: string;
+  serplyApiKey: string;
 }
 
 export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
@@ -35,4 +38,5 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   exaApiKey: "$EXA_API_KEY",
   anysearchApiKey: "$ANYSEARCH_API_KEY",
   zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",
+  serplyApiKey: "$SERPLY_API_KEY",
 };

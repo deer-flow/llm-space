@@ -10,6 +10,7 @@ export interface WebBuiltInToolsDependencies {
 const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
 const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
+const SERPLY_SEARCH_URL = "https://api.serply.io/v1/search/";
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
 const ANYSEARCH_MCP_URL = "https://api.anysearch.com/mcp";
 const ZHIHU_MCP_SSE_URL =
@@ -104,6 +105,16 @@ interface BraveSearchResponse {
   };
   message?: string;
   detail?: string;
+}
+
+interface SerplySearchResponse {
+  results?: {
+    title?: string;
+    link?: string;
+    description?: string;
+  }[];
+  detail?: string;
+  message?: string;
 }
 
 function _truncateText(text: string, maxChars: number): string {
@@ -348,6 +359,84 @@ class BraveSearchProvider implements SearchProvider {  constructor(
             : undefined,
       };
     });
+  }
+}
+
+/**
+ * Serply-backed web search: Google SERP results over a plain REST endpoint.
+ * Like Brave, Serply exposes no single-page extraction endpoint, so `web_fetch`
+ * delegates to Firecrawl instead of fetching arbitrary URLs from the trusted
+ * Bun process, which would widen the tool's SSRF surface.
+ */
+class SerplySearchProvider implements SearchProvider {
+  constructor(
+    private readonly _apiKey: string,
+    private readonly _fetchProvider: SearchProvider
+  ) {
+    if (!_apiKey) {
+      throw new Error(
+        "Serply API key is not configured. Add one in Settings → Search."
+      );
+    }
+  }
+
+  fetch(url: string): Promise<WebFetchResult> {
+    return this._fetchProvider.fetch(url);
+  }
+
+  async search(
+    query: string,
+    limit: number,
+    includeContent: boolean
+  ): Promise<WebSearchResult[]> {
+    // One request reads a single result page and a page carries at most ten
+    // organic results, so `num` is clamped here rather than silently truncated
+    // by the API. A page crowded with non-organic blocks (weather, maps) can
+    // return fewer, so the count is a ceiling, not a guarantee.
+    const count = _clampedLimit(limit);
+    const url = new URL(SERPLY_SEARCH_URL);
+    url.searchParams.set("q", query);
+    url.searchParams.set("num", String(count));
+
+    const res = await fetch(url, {
+      headers: { Accept: "application/json", "X-Api-Key": this._apiKey },
+    });
+
+    // Serply reports errors as JSON, but it sits behind a CDN that can answer
+    // with an HTML page instead; parsing blind would bury the status code under
+    // a syntax error.
+    const body = await res.text();
+    let json: SerplySearchResponse | undefined;
+    try {
+      json = JSON.parse(body) as SerplySearchResponse;
+    } catch {
+      // Left undefined and handled below, so the HTTP status still surfaces.
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        json?.detail ?? json?.message ?? `web_search failed: ${res.status}`
+      );
+    }
+    if (!json) {
+      throw new Error(
+        `web_search failed: Serply returned a non-JSON response (${res.status}).`
+      );
+    }
+
+    // `num` is a request hint, so hold the response to the caller's limit too.
+    return (json.results ?? []).slice(0, count).map((item) => ({
+      title: item.title ?? "Untitled",
+      url: item.link ?? "",
+      snippet: item.description,
+      // A SERP row carries one snippet and no page body, so `includeContent`
+      // has no longer text to offer here; `web_fetch` reads the full page when
+      // a run needs it.
+      content:
+        includeContent && item.description
+          ? _truncateText(item.description, 2_000)
+          : undefined,
+    }));
   }
 }
 
@@ -851,6 +940,12 @@ function _getSearchProvider({
   }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
+  }
+  if (settings.provider === "serply") {
+    return new SerplySearchProvider(
+      _resolveApiKey(settings.serplyApiKey, env),
+      new FirecrawlSearchProvider(_resolveApiKey(settings.firecrawlApiKey, env))
+    );
   }
   // MCP-backed providers keep `web_fetch` on Firecrawl's safe extraction path.
   const fetchViaFirecrawl = (url: string) =>
