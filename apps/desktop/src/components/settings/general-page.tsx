@@ -1,5 +1,6 @@
 "use client";
 
+import { selectableModels } from "@llm-space/core/thread";
 import {
   isModelAvailable,
   useDefaultModel,
@@ -119,11 +120,10 @@ function DefaultModelSelect() {
       [...providers]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((group) => {
-          const disabled = new Set(group.disabledModels ?? []);
           return {
             id: group.id,
             name: group.name,
-            models: group.models.filter((model) => !disabled.has(model.id)),
+            models: selectableModels(group),
           };
         })
         .filter((group) => group.models.length > 0),
@@ -152,7 +152,14 @@ function DefaultModelSelect() {
   return (
     <Select value={value} onValueChange={handleChange}>
       <SelectTrigger className="w-64" aria-label={t.general.defaultModelAria}>
-        <SelectValue />
+        <SelectValue>
+          {value === AUTO_DEFAULT_MODEL
+            ? t.general.defaultModelAutomatic
+            : providers
+                .find((group) => group.id === defaultModel?.provider)
+                ?.models.find((model) => model.id === defaultModel?.id)?.name ??
+              defaultModel?.id}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={AUTO_DEFAULT_MODEL}>

@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { minimaxProvider } from "../../../../src/models/providers/minimax";
 import { minimaxCnProvider } from "../../../../src/models/providers/minimax-cn";
 
-const MODELS = ["MiniMax-M3", "MiniMax-M2.7"] as const;
+const MODELS = ["MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M2.7"] as const;
 
 describe("minimaxProvider", () => {
   test("exposes the OpenAI-compatible global endpoint and the M3/M2.7 models", () => {

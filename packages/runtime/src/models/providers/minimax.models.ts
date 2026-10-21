@@ -38,6 +38,41 @@ const M3_INPUT = ["text", "image", "video"] as unknown as ("text" | "image")[];
  * thinking. MiniMax-M2.7 stays an always-on reasoning text model.
  */
 export const MINIMAX_MODELS = {
+  "MiniMax-M3.1-Flash": {
+    id: "MiniMax-M3.1-Flash",
+    provider: "minimax",
+    name: "MiniMax-M3.1-Flash",
+    api: "openai-completions",
+    baseUrl: OPENAI_BASE_URL,
+    reasoning: true,
+    thinkingLevelMap: {
+      off: null,
+      minimal: null,
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      max: "max",
+    },
+    input: M3_INPUT,
+    cost: {
+      input: 0.15,
+      output: 0.6,
+      cacheRead: 0.015,
+      // Unknown cache-write pricing uses the catalog's zero sentinel.
+      cacheWrite: 0,
+    },
+    contextWindow: 1000000,
+    maxTokens: 524288,
+    samplingParams: { thinking: { type: "adaptive" } },
+    compat: {
+      thinkingFormat: "openai",
+      supportsReasoningEffort: true,
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsLongCacheRetention: false,
+    },
+  } satisfies Model<"openai-completions">,
   "MiniMax-M3": {
     id: "MiniMax-M3",
     provider: "minimax",
@@ -87,6 +122,11 @@ export const MINIMAX_MODELS = {
  * the China OpenAI-compatible endpoint (`https://api.minimaxi.com/v1`).
  */
 export const MINIMAX_CN_MODELS = {
+  "MiniMax-M3.1-Flash": {
+    ...MINIMAX_MODELS["MiniMax-M3.1-Flash"],
+    provider: "minimax-cn",
+    baseUrl: OPENAI_BASE_URL_CN,
+  } satisfies Model<"openai-completions">,
   "MiniMax-M3": {
     ...MINIMAX_MODELS["MiniMax-M3"],
     provider: "minimax-cn",
