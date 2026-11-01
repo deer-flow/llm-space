@@ -24,7 +24,7 @@ jobs:
 
       # Reads mise.lock: installs the exact locked bun with checksum
       # verification (auto `mise install --locked`).
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
 
       - run: bun install --frozen-lockfile
 
