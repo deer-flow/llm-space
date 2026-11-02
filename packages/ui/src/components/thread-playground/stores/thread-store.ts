@@ -232,6 +232,13 @@ export function createThreadStore(
      */
     getReactLoop?: () => boolean;
     /**
+     * Whether full access mode is enabled: auto-run executes every tool call,
+     * including bash commands flagged destructive, without pausing. Opt-in via
+     * Experimental settings (with a one-time risk acknowledgement); off by
+     * default. Read fresh at run time. Defaults to `false`.
+     */
+    getFullAccessMode?: () => boolean;
+    /**
      * Execute an MCP or built-in tool call, returning structured model-facing
      * content. Only used by the auto-run-tools path; manual tool runs go through
      * the UI's own runner. Injected so the store stays decoupled from the RPC
@@ -568,28 +575,44 @@ export function createThreadStore(
           toolCall: ToolCall;
           tool: McpTool | BuiltinTool | PluginTool;
         }[] = [];
+        // A destructive `bash` command must never be auto-executed, even under
+        // "auto run tools" or the ReAct loop — treat it like a `terminate`
+        // tool: stop the loop and leave it pending for the user to review and
+        // run by hand. Full access mode is the deliberate opt-out: the user
+        // acknowledged the risk and accepted that every tool runs unattended.
+        //
+        // The mode is read on every check instead of captured once, because
+        // resolving plugin variables below yields to the event loop: a user who
+        // switches the mode off while a batch is being prepared must still stop
+        // the destructive command (see the re-check after the `await`).
+        const isRiskPaused = (
+          toolCall: ToolCall,
+          tool: McpTool | BuiltinTool | PluginTool
+        ): boolean => {
+          if (options.getFullAccessMode?.() ?? false) {
+            return false;
+          }
+          if (tool.type !== "builtin" || tool.name !== "bash") {
+            return false;
+          }
+          const command = (toolCall.input.arguments as { command?: unknown })
+            ?.command;
+          return typeof command === "string" && isDangerousBashCommand(command);
+        };
+        const pauseForRiskyCommand = () => {
+          toast.warning("Auto-run paused for a risky command", {
+            description:
+              "A bash command looked destructive, so it wasn't run automatically. Review it and run it by hand if it's safe.",
+          });
+          return null;
+        };
         for (const toolCall of toolCalls) {
           const tool = toolsByName.get(toolCall.input.name);
           if (!tool || !isExecutableTool(tool)) {
             return null;
           }
-          // A destructive `bash` command must never be auto-executed, even under
-          // "auto run tools" or the ReAct loop — treat it like a `terminate`
-          // tool: stop the loop and leave it pending for the user to review and
-          // run by hand.
-          if (tool.type === "builtin" && tool.name === "bash") {
-            const command = (toolCall.input.arguments as { command?: unknown })
-              ?.command;
-            if (
-              typeof command === "string" &&
-              isDangerousBashCommand(command)
-            ) {
-              toast.warning("Auto-run paused for a risky command", {
-                description:
-                  "A bash command looked destructive, so it wasn't run automatically. Review it and run it by hand if it's safe.",
-              });
-              return null;
-            }
+          if (isRiskPaused(toolCall, tool)) {
+            return pauseForRiskyCommand();
           }
           executable.push({ toolCall, tool });
         }
@@ -609,6 +632,16 @@ export function createThreadStore(
         const invocationContext = { thread: owningThread, variables };
         if (signal.aborted || get().activeRunId !== runId) {
           return null;
+        }
+        // Re-check after the asynchronous preparation: that `await` is a real
+        // yield to the event loop, so full access mode may have been switched
+        // off while the batch was being prepared. This is the last point before
+        // anything runs, so gate again here rather than trusting the reading
+        // taken while the batch was collected.
+        if (
+          executable.some(({ toolCall, tool }) => isRiskPaused(toolCall, tool))
+        ) {
+          return pauseForRiskyCommand();
         }
         set({
           executingToolCallIds: executable.map(({ toolCall }) => toolCall.id),
@@ -1172,6 +1205,13 @@ export function createThreadStore(
             streamingMessage: null,
             executingToolCallIds: [],
           });
+          // Persistent reminder (dismissible) that this run may execute
+          // anything without pausing — see the full access mode acknowledgement.
+          if (options.getFullAccessMode?.()) {
+            toast.warning(
+              "Full access mode is on — tools, including commands flagged destructive, run without confirmation."
+            );
+          }
 
           // Commit the truncation while running so it folds into the run's
           // single undo step instead of becoming its own snapshot.
