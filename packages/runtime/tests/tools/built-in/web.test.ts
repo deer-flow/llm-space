@@ -47,6 +47,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -87,6 +88,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -130,6 +132,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -178,6 +181,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_fetch");
 
@@ -202,6 +206,7 @@ const NEW_SETTINGS_FIELDS = {
   exaApiKey: "",
   anysearchApiKey: "",
   zhihuAccessSecret: "",
+  keenableApiKey: "",
 };
 
 interface RpcCallBody {
@@ -430,6 +435,7 @@ describe("Zhihu MCP provider", () => {
         tavilyApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -512,6 +518,7 @@ describe("Zhihu MCP provider", () => {
         tavilyApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "zhihu-secret",
+        keenableApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -548,6 +555,91 @@ describe("Zhihu MCP provider", () => {
         url: "https://zhuanlan.zhihu.com/p/1",
         snippet: "本文介绍了主流 RAG 评测框架。",
         content: undefined,
+      },
+    ]);
+  });
+});
+
+describe("Keenable provider", () => {
+  const settings = (keenableApiKey: string) => ({
+    provider: "keenable" as const,
+    braveApiKey: "",
+    firecrawlApiKey: "",
+    tavilyApiKey: "",
+    exaApiKey: "",
+    anysearchApiKey: "",
+    zhihuAccessSecret: "",
+    keenableApiKey,
+  });
+
+  const capture = () => {
+    const calls: { url: string; headers: Headers; body: unknown }[] = [];
+    globalThis.fetch = ((input, init) => {
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+        body: JSON.parse(String(init?.body)),
+      });
+      return Promise.resolve(
+        Response.json({
+          results: [
+            {
+              title: "Keenable",
+              url: "https://keenable.ai",
+              description: "Search API",
+              snippet: "Longer page snippet",
+            },
+            { title: "no url" },
+          ],
+        })
+      );
+    }) as typeof fetch;
+    return calls;
+  };
+
+  test("uses the keyless public endpoint without a key", async () => {
+    const calls = capture();
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => settings("$KEENABLE_API_KEY"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    const result = await search?.execute({ query: "q", limit: 50 });
+
+    expect(calls[0]?.url).toBe("https://api.keenable.ai/v1/search/public");
+    expect(calls[0]?.headers.get("X-Keenable-Title")).toBe("LLM Space");
+    expect(calls[0]?.headers.get("X-API-Key")).toBeNull();
+    expect(calls[0]?.body).toEqual({ query: "q", max_results: 10 });
+    expect(result).toEqual([
+      {
+        title: "Keenable",
+        url: "https://keenable.ai",
+        snippet: "Search API",
+        content: undefined,
+      },
+    ]);
+  });
+
+  test("uses the keyed endpoint when a key resolves", async () => {
+    const calls = capture();
+    const search = createWebBuiltInTools({
+      env: { KEENABLE_API_KEY: "k-123" },
+      getSearchSettings: () => settings("$KEENABLE_API_KEY"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    const result = await search?.execute({
+      query: "q",
+      includeContent: true,
+    });
+
+    expect(calls[0]?.url).toBe("https://api.keenable.ai/v1/search");
+    expect(calls[0]?.headers.get("X-API-Key")).toBe("k-123");
+    expect(result).toEqual([
+      {
+        title: "Keenable",
+        url: "https://keenable.ai",
+        snippet: "Search API",
+        content: "Longer page snippet",
       },
     ]);
   });

@@ -25,6 +25,7 @@ const PROVIDER_ORDER: readonly SearchProviderId[] = [
   "exa",
   "anysearch",
   "zhihu",
+  "keenable",
 ];
 
 /** Where each provider's key is issued, for the "Get API key" link. */
@@ -35,6 +36,7 @@ const FAVICON_DOMAINS: Record<SearchProviderId, string> = {
   exa: "exa.ai",
   anysearch: "anysearch.com",
   zhihu: "zhihu.com",
+  keenable: "keenable.ai",
 };
 
 const GET_KEY_URLS: Record<SearchProviderId, string> = {
@@ -44,6 +46,7 @@ const GET_KEY_URLS: Record<SearchProviderId, string> = {
   exa: "https://dashboard.exa.ai/api-keys",
   anysearch: "https://www.anysearch.com/console/api-keys",
   zhihu: "https://developer.zhihu.com/",
+  keenable: "https://keenable.ai",
 };
 
 export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
@@ -237,7 +240,8 @@ function _settingsKeyFor(
   | "tavilyApiKey"
   | "exaApiKey"
   | "anysearchApiKey"
-  | "zhihuAccessSecret" {
+  | "zhihuAccessSecret"
+  | "keenableApiKey" {
   return provider === "zhihu" ? "zhihuAccessSecret" : `${provider}ApiKey`;
 }
 
