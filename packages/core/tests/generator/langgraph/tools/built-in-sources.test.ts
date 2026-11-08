@@ -416,3 +416,123 @@ print("unsupported-without-side-effects")
     await rm(root, { recursive: true, force: true });
   }
 });
+
+it("executes the generated Outcrawl web_search and web_fetch backends with a stubbed requests", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "llm-space-python-outcrawl-"));
+  try {
+    await writeFile(path.join(root, "web_search.py"), BUILTIN_TOOL_SOURCES.web_search!, "utf8");
+    await writeFile(path.join(root, "web_fetch.py"), BUILTIN_TOOL_SOURCES.web_fetch!, "utf8");
+    const script = `
+import os
+import runpy
+import sys
+import types
+
+calls = []
+
+
+class FakeResponse:
+    def __init__(self, status, body):
+        self.status_code = status
+        self.ok = status < 400
+        self._body = body
+
+    def json(self):
+        if self._body is None:
+            raise ValueError("not json")
+        return self._body
+
+
+responses = []
+
+
+def fake_post(url, headers=None, json=None):
+    calls.append((url, headers, json))
+    return responses.pop(0)
+
+
+requests = types.ModuleType("requests")
+requests.post = fake_post
+sys.modules["requests"] = requests
+langchain = types.ModuleType("langchain")
+langchain_tools = types.ModuleType("langchain.tools")
+langchain_tools.tool = lambda fn: fn
+sys.modules["langchain"] = langchain
+sys.modules["langchain.tools"] = langchain_tools
+
+search = runpy.run_path("web_search.py")["web_search"]
+fetch = runpy.run_path("web_fetch.py")["web_fetch"]
+
+os.environ["SEARCH_PROVIDER"] = "outcrawl"
+os.environ.pop("OUTCRAWL_API_KEY", None)
+for call in (lambda: search("q"), lambda: fetch("https://example.com")):
+    try:
+        call()
+    except RuntimeError as error:
+        assert "OUTCRAWL_API_KEY" in str(error)
+    else:
+        raise AssertionError("expected a missing-key error")
+assert calls == []
+
+os.environ["OUTCRAWL_API_KEY"] = "oc-key"
+responses.append(FakeResponse(200, {"hits": [{"title": "Bun", "url": "https://bun.com", "snippet": "Fast."}, {"url": "https://x.test"}]}))
+hits = search("bun", limit=50, includeContent=True)
+url, headers, body = calls.pop()
+assert url == "https://api.outcrawl.ai/v1/search"
+assert headers["Authorization"] == "Bearer oc-key"
+assert body == {"query": "bun", "limit": 20}
+assert hits == [
+    {"title": "Bun", "url": "https://bun.com", "snippet": "Fast.", "content": None},
+    {"title": "Untitled", "url": "https://x.test", "snippet": None, "content": None},
+]
+
+responses.append(FakeResponse(200, {"markdown": "# Example", "metadata": {"title": "Example"}}))
+page = fetch("https://example.com")
+url, headers, body = calls.pop()
+assert url == "https://api.outcrawl.ai/v1/scrape"
+assert body == {"url": "https://example.com", "formats": ["markdown"]}
+assert page == {"url": "https://example.com", "title": "Example", "content": "# Example", "metadata": {"title": "Example"}}
+
+responses.append(FakeResponse(401, {"code": "unauthorized", "message": "authentication failed"}))
+try:
+    search("bun")
+except RuntimeError as error:
+    assert str(error) == "authentication failed"
+else:
+    raise AssertionError("expected an API error")
+calls.clear()
+
+responses.append(FakeResponse(502, None))
+try:
+    fetch("https://example.com")
+except RuntimeError as error:
+    assert str(error) == "web_fetch failed: 502"
+else:
+    raise AssertionError("expected a status error")
+
+responses.append(FakeResponse(200, {"metadata": {}}))
+try:
+    fetch("https://example.com")
+except RuntimeError as error:
+    assert "could not extract" in str(error)
+else:
+    raise AssertionError("expected an empty-page error")
+print("outcrawl-ok")
+`;
+    const child = Bun.spawn(["python3", "-c", script], {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(stdout).toContain("outcrawl-ok");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -435,6 +435,7 @@ export function GenerateProjectButton({
           search.firecrawlApiKey,
           search.tavilyApiKey,
           search.braveApiKey,
+          search.outcrawlApiKey,
         ]) {
           if (raw?.startsWith("$")) {
             envNames.push(raw.slice(1));
@@ -457,6 +458,7 @@ export function GenerateProjectButton({
             exaApiKey: resolveKey(search.exaApiKey),
             anysearchApiKey: resolveKey(search.anysearchApiKey),
             zhihuAccessSecret: resolveKey(search.zhihuAccessSecret),
+            outcrawlApiKey: resolveKey(search.outcrawlApiKey),
           }
         : undefined;
 

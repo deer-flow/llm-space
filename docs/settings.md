@@ -213,6 +213,7 @@ Supported Search Providers:
 | --- | --- |
 | Firecrawl | Default Search Provider. Requires a Firecrawl API Key. |
 | Tavily | Optional Search Provider. Requires a Tavily API Key. |
+| Outcrawl | Optional Search Provider. Requires an Outcrawl API Key from https://outcrawl.ai. Both `web_search` and `web_fetch` use Outcrawl. |
 
 API Keys on this page support two forms:
 
@@ -225,6 +226,7 @@ Or reference environment variables:
 ```text
 $FIRECRAWL_API_KEY
 $TAVILY_API_KEY
+$OUTCRAWL_API_KEY
 ```
 
 If your Thread does not enable the `web_search` or `web_fetch` tool, the Provider and API Key settings here are not used during the run.

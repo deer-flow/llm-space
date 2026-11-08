@@ -25,6 +25,7 @@ const PROVIDER_ORDER: readonly SearchProviderId[] = [
   "exa",
   "anysearch",
   "zhihu",
+  "outcrawl",
 ];
 
 /** Where each provider's key is issued, for the "Get API key" link. */
@@ -35,6 +36,7 @@ const FAVICON_DOMAINS: Record<SearchProviderId, string> = {
   exa: "exa.ai",
   anysearch: "anysearch.com",
   zhihu: "zhihu.com",
+  outcrawl: "outcrawl.ai",
 };
 
 const GET_KEY_URLS: Record<SearchProviderId, string> = {
@@ -44,6 +46,7 @@ const GET_KEY_URLS: Record<SearchProviderId, string> = {
   exa: "https://dashboard.exa.ai/api-keys",
   anysearch: "https://www.anysearch.com/console/api-keys",
   zhihu: "https://developer.zhihu.com/",
+  outcrawl: "https://outcrawl.ai",
 };
 
 export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
@@ -207,7 +210,8 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
                     {t.search.envMiddle}
                     <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
                     <code>$FIRECRAWL_API_KEY</code>,{" "}
-                    <code>$TAVILY_API_KEY</code>
+                    <code>$TAVILY_API_KEY</code>,{" "}
+                    <code>$OUTCRAWL_API_KEY</code>
                     {t.search.envSuffix}
                     {t.search.keyNotes}
                   </p>
@@ -237,7 +241,8 @@ function _settingsKeyFor(
   | "tavilyApiKey"
   | "exaApiKey"
   | "anysearchApiKey"
-  | "zhihuAccessSecret" {
+  | "zhihuAccessSecret"
+  | "outcrawlApiKey" {
   return provider === "zhihu" ? "zhihuAccessSecret" : `${provider}ApiKey`;
 }
 

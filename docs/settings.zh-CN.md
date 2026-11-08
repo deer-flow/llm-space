@@ -213,6 +213,7 @@ Search 页面用于配置内置 `web_search` 和 `web_fetch` 工具的搜索服�
 | --- | --- |
 | Firecrawl | 默认搜索 Provider。需要配置 Firecrawl API Key。 |
 | Tavily | 可选搜索 Provider。需要配置 Tavily API Key。 |
+| Outcrawl | 可选搜索 Provider。需要在 https://outcrawl.ai 获取 Outcrawl API Key。`web_search` 和 `web_fetch` 均使用 Outcrawl。 |
 
 页面中的 API Key 支持两种写法：
 
@@ -225,6 +226,7 @@ Search 页面用于配置内置 `web_search` 和 `web_fetch` 工具的搜索服�
 ```text
 $FIRECRAWL_API_KEY
 $TAVILY_API_KEY
+$OUTCRAWL_API_KEY
 ```
 
 如果你的 Thread 没有启用 `web_search` 或 `web_fetch` 工具，这里的 Provider 和 API Key 设置不会参与运行。

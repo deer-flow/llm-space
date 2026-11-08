@@ -5,6 +5,7 @@ from langchain.tools import tool
 
 FIRECRAWL_BASE_URL = "https://api.firecrawl.dev"
 TAVILY_BASE_URL = "https://api.tavily.com"
+OUTCRAWL_BASE_URL = "https://api.outcrawl.ai/v1"
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 
 
@@ -133,6 +134,36 @@ def _brave_search(query: str, limit: int, include_content: bool) -> list[dict]:
     return results
 
 
+def _outcrawl_search(query: str, limit: int, include_content: bool) -> list[dict]:
+    """Outcrawl web search. Requires ``OUTCRAWL_API_KEY``. Hits carry a snippet
+    only, so ``include_content`` has no effect."""
+    api_key = os.environ.get("OUTCRAWL_API_KEY")
+    if not api_key:
+        raise RuntimeError("Outcrawl API key is not configured. Set OUTCRAWL_API_KEY.")
+
+    res = requests.post(
+        f"{OUTCRAWL_BASE_URL}/search",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        json={"query": query, "limit": max(1, min(20, limit))},
+    )
+    try:
+        json_body = res.json()
+    except ValueError:
+        json_body = {}
+    if not res.ok:
+        raise RuntimeError(json_body.get("message") or f"web_search failed: {res.status_code}")
+
+    return [
+        {
+            "title": item.get("title") or "Untitled",
+            "url": item.get("url") or "",
+            "snippet": item.get("snippet"),
+            "content": None,
+        }
+        for item in json_body.get("hits") or []
+    ]
+
+
 @tool
 def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list[dict]:
     """Search the web and return LLM-friendly results.
@@ -140,7 +171,7 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
     Search the web and return LLM-friendly results.
 
     The backend is chosen by the ``SEARCH_PROVIDER`` environment variable
-    (``firecrawl`` by default, or ``tavily``/``brave``).
+    (``firecrawl`` by default, or ``tavily``/``brave``/``outcrawl``).
 
     Args:
         query: The search query string to look up on the web.
@@ -153,4 +184,6 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
         return _tavily_search(query, limit, includeContent)
     if provider == "brave":
         return _brave_search(query, limit, includeContent)
+    if provider == "outcrawl":
+        return _outcrawl_search(query, limit, includeContent)
     return _firecrawl_search(query, limit, includeContent)
