@@ -699,6 +699,7 @@ const APP_MESSAGES = {
         exa: "Exa",
         anysearch: "AnySearch",
         zhihu: "Zhihu",
+        serply: "Serply",
       },
       keys: {
         brave: "Brave Search API key",
@@ -707,6 +708,7 @@ const APP_MESSAGES = {
         exa: "Exa API key (optional)",
         anysearch: "AnySearch API key (optional)",
         zhihu: "Zhihu Access Secret",
+        serply: "Serply API key",
       },
       envPrefix: "Values starting with ",
       envMiddle: " are read from the environment (e.g. ",
@@ -1359,6 +1361,7 @@ const APP_MESSAGES = {
         exa: "Exa",
         anysearch: "AnySearch",
         zhihu: "知乎",
+        serply: "Serply",
       },
       keys: {
         brave: "Brave Search API Key",
@@ -1367,6 +1370,7 @@ const APP_MESSAGES = {
         exa: "Exa API Key（可选）",
         anysearch: "AnySearch API Key（可选）",
         zhihu: "知乎 Access Secret",
+        serply: "Serply API Key",
       },
       envPrefix: "以 ",
       envMiddle: " 开头的值会从环境变量读取（例如 ",

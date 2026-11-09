@@ -34,6 +34,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -77,6 +78,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: "/tmp/workspace",
     });
@@ -143,6 +145,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: "/tmp/workspace",
     } as never);
@@ -173,6 +176,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -213,6 +217,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: directory,
     }).register(tools);
@@ -253,6 +258,7 @@ describe("built-in tools module", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        serplyApiKey: "",
       }),
       workspaceRoot: directory,
     }).register(tools);

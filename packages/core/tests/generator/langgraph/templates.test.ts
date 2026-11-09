@@ -6,13 +6,20 @@ import path from "node:path";
 import {
   agentPy,
   applyTemplatePy,
+  envExample,
+  envFile,
   langgraphJson,
   makefile,
   mcpEnvEntries,
   mcpModule,
   metaPromptMiddlewarePy,
 } from "../../../src/generator/langgraph/templates";
-import type { GeneratorMcpServer } from "../../../src/generator/types";
+import type {
+  GeneratorMcpServer,
+  GeneratorModelInfo,
+} from "../../../src/generator/types";
+import type { ModelConfig } from "../../../src/types";
+import { DEFAULT_SEARCH_SETTINGS } from "../../../src/types/search";
 
 const pythonTmp = mkdtempSync(
   path.join(os.tmpdir(), "llm-space-working-directory-python-")
@@ -136,6 +143,46 @@ describe("mcpEnvEntries", () => {
     const ref = entries.find((e) => e.name === "S_TOKEN");
     expect(ref).toBeDefined();
     expect(ref?.value).toBe("");
+  });
+});
+
+describe("envFile / envExample search block", () => {
+  const model: ModelConfig = { provider: "openai", id: "gpt-4o" };
+  const info: GeneratorModelInfo = {
+    name: "gpt-4o",
+    apiKey: "$OPENAI_API_KEY",
+    anthropic: false,
+    deepseekThinking: false,
+    supportsReasoning: false,
+  };
+
+  test("selects serply and fills in its literal key", () => {
+    const env = envFile(model, info, {
+      ...DEFAULT_SEARCH_SETTINGS,
+      provider: "serply",
+      serplyApiKey: "serply-literal-key",
+    });
+    expect(env).toContain("SEARCH_PROVIDER=serply");
+    expect(env).toContain("SERPLY_API_KEY=serply-literal-key");
+  });
+
+  test("a $VAR serply key is left for the environment to supply", () => {
+    const env = envFile(model, info, {
+      ...DEFAULT_SEARCH_SETTINGS,
+      provider: "serply",
+    });
+    expect(env).toContain("SERPLY_API_KEY=\n");
+  });
+
+  test("the example file names the var without leaking the key", () => {
+    const example = envExample(model, info, {
+      ...DEFAULT_SEARCH_SETTINGS,
+      provider: "serply",
+      serplyApiKey: "serply-literal-key",
+    });
+    expect(example).toContain("# Required only when SEARCH_PROVIDER=serply.");
+    expect(example).toContain("SERPLY_API_KEY=\n");
+    expect(example).not.toContain("serply-literal-key");
   });
 });
 
