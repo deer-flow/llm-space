@@ -504,7 +504,7 @@ describe("ModelManager provider-owned image generation", () => {
     ).toBeUndefined();
   });
 
-  test("rejects image configuration on non-Ark built-in providers", async () => {
+  test("rejects image configuration on unsupported built-in providers", async () => {
     const settingsDir = await _settingsDir({ providers: [] });
     const manager = new ModelManager({ settingsDir });
     manager.addBuiltInProvider({ id: "openai" });
@@ -524,8 +524,23 @@ describe("ModelManager provider-owned image generation", () => {
         },
       })
     ).toThrow(
-      "Image generation can only be configured on Ark or a custom provider"
+      "Image generation can only be configured on Ark, MiniMax, or a custom provider"
     );
+  });
+
+  test("persists MiniMax image-model availability", async () => {
+    const settingsDir = await _settingsDir({ providers: [] });
+    const manager = new ModelManager({ settingsDir });
+    manager.addBuiltInProvider({ id: "minimax" });
+
+    expect(manager.getMiniMaxImageGenerationConfig()).toEqual({});
+    manager.updateProvider("minimax", {
+      imageGeneration: { disabledModels: ["image-01-live"] },
+    });
+
+    expect(
+      new ModelManager({ settingsDir }).getMiniMaxImageGenerationConfig()
+    ).toEqual({ disabledModels: ["image-01-live"] });
   });
 
   test("persists an image-only custom provider without registering chat models", async () => {

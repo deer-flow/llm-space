@@ -12,12 +12,15 @@ import {
 import {
   DEFAULT_ARK_IMAGE_GENERATION_CONFIG,
   getImageModelDefinitions,
+  getMiniMaxImageModelDefinitions,
   isImageSize,
+  MINIMAX_IMAGE_MODELS,
   ModelConfig,
   SEEDREAM_IMAGE_MODELS,
   type CustomModel,
   type ImageGenerationConfig,
   type ModelProviderGroup,
+  type MiniMaxImageGenerationConfig,
   type ProviderConnectionRef,
   type ProviderProfile,
   type ProviderProfilePatch,
@@ -260,7 +263,9 @@ export class ModelManager {
       builtin: true,
       ...(id === "ark"
         ? { imageGeneration: { ...DEFAULT_ARK_IMAGE_GENERATION_CONFIG } }
-        : {}),
+        : id === "minimax"
+          ? { imageGeneration: {} }
+          : {}),
       profiles: [
         {
           id: uuid(),
@@ -347,17 +352,25 @@ export class ModelManager {
       else entry.icon = icon;
     }
     if (imageGeneration !== undefined) {
-      if (entry.builtin === true && entry.id !== "ark") {
+      if (
+        entry.builtin === true &&
+        entry.id !== "ark" &&
+        entry.id !== "minimax"
+      ) {
         throw new Error(
-          "Image generation can only be configured on Ark or a custom provider."
+          "Image generation can only be configured on Ark, MiniMax, or a custom provider."
         );
       }
-      _assertImageGenerationConfig(
-        imageGeneration,
-        entry.id === "ark" && entry.builtin === true
-          ? SEEDREAM_IMAGE_MODELS
-          : []
-      );
+      if (entry.id === "minimax" && entry.builtin === true) {
+        _assertMiniMaxImageGenerationConfig(imageGeneration);
+      } else {
+        _assertImageGenerationConfig(
+          imageGeneration,
+          entry.id === "ark" && entry.builtin === true
+            ? SEEDREAM_IMAGE_MODELS
+            : []
+        );
+      }
       entry.imageGeneration = { ...imageGeneration };
     }
     // Rebuild the registry so a cleared baseUrl restores the model's default
@@ -537,6 +550,12 @@ export class ModelManager {
   ): ImageGenerationConfig | undefined {
     const config = this._findProvider(providerId)?.imageGeneration;
     return config ? { ...config } : undefined;
+  }
+
+  /** The saved MiniMax image-model inventory, or undefined without MiniMax. */
+  getMiniMaxImageGenerationConfig(): MiniMaxImageGenerationConfig | undefined {
+    const config = this.getImageGenerationConfig("minimax");
+    return config ? { disabledModels: config.disabledModels } : undefined;
   }
 
   /** The ids of the user-added models for a provider (empty by default). */
@@ -889,19 +908,26 @@ export class ModelManager {
     let changed = false;
     for (const entry of this._config.providers) {
       if (entry.imageGeneration === undefined) {
+        if (entry.builtin === true && entry.id === "minimax") {
+          entry.imageGeneration = {};
+          changed = true;
+        }
         continue;
       }
       const isArk = entry.id === "ark" && entry.builtin === true;
-      if (entry.builtin === true && !isArk) {
+      const isMiniMax = entry.id === "minimax" && entry.builtin === true;
+      if (entry.builtin === true && !isArk && !isMiniMax) {
         delete entry.imageGeneration;
         changed = true;
         continue;
       }
-      const normalized = _normalizeImageGenerationConfig(
-        entry.imageGeneration,
-        isArk ? SEEDREAM_IMAGE_MODELS : [],
-        isArk ? "ark-images" : "openai-images"
-      );
+      const normalized = isMiniMax
+        ? _normalizeMiniMaxImageGenerationConfig(entry.imageGeneration)
+        : _normalizeImageGenerationConfig(
+            entry.imageGeneration,
+            isArk ? SEEDREAM_IMAGE_MODELS : [],
+            isArk ? "ark-images" : "openai-images"
+          );
       if (
         JSON.stringify(entry.imageGeneration) !== JSON.stringify(normalized)
       ) {
@@ -1086,6 +1112,24 @@ function _assertImageGenerationConfig(
   }
 }
 
+/** Validate renderer-supplied MiniMax image settings before persisting them. */
+function _assertMiniMaxImageGenerationConfig(
+  config: ImageGenerationConfig
+): void {
+  const disabledModels = config.disabledModels ?? [];
+  const modelIds = new Set<string>(
+    MINIMAX_IMAGE_MODELS.map((model) => model.id)
+  );
+  if (
+    disabledModels.some((modelId) => !modelIds.has(modelId)) ||
+    new Set(disabledModels).size !== disabledModels.length
+  ) {
+    throw new Error(
+      "Disabled MiniMax image models must reference unique model ids."
+    );
+  }
+}
+
 /** Normalize untrusted JSON from older or manually edited settings files. */
 function _normalizeImageGenerationConfig(
   value: unknown,
@@ -1124,6 +1168,30 @@ function _normalizeImageGenerationConfig(
     ...(models.length > 0 ? { models } : {}),
     ...(disabledModels.length > 0 ? { disabledModels } : {}),
   };
+}
+
+/** Repair MiniMax image settings loaded from user-edited JSON. */
+function _normalizeMiniMaxImageGenerationConfig(
+  value: unknown
+): MiniMaxImageGenerationConfig {
+  const candidate =
+    value && typeof value === "object"
+      ? (value as Partial<MiniMaxImageGenerationConfig>)
+      : {};
+  const modelIds = new Set(
+    getMiniMaxImageModelDefinitions({}).map((model) => model.id)
+  );
+  const disabledModels = Array.isArray(candidate.disabledModels)
+    ? [
+        ...new Set(
+          candidate.disabledModels.filter(
+            (modelId): modelId is string =>
+              typeof modelId === "string" && modelIds.has(modelId)
+          )
+        ),
+      ]
+    : [];
+  return disabledModels.length > 0 ? { disabledModels } : {};
 }
 
 /** Reject invalid custom model definitions supplied through renderer RPC. */
