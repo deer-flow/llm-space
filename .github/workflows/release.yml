@@ -248,7 +248,7 @@ jobs:
           }
           pkill -f "$APP/Contents/" || true
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.edition }}-${{ matrix.arch }}
           path: apps/desktop/artifacts/
@@ -277,7 +277,7 @@ jobs:
       - name: Build server package
         run: bun --filter @llm-space/server pack -- --target "${{ matrix.target }}"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: server-artifacts-${{ matrix.target }}
           path: apps/server/artifacts/
