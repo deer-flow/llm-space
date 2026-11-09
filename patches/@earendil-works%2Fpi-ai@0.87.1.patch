@@ -1,8 +1,7 @@
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cca0d8095c 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
-@@ -72,7 +72,7 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
+@@ -74,7 +74,7 @@
      };
      const normalizeToolCallId = (id, _targetModel, source) => {
          if (!allowedToolCallProviders.has(model.provider))
@@ -11,7 +10,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
          if (!id.includes("|"))
              return normalizeIdPart(id);
          const [callId, itemId] = id.split("|");
-@@ -129,6 +129,11 @@ export function convertResponsesMessages(model, context, allowedToolCallProvider
+@@ -169,6 +169,11 @@
          else if (msg.role === "assistant") {
              const output = [];
              const assistantMsg = msg;
@@ -23,7 +22,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
              const isSameProviderAndApi = assistantMsg.provider === model.provider && assistantMsg.api === model.api;
              const isSameModel = isSameProviderAndApi && assistantMsg.model === model.id;
              const isDifferentModel = isSameProviderAndApi && assistantMsg.model !== model.id;
-@@ -320,6 +325,7 @@ function appendCustomToolCallInput(block, nextInput, close) {
+@@ -320,6 +325,7 @@
  export async function processResponsesStream(openaiStream, output, stream, model, options) {
      let sawTerminalResponseEvent = false;
      const outputSlots = new Map();
@@ -31,7 +30,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
      const reasoningBlocksById = new Map();
      const applyMessagePhaseStopReason = (item) => {
          if (item.type === "message" && item.phase === "final_answer") {
-@@ -430,9 +436,66 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -430,9 +436,66 @@
              });
          }
      };
@@ -99,7 +98,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
          if (response?.id) {
              output.responseId = response.id;
          }
-@@ -479,6 +542,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -479,6 +542,7 @@
              output.responseId = event.response.id;
          }
          else if (event.type === "response.output_item.added") {
@@ -107,7 +106,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
              createSlot(event.output_index, event.item);
          }
          else if (event.type === "response.reasoning_summary_text.delta") {
-@@ -576,6 +640,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -576,6 +640,7 @@
          }
          else if (event.type === "response.output_item.done") {
              const item = event.item;
@@ -115,7 +114,7 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
              applyMessagePhaseStopReason(item);
              const slot = getOrCreateSlot(event.output_index, item);
              if (item.type === "reasoning" && slot?.type === "thinking") {
-@@ -594,6 +659,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -594,6 +659,9 @@
              }
              else if (item.type === "message" && slot?.type === "text") {
                  slot.block.text = item.content?.map((c) => (c.type === "output_text" ? c.text : c.refusal)).join("") || "";
@@ -126,10 +125,9 @@ index 43e463dbfd1e6cc437ebc680468036f47678de26..c65c855f50f616ab219ec9e69a06e4cc
                  stream.push({
                      type: "text_end",
 diff --git a/dist/api/openai-responses.d.ts b/dist/api/openai-responses.d.ts
-index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e46221e2c 100644
 --- a/dist/api/openai-responses.d.ts
 +++ b/dist/api/openai-responses.d.ts
-@@ -5,6 +5,7 @@ export interface OpenAIResponsesOptions extends StreamOptions {
+@@ -5,6 +5,7 @@
      reasoningSummary?: "auto" | "detailed" | "concise" | null;
      serviceTier?: ResponseCreateParamsStreaming["service_tier"];
      toolChoice?: ResponseCreateParamsStreaming["tool_choice"];
@@ -138,10 +136,9 @@ index 41267bd50904069aa0879cc8634ea94bc1045236..4ec81bb33bc068d5abee3e26ec30d31e
  /**
   * Generate function for OpenAI Responses API
 diff --git a/dist/api/openai-responses.js b/dist/api/openai-responses.js
-index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982962b7676 100644
 --- a/dist/api/openai-responses.js
 +++ b/dist/api/openai-responses.js
-@@ -167,6 +167,9 @@ export const streamSimple = (model, context, options) => {
+@@ -166,6 +166,9 @@
      };
      const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
      const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
@@ -151,16 +148,19 @@ index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982
      return stream(model, context, {
          ...base,
          reasoningEffort,
-@@ -241,11 +244,13 @@ function buildParams(model, context, options, compat = getCompat(model), grammar
+@@ -236,11 +239,13 @@
      if (options?.serviceTier !== undefined) {
          params.service_tier = options.serviceTier;
      }
--    if (toolPlacement.immediate.length > 0) {
--        params.tools = convertResponsesTools(toolPlacement.immediate, {
-+    const immediateTools = convertResponsesTools(toolPlacement.immediate, {
-             supportsStrictMode: compat.supportsStrictMode,
-             supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
-         });
+-    if (transcriptTools.requestTools.length > 0) {
+-        params.tools = convertResponsesTools(transcriptTools.requestTools, {
+-            supportsStrictMode: compat.supportsStrictMode,
+-            supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
+-        });
++    const immediateTools = convertResponsesTools(transcriptTools.requestTools, {
++        supportsStrictMode: compat.supportsStrictMode,
++        supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
++    });
 +    const nativeTools = options?.responseApiNativeTools ?? [];
 +    if (immediateTools.length > 0 || nativeTools.length > 0) {
 +        params.tools = [...immediateTools, ...nativeTools];
@@ -168,19 +168,18 @@ index 26050228ed2fc51133e3d7efd7831eac72145723..e29b61a8813464f28b87fe98b25d8982
      if (options?.toolChoice !== undefined) {
          params.tool_choice = options.toolChoice;
 diff --git a/dist/types.d.ts b/dist/types.d.ts
-index 85f95217bae764ef5a4fe4e9195ccbd8f2562a1e..f69f8fd542db171e467b6057e0843c5d89ba615b 100644
 --- a/dist/types.d.ts
 +++ b/dist/types.d.ts
-@@ -226,6 +226,8 @@ export interface SimpleStreamOptions extends StreamOptions {
+@@ -231,6 +231,8 @@
      };
      /** Custom token budgets for thinking levels (token-based providers only) */
      thinkingBudgets?: ThinkingBudgets;
 +    /** Raw provider-hosted tool definitions forwarded only by Responses adapters. */
 +    responseApiNativeTools?: readonly Record<string, unknown>[];
  }
- export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (model: Model<TApi>, context: Context, options?: TOptions) => AssistantMessageEventStream;
+ export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (model: Model<TApi>, context: TranscriptContext, options?: TOptions) => AssistantMessageEventStream;
  export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> = (model: ImagesModel<TApi>, context: ImagesContext, options?: TOptions) => Promise<AssistantImages>;
-@@ -238,7 +240,30 @@ export interface TextContent {
+@@ -243,7 +245,30 @@
      type: "text";
      text: string;
      textSignature?: string;
@@ -212,7 +211,7 @@ index 85f95217bae764ef5a4fe4e9195ccbd8f2562a1e..f69f8fd542db171e467b6057e0843c5d
  export interface ThinkingContent {
      type: "thinking";
      thinking: string;
-@@ -320,6 +345,8 @@ export interface AssistantMessage {
+@@ -366,6 +391,8 @@
      deferred?: DeferredHandle;
      errorMessage?: string;
      rawStopReason?: string;

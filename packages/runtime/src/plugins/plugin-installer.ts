@@ -194,10 +194,15 @@ async function _extractZip(archive: Uint8Array, destination: string) {
   try {
     unzip.push(archive, true);
   } catch (error) {
-    throw _asError(error);
+    extractionError ??= _asError(error);
   }
+  // Cleanup must not remove the extraction directory while writes are pending,
+  // even when parsing or another write has already failed.
+  const results = await Promise.allSettled(writes);
   if (extractionError) throw extractionError;
-  await Promise.all(writes);
+  for (const result of results) {
+    if (result.status === "rejected") throw _asError(result.reason);
+  }
 }
 
 function _safeArchivePath(name: string): string {

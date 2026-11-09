@@ -1,11 +1,11 @@
 import type {
   AgentEvent,
   AgentStreamRequest,
+  ImageGenerationConfig,
   BuiltinTool,
   BuiltinToolCallResponse,
   CustomModel,
   FileNode,
-  ImageGenerationConfig,
   McpCallToolResponse,
   McpServerDraft,
   McpServerToolsResponse,
@@ -29,7 +29,6 @@ import type {
   CreateSubagentThreadInput,
   CreateSubagentThreadResult,
 } from "@llm-space/core/thread";
-
 
 import type {
   TraceConnectedProjectInput,
@@ -154,7 +153,7 @@ export interface RuntimeClient {
   }): Promise<ModelProviderGroup[]>;
 
   createSubagentThread(
-    input: CreateSubagentThreadInput,
+    input: CreateSubagentThreadInput
   ): Promise<CreateSubagentThreadResult>;
 
   fsLs(path: string): Promise<FileNode[]>;
@@ -168,10 +167,7 @@ export interface RuntimeClient {
     path: string,
     run: ThreadRunSnapshot & { id: string }
   ): Promise<ThreadRunReference>;
-  fsReadRunSnapshot(
-    path: string,
-    snapshotRef: string
-  ): Promise<ThreadSnapshot>;
+  fsReadRunSnapshot(path: string, snapshotRef: string): Promise<ThreadSnapshot>;
   fsRealpath(path: string): Promise<string>;
   /** Read arbitrary prompt text (`~` expands on this runtime). */
   readTextFile(path: string): Promise<string>;

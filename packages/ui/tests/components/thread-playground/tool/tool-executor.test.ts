@@ -35,3 +35,33 @@ test("tool executor resolves a provider-backed tool connection once for every ca
     connection: { providerId: "ark", profileId: "profile-work" },
   });
 });
+
+test("tool executor routes a custom image provider and keeps legacy Ark fallback", async () => {
+  const calls: unknown[] = [];
+  const execute = createToolExecutor({
+    executeTool: (_tool, _args, options) => {
+      calls.push(options.connection);
+      return Promise.resolve({ content: [], isError: false });
+    },
+    getProfileId: (providerId) => `${providerId}-profile`,
+  });
+  const thread = { id: "thread-fixture" } as Thread;
+  const base = {
+    type: "builtin",
+    name: "generate_image",
+    description: "Generate an image.",
+    parameters: { type: "object", properties: {} },
+  } as BuiltinTool;
+
+  await execute(
+    { ...base, connection: { providerId: "agnes" } },
+    {},
+    { thread, variables: {} }
+  );
+  await execute(base, {}, { thread, variables: {} });
+
+  expect(calls).toEqual([
+    { providerId: "agnes", profileId: "agnes-profile" },
+    { providerId: "ark", profileId: "ark-profile" },
+  ]);
+});

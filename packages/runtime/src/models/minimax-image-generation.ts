@@ -149,7 +149,10 @@ export function createMiniMaxImageGenerator(
     );
     const body = await _readResponse(response);
     const statusCode = body.base_resp?.status_code;
-    if (!response.ok || (statusCode !== undefined && Number(statusCode) !== 0)) {
+    if (
+      !response.ok ||
+      (statusCode !== undefined && Number(statusCode) !== 0)
+    ) {
       throw _providerError(body, `HTTP ${response.status}`);
     }
 
@@ -179,9 +182,9 @@ export function createConfiguredMiniMaxImageGenerator({
   });
 }
 
-function _dimensions(input: MiniMaxImageGenerationInput):
-  | { width: number; height: number }
-  | undefined {
+function _dimensions(
+  input: MiniMaxImageGenerationInput
+): { width: number; height: number } | undefined {
   if (input.width === undefined && input.height === undefined) {
     return undefined;
   }
@@ -214,7 +217,9 @@ function _requestHeaders(
   return { ...(headers ?? {}) };
 }
 
-async function _readResponse(response: Response): Promise<MiniMaxImageResponse> {
+async function _readResponse(
+  response: Response
+): Promise<MiniMaxImageResponse> {
   const text = await response.text();
   try {
     const value = JSON.parse(text) as unknown;
@@ -229,10 +234,7 @@ async function _readResponse(response: Response): Promise<MiniMaxImageResponse> 
   }
 }
 
-function _providerError(
-  body: MiniMaxImageResponse,
-  fallback: string
-): Error {
+function _providerError(body: MiniMaxImageResponse, fallback: string): Error {
   const rawCode = body.base_resp?.status_code;
   const code =
     typeof rawCode === "string" || typeof rawCode === "number"
@@ -259,9 +261,7 @@ async function _readImage(
     return _normalizeBase64Image(base64);
   }
 
-  const urls = Array.isArray(body.data?.image_urls)
-    ? body.data.image_urls
-    : [];
+  const urls = Array.isArray(body.data?.image_urls) ? body.data.image_urls : [];
   const url = urls.find(
     (value): value is string => typeof value === "string" && value.length > 0
   );
@@ -270,9 +270,7 @@ async function _readImage(
   }
   const response = await fetchImpl(url, { signal });
   if (!response.ok) {
-    throw new Error(
-      `MiniMax image download failed (HTTP ${response.status}).`
-    );
+    throw new Error(`MiniMax image download failed (HTTP ${response.status}).`);
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.length === 0) {
@@ -280,7 +278,8 @@ async function _readImage(
   }
   return {
     data: Buffer.from(bytes).toString("base64"),
-    mimeType: response.headers.get("content-type")?.split(";")[0] || "image/jpeg",
+    mimeType:
+      response.headers.get("content-type")?.split(";")[0] || "image/jpeg",
   };
 }
 

@@ -10,8 +10,7 @@ import {
 import type { ModelManager } from "./model-manager";
 
 export type ImageGenerationInput =
-  | ArkImageGenerationInput
-  | MiniMaxImageGenerationInput;
+  ArkImageGenerationInput | MiniMaxImageGenerationInput;
 
 /** Route a built-in image tool call through its selected provider connection. */
 export function createConfiguredImageGenerator({

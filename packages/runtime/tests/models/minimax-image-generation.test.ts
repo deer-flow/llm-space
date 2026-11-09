@@ -10,8 +10,7 @@ function _dependencies(
 ): MiniMaxImageGenerationDependencies {
   return {
     getConfig: () => ({}),
-    resolveConnection: () =>
-      Promise.resolve({ apiKey: "test-key" }),
+    resolveConnection: () => Promise.resolve({ apiKey: "test-key" }),
     ...overrides,
   };
 }
@@ -120,9 +119,7 @@ describe("MiniMax image generation", () => {
       model: "image-01-live",
       size: "1024x768",
     });
-    expect(requestedUrl).toBe(
-      "https://api.minimaxi.com/v1/image_generation"
-    );
+    expect(requestedUrl).toBe("https://api.minimaxi.com/v1/image_generation");
     expect(payload).toEqual({
       model: "image-01-live",
       prompt: "A green circle",

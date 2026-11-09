@@ -1,4 +1,5 @@
 export {
+  createArkImageGenerator as createImageGenerator,
   createArkImageGenerator,
   createConfiguredArkImageGenerator,
   type ArkImageGenerationDependencies,
@@ -16,8 +17,5 @@ export {
   type MiniMaxImageGenerationInput,
   type MiniMaxImageGenerationResult,
 } from "./minimax-image-generation";
-export {
-  ModelManager,
-  type ResolvedProviderConnection,
-} from "./model-manager";
+export { ModelManager, type ResolvedProviderConnection } from "./model-manager";
 export type { ModelsConfig, ProviderConfig } from "./types";

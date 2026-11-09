@@ -3,13 +3,15 @@
 import {
   formatProviderProfileLabel,
   getArkImageModelDefinitions,
+  getImageModelDefinitions,
   getMiniMaxImageModelDefinitions,
-  type ArkImageGenerationConfig,
   type CustomModel,
+  type ImageGenerationApi,
+  type ImageGenerationConfig,
+  type ImageModelDefinition,
   type ModelProviderGroup,
   type MiniMaxImageGenerationConfig,
   type ProviderProfile,
-  type SeedreamImageModelDefinition,
 } from "@llm-space/core";
 import { ConfirmDialog } from "@llm-space/ui/components/confirm-dialog";
 import { Link } from "@llm-space/ui/components/link";
@@ -1096,8 +1098,8 @@ function ProviderEditor({
             </div>
           ) : null}
 
-          {provider.id === "ark" && canManageModels ? (
-            <_ArkImageGenerationEditor provider={provider} />
+          {(provider.id === "ark" || !isBuiltin) && canManageModels ? (
+            <_ImageGenerationEditor provider={provider} />
           ) : null}
           {provider.id === "minimax" && canManageModels ? (
             <_MiniMaxImageGenerationEditor provider={provider} />
@@ -1241,8 +1243,8 @@ function _ProviderProfileEditor({
   );
 }
 
-/** Chat-model-parity inventory management for Ark image models. */
-function _ArkImageGenerationEditor({
+/** Chat-model-parity inventory management for provider-owned image models. */
+function _ImageGenerationEditor({
   provider,
 }: {
   provider: ModelProviderGroup;
@@ -1250,8 +1252,13 @@ function _ArkImageGenerationEditor({
   const { lang, t } = useI18n();
   const displayName = providerDisplayName(provider, lang);
   const updateProvider = useUpdateProvider();
-  const config: ArkImageGenerationConfig = provider.imageGeneration ?? {};
-  const models = getArkImageModelDefinitions(config);
+  const config = provider.imageGeneration ?? {};
+  const imageApi =
+    config.api ?? (provider.id === "ark" ? "ark-images" : "openai-images");
+  const models =
+    provider.id === "ark"
+      ? getArkImageModelDefinitions(config)
+      : getImageModelDefinitions(config);
   const disabledModels = new Set(config.disabledModels ?? []);
   const enabledModels = models.filter((model) => !disabledModels.has(model.id));
   const customModels = new Set((config.models ?? []).map((model) => model.id));
@@ -1260,8 +1267,9 @@ function _ArkImageGenerationEditor({
   );
   const [modelListRef] = useAutoAnimation<HTMLDivElement>();
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingModel, setEditingModel] =
-    useState<SeedreamImageModelDefinition | null>(null);
+  const [editingModel, setEditingModel] = useState<ImageModelDefinition | null>(
+    null
+  );
 
   const visibleModels = models.filter((model) => {
     if (modelView === "enabled") return !disabledModels.has(model.id);
@@ -1269,7 +1277,7 @@ function _ArkImageGenerationEditor({
     return true;
   });
 
-  const update = (imageGeneration: ArkImageGenerationConfig) => {
+  const update = (imageGeneration: ImageGenerationConfig) => {
     void updateProvider(provider.id, { imageGeneration }).catch((error) => {
       toast.error("Failed to update image generation", {
         description:
@@ -1301,7 +1309,7 @@ function _ArkImageGenerationEditor({
 
   /** Add or replace a custom image model and preserve its disabled state. */
   const handleSaveCustomModel = (
-    model: SeedreamImageModelDefinition,
+    model: ImageModelDefinition,
     originalId?: string
   ) => {
     const custom = (config.models ?? []).filter(
@@ -1336,6 +1344,37 @@ function _ArkImageGenerationEditor({
 
   return (
     <>
+      {provider.id !== "ark" ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">{t.models.imageApiType}</span>
+          <Select
+            value={imageApi}
+            onValueChange={(api) =>
+              update({ ...config, api: api as ImageGenerationApi })
+            }
+          >
+            <SelectTrigger
+              className="w-full"
+              aria-label={formatMessage(t.models.imageApiAriaLabel, {
+                name: displayName,
+              })}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ark-images">
+                {t.models.arkImagesApi}
+              </SelectItem>
+              <SelectItem value="openai-images">
+                {t.models.openAIImagesApi}
+              </SelectItem>
+              <SelectItem value="openai-images-extra-body">
+                {t.models.openAIImagesExtraBodyApi}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{t.models.imageModels}</span>
@@ -1432,6 +1471,7 @@ function _ArkImageGenerationEditor({
       <ImageModelEditorDialog
         open={editorOpen}
         onOpenChange={setEditorOpen}
+        api={imageApi}
         model={editingModel}
         existingIds={models.map((model) => model.id)}
         onSave={handleSaveCustomModel}
@@ -1447,8 +1487,7 @@ function _MiniMaxImageGenerationEditor({
   provider: ModelProviderGroup;
 }) {
   const updateProvider = useUpdateProvider();
-  const config: MiniMaxImageGenerationConfig =
-    provider.imageGeneration ?? {};
+  const config: MiniMaxImageGenerationConfig = provider.imageGeneration ?? {};
   const models = getMiniMaxImageModelDefinitions(config);
   const disabledModels = new Set(config.disabledModels ?? []);
   const enabledCount = models.length - disabledModels.size;

@@ -11,22 +11,20 @@ import {
 } from "@earendil-works/pi-ai";
 import {
   DEFAULT_ARK_IMAGE_GENERATION_CONFIG,
-  getArkImageModelDefinitions,
+  getImageModelDefinitions,
   getMiniMaxImageModelDefinitions,
-  type ImageGenerationConfig,
+  isImageSize,
   MINIMAX_IMAGE_MODELS,
   ModelConfig,
   SEEDREAM_IMAGE_MODELS,
-  SEEDREAM_IMAGE_SIZES,
-  type ArkImageGenerationConfig,
   type CustomModel,
+  type ImageGenerationConfig,
   type ModelProviderGroup,
   type MiniMaxImageGenerationConfig,
   type ProviderConnectionRef,
   type ProviderProfile,
   type ProviderProfilePatch,
   type SeedreamImageModelDefinition,
-  type SeedreamImageSize,
   uuid,
 } from "@llm-space/core";
 import {
@@ -91,20 +89,6 @@ const PROVIDER_PROFILE_FILE_SCHEMA = z.object({
   baseUrl: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
 });
-const ARK_IMAGE_MODEL_FILE_SCHEMA = z.object({
-  id: z.string(),
-  name: z.string(),
-  supportedSizes: z.array(z.enum(SEEDREAM_IMAGE_SIZES)),
-  defaultSize: z.enum(SEEDREAM_IMAGE_SIZES),
-  icon: z.string().optional(),
-});
-const ARK_IMAGE_GENERATION_FILE_SCHEMA = z.object({
-  models: z.array(ARK_IMAGE_MODEL_FILE_SCHEMA).optional(),
-  disabledModels: z.array(z.string()).optional(),
-});
-const MINIMAX_IMAGE_GENERATION_FILE_SCHEMA = z.object({
-  disabledModels: z.array(z.string()).optional(),
-});
 const ProviderConfigFileSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -120,12 +104,9 @@ const ProviderConfigFileSchema = z.object({
   disabledModels: z.array(z.string()).optional(),
   models: z.array(CustomModelFileSchema).optional(),
   customModels: z.array(z.string()).optional(),
-  imageGeneration: z
-    .union([
-      ARK_IMAGE_GENERATION_FILE_SCHEMA,
-      MINIMAX_IMAGE_GENERATION_FILE_SCHEMA,
-    ])
-    .optional(),
+  // Parse this field leniently so one damaged image inventory cannot discard
+  // every otherwise valid provider before field-level normalization runs.
+  imageGeneration: z.unknown().optional(),
 });
 const ModelsConfigFileSchema = z.object({
   providers: z.array(ProviderConfigFileSchema),
@@ -282,7 +263,9 @@ export class ModelManager {
       builtin: true,
       ...(id === "ark"
         ? { imageGeneration: { ...DEFAULT_ARK_IMAGE_GENERATION_CONFIG } }
-        : {}),
+        : id === "minimax"
+          ? { imageGeneration: {} }
+          : {}),
       profiles: [
         {
           id: uuid(),
@@ -316,6 +299,7 @@ export class ModelManager {
       id,
       name,
       api,
+      imageGeneration: { api: "openai-images" },
       profiles: [
         {
           id: uuid(),
@@ -369,17 +353,23 @@ export class ModelManager {
     }
     if (imageGeneration !== undefined) {
       if (
-        (providerId !== "ark" && providerId !== "minimax") ||
-        entry.builtin !== true
+        entry.builtin === true &&
+        entry.id !== "ark" &&
+        entry.id !== "minimax"
       ) {
         throw new Error(
-          "Image generation can only be configured on a supported builtin provider."
+          "Image generation can only be configured on Ark, MiniMax, or a custom provider."
         );
       }
-      if (providerId === "minimax") {
+      if (entry.id === "minimax" && entry.builtin === true) {
         _assertMiniMaxImageGenerationConfig(imageGeneration);
       } else {
-        _assertArkImageGenerationConfig(imageGeneration);
+        _assertImageGenerationConfig(
+          imageGeneration,
+          entry.id === "ark" && entry.builtin === true
+            ? SEEDREAM_IMAGE_MODELS
+            : []
+        );
       }
       entry.imageGeneration = { ...imageGeneration };
     }
@@ -550,21 +540,22 @@ export class ModelManager {
   }
 
   /** The saved Ark image-model inventory, or undefined without Ark. */
-  getArkImageGenerationConfig(): ArkImageGenerationConfig | undefined {
-    const config = this._config.providers.find(
-      (entry) => entry.id === "ark" && entry.builtin === true
-    )?.imageGeneration;
-    return config ? { ...(config as ArkImageGenerationConfig) } : undefined;
+  getArkImageGenerationConfig(): ImageGenerationConfig | undefined {
+    return this.getImageGenerationConfig("ark");
+  }
+
+  /** The provider-owned image inventory, if image generation is configured. */
+  getImageGenerationConfig(
+    providerId: string
+  ): ImageGenerationConfig | undefined {
+    const config = this._findProvider(providerId)?.imageGeneration;
+    return config ? { ...config } : undefined;
   }
 
   /** The saved MiniMax image-model inventory, or undefined without MiniMax. */
-  getMiniMaxImageGenerationConfig():
-    | MiniMaxImageGenerationConfig
-    | undefined {
-    const config = this._config.providers.find(
-      (entry) => entry.id === "minimax" && entry.builtin === true
-    )?.imageGeneration;
-    return config ? { ...config } : undefined;
+  getMiniMaxImageGenerationConfig(): MiniMaxImageGenerationConfig | undefined {
+    const config = this.getImageGenerationConfig("minimax");
+    return config ? { disabledModels: config.disabledModels } : undefined;
   }
 
   /** The ids of the user-added models for a provider (empty by default). */
@@ -912,25 +903,32 @@ export class ModelManager {
     return changed;
   }
 
-  /**
-   * Normalize Ark's image-model inventory and remove legacy provider defaults.
-   * This keeps upgrades readable without treating image models as chat models
-   * or rejecting the whole settings file.
-   */
+  /** Normalize every provider's image inventory while preserving Ark legacy data. */
   private _normalizeImageGeneration(): boolean {
     let changed = false;
     for (const entry of this._config.providers) {
-      if (entry.builtin !== true) {
+      if (entry.imageGeneration === undefined) {
+        if (entry.builtin === true && entry.id === "minimax") {
+          entry.imageGeneration = {};
+          changed = true;
+        }
         continue;
       }
-      const normalized =
-        entry.id === "ark"
-          ? _normalizeArkImageGenerationConfig(entry.imageGeneration)
-          : entry.id === "minimax"
-            ? _normalizeMiniMaxImageGenerationConfig(entry.imageGeneration)
-            : undefined;
+      const isArk = entry.id === "ark" && entry.builtin === true;
+      const isMiniMax = entry.id === "minimax" && entry.builtin === true;
+      if (entry.builtin === true && !isArk && !isMiniMax) {
+        delete entry.imageGeneration;
+        changed = true;
+        continue;
+      }
+      const normalized = isMiniMax
+        ? _normalizeMiniMaxImageGenerationConfig(entry.imageGeneration)
+        : _normalizeImageGenerationConfig(
+            entry.imageGeneration,
+            isArk ? SEEDREAM_IMAGE_MODELS : [],
+            isArk ? "ark-images" : "openai-images"
+          );
       if (
-        normalized !== undefined &&
         JSON.stringify(entry.imageGeneration) !== JSON.stringify(normalized)
       ) {
         entry.imageGeneration = normalized;
@@ -1094,12 +1092,14 @@ export class ModelManager {
   }
 }
 
-/** Validate a renderer-supplied Ark image configuration before persisting it. */
-function _assertArkImageGenerationConfig(
-  config: ArkImageGenerationConfig
+/** Validate a renderer-supplied provider image configuration before persisting it. */
+function _assertImageGenerationConfig(
+  config: ImageGenerationConfig,
+  catalog: readonly SeedreamImageModelDefinition[]
 ): void {
-  _assertCustomArkImageModels(config.models);
-  const models = getArkImageModelDefinitions(config);
+  const scope = catalog.length > 0 ? "Ark image" : "image";
+  _assertCustomImageModels(config.models, catalog);
+  const models = getImageModelDefinitions(config, catalog);
   const modelIds = new Set(models.map((model) => model.id));
   const disabledModels = config.disabledModels ?? [];
   if (
@@ -1107,7 +1107,7 @@ function _assertArkImageGenerationConfig(
     new Set(disabledModels).size !== disabledModels.length
   ) {
     throw new Error(
-      "Disabled Ark image models must reference unique model ids."
+      `Disabled ${scope} models must reference unique model ids.`
     );
   }
 }
@@ -1131,19 +1131,27 @@ function _assertMiniMaxImageGenerationConfig(
 }
 
 /** Normalize untrusted JSON from older or manually edited settings files. */
-function _normalizeArkImageGenerationConfig(
-  value: unknown
-): ArkImageGenerationConfig {
+function _normalizeImageGenerationConfig(
+  value: unknown,
+  catalog: readonly SeedreamImageModelDefinition[],
+  defaultApi: "ark-images" | "openai-images"
+): ImageGenerationConfig {
   const candidate =
     value && typeof value === "object"
-      ? (value as Partial<ArkImageGenerationConfig>)
+      ? (value as Partial<ImageGenerationConfig>)
       : {};
-  const models = _normalizeCustomArkImageModels(candidate.models);
-  const withModels: ArkImageGenerationConfig = {
+  const models = _normalizeCustomImageModels(candidate.models, catalog);
+  const api =
+    candidate.api === "ark-images" ||
+    candidate.api === "openai-images" ||
+    candidate.api === "openai-images-extra-body"
+      ? candidate.api
+      : defaultApi;
+  const withModels: ImageGenerationConfig = {
     ...(models.length > 0 ? { models } : {}),
   };
   const modelIds = new Set(
-    getArkImageModelDefinitions(withModels).map((model) => model.id)
+    getImageModelDefinitions(withModels, catalog).map((model) => model.id)
   );
   const disabledModels = Array.isArray(candidate.disabledModels)
     ? [
@@ -1156,6 +1164,7 @@ function _normalizeArkImageGenerationConfig(
       ]
     : [];
   return {
+    ...(api !== defaultApi ? { api } : {}),
     ...(models.length > 0 ? { models } : {}),
     ...(disabledModels.length > 0 ? { disabledModels } : {}),
   };
@@ -1186,16 +1195,18 @@ function _normalizeMiniMaxImageGenerationConfig(
 }
 
 /** Reject invalid custom model definitions supplied through renderer RPC. */
-function _assertCustomArkImageModels(
-  models: ArkImageGenerationConfig["models"]
+function _assertCustomImageModels(
+  models: ImageGenerationConfig["models"],
+  catalog: readonly SeedreamImageModelDefinition[]
 ): void {
+  const scope = catalog.length > 0 ? "Ark image" : "image";
   if (models === undefined) {
     return;
   }
   if (!Array.isArray(models)) {
-    throw new Error("Custom Ark image models must be an array.");
+    throw new Error(`Custom ${scope} models must be an array.`);
   }
-  const seen = new Set<string>(SEEDREAM_IMAGE_MODELS.map((model) => model.id));
+  const seen = new Set<string>(catalog.map((model) => model.id));
   for (const model of models) {
     if (
       !model ||
@@ -1206,40 +1217,47 @@ function _assertCustomArkImageModels(
       model.name.trim() !== model.name ||
       model.name === ""
     ) {
-      throw new Error("Custom Ark image models require a valid id and name.");
+      throw new Error(`Custom ${scope} models require a valid id and name.`);
     }
     if (seen.has(model.id)) {
-      throw new Error(`Duplicate Ark image model id: ${model.id}`);
+      throw new Error(`Duplicate ${scope} model id: ${model.id}`);
     }
     seen.add(model.id);
     const sizes = model.supportedSizes;
     if (
       !Array.isArray(sizes) ||
       sizes.length === 0 ||
-      sizes.some((size) => !_isSeedreamImageSize(size)) ||
+      sizes.some((size) => !isImageSize(size)) ||
       new Set(sizes).size !== sizes.length ||
       !sizes.includes(model.defaultSize)
     ) {
       throw new Error(
-        `Custom Ark image model ${model.id} has invalid size presets.`
+        `Custom ${scope} model ${model.id} has invalid size presets.`
       );
     }
     if (model.icon !== undefined && typeof model.icon !== "string") {
+      throw new Error(`Custom ${scope} model ${model.id} has an invalid icon.`);
+    }
+    if (
+      model.responseFormat !== undefined &&
+      model.responseFormat !== "b64_json"
+    ) {
       throw new Error(
-        `Custom Ark image model ${model.id} has an invalid icon.`
+        `Custom ${scope} model ${model.id} has an invalid response format.`
       );
     }
   }
 }
 
 /** Repair user-edited JSON by keeping only complete, unique custom models. */
-function _normalizeCustomArkImageModels(
-  value: unknown
+function _normalizeCustomImageModels(
+  value: unknown,
+  catalog: readonly SeedreamImageModelDefinition[]
 ): SeedreamImageModelDefinition[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  const seen = new Set<string>(SEEDREAM_IMAGE_MODELS.map((model) => model.id));
+  const seen = new Set<string>(catalog.map((model) => model.id));
   const models: SeedreamImageModelDefinition[] = [];
   for (const raw of value) {
     if (!raw || typeof raw !== "object") {
@@ -1253,13 +1271,13 @@ function _normalizeCustomArkImageModels(
       continue;
     }
     const supportedSizes = Array.isArray(candidate.supportedSizes)
-      ? [...new Set(candidate.supportedSizes.filter(_isSeedreamImageSize))]
+      ? [...new Set(candidate.supportedSizes.filter(isImageSize))]
       : [];
     if (supportedSizes.length === 0) {
       continue;
     }
     const defaultSize =
-      _isSeedreamImageSize(candidate.defaultSize) &&
+      isImageSize(candidate.defaultSize) &&
       supportedSizes.includes(candidate.defaultSize)
         ? candidate.defaultSize
         : supportedSizes[0];
@@ -1273,16 +1291,11 @@ function _normalizeCustomArkImageModels(
       name,
       supportedSizes,
       defaultSize,
+      ...(candidate.responseFormat === "b64_json"
+        ? { responseFormat: "b64_json" as const }
+        : {}),
       ...(icon ? { icon } : {}),
     });
   }
   return models;
-}
-
-/** Narrow unknown persisted values to Ark's supported size presets. */
-function _isSeedreamImageSize(value: unknown): value is SeedreamImageSize {
-  return (
-    typeof value === "string" &&
-    (SEEDREAM_IMAGE_SIZES as readonly string[]).includes(value)
-  );
 }

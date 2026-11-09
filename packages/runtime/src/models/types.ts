@@ -58,7 +58,7 @@ export interface ProviderConfig {
    * so these models can later be singled out for deletion.
    */
   customModels?: string[];
-  /** Native image-model inventory for a supported builtin provider. */
+  /** Provider-owned image-model inventory and request protocol. */
   imageGeneration?: ImageGenerationConfig;
 }
 

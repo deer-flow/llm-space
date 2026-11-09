@@ -55,7 +55,8 @@ export class PluginSettingsStore {
     const entry = this._value.plugins[pluginId];
     return entry
       ? { enabled: entry.enabled, settings: structuredClone(entry.settings) }
-      : { enabled: true, settings: {} };
+      // Bundled Memory is opt-in; a saved user choice always takes precedence.
+      : { enabled: pluginId !== "@llm-space/memory", settings: {} };
   }
 
   setEnabled(pluginId: string, enabled: boolean): void {

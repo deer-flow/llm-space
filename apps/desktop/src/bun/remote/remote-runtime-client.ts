@@ -135,7 +135,7 @@ export class RemoteRuntimeClient implements RuntimeClient {
   }
 
   createSubagentThread(
-    input: Parameters<RuntimeClient["createSubagentThread"]>[0],
+    input: Parameters<RuntimeClient["createSubagentThread"]>[0]
   ) {
     return this._rpc<
       Awaited<ReturnType<RuntimeClient["createSubagentThread"]>>

@@ -16,12 +16,7 @@ export async function getModelProviderGroups(
     api: modelManager.getApi(provider.id),
     disabledModels: modelManager.getDisabledModels(provider.id),
     customModels: modelManager.getCustomModels(provider.id),
-    imageGeneration:
-      provider.id === "ark"
-        ? modelManager.getArkImageGenerationConfig()
-        : provider.id === "minimax"
-          ? modelManager.getMiniMaxImageGenerationConfig()
-        : undefined,
+    imageGeneration: modelManager.getImageGenerationConfig(provider.id),
     websiteLink: modelManager.getWebsiteLink(provider.id),
     icon: modelManager.getProviderIcon(provider.id),
   }));

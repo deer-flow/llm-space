@@ -116,6 +116,168 @@ describe("LocalFileSystem.mv", () => {
   });
 });
 
+describe("LocalFileSystem path confinement", () => {
+  test("copies nested files into new and existing destination directories", async () => {
+    const fileSystem = await _createFileSystem();
+    await fileSystem.mkdir("src/nested");
+    await fileSystem.write("src/nested/thread.json", { title: "Copied" });
+    await fileSystem.mkdir("existing/nested");
+    await fileSystem.write("existing/nested/thread.json", { title: "Old" });
+    await fileSystem.write("existing/keep.json", { title: "Keep" });
+
+    await fileSystem.cp("src", "new");
+    await fileSystem.cp("src", "existing");
+
+    expect(await fileSystem.read("new/nested/thread.json")).toMatchObject({
+      title: "Copied",
+    });
+    expect(await fileSystem.read("existing/nested/thread.json")).toMatchObject({
+      title: "Copied",
+    });
+    expect(await fileSystem.read("existing/keep.json")).toMatchObject({
+      title: "Keep",
+    });
+  });
+
+  for (const side of ["source", "destination"] as const) {
+    for (const target of ["file", "directory"] as const) {
+      test(`rejects a nested ${side} ${target} symlink during copy`, async () => {
+        const fileSystem = await _createFileSystem();
+        const outside = await fs.mkdtemp(
+          path.join(os.tmpdir(), "llm-space-outside-")
+        );
+        TEMP_DIRS.push(outside);
+        const externalFile = path.join(outside, "probe.txt");
+        await fs.writeFile(externalFile, "original");
+        await fileSystem.mkdir("src/nested");
+        await fileSystem.mkdir("dest/nested");
+        if (side === "destination") {
+          await fs.writeFile(
+            fileSystem.realpath("src/nested/probe.txt"),
+            "replacement"
+          );
+        }
+        const directory = side === "source" ? "src" : "dest";
+        const link = fileSystem.realpath(
+          target === "directory"
+            ? `${directory}/nested`
+            : `${directory}/nested/probe.txt`
+        );
+        if (target === "directory") await fs.rmdir(link);
+        await fs.symlink(target === "directory" ? outside : externalFile, link);
+
+        const error: unknown = await fileSystem.cp("src", "dest").then(
+          () => undefined,
+          (error: unknown) => error
+        );
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain(
+          "Symbolic links are not allowed in storage paths"
+        );
+        expect(await fs.readFile(externalFile, "utf8")).toBe("original");
+      });
+    }
+  }
+
+  const operations: Record<
+    string,
+    (storage: LocalFileSystem, resource: string) => unknown
+  > = {
+    ls: (storage, resource) => storage.ls(resource),
+    read: (storage, resource) => storage.read(resource),
+    write: (storage, resource) => storage.write(resource, { title: "Changed" }),
+    mkdir: (storage, resource) => storage.mkdir(resource),
+    rm: (storage, resource) => storage.rm(resource),
+    "copy source": (storage, resource) => storage.cp(resource, "copy.json"),
+    "copy destination": (storage, resource) =>
+      storage.cp("safe.json", resource),
+    "move source": (storage, resource) => storage.mv(resource, "moved.json"),
+    "move destination": (storage, resource) =>
+      storage.mv("safe.json", resource),
+    realpath: (storage, resource) => storage.realpath(resource),
+    archiveRun: (storage, resource) =>
+      storage.archiveRun(resource, _legacyRun("run")),
+    readRunSnapshot: (storage, resource) =>
+      storage.readRunSnapshot(resource, "run.json"),
+  };
+
+  for (const [name, operation] of Object.entries(operations)) {
+    test(`${name} rejects POSIX and Windows absolute paths`, async () => {
+      const storage = await _createFileSystem();
+      await storage.write("safe.json", { title: "Safe" });
+      for (const resource of [
+        "/outside.json",
+        "C:/outside.json",
+        "//server/share/file.json",
+      ]) {
+        const result = await Promise.resolve()
+          .then(() => operation(storage, resource))
+          .then(
+            () => undefined,
+            (error: unknown) => error
+          );
+        expect(result).toBeInstanceOf(Error);
+        expect((result as Error).message).toContain(
+          "Path must be relative to the storage root"
+        );
+      }
+      expect(await storage.read("safe.json")).toMatchObject({ title: "Safe" });
+      expect((await storage.ls("")).map((node) => node.name)).toEqual([
+        "safe.json",
+      ]);
+    });
+
+    for (const target of ["outside", "inside", "missing"] as const) {
+      test(`${name} rejects ${target} symlink components without changing files`, async () => {
+        const storage = await _createFileSystem();
+        const root = storage.realpath("");
+        const outside = await fs.mkdtemp(
+          path.join(os.tmpdir(), "llm-space-outside-")
+        );
+        TEMP_DIRS.push(outside);
+        await storage.write("safe.json", { title: "Safe" });
+        await fs.writeFile(
+          path.join(outside, "safe.json"),
+          '{"title":"Outside"}'
+        );
+        await fs.symlink(
+          target === "outside"
+            ? outside
+            : target === "inside"
+              ? root
+              : path.join(outside, "missing"),
+          path.join(root, "link")
+        );
+        // Check both the link itself and a path through it (including new files).
+        for (const resource of [
+          "link",
+          "link/safe.json",
+          "link/new/file.json",
+        ]) {
+          const result = await Promise.resolve()
+            .then(() => operation(storage, resource))
+            .then(
+              () => undefined,
+              (error: unknown) => error
+            );
+          expect(result).toBeInstanceOf(Error);
+          expect((result as Error).message).toContain(
+            "Symbolic links are not allowed in storage paths"
+          );
+        }
+        expect(await storage.read("safe.json")).toMatchObject({
+          title: "Safe",
+        });
+        expect(await fs.readFile(path.join(outside, "safe.json"), "utf8")).toBe(
+          '{"title":"Outside"}'
+        );
+        expect(await fs.readdir(outside)).toEqual(["safe.json"]);
+        expect((await fs.readdir(root)).sort()).toEqual(["link", "safe.json"]);
+      });
+    }
+  }
+});
+
 describe("LocalFileSystem.write", () => {
   test("writes a new formatted thread file", async () => {
     const fileSystem = await _createFileSystem();

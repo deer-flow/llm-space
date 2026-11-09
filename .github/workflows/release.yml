@@ -89,7 +89,7 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
-      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
 
       - run: bun install --frozen-lockfile
 
@@ -139,7 +139,7 @@ jobs:
       # v4: reads mise.lock (installs the exact locked bun with checksum
       # verification) and exports the full `mise env` (incl. PATH) into
       # GITHUB_ENV — our [env] carries nothing beyond PATH.
-      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
 
       - run: bun install --frozen-lockfile
 
@@ -270,7 +270,7 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
 
-      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
 
       - run: bun install --frozen-lockfile
 

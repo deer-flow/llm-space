@@ -25,7 +25,7 @@ export interface ModelProviderGroup {
   disabledModels?: string[];
   /** Ids of the user-added custom models within this provider. */
   customModels?: string[];
-  /** Native image-model inventory exposed by a supported provider. */
+  /** Provider-owned image-model inventory and request protocol. */
   imageGeneration?: ImageGenerationConfig;
   websiteLink?: string;
   websiteURL?: string;

@@ -2,7 +2,7 @@ import { type Provider } from "@earendil-works/pi-ai";
 import { amazonBedrockProvider } from "@earendil-works/pi-ai/providers/amazon-bedrock";
 import { antLingProvider } from "@earendil-works/pi-ai/providers/ant-ling";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { azureOpenAIResponsesProvider } from "@earendil-works/pi-ai/providers/azure-openai-responses";
+import { azureProvider } from "@earendil-works/pi-ai/providers/azure";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
 import { groqProvider } from "@earendil-works/pi-ai/providers/groq";
 import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface";
@@ -86,7 +86,7 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   ark: arkProvider(),
   "ark-agent-plan": arkAgentPlanProvider(),
   "ark-coding-plan": arkCodingPlanProvider(),
-  "azure-openai-responses": azureOpenAIResponsesProvider(),
+  "azure-openai-responses": legacyAzureProvider(),
   deepseek: deepseekProvider(),
   google: googleProvider(),
   groq: groqProvider(),
@@ -106,3 +106,16 @@ export const BUILTIN_PROVIDERS: Record<string, Provider> = {
   zai: zaiProvider(),
   "zai-coding-cn": zaiCodingCnProvider(),
 };
+
+/** Keep saved provider references stable across Pi's Azure provider rename. */
+function legacyAzureProvider(): Provider {
+  const provider = azureProvider();
+  const id = "azure-openai-responses";
+  const models = provider.getModels().map((model) => ({ ...model, provider: id }));
+  return {
+    ...provider,
+    id,
+    getModels: () => models,
+    getAllModels: () => models,
+  };
+}

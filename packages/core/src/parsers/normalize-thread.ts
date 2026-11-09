@@ -44,6 +44,7 @@ interface RawToolUse {
 interface RawToolResult {
   toolUseId: string | undefined;
   content: TextContent[];
+  isError: boolean;
 }
 
 /**
@@ -96,7 +97,12 @@ export function normalizeToThread(
         // Anthropic carries tool results inside a `user` message; they belong
         // on the matching assistant tool call, not in the user content.
         for (const result of resolved.toolResults) {
-          _attachToolResult(toolCallsById, result.toolUseId, result.content);
+          _attachToolResult(
+            toolCallsById,
+            result.toolUseId,
+            result.content,
+            result.isError
+          );
         }
         const content: UserMessageContent[] = [
           ...resolved.text,
@@ -122,7 +128,14 @@ export function normalizeToThread(
         const toolCallId =
           typeof m.tool_call_id === "string" ? m.tool_call_id : undefined;
         const content = _resolveContent(m.content).text;
-        _attachToolResult(toolCallsById, toolCallId, content);
+        // LangChain `ToolMessage` dumps (such as DeerFlow's) mark failures
+        // with `status: "error"`.
+        _attachToolResult(
+          toolCallsById,
+          toolCallId,
+          content,
+          m.status === "error"
+        );
         break;
       }
 
@@ -318,6 +331,7 @@ function _resolveContent(content: unknown): ResolvedContent {
           toolUseId:
             typeof b.tool_use_id === "string" ? b.tool_use_id : undefined,
           content: _resolveContent(b.content).text,
+          isError: b.is_error === true,
         });
         break;
       }
@@ -534,11 +548,15 @@ function _imageContent(
   return { type: "image", mimeType, data };
 }
 
-/** Set a tool call's output, matching by id. Unmatched results are dropped. */
+/**
+ * Set a tool call's output, matching by id, and keep a failed result marked as
+ * an error. Unmatched results are dropped.
+ */
 function _attachToolResult(
   toolCallsById: Map<string, ToolCall>,
   toolCallId: string | undefined,
-  content: TextContent[]
+  content: TextContent[],
+  isError: boolean
 ): void {
   if (!toolCallId) {
     return;
@@ -547,7 +565,7 @@ function _attachToolResult(
   if (!toolCall) {
     return;
   }
-  toolCall.output = { content };
+  toolCall.output = isError ? { content, isError: true } : { content };
 }
 
 /** A {@link TextContent} from a value, or `undefined` for empty/non-string. */

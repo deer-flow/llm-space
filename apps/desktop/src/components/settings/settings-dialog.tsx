@@ -10,6 +10,7 @@ import {
 } from "@llm-space/ui/ui/tabs";
 import {
   Boxes,
+  Brain,
   Cable,
   CircleUser,
   FlaskConical,
@@ -22,9 +23,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { listPlugins } from "@/client/plugins";
 import { getDefaultRuntime } from "@/client/remote-servers";
 import { createElectrobunModelClient } from "@/host/host-services";
 import { useI18n } from "@/i18n/i18n-provider";
+import { electrobun } from "@/lib/electrobun";
 import type { SettingsTab } from "@/shared/commands";
 import type { RuntimeId } from "@/shared/runtime";
 
@@ -32,6 +35,7 @@ import { AccountPage } from "./account-page";
 import { ExperimentalPage } from "./experimental-page";
 import { GeneralPage } from "./general-page";
 import { McpPage } from "./mcp-page";
+import { MemoryPage } from "./memory-page";
 import { ModelsPage } from "./models-page";
 import { NetworkPage } from "./network-page";
 import { PluginsPage } from "./plugins-page";
@@ -82,6 +86,14 @@ const PAGES = [
     Page: ({ runtimeId }: { runtimeId: RuntimeId }) => (
       <McpPage runtimeId={runtimeId} />
     ),
+  },
+  {
+    // Machine-wide store, so this page is not runtime-scoped either.
+    group: "Agent",
+    value: "memory",
+    labelKey: "memory",
+    icon: Brain,
+    Page: () => <MemoryPage />,
   },
   {
     group: "Agent",
@@ -185,10 +197,27 @@ export function SettingsDialog({
 }) {
   const { t } = useI18n();
   const [runtimeId, setRuntimeId] = useState<RuntimeId>("local");
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    const loadMemoryPlugin = () => {
+      void listPlugins()
+        .then((plugins) => {
+          if (!cancelled)
+            setMemoryEnabled(
+              plugins.some(
+                (plugin) => plugin.id === "@llm-space/memory" && plugin.enabled
+              )
+            );
+        })
+        .catch(() => {
+          if (!cancelled) setMemoryEnabled(false);
+        });
+    };
+    loadMemoryPlugin();
+    electrobun.rpc?.addMessageListener("pluginsChanged", loadMemoryPlugin);
     void getDefaultRuntime()
       .then((defaultRuntimeId) => {
         if (!cancelled) setRuntimeId(defaultRuntimeId);
@@ -198,6 +227,7 @@ export function SettingsDialog({
       });
     return () => {
       cancelled = true;
+      electrobun.rpc?.removeMessageListener("pluginsChanged", loadMemoryPlugin);
     };
   }, [open]);
 
@@ -226,27 +256,25 @@ export function SettingsDialog({
             </header>
             <TabsList className="h-fit w-full flex-col gap-0 bg-transparent p-0">
               {PAGE_GROUPS.map((group) => (
-                <div
-                  key={group}
-                  className="mb-4 w-full"
-                  role="presentation"
-                >
+                <div key={group} className="mb-4 w-full" role="presentation">
                   <div className="text-muted-foreground/70 dark:text-muted-foreground/50 px-2 pb-1 text-[10px] font-medium">
                     {t.settingsDialog.groups[PAGE_GROUP_LABEL_KEYS[group]]}
                   </div>
                   <div className="flex flex-col gap-0.5" role="presentation">
-                    {PAGES.filter((page) => page.group === group).map(
-                      ({ value, labelKey, icon: Icon }) => (
-                        <TabsTrigger
-                          key={value}
-                          value={value}
-                          className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full pl-5 dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
-                        >
-                          <Icon />
-                          {t.settingsDialog.pages[labelKey]}
-                        </TabsTrigger>
-                      )
-                    )}
+                    {PAGES.filter(
+                      (page) =>
+                        page.group === group &&
+                        (page.value !== "memory" || memoryEnabled)
+                    ).map(({ value, labelKey, icon: Icon }) => (
+                      <TabsTrigger
+                        key={value}
+                        value={value}
+                        className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground w-full pl-5"
+                      >
+                        <Icon />
+                        {t.settingsDialog.pages[labelKey]}
+                      </TabsTrigger>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -256,7 +284,7 @@ export function SettingsDialog({
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary w-full dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground"
+                      className="data-active:border-primary/25 data-active:bg-primary/10 data-active:text-primary data-active:hover:text-primary dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground dark:data-active:hover:text-foreground w-full"
                     >
                       <Icon />
                       {t.settingsDialog.pages[labelKey]}
@@ -267,7 +295,9 @@ export function SettingsDialog({
             </TabsList>
           </aside>
           <div className="min-w-0 grow">
-            {PAGES.map(({ value, Page }) => (
+            {PAGES.filter(
+              (page) => page.value !== "memory" || memoryEnabled
+            ).map(({ value, Page }) => (
               <TabsContent key={value} value={value} className="size-full">
                 <Page
                   runtimeId={runtimeId}

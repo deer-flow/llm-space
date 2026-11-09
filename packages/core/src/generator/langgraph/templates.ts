@@ -478,6 +478,8 @@ export function applyTemplatePy(
 
   // Skip Jinja2 entirely for a prompt with no variables, so stray braces in
   // prose can't trip the renderer.
+  // Resolve live variables once per prompt render and share that map with every
+  // recursive include, matching the desktop renderer's single-clock snapshot.
   const renderBody =
     entries.length > 0
       ? `    template = path.read_text(encoding="utf-8")\n    return apply_template(build_variables(), template)`
@@ -985,7 +987,7 @@ async def get_mcp_tools():
 export function planMd(
   functionTools: FunctionTool[],
   mcpTools: McpTool[],
-  hasSpawnAgent = false,
+  hasSpawnAgent = false
 ): string {
   const sections: string[] = [
     `# PLAN.md
@@ -1003,7 +1005,7 @@ make dev
 
   if (hasSpawnAgent) {
     sections.push(
-      "## Unsupported built-in tool\n\n`spawn_agent` is not supported in Python exports. Its placeholder raises `NotImplementedError` and creates no files. Create subtask threads manually in the LLM Space desktop app.",
+      "## Unsupported built-in tool\n\n`spawn_agent` is not supported in Python exports. Its placeholder raises `NotImplementedError` and creates no files. Create subtask threads manually in the LLM Space desktop app."
     );
   }
 

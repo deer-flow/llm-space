@@ -24,9 +24,7 @@ afterAll(() => {
 
 describe("makefile", () => {
   test("runs the LangGraph development server through uv", () => {
-    expect(makefile()).toBe(
-      ".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n"
-    );
+    expect(makefile()).toBe(".PHONY: dev\n\ndev:\n\tuv run langgraph dev\n");
   });
 });
 
@@ -177,6 +175,66 @@ describe("agentPy / langgraphJson MCP wiring", () => {
 });
 
 describe("meta prompt templates", () => {
+  test("generated Python refreshes dates in nested includes for system and meta prompts", async () => {
+    const root = path.join(pythonTmp, "date-freshness");
+    const promptingDir = path.join(root, "src", "prompting");
+    mkdirSync(promptingDir, { recursive: true });
+    await Bun.write(
+      path.join(promptingDir, "apply_template.py"),
+      applyTemplatePy(
+        {
+          variables: {
+            current_date: { type: "currentDate", format: "iso-date" },
+          },
+        },
+        [],
+        {}
+      )
+    );
+    await Bun.write(
+      path.join(promptingDir, "variables.py"),
+      Bun.file(
+        new URL(
+          "../../../src/generator/langgraph/variables.py",
+          import.meta.url
+        )
+      )
+    );
+    await Bun.write(path.join(root, "outer.md"), '{{@include("inner.md")}}');
+    await Bun.write(path.join(root, "inner.md"), "Today: {{current_date}}");
+    for (const name of ["system_prompt.md", "meta_user_prompt.md"]) {
+      await Bun.write(
+        path.join(promptingDir, name),
+        '{{@include("outer.md")}}'
+      );
+    }
+    const child = Bun.spawn(
+      [
+        "python3",
+        "-c",
+        `
+from unittest.mock import patch
+from src.prompting import apply_template as runtime
+for date in ("2026-08-29", "2026-08-30"):
+    with patch.object(runtime, "current_date", return_value=date) as clock:
+        assert runtime.get_system_prompt() == "Today: " + date
+        assert runtime.get_meta_user_prompt() == "Today: " + date
+        assert clock.call_count == 2
+print("ok")
+`,
+      ],
+      { cwd: root, stdout: "pipe", stderr: "pipe" }
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe("ok");
+  });
+
   test("working directory is emitted as a built-in runtime variable", () => {
     const py = applyTemplatePy(
       {
@@ -189,8 +247,7 @@ describe("meta prompt templates", () => {
       },
       [],
       {
-        current_working_directory:
-          "/Users/tester/Desktop/llm-space-project",
+        current_working_directory: "/Users/tester/Desktop/llm-space-project",
       }
     );
     expect(py).toContain(
@@ -214,8 +271,7 @@ describe("meta prompt templates", () => {
         },
         [],
         {
-          current_working_directory:
-            "/Users/tester/Desktop/llm-space-project",
+          current_working_directory: "/Users/tester/Desktop/llm-space-project",
         }
       )
     );
@@ -306,7 +362,9 @@ describe("meta prompt templates", () => {
   test("apply-template translates and recursively renders @include macros", () => {
     const py = applyTemplatePy({}, [], {});
     expect(py).toContain("def _normalize_include_macros(content: str) -> str:");
-    expect(py).toContain('runtime_variables = {**variables, "include": include}');
+    expect(py).toContain(
+      'runtime_variables = {**variables, "include": include}'
+    );
     expect(py).toContain(
       "return apply_template(variables, included, include_depth + 1)"
     );

@@ -10,10 +10,12 @@ import { createContext, useContext, type ReactNode } from "react";
  * message tree through {@link PlaygroundLabelsProvider}.
  *
  * Boundary: these are UI chrome only. Model-facing strings — tool names and
- * descriptions, system prompts, generated code, and thread content — are
+ * definitions, system prompts, generated code, and thread content — are
  * deliberately not part of this type and must not be localized.
  */
 export interface PlaygroundLabels {
+  /** UI-only summaries keyed by built-in name; missing entries use the English definition. */
+  builtInToolDescriptions: Readonly<Record<string, string | undefined>>;
   /** Localize a provider name for presentation without changing its identity. */
   providerDisplayName: (provider: { id: string; name: string }) => string;
   /** Tooltip + aria-label of the "More actions" dropdown trigger. */
@@ -133,6 +135,9 @@ export interface PlaygroundLabels {
       loadFailed: string;
       chooseImageModel: string;
       chooseImageModelHint: string;
+      provider: string;
+      chooseProvider: string;
+      imageProviderAria: string;
       model: string;
       profile: string;
       defaultSize: string;
@@ -396,6 +401,7 @@ export function identityProviderDisplayName(provider: {
 }
 
 export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
+  builtInToolDescriptions: {},
   providerDisplayName: identityProviderDisplayName,
   moreActions: "More actions",
   viewRunHistory: "View Run History",
@@ -519,7 +525,10 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
       loadFailed: "Failed to load built-in tools",
       chooseImageModel: "Choose an enabled image model",
       chooseImageModelHint:
-        "Enable an Ark image model in Settings, then select it here.",
+        "Enable an image model in Settings, then select it here.",
+      provider: "Provider",
+      chooseProvider: "Choose provider",
+      imageProviderAria: "Generate image provider",
       model: "Model",
       profile: "Profile",
       defaultSize: "Default size",
@@ -529,7 +538,7 @@ export const DEFAULT_PLAYGROUND_LABELS: PlaygroundLabels = {
       imageSizeAria: "Default image size",
       imageWatermarkAria: "Add AI-generated watermark",
       noImageModels:
-        "Enable an Ark image model in Settings before adding this tool.",
+        "Enable an image model for this provider in Settings before adding this tool.",
     },
     mcp: {
       title: "Add MCP tools",

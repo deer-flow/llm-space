@@ -5,14 +5,8 @@ import {
   type SearchProviderId,
   type SearchSettings,
 } from "@llm-space/core";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@llm-space/ui/ui/select";
-import { Separator } from "@llm-space/ui/ui/separator";
+import { Button } from "@llm-space/ui/ui/button";
+import { Check, Circle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -34,6 +28,15 @@ const PROVIDER_ORDER: readonly SearchProviderId[] = [
 ];
 
 /** Where each provider's key is issued, for the "Get API key" link. */
+const FAVICON_DOMAINS: Record<SearchProviderId, string> = {
+  brave: "search.brave.com",
+  firecrawl: "firecrawl.dev",
+  tavily: "tavily.com",
+  exa: "exa.ai",
+  anysearch: "anysearch.com",
+  zhihu: "zhihu.com",
+};
+
 const GET_KEY_URLS: Record<SearchProviderId, string> = {
   brave: "https://api-dashboard.search.brave.com/app/keys",
   firecrawl: "https://www.firecrawl.dev/app/api-keys",
@@ -48,6 +51,9 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
   const [settings, setSettings] = useState<SearchSettings>(
     DEFAULT_SEARCH_SETTINGS
   );
+  const [selectedProvider, setSelectedProvider] = useState<SearchProviderId>(
+    DEFAULT_SEARCH_SETTINGS.provider
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +61,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
       .then((loaded) => {
         if (!cancelled) {
           setSettings(loaded);
+          setSelectedProvider(loaded.provider);
         }
       })
       .catch(() => {
@@ -73,9 +80,7 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
       } catch (error) {
         toast.error(t.search.failedToSave, {
           description:
-            error instanceof Error
-              ? error.message
-              : t.common.pleaseTryAgain,
+            error instanceof Error ? error.message : t.common.pleaseTryAgain,
         });
       }
     },
@@ -85,7 +90,6 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
   return (
     <SettingsPage
       title={t.search.title}
-      className="pt-0"
       description={
         <>
           {t.search.descriptionPrefix}
@@ -96,55 +100,126 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex h-14 items-center justify-between gap-4">
-          <span className="text-sm">{t.search.providerRow}</span>
-          <Select
-            value={settings.provider}
-            onValueChange={(value) =>
-              void persist({ ...settings, provider: value as SearchProviderId })
-            }
-          >
-            <SelectTrigger className="w-40" aria-label={t.search.providerAria}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PROVIDER_ORDER.map((provider) => (
-                <SelectItem key={provider} value={provider}>
-                  {t.search.providers[provider]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex h-full min-h-0 gap-6">
+        <aside className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            {t.search.providersHeading}
+          </span>
 
-        <Separator />
-
-        {PROVIDER_ORDER.map((provider) => (
-          <ApiKeyField
-            key={provider}
-            label={t.search.keys[provider]}
-            value={settings[_settingsKeyFor(provider)]}
-            getKeyUrl={GET_KEY_URLS[provider]}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                [_settingsKeyFor(provider)]: e.target.value,
-              })
-            }
-            onBlur={() => void persist(settings)}
-          />
-        ))}
-
-        <p className="text-muted-foreground text-xs">
-          {t.search.envPrefix}
-          <code>$</code>
-          {t.search.envMiddle}
-          <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
-          <code>$FIRECRAWL_API_KEY</code>, <code>$TAVILY_API_KEY</code>
-          {t.search.envSuffix}
-          {t.search.keyNotes}
-        </p>
+          <div className="flex flex-col gap-1">
+            {PROVIDER_ORDER.map((provider) => {
+              const active = selectedProvider === provider;
+              const isDefault = settings.provider === provider;
+              return (
+                <button
+                  key={provider}
+                  type="button"
+                  onClick={() => setSelectedProvider(provider)}
+                  className={`group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors ${active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+                >
+                  <span
+                    className={`flex size-8 items-center justify-center rounded-md text-xs font-bold ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${FAVICON_DOMAINS[provider]}&sz=64`}
+                      alt=""
+                      className="size-full rounded-sm object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`block truncate text-sm font-medium ${active ? "!text-primary" : "text-foreground"}`}
+                    >
+                      {_displayProviderName(t.search.providers[provider])}
+                    </span>
+                  </span>
+                  {isDefault ? (
+                    <span className="text-primary flex shrink-0 items-center gap-1 text-[11px] font-medium">
+                      <Check className="size-3" /> {t.search.defaultLabel}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+        <section className="min-w-0 grow">
+          {(() => {
+            const provider = selectedProvider;
+            const isDefault = settings.provider === provider;
+            return (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-primary/15 text-primary flex size-11 items-center justify-center rounded-xl">
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${FAVICON_DOMAINS[provider]}&sz=64`}
+                        alt=""
+                        className="size-full rounded-md object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </span>
+                    <div>
+                      <h2 className="text-xl font-semibold tracking-tight">
+                        {_displayProviderName(t.search.providers[provider])}
+                      </h2>
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        {t.search.detailsDescription}
+                      </p>
+                    </div>
+                  </div>
+                  {isDefault ? (
+                    <span className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold">
+                      <Check className="size-3.5" /> {t.search.defaultLabel}
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void persist({ ...settings, provider })}
+                    >
+                      {t.search.setDefault}
+                    </Button>
+                  )}
+                </div>
+                <div className="border-border/70 bg-background/40 mt-8 rounded-xl border p-5">
+                  <ApiKeyField
+                    label={t.search.keys[provider]}
+                    value={settings[_settingsKeyFor(provider)]}
+                    getKeyUrl={GET_KEY_URLS[provider]}
+                    getKeyButton
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        [_settingsKeyFor(provider)]: e.target.value,
+                      })
+                    }
+                    onBlur={() => void persist(settings)}
+                  />
+                  <p className="text-muted-foreground mt-4 text-xs">
+                    {t.search.envPrefix}
+                    <code>$</code>
+                    {t.search.envMiddle}
+                    <code>$BRAVE_SEARCH_API_KEY</code>,{" "}
+                    <code>$FIRECRAWL_API_KEY</code>,{" "}
+                    <code>$TAVILY_API_KEY</code>
+                    {t.search.envSuffix}
+                    {t.search.keyNotes}
+                  </p>
+                </div>
+                <div className="text-muted-foreground mt-6 flex items-center gap-2 text-xs">
+                  <Circle className="size-3 fill-current" />{" "}
+                  {t.search.defaultHint}
+                </div>
+              </>
+            );
+          })()}
+        </section>
       </div>
     </SettingsPage>
   );
@@ -156,6 +231,16 @@ export function SearchPage({ runtimeId }: { runtimeId: RuntimeId }) {
  */
 function _settingsKeyFor(
   provider: SearchProviderId
-): "braveApiKey" | "firecrawlApiKey" | "tavilyApiKey" | "exaApiKey" | "anysearchApiKey" | "zhihuAccessSecret" {
+):
+  | "braveApiKey"
+  | "firecrawlApiKey"
+  | "tavilyApiKey"
+  | "exaApiKey"
+  | "anysearchApiKey"
+  | "zhihuAccessSecret" {
   return provider === "zhihu" ? "zhihuAccessSecret" : `${provider}ApiKey`;
+}
+
+function _displayProviderName(name: string): string {
+  return name.replace(/\s*\(MCP\)$/i, "");
 }

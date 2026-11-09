@@ -3,7 +3,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { edit, glob, grep, ls, present_files, read, tree, write } from "../../../src/tools/built-in/fs";
+import {
+  bash,
+  edit,
+  glob,
+  grep,
+  ls,
+  present_files,
+  read,
+  tree,
+  write,
+} from "../../../src/tools/built-in/fs";
 
 const testDirectories: string[] = [];
 
@@ -27,6 +37,26 @@ describe("filesystem built-in paths", () => {
     await edit(absolutePath, "before", "after");
 
     expect(await fs.readFile(absolutePath, "utf8")).toBe("after");
+  });
+
+  test("edit writes $ sequences in new_string literally", async () => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "llm-space-fs-test-")
+    );
+    testDirectories.push(directory);
+    const newString = "echo $$HOME $& $' $`";
+    const allPath = path.join(directory, "all.mk");
+    const singlePath = path.join(directory, "single.mk");
+
+    await write(allPath, "run:\n\techo OLD\n");
+    await edit(allPath, "echo OLD", newString, true);
+    expect(await fs.readFile(allPath, "utf8")).toBe(`run:\n\t${newString}\n`);
+
+    await write(singlePath, "run:\n\techo OLD\n");
+    await edit(singlePath, "echo OLD", newString);
+    expect(await fs.readFile(singlePath, "utf8")).toBe(
+      `run:\n\t${newString}\n`
+    );
   });
 
   test("write and edit expand a leading home shortcut", async () => {
@@ -84,5 +114,113 @@ describe("filesystem built-in paths", () => {
     expect(await tree(homeDirectory)).toContain("└── example.txt");
     expect(await grep("target", homeDirectory)).toContain(absolutePath);
     expect(await glob("*.txt", homeDirectory, "/unused")).toBe(absolutePath);
+  });
+});
+
+describe("subprocess and glob output caps", () => {
+  test("bash truncates stdout past the cap with a marker", async () => {
+    const { stdout, exitCode } = await bash("seq 1 60000", os.tmpdir());
+
+    expect(exitCode).toBe(0);
+    expect(stdout.length).toBeLessThan(280_000);
+    expect(stdout).toContain(
+      "[truncated at 262144 bytes; redirect output to a file and read ranges with the read tool]"
+    );
+  });
+
+  test("bash truncates stderr past the cap with a marker", async () => {
+    const { stderr, exitCode } = await bash("seq 1 60000 >&2", os.tmpdir());
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("[truncated at 262144 bytes");
+    expect(stderr.length).toBeLessThan(280_000);
+  });
+
+  test("bash keeps short output byte-identical", async () => {
+    const { stdout, stderr, exitCode } = await bash(
+      "printf out; printf err >&2; exit 3",
+      os.tmpdir()
+    );
+
+    expect(stdout).toBe("out");
+    expect(stderr).toBe("err");
+    expect(exitCode).toBe(3);
+  });
+
+  const cap = 256 * 1024;
+  const marker = `\n... [truncated at ${cap} bytes; redirect output to a file and read ranges with the read tool]`;
+
+  for (const stream of ["stdout", "stderr"] as const) {
+    for (const size of [cap - 1, cap, cap + 1]) {
+      test(`${stream} handles ${size} bytes at the cap boundary`, async () => {
+        const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-cap-"));
+        testDirectories.push(directory);
+        await fs.writeFile(path.join(directory, "input"), "a".repeat(size));
+        const result = await bash(
+          `cat input${stream === "stderr" ? " >&2" : ""}`,
+          directory
+        );
+        expect(result.exitCode).toBe(0);
+        expect(result[stream]).toBe(
+          "a".repeat(Math.min(size, cap)) + (size > cap ? marker : "")
+        );
+      });
+    }
+    for (const character of ["é", "中", "😀"]) {
+      for (let keptBytes = 1; keptBytes <= Buffer.byteLength(character); keptBytes++) {
+        test(`${stream} preserves UTF-8 with ${keptBytes} bytes of ${character} at the boundary`, async () => {
+          const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-utf8-"));
+          testDirectories.push(directory);
+          const prefix = "a".repeat(cap - keptBytes);
+          await fs.writeFile(path.join(directory, "input"), prefix + character + "tail");
+          const result = await bash(
+            `cat input${stream === "stderr" ? " >&2" : ""}`,
+            directory
+          );
+          const expected = prefix + (keptBytes === Buffer.byteLength(character) ? character : "");
+          expect(result.exitCode).toBe(0);
+          expect(result[stream]).toBe(expected + marker);
+          expect(Buffer.byteLength(expected)).toBeLessThanOrEqual(cap);
+        });
+      }
+    }
+  }
+
+  test("bash drains both streams after truncation and preserves the exit code", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-drain-"));
+    testDirectories.push(directory);
+    await fs.writeFile(path.join(directory, "input"), "x".repeat(4 * 1024 * 1024));
+    const result = await bash("cat input & cat input >&2 & wait; exit 7", directory, 5000);
+    expect(result.exitCode).toBe(7);
+    expect(result.stdout).toBe("x".repeat(cap) + marker);
+    expect(result.stderr).toBe("x".repeat(cap) + marker);
+  });
+
+  test("grep caps multibyte matching output", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "llm-space-grep-cap-"));
+    testDirectories.push(directory);
+    await fs.writeFile(path.join(directory, "input"), "中文匹配\n".repeat(40000));
+    const result = await grep("匹配", directory);
+    expect(result.endsWith(marker)).toBe(true);
+    expect(result).not.toContain("\ufffd");
+    expect(Buffer.byteLength(result.slice(0, -marker.length))).toBeLessThanOrEqual(cap);
+  });
+
+  test("glob caps results and reports the total", async () => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "llm-space-glob-cap-")
+    );
+    testDirectories.push(directory);
+    for (let i = 0; i < 205; i++) {
+      await fs.writeFile(path.join(directory, `file-${i}.txt`), "x", "utf8");
+    }
+
+    const result = await glob("*.txt", directory, "/unused");
+    const lines = result.split("\n");
+
+    expect(lines).toHaveLength(201);
+    expect(lines[200]).toBe(
+      "... [showing first 200 of 205 matches; narrow the pattern or target directory]"
+    );
   });
 });

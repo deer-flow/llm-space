@@ -4,8 +4,10 @@ import { type ArkImageGenerationConfig } from "@llm-space/core";
 
 import {
   createArkImageGenerator,
+  createConfiguredArkImageGenerator,
   type ArkImageGenerationDependencies,
 } from "../../src/models/ark-image-generation";
+import type { ModelManager } from "../../src/models/model-manager";
 
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
@@ -264,5 +266,474 @@ describe("Ark image generation", () => {
       generate({ ...DEFAULT_INPUT, signal: controller.signal })
     ).rejects.toThrow("Ark image generation was aborted");
     expect(receivedSignal).toBe(controller.signal);
+  });
+
+  test("uses a custom provider connection and Agnes-compatible payload", async () => {
+    let requestUrl = "";
+    let requestHeaders: HeadersInit | undefined;
+    let requestBody: unknown;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: (providerId) =>
+          providerId === "agnes"
+            ? {
+                api: "openai-images-extra-body",
+                models: [
+                  {
+                    id: "agnes-image-2.5-flash",
+                    name: "Agnes Image 2.5 Flash",
+                    supportedSizes: ["1K", "2K", "3K", "4K"],
+                    defaultSize: "2K",
+                  },
+                ],
+              }
+            : undefined,
+        resolveConnection: (connection) => {
+          expect(connection).toEqual({
+            providerId: "agnes",
+            profileId: "agnes-default",
+          });
+          return Promise.resolve({
+            apiKey: "agnes-key",
+            baseUrl: "https://api.agnes-ai.cn/v1/",
+            headers: { "X-Tenant": "test" },
+          });
+        },
+        fetch: (input, init) => {
+          requestUrl =
+            typeof input === "string"
+              ? input
+              : input instanceof URL
+                ? input.href
+                : input.url;
+          requestHeaders = init?.headers;
+          requestBody =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "agnes-image-2.5-flash",
+              data: [{ b64_json: PNG_BASE64, size: "2048x2048" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "agnes-image-2.5-flash",
+      size: "2K",
+      watermark: false,
+      connection: {
+        providerId: "agnes",
+        profileId: "agnes-default",
+      },
+    });
+
+    expect(requestUrl).toBe("https://api.agnes-ai.cn/v1/images/generations");
+    expect(requestHeaders).toMatchObject({
+      Authorization: "Bearer agnes-key",
+      "X-Tenant": "test",
+    });
+    expect(requestBody).toEqual({
+      model: "agnes-image-2.5-flash",
+      prompt: "A red circle",
+      size: "2K",
+      return_base64: true,
+      extra_body: { response_format: "b64_json" },
+    });
+  });
+
+  test("uses standard OpenAI sizes and omits response_format for GPT Image", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "gpt-image-1",
+              name: "GPT Image 1",
+              supportedSizes: ["1024x1024"],
+              defaultSize: "1024x1024",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          const parsed: unknown =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          requestBody =
+            parsed && typeof parsed === "object"
+              ? (parsed as Record<string, unknown>)
+              : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "gpt-image-1",
+              data: [{ b64_json: PNG_BASE64, size: "1024x1024" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "gpt-image-1",
+      size: "1024x1024",
+      watermark: false,
+      connection: { providerId: "openai-images" },
+    });
+
+    expect(requestBody).toEqual({
+      model: "gpt-image-1",
+      prompt: "A red circle",
+      size: "1024x1024",
+    });
+  });
+
+  test("requests base64 explicitly for DALL-E and migrates legacy 1K", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "dall-e-3",
+              name: "DALL-E 3",
+              supportedSizes: ["1K"],
+              defaultSize: "1K",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          const parsed: unknown =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          requestBody =
+            parsed && typeof parsed === "object"
+              ? (parsed as Record<string, unknown>)
+              : undefined;
+          return Promise.resolve(
+            Response.json({
+              model: "dall-e-3",
+              data: [{ b64_json: PNG_BASE64, size: "1024x1024" }],
+            })
+          );
+        },
+      })
+    );
+
+    await generate({
+      prompt: "A red circle",
+      model: "dall-e-3",
+      size: "1K",
+      watermark: false,
+      connection: { providerId: "openai-images" },
+    });
+
+    expect(requestBody).toEqual({
+      model: "dall-e-3",
+      prompt: "A red circle",
+      response_format: "b64_json",
+      size: "1024x1024",
+    });
+  });
+
+  test("rejects ambiguous non-1K presets in standard OpenAI mode", async () => {
+    let calls = 0;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: "gpt-image-1",
+              name: "GPT Image 1",
+              supportedSizes: ["2K"],
+              defaultSize: "2K",
+            },
+          ],
+        }),
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve(Response.json({}));
+        },
+      })
+    );
+
+    expect(
+      generate({
+        prompt: "A red circle",
+        model: "gpt-image-1",
+        size: "2K",
+        watermark: false,
+        connection: { providerId: "openai-images" },
+      })
+    ).rejects.toThrow("requires an explicit pixel size");
+    expect(calls).toBe(0);
+  });
+
+  test("requests base64 for a configured gateway alias that otherwise returns a URL", async () => {
+    let requestBody: unknown;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          models: [
+            {
+              id: "dalle-prod",
+              name: "Production image model",
+              supportedSizes: ["1024x1024"],
+              defaultSize: "1024x1024",
+              responseFormat: "b64_json",
+            },
+          ],
+        }),
+        fetch: (_input, init) => {
+          requestBody =
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+          const format = (requestBody as { response_format?: unknown })
+            ?.response_format;
+          return Promise.resolve(
+            Response.json({
+              data: [
+                format === "b64_json"
+                  ? { b64_json: PNG_BASE64 }
+                  : { url: "https://images.example/generated.png" },
+              ],
+            })
+          );
+        },
+      })
+    );
+
+    expect(
+      await generate({
+        ...DEFAULT_INPUT,
+        model: "dalle-prod",
+        size: "1024x1024",
+        connection: { providerId: "gateway" },
+      })
+    ).toMatchObject({ data: PNG_BASE64, mimeType: "image/png" });
+    expect(requestBody).toEqual({
+      model: "dalle-prod",
+      prompt: DEFAULT_INPUT.prompt,
+      size: "1024x1024",
+      response_format: "b64_json",
+    });
+  });
+
+  test.each([
+    ["1024x1024", "1K"],
+    ["1K", "1024x1024"],
+    ["1024x1024", "1024x1024"],
+  ] as const)(
+    "matches standard inventory size %s with thread size %s",
+    async (inventorySize, threadSize) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            models: [
+              {
+                id: "dall-e-3",
+                name: "DALL-E 3",
+                supportedSizes: [inventorySize],
+                defaultSize: inventorySize,
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      expect(
+        await generate({
+          ...DEFAULT_INPUT,
+          model: "dall-e-3",
+          size: threadSize,
+          connection: { providerId: "gateway" },
+        })
+      ).toMatchObject({ data: PNG_BASE64, size: "1024x1024" });
+      expect(requestBody).toMatchObject({ size: "1024x1024" });
+    }
+  );
+
+  test.each(["ark-images", "openai-images-extra-body"] as const)(
+    "keeps native 1K presets for %s",
+    async (api) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            api,
+            models: [
+              {
+                id: "custom-image",
+                name: "Custom Image",
+                supportedSizes: ["1K"],
+                defaultSize: "1K",
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      await generate({
+        ...DEFAULT_INPUT,
+        model: "custom-image",
+        size: "1K",
+        connection: { providerId: "gateway" },
+      });
+      expect(requestBody).toMatchObject({ size: "1K" });
+      expect(
+        generate({
+          ...DEFAULT_INPUT,
+          model: "custom-image",
+          size: "1024x1024",
+          connection: { providerId: "gateway" },
+        })
+      ).rejects.toThrow("does not support the 1024x1024 size preset");
+    }
+  );
+
+  test.each(["gpt-image-2", "gpt-image-2-2026-04-21"])(
+    "accepts a supported landscape size for %s",
+    async (model) => {
+      let requestBody: unknown;
+      const generate = createArkImageGenerator(
+        _dependencies({
+          getConfig: () => ({
+            api: "openai-images",
+            models: [
+              {
+                id: model,
+                name: model,
+                supportedSizes: ["1792x1024"],
+                defaultSize: "1792x1024",
+              },
+            ],
+          }),
+          fetch: (_input, init) => {
+            requestBody =
+              typeof init?.body === "string"
+                ? JSON.parse(init.body)
+                : undefined;
+            return Promise.resolve(
+              Response.json({ data: [{ b64_json: PNG_BASE64 }] })
+            );
+          },
+        })
+      );
+
+      expect(
+        await generate({
+          ...DEFAULT_INPUT,
+          model,
+          size: "1792x1024",
+          connection: { providerId: "gateway" },
+        })
+      ).toMatchObject({ size: "1792x1024" });
+      expect(requestBody).toEqual({
+        model,
+        prompt: DEFAULT_INPUT.prompt,
+        size: "1792x1024",
+      });
+    }
+  );
+
+  test.each([
+    ["gpt-image-1", "1792x1024"],
+    ["gpt-image-1-mini", "1792x1024"],
+    ["gpt-image-1.5", "1792x1024"],
+    ["gpt-image-1-2025-04-15", "1792x1024"],
+    ["dall-e-2", "1792x1024"],
+    ["dall-e-3", "auto"],
+  ] as const)("still enforces %s size restrictions", (model, size) => {
+    let calls = 0;
+    const generate = createArkImageGenerator(
+      _dependencies({
+        getConfig: () => ({
+          api: "openai-images",
+          models: [
+            {
+              id: model,
+              name: model,
+              supportedSizes: [size],
+              defaultSize: size,
+            },
+          ],
+        }),
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve(Response.json({}));
+        },
+      })
+    );
+
+    expect(
+      generate({
+        ...DEFAULT_INPUT,
+        model,
+        size,
+        connection: { providerId: "gateway" },
+      })
+    ).rejects.toThrow(`${model} does not support image size ${size}`);
+    expect(calls).toBe(0);
+  });
+
+  test("never falls back to the Ark key for a custom provider", async () => {
+    let fallbackApiKey: string | undefined;
+    const modelManager = {
+      getImageGenerationConfig: () => ({
+        api: "openai-images",
+        models: [
+          {
+            id: "fixture",
+            name: "Fixture",
+            supportedSizes: ["1K"],
+            defaultSize: "1K",
+          },
+        ],
+      }),
+      resolveConnection: (
+        _connection: unknown,
+        options: { fallbackApiKey?: string }
+      ) => {
+        fallbackApiKey = options.fallbackApiKey;
+        return Promise.resolve({});
+      },
+    } as unknown as ModelManager;
+    const generate = createConfiguredArkImageGenerator({
+      modelManager,
+      env: { ARK_API_KEY: "ark-secret-canary" },
+    });
+
+    expect(
+      generate({
+        prompt: "fixture",
+        model: "fixture",
+        size: "1K",
+        watermark: false,
+        connection: { providerId: "other-images" },
+      })
+    ).rejects.toThrow('Configure an API key for provider "other-images"');
+    expect(fallbackApiKey).toBeUndefined();
   });
 });

@@ -77,6 +77,25 @@ describe("installPluginZip", () => {
     await assert.rejects(readFile(outside, "utf8"));
   });
 
+  test("settles pending writes before cleaning up a rejected archive", async () => {
+    const homePath = await _home();
+    const files: Record<string, Uint8Array> = {
+      "package.json": strToU8(
+        JSON.stringify({ name: "safe-plugin", version: "1.0.0" })
+      ),
+    };
+    for (let index = 0; index < 32; index += 1) {
+      files[`assets/${index}/nested/file.txt`] = strToU8("pending write");
+    }
+    files["../escape.txt"] = strToU8("escape");
+
+    await assert.rejects(
+      installPluginZip({ homePath, archive: zipSync(files) }),
+      /Unsafe path/
+    );
+    await assert.rejects(readFile(path.join(homePath, "escape.txt"), "utf8"));
+  });
+
   test("leaves an existing plugin untouched when validation fails", async () => {
     const homePath = await _home();
     const target = path.join(homePath, "plugins", "keep-plugin", "value.txt");

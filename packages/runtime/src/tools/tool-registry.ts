@@ -124,7 +124,8 @@ export class ToolRegistry {
     }
     if (
       connection &&
-      entry.tool.connection?.providerId !== connection.providerId
+      entry.tool.connection &&
+      entry.tool.connection.providerId !== connection.providerId
     ) {
       throw new Error(
         `Built-in tool ${name} does not use provider: ${connection.providerId}`

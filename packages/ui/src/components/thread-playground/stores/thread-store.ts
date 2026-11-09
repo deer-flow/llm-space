@@ -1244,7 +1244,9 @@ export function createThreadStore(
                 );
                 let runHistory = recordRun(
                   get().runHistory,
-                  threadWithSnapshot,
+                  // Record the resolved model, including automatic/fallback
+                  // selection, without changing the thread's preference.
+                  { ...threadWithSnapshot, model },
                   Date.now(),
                   { usage: runUsage }
                 );

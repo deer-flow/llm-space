@@ -8,12 +8,12 @@ import type {
   Model,
   Models,
   SimpleStreamOptions,
+  TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { streamSimple as streamOpenAICompletions } from "@earendil-works/pi-ai/api/openai-completions";
 
 import { streamAgent } from "../../../src/server/agent/stream";
 import type { AgentStreamRequest } from "../../../src/types/agent";
-
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -104,6 +104,103 @@ function _completedStream(
 }
 
 describe("streamAgent Responses native tool forwarding", () => {
+  test("keeps function calls step-by-step with transcript tool declarations", async () => {
+    let requestCount = 0;
+    globalThis.fetch = (() => {
+      requestCount += 1;
+      const chunks = [
+        {
+          id: "chatcmpl_tool",
+          choices: [
+            {
+              index: 0,
+              delta: {
+                role: "assistant",
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: "call_lookup",
+                    type: "function",
+                    function: {
+                      name: "lookup",
+                      arguments: "{}",
+                    },
+                  },
+                ],
+              },
+              finish_reason: null,
+            },
+          ],
+        },
+        {
+          id: "chatcmpl_tool",
+          choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+        },
+      ];
+      return Promise.resolve(
+        new Response(
+          chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") +
+            "data: [DONE]\n\n",
+          { headers: { "content-type": "text/event-stream" } }
+        )
+      );
+    }) as unknown as typeof fetch;
+    const model: Model<"openai-completions"> = {
+      id: "tool-test",
+      name: "Tool test",
+      api: "openai-completions",
+      provider: "openai",
+      baseUrl: "https://example.invalid/v1",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128_000,
+      maxTokens: 16_384,
+    };
+    const models = {
+      getModel: () => model,
+      streamSimple: (
+        _model: Model<Api>,
+        context: TranscriptContext,
+        options?: SimpleStreamOptions
+      ) => streamOpenAICompletions(model, context, options),
+    } as unknown as Models;
+    const events = [];
+    for await (const event of streamAgent(
+      {
+        model: { provider: model.provider, id: model.id },
+        context: {
+          systemPrompt: "Use lookup.",
+          responseApiNativeTools: [],
+          messages: [{ role: "user", content: "Look it up", timestamp: 0 }],
+          tools: [
+            {
+              name: "lookup",
+              description: "Look up a topic",
+              parameters: { type: "object", properties: {} },
+            },
+          ],
+        },
+      },
+      {
+        models,
+        signal: new AbortController().signal,
+        getApiKey: () => "test-key",
+      }
+    )) {
+      events.push(event);
+    }
+    expect(requestCount).toBe(1);
+    expect(
+      events.find((event) => event.type === "tool_execution_end")
+    ).toMatchObject({
+      toolName: "lookup",
+      isError: false,
+      result: { terminate: true },
+    });
+    expect(events.at(-1)?.type).toBe("agent_end");
+  });
+
   test("forwards native tools without gating on the model API", async () => {
     let streamCalls = 0;
     let receivedPayload: Record<string, unknown> | undefined;
@@ -128,20 +225,18 @@ describe("streamAgent Responses native tool forwarding", () => {
       ) => {
         streamCalls += 1;
         return _completedStream(model, async () => {
-            const payload = {
-              tools: [{ type: "function", name: "lookup" }],
-            };
-            receivedPayload = ((await options?.onPayload?.(payload, model)) ??
-              payload) as Record<string, unknown>;
+          const payload = {
+            tools: [{ type: "function", name: "lookup" }],
+          };
+          receivedPayload = ((await options?.onPayload?.(payload, model)) ??
+            payload) as Record<string, unknown>;
         });
       },
     } as unknown as Models;
     const request: AgentStreamRequest = {
       model: { provider: "openai", id: model.id },
       context: {
-        messages: [
-          { role: "user", content: "Hello", timestamp: Date.now() },
-        ],
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
         tools: [],
         responseApiNativeTools: [{ type: "web_search" }],
       },
@@ -195,9 +290,7 @@ describe("streamAgent Responses native tool forwarding", () => {
     const request: AgentStreamRequest = {
       model: { provider: model.provider, id: model.id },
       context: {
-        messages: [
-          { role: "user", content: "Hello", timestamp: Date.now() },
-        ],
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
         tools: [],
         responseApiNativeTools: [{ type: "web_search" }],
       },
@@ -238,16 +331,15 @@ describe("streamAgent Responses native tool forwarding", () => {
       getModel: () => model as Model<Api>,
       streamSimple: (
         _model: Model<Api>,
-        context: Context,
+        context: TranscriptContext,
         options?: SimpleStreamOptions
       ) => streamOpenAICompletions(model, context, options),
     } as unknown as Models;
     const request: AgentStreamRequest = {
       model: { provider: model.provider, id: model.id },
       context: {
-        messages: [
-          { role: "user", content: "Hello", timestamp: Date.now() },
-        ],
+        systemPrompt: "Preserve this system instruction.",
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
         tools: [
           {
             name: "lookup",
@@ -267,6 +359,10 @@ describe("streamAgent Responses native tool forwarding", () => {
       void event;
     }
 
+    expect(requestBody?.messages).toEqual([
+      { role: "system", content: "Preserve this system instruction." },
+      { role: "user", content: "Hello" },
+    ]);
     expect(requestBody?.tools).toEqual([
       {
         type: "function",
@@ -274,7 +370,6 @@ describe("streamAgent Responses native tool forwarding", () => {
           name: "lookup",
           description: "Look up a topic",
           parameters: { type: "object", properties: {} },
-          strict: false,
         },
       },
       { type: "web_search" },

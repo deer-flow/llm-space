@@ -19,6 +19,20 @@ afterEach(() =>
 );
 
 describe("PluginSettingsStore", () => {
+  test("keeps Memory disabled until explicitly enabled, including after reload", () => {
+    const home = _home();
+    const store = new PluginSettingsStore(home);
+    expect(store.get("@llm-space/memory").enabled).toBe(false);
+    store.setSettings("@llm-space/memory", { maxRecords: 1000 });
+    const reloaded = new PluginSettingsStore(home);
+    expect(reloaded.get("@llm-space/memory").enabled).toBe(false);
+    reloaded.setEnabled("@llm-space/memory", true);
+    expect(new PluginSettingsStore(home).get("@llm-space/memory")).toEqual({
+      enabled: true,
+      settings: { maxRecords: 1000 },
+    });
+  });
+
   test("defaults unknown plugins to enabled without creating the file", () => {
     const home = _home();
     expect(new PluginSettingsStore(home).get("demo")).toEqual({

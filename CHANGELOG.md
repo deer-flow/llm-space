@@ -4,6 +4,50 @@ All notable changes to LLM Space are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.0] - 2026-10-11
+
+### Changed
+
+- Upgraded the Pi model and agent libraries to 1.1.0, verified as the latest
+  official npm registry release on 2026-10-11.
+- Migrated image generation to Pi's unified model and provider APIs.
+- Retained and rebased the Responses compatibility patch for native-tool
+  output, citations, and tool-call ID replay for non-OpenAI providers; these
+  behaviors are still not fully provided upstream.
+
+### Fixed
+
+- Preserve saved Azure provider and model references across Pi's provider rename.
+
+## [4.19.1] - 2026-09-29
+
+Includes the improvements from 4.19.0, whose release publication did not complete.
+
+### Added
+
+- Provider-owned image models and localized built-in tool descriptions.
+- Multilingual memory retrieval, archiving, and a memory management panel.
+
+### Changed
+
+- Refined search provider settings, provider selection, and API-key actions.
+- Bundled memory is disabled by default, and its settings stay hidden until enabled.
+- Updated Pi model and agent libraries to 0.87.1, verified against the official
+  npm registry on 2026-09-29. Retained the local Responses compatibility and
+  native-tool patch because upstream still lacks the required behavior,
+  including tool-call ID replay for non-OpenAI providers.
+
+### Fixed
+
+- Preserve literal edit-tool replacements, imported tool-result errors, blank
+  context lines in patches, and insertion-only patch hunk ordering.
+- Wait for plugin ZIP writes to settle before cleaning up failed installations.
+- Keep dynamic prompt variables fresh, record resolved run models, and preserve
+  memory records during upgrades and concurrent writes.
+- Confine local filesystem operations, reject nested symlinks during recursive
+  copies, and cap tool output without splitting UTF-8 characters.
+- Synchronize delayed fullscreen state.
+
 ## [4.18.1] - 2026-09-07
 
 ### Added
