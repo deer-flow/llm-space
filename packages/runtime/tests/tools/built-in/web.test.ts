@@ -47,6 +47,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        outcrawlApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -87,6 +88,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        outcrawlApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -130,6 +132,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        outcrawlApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_search");
 
@@ -178,6 +181,7 @@ describe("Brave Search provider", () => {
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
+        outcrawlApiKey: "",
       }),
     }).find((entry) => entry.tool.name === "web_fetch");
 
@@ -202,6 +206,7 @@ const NEW_SETTINGS_FIELDS = {
   exaApiKey: "",
   anysearchApiKey: "",
   zhihuAccessSecret: "",
+  outcrawlApiKey: "",
 };
 
 interface RpcCallBody {
@@ -550,5 +555,218 @@ describe("Zhihu MCP provider", () => {
         content: undefined,
       },
     ]);
+  });
+});
+
+// -- Outcrawl ------------------------------------------------------------------
+
+function _outcrawlSettings(outcrawlApiKey: string) {
+  return {
+    provider: "outcrawl" as const,
+    braveApiKey: "",
+    firecrawlApiKey: "",
+    tavilyApiKey: "",
+    ...NEW_SETTINGS_FIELDS,
+    outcrawlApiKey,
+  };
+}
+
+describe("Outcrawl provider", () => {
+  test("web_search posts to the search endpoint with a bearer key and normalizes hits", async () => {
+    let request: { url: string; headers: Headers; body: unknown } | undefined;
+    globalThis.fetch = ((input, init) => {
+      request = {
+        url:
+          input instanceof URL
+            ? input.href
+            : typeof input === "string"
+              ? input
+              : input.url,
+        headers: new Headers(init?.headers),
+        body: JSON.parse(
+          typeof init?.body === "string" ? init.body : "null"
+        ) as unknown,
+      };
+      return Promise.resolve(
+        Response.json({
+          hits: [
+            {
+              title: "Test runner | Bun Docs",
+              url: "https://bun.com/docs/test",
+              snippet: "Bun's built-in, Jest-compatible test runner.",
+              rank: 1,
+            },
+            { url: "https://example.com/no-title" },
+          ],
+          usage: { credits: "1" },
+        })
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: { OUTCRAWL_API_KEY: "oc-env-key" },
+      getSearchSettings: () => _outcrawlSettings("$OUTCRAWL_API_KEY"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    const result = await search?.execute({
+      query: "bun test runner",
+      limit: 50,
+      includeContent: true,
+    });
+
+    expect(request).toBeDefined();
+    if (!request) throw new Error("Outcrawl request was not captured");
+    expect(request.url).toBe("https://api.outcrawl.ai/v1/search");
+    expect(request.headers.get("Authorization")).toBe("Bearer oc-env-key");
+    expect(request.body).toEqual({ query: "bun test runner", limit: 20 });
+    expect(result).toEqual([
+      {
+        title: "Test runner | Bun Docs",
+        url: "https://bun.com/docs/test",
+        snippet: "Bun's built-in, Jest-compatible test runner.",
+        content: undefined,
+      },
+      {
+        title: "Untitled",
+        url: "https://example.com/no-title",
+        snippet: undefined,
+        content: undefined,
+      },
+    ]);
+  });
+
+  test("web_fetch scrapes to markdown through Outcrawl, not Firecrawl", async () => {
+    let request: { url: string; headers: Headers; body: unknown } | undefined;
+    globalThis.fetch = ((input, init) => {
+      request = {
+        url:
+          input instanceof URL
+            ? input.href
+            : typeof input === "string"
+              ? input
+              : input.url,
+        headers: new Headers(init?.headers),
+        body: JSON.parse(
+          typeof init?.body === "string" ? init.body : "null"
+        ) as unknown,
+      };
+      return Promise.resolve(
+        Response.json({
+          markdown: "# Example Domain",
+          metadata: { title: "Example Domain" },
+          usage: { credits: "1" },
+        })
+      );
+    }) as typeof fetch;
+
+    const fetchTool = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => _outcrawlSettings("oc-key"),
+    }).find((entry) => entry.tool.name === "web_fetch");
+
+    const result = await fetchTool?.execute({ url: "https://example.com" });
+
+    expect(request).toBeDefined();
+    if (!request) throw new Error("Outcrawl request was not captured");
+    expect(request.url).toBe("https://api.outcrawl.ai/v1/scrape");
+    expect(request.headers.get("Authorization")).toBe("Bearer oc-key");
+    expect(request.body).toEqual({
+      url: "https://example.com",
+      formats: ["markdown"],
+    });
+    expect(result).toEqual({
+      url: "https://example.com",
+      title: "Example Domain",
+      content: "# Example Domain",
+      metadata: { title: "Example Domain" },
+    });
+  });
+
+  test("web_fetch fails when the page returns no markdown", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(Response.json({ metadata: {} }));
+    }) as typeof fetch;
+
+    const fetchTool = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => _outcrawlSettings("oc-key"),
+    }).find((entry) => entry.tool.name === "web_fetch");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(fetchTool!.execute({ url: "https://example.com" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toContain(
+      "could not extract https://example.com"
+    );
+  });
+
+  test("requires a configured Outcrawl API key", async () => {
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => _outcrawlSettings("$OUTCRAWL_API_KEY"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toContain(
+      "Outcrawl API key is not configured"
+    );
+  });
+
+  test("surfaces the message from Outcrawl's { code, message } errors", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(
+        Response.json(
+          { code: "unauthorized", message: "authentication failed" },
+          { status: 401 }
+        )
+      );
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => _outcrawlSettings("bad-key"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe("authentication failed");
+  });
+
+  test("falls back to a status message when the error body is not JSON", async () => {
+    globalThis.fetch = ((input) => {
+      void input;
+      return Promise.resolve(new Response("Bad gateway", { status: 502 }));
+    }) as typeof fetch;
+
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => _outcrawlSettings("oc-key"),
+    }).find((entry) => entry.tool.name === "web_search");
+
+    let rejection: unknown;
+    try {
+      await Promise.resolve(search!.execute({ query: "test" }));
+    } catch (error) {
+      rejection = error;
+    }
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe("web_search failed: 502");
   });
 });

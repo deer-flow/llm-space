@@ -5,6 +5,7 @@ from langchain.tools import tool
 
 FIRECRAWL_BASE_URL = "https://api.firecrawl.dev"
 TAVILY_BASE_URL = "https://api.tavily.com"
+OUTCRAWL_BASE_URL = "https://api.outcrawl.ai/v1"
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -70,6 +71,36 @@ def _tavily_fetch(url: str) -> dict:
     }
 
 
+def _outcrawl_fetch(url: str) -> dict:
+    """Scrape one page to markdown via Outcrawl. Requires ``OUTCRAWL_API_KEY``."""
+    api_key = os.environ.get("OUTCRAWL_API_KEY")
+    if not api_key:
+        raise RuntimeError("Outcrawl API key is not configured. Set OUTCRAWL_API_KEY.")
+
+    res = requests.post(
+        f"{OUTCRAWL_BASE_URL}/scrape",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        json={"url": url, "formats": ["markdown"]},
+    )
+    try:
+        json_body = res.json()
+    except ValueError:
+        json_body = {}
+    if not res.ok:
+        raise RuntimeError(json_body.get("message") or f"web_fetch failed: {res.status_code}")
+    if not json_body.get("markdown"):
+        raise RuntimeError(f"web_fetch failed: could not extract {url}")
+
+    metadata = json_body.get("metadata") or {}
+    title = metadata.get("title")
+    return {
+        "url": url,
+        "title": title if isinstance(title, str) else None,
+        "content": _truncate_text(json_body["markdown"], 20_000),
+        "metadata": metadata,
+    }
+
+
 @tool
 def web_fetch(url: str) -> dict:
     """Fetch one webpage and return LLM-friendly readable markdown content.
@@ -77,7 +108,7 @@ def web_fetch(url: str) -> dict:
     Fetch one webpage and return LLM-friendly readable markdown content.
 
     The backend is chosen by the ``SEARCH_PROVIDER`` environment variable
-    (``firecrawl`` by default, or ``tavily``/``brave``). Brave exposes no
+    (``firecrawl`` by default, or ``tavily``/``brave``/``outcrawl``). Brave exposes no
     single-page extraction endpoint, so under ``brave`` the fetch falls back to
     Firecrawl.
 
@@ -88,6 +119,8 @@ def web_fetch(url: str) -> dict:
     provider = os.environ.get("SEARCH_PROVIDER", "firecrawl").strip().lower()
     if provider == "tavily":
         return _tavily_fetch(url)
+    if provider == "outcrawl":
+        return _outcrawl_fetch(url)
     # `brave` has no extraction endpoint, so it delegates to Firecrawl (matching
     # the desktop behavior, which avoids fetching arbitrary URLs from the trusted
     # process and widening the SSRF surface).

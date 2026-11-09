@@ -5,7 +5,8 @@ export type SearchProviderId =
   | "tavily"
   | "exa"
   | "anysearch"
-  | "zhihu";
+  | "zhihu"
+  | "outcrawl";
 
 /**
  * User-configured search settings, persisted to `settings/search.json`. API keys
@@ -16,6 +17,8 @@ export type SearchProviderId =
  * `exa` and `anysearch` are MCP-backed providers whose keys are optional (both
  * work anonymously with lower rate limits); `zhihu` is Zhihu's official MCP
  * search and requires an access secret from the Zhihu developer console.
+ * `outcrawl` is Outcrawl's REST API (search and page scrape) and requires an
+ * API key.
  */
 export interface SearchSettings {
   provider: SearchProviderId;
@@ -25,6 +28,7 @@ export interface SearchSettings {
   exaApiKey: string;
   anysearchApiKey: string;
   zhihuAccessSecret: string;
+  outcrawlApiKey: string;
 }
 
 export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
@@ -35,4 +39,5 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   exaApiKey: "$EXA_API_KEY",
   anysearchApiKey: "$ANYSEARCH_API_KEY",
   zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",
+  outcrawlApiKey: "$OUTCRAWL_API_KEY",
 };

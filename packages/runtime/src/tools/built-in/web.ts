@@ -9,6 +9,7 @@ export interface WebBuiltInToolsDependencies {
 
 const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
+const OUTCRAWL_BASE_URL = "https://api.outcrawl.ai/v1";
 const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
 const ANYSEARCH_MCP_URL = "https://api.anysearch.com/mcp";
@@ -88,6 +89,25 @@ interface TavilyExtractResponse {
     url?: string;
     error?: string;
   }[];
+}
+
+interface OutcrawlScrapeResponse {
+  markdown?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface OutcrawlSearchResponse {
+  hits?: {
+    title?: string;
+    url?: string;
+    snippet?: string;
+  }[];
+}
+
+/** Outcrawl errors are `{ code, message }`. */
+interface OutcrawlErrorResponse {
+  code?: string;
+  message?: string;
 }
 
 interface BraveSearchResponse {
@@ -280,6 +300,80 @@ class TavilySearchProvider implements SearchProvider {
         includeContent && item.raw_content
           ? _truncateText(item.raw_content, 2_000)
           : undefined,
+    }));
+  }
+}
+
+/**
+ * Outcrawl-backed provider (https://outcrawl.ai). Requires an API key. Both
+ * `web_fetch` (scrape to markdown, JavaScript-rendered pages included) and
+ * `web_search` use Outcrawl's REST API directly, so no Firecrawl delegate is
+ * needed. Search hits carry only a snippet, so `includeContent` has no effect.
+ */
+class OutcrawlSearchProvider implements SearchProvider {
+  constructor(private readonly _apiKey: string) {
+    if (!_apiKey) {
+      throw new Error(
+        "Outcrawl API key is not configured. Add one in Settings → Search."
+      );
+    }
+  }
+
+  private async _post<T>(
+    endpoint: "scrape" | "search",
+    body: Record<string, unknown>,
+    action: "web_fetch" | "web_search"
+  ): Promise<T> {
+    const res = await fetch(`${OUTCRAWL_BASE_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this._apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const json = (await res.json().catch(() => ({}))) as T &
+      OutcrawlErrorResponse;
+
+    if (!res.ok) {
+      throw new Error(json.message ?? `${action} failed: ${res.status}`);
+    }
+    return json;
+  }
+
+  async fetch(url: string): Promise<WebFetchResult> {
+    const json = await this._post<OutcrawlScrapeResponse>(
+      "scrape",
+      { url, formats: ["markdown"] },
+      "web_fetch"
+    );
+
+    if (!json.markdown) {
+      throw new Error(`web_fetch failed: could not extract ${url}`);
+    }
+
+    const metadata = json.metadata ?? {};
+    return {
+      url,
+      title: typeof metadata.title === "string" ? metadata.title : undefined,
+      content: _truncateText(json.markdown, 20_000),
+      metadata,
+    };
+  }
+
+  async search(query: string, limit: number): Promise<WebSearchResult[]> {
+    const json = await this._post<OutcrawlSearchResponse>(
+      "search",
+      { query, limit: Math.max(1, Math.min(20, Math.round(limit))) },
+      "web_search"
+    );
+
+    return (json.hits ?? []).map((item) => ({
+      title: item.title ?? "Untitled",
+      url: item.url ?? "",
+      snippet: item.snippet,
+      content: undefined,
     }));
   }
 }
@@ -851,6 +945,11 @@ function _getSearchProvider({
   }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
+  }
+  if (settings.provider === "outcrawl") {
+    return new OutcrawlSearchProvider(
+      _resolveApiKey(settings.outcrawlApiKey, env)
+    );
   }
   // MCP-backed providers keep `web_fetch` on Firecrawl's safe extraction path.
   const fetchViaFirecrawl = (url: string) =>
