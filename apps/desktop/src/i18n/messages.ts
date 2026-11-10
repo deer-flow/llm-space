@@ -681,7 +681,7 @@ const APP_MESSAGES = {
       title: "Search",
       descriptionPrefix: "Choose the provider for the built-in ",
       descriptionMiddle:
-        " tool. When Brave Search, Exa, AnySearch, or Zhihu is selected, ",
+        " tool. When Brave Search, Exa, AnySearch, Zhihu, or Keenable is selected, ",
       descriptionSuffix:
         " continues to use Firecrawl for safe page extraction.",
       providerRow: "Search provider",
@@ -699,6 +699,7 @@ const APP_MESSAGES = {
         exa: "Exa",
         anysearch: "AnySearch",
         zhihu: "Zhihu",
+        keenable: "Keenable",
       },
       keys: {
         brave: "Brave Search API key",
@@ -707,12 +708,13 @@ const APP_MESSAGES = {
         exa: "Exa API key (optional)",
         anysearch: "AnySearch API key (optional)",
         zhihu: "Zhihu Access Secret",
+        keenable: "Keenable API key (optional)",
       },
       envPrefix: "Values starting with ",
       envMiddle: " are read from the environment (e.g. ",
       envSuffix: "). ",
       keyNotes:
-        "Exa and AnySearch work without a key at lower rate limits; Zhihu requires the Access Secret from its developer console.",
+        "Exa, AnySearch, and Keenable work without a key at lower rate limits; Zhihu requires the Access Secret from its developer console.",
       failedToSave: "Failed to save search settings",
     },
   },
@@ -1342,7 +1344,7 @@ const APP_MESSAGES = {
       title: "网络搜索",
       descriptionPrefix: "为内置的 ",
       descriptionMiddle:
-        " 工具选择提供方。当选择 Brave Search、Exa、AnySearch 或知乎时，",
+        " 工具选择提供方。当选择 Brave Search、Exa、AnySearch、知乎或 Keenable 时，",
       descriptionSuffix: " 仍会使用 Firecrawl 进行安全的页面提取。",
       providerRow: "搜索提供方",
       providersHeading: "提供方",
@@ -1359,6 +1361,7 @@ const APP_MESSAGES = {
         exa: "Exa",
         anysearch: "AnySearch",
         zhihu: "知乎",
+        keenable: "Keenable",
       },
       keys: {
         brave: "Brave Search API Key",
@@ -1367,12 +1370,13 @@ const APP_MESSAGES = {
         exa: "Exa API Key（可选）",
         anysearch: "AnySearch API Key（可选）",
         zhihu: "知乎 Access Secret",
+        keenable: "Keenable API Key（可选）",
       },
       envPrefix: "以 ",
       envMiddle: " 开头的值会从环境变量读取（例如 ",
       envSuffix: "）。",
       keyNotes:
-        "Exa 和 AnySearch 无需 Key 即可使用（限流较低）；知乎需要从开发者平台的个人中心获取 Access Secret。",
+        "Exa、AnySearch 和 Keenable 无需 Key 即可使用（限流较低）；知乎需要从开发者平台的个人中心获取 Access Secret。",
       failedToSave: "保存搜索设置失败",
     },
   },

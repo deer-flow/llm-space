@@ -11,6 +11,8 @@ const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
 const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
+const KEENABLE_PUBLIC_SEARCH_URL = "https://api.keenable.ai/v1/search/public";
+const KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search";
 const ANYSEARCH_MCP_URL = "https://api.anysearch.com/mcp";
 const ZHIHU_MCP_SSE_URL =
   "https://developer.zhihu.com/api/mcp/zhihu_search/v1/sse";
@@ -281,6 +283,74 @@ class TavilySearchProvider implements SearchProvider {
           ? _truncateText(item.raw_content, 2_000)
           : undefined,
     }));
+  }
+}
+
+interface KeenableSearchResponse {
+  results?: Array<{
+    title?: string;
+    url?: string;
+    description?: string;
+    snippet?: string;
+  }>;
+}
+
+/**
+ * Keenable-backed web search. Works without a key (public endpoint); a key
+ * selects the keyed endpoint with higher rate limits. Keenable has no
+ * single-page extraction endpoint, so `web_fetch` delegates to Firecrawl like
+ * the Brave provider.
+ */
+class KeenableSearchProvider implements SearchProvider {
+  constructor(
+    private readonly _apiKey: string,
+    private readonly _fetchProvider: SearchProvider
+  ) {}
+
+  fetch(url: string): Promise<WebFetchResult> {
+    return this._fetchProvider.fetch(url);
+  }
+
+  async search(
+    query: string,
+    limit: number,
+    includeContent: boolean
+  ): Promise<WebSearchResult[]> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-Keenable-Title": "LLM Space",
+    };
+    if (this._apiKey) {
+      headers["X-API-Key"] = this._apiKey;
+    }
+    const res = await fetch(
+      this._apiKey ? KEENABLE_SEARCH_URL : KEENABLE_PUBLIC_SEARCH_URL,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ query, max_results: _clampedLimit(limit) }),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`web_search failed: ${res.status}`);
+    }
+    const json = (await res.json()) as KeenableSearchResponse;
+
+    return (json.results ?? [])
+      .filter((item) => Boolean(item.url))
+      .map((item) => {
+        const snippet = item.description || item.snippet;
+        return {
+          title: item.title || "Untitled",
+          url: item.url ?? "",
+          snippet: snippet ? _truncateText(snippet, 1_000) : undefined,
+          content:
+            includeContent && item.snippet
+              ? _truncateText(item.snippet, 2_000)
+              : undefined,
+        };
+      });
   }
 }
 
@@ -851,6 +921,12 @@ function _getSearchProvider({
   }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
+  }
+  if (settings.provider === "keenable") {
+    return new KeenableSearchProvider(
+      _resolveApiKey(settings.keenableApiKey, env),
+      new FirecrawlSearchProvider(_resolveApiKey(settings.firecrawlApiKey, env))
+    );
   }
   // MCP-backed providers keep `web_fetch` on Firecrawl's safe extraction path.
   const fetchViaFirecrawl = (url: string) =>
