@@ -294,6 +294,14 @@ export async function edit(
   replaceAll = false
 ): Promise<string> {
   filePath = expandHomePath(filePath);
+  // An empty old_string "occurs" between every character: replace_all would
+  // splice new_string between all of them, and a single replace reports one
+  // match per character as "not unique".
+  if (oldString === "") {
+    throw new Error(
+      "old_string must not be empty. Use write to create a file or replace its whole contents."
+    );
+  }
   if (oldString === newString) {
     throw new Error("new_string must differ from old_string.");
   }
