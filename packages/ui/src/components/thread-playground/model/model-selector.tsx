@@ -1,6 +1,7 @@
 "use client";
 
 import { type ModelConfig } from "@llm-space/core";
+import { selectableModels } from "@llm-space/core/thread";
 import { SettingsIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -64,14 +65,11 @@ export function ModelSelector({
           providerDisplayName(a).localeCompare(providerDisplayName(b))
         )
         .map((group) => {
-          const disabled = new Set(group.disabledModels ?? []);
           return {
             id: group.id,
             name: providerDisplayName(group),
             icon: group.icon,
-            items: group.models
-              .filter((model) => !disabled.has(model.id))
-              .map((model) => toModelKey(model)),
+            items: selectableModels(group).map((model) => toModelKey(model)),
           };
         })
         .filter((group) => group.items.length > 0),
