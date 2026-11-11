@@ -1,5 +1,6 @@
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
+import { MessageVirtualizationProvider } from "@llm-space/ui/components/message-virtualization-provider";
 import {
   ThemeProvider,
   useTheme,
@@ -16,25 +17,33 @@ import { PLAYGROUND_LABELS } from "@/i18n/playground-labels";
 
 import { QueryProvider } from "./query-provider";
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({
+  children,
+  totalMemoryBytes,
+}: {
+  children: React.ReactNode;
+  totalMemoryBytes: number | null;
+}) {
   return (
     <ThemeProvider>
-      <I18nProvider>
-        <PlaygroundLabelsBridge>
-          <ExperimentalProvider>
-            <QueryProvider>
-              <TooltipProvider delayDuration={1000}>
-                <PluginCommandExecutionProvider>
-                  <div className="flex size-full flex-col">
-                    <ThemedToaster />
-                    {children}
-                  </div>
-                </PluginCommandExecutionProvider>
-              </TooltipProvider>
-            </QueryProvider>
-          </ExperimentalProvider>
-        </PlaygroundLabelsBridge>
-      </I18nProvider>
+      <MessageVirtualizationProvider totalMemoryBytes={totalMemoryBytes}>
+        <I18nProvider>
+          <PlaygroundLabelsBridge>
+            <ExperimentalProvider>
+              <QueryProvider>
+                <TooltipProvider delayDuration={1000}>
+                  <PluginCommandExecutionProvider>
+                    <div className="flex size-full flex-col">
+                      <ThemedToaster />
+                      {children}
+                    </div>
+                  </PluginCommandExecutionProvider>
+                </TooltipProvider>
+              </QueryProvider>
+            </ExperimentalProvider>
+          </PlaygroundLabelsBridge>
+        </I18nProvider>
+      </MessageVirtualizationProvider>
     </ThemeProvider>
   );
 }

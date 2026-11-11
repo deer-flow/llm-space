@@ -1,7 +1,11 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
-import { ThreadPlayground } from "@llm-space/ui/components/thread-playground";
+import type { EditorCommitScopeHandle } from "@llm-space/ui/components/code-editor/editor-commit-scope";
+import {
+  ThreadPlayground,
+  type ThreadScrollSnapshot,
+} from "@llm-space/ui/components/thread-playground";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
 import { Button } from "@llm-space/ui/ui/button";
@@ -35,6 +39,10 @@ interface TraceTabPaneProps {
     title: string,
     runtimeId: RuntimeId
   ) => void;
+  onViewCommitScopeReady?: (
+    paneId: string,
+    handle: EditorCommitScopeHandle | null
+  ) => void;
 }
 
 function _TraceTabPane({
@@ -48,6 +56,7 @@ function _TraceTabPane({
   refreshNonce = 0,
   onClose,
   onRenameTitle,
+  onViewCommitScopeReady,
 }: TraceTabPaneProps) {
   const tabId = `trace:${runtimeId}:${projectId}:${traceKey}`;
   const rpcTransport = createRpcTransport(runtimeId);
@@ -223,6 +232,19 @@ function _TraceTabPane({
     void mutationRevision;
     return lifecycleHost.isMutationReserved(tabId, runtimeId);
   }, [lifecycleHost, mutationRevision, runtimeId, tabId]);
+  const handleViewCommitScopeReady = useCallback(
+    (handle: EditorCommitScopeHandle | null) => {
+      onViewCommitScopeReady?.(tabId, handle);
+    },
+    [onViewCommitScopeReady, tabId]
+  );
+  const scrollSnapshotRef = useRef<ThreadScrollSnapshot | null>(null);
+  const handleScrollSnapshotChange = useCallback(
+    (snapshot: ThreadScrollSnapshot) => {
+      scrollSnapshotRef.current = snapshot;
+    },
+    []
+  );
 
   return (
     <ThreadPlayground
@@ -239,6 +261,9 @@ function _TraceTabPane({
       readonly={mutationReserved}
       active={active}
       viewMounted={viewMounted}
+      initialScrollSnapshot={scrollSnapshotRef.current}
+      onScrollSnapshotChange={handleScrollSnapshotChange}
+      onEditorCommitScopeReady={handleViewCommitScopeReady}
       transport={rpcTransport}
       runtimeId={runtimeId}
       onChange={handleChange}

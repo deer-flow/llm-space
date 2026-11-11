@@ -1,4 +1,5 @@
 import type { Thread } from "@llm-space/core";
+import type { EditorCommitScopeHandle } from "@llm-space/ui/components/code-editor/editor-commit-scope";
 import { FirecrawlLimitDialog } from "@llm-space/ui/components/firecrawl-limit-dialog";
 import {
   useModels,
@@ -299,6 +300,27 @@ function PageWorkspace({
     );
   }, []);
   const tabs = useThreadTabs({ canPruneRestoredTab });
+  const viewCommitHandlesRef = useRef(
+    new Map<string, EditorCommitScopeHandle>()
+  );
+  const commitView = useCallback((paneId: string) => {
+    viewCommitHandlesRef.current.get(paneId)?.commitAll();
+  }, []);
+  const commitViews = useCallback(
+    (closingTabs: AppTab[]) => {
+      for (const tab of closingTabs) {
+        commitView(paneIdForTab(tab));
+      }
+    },
+    [commitView]
+  );
+  const handleViewCommitScopeReady = useCallback(
+    (paneId: string, handle: EditorCommitScopeHandle | null) => {
+      if (handle) viewCommitHandlesRef.current.set(paneId, handle);
+      else viewCommitHandlesRef.current.delete(paneId);
+    },
+    []
+  );
   const { executeCommand } = useCommands();
   const models = useModels();
   const refreshModels = useRefreshModels();
@@ -749,6 +771,7 @@ function PageWorkspace({
         tabs: tabs.tabs,
         targetId: target,
         onBlocked: () => showRuntimeRunBlocked("closing this tab"),
+        commitViews,
         close,
       });
     },
@@ -764,6 +787,7 @@ function PageWorkspace({
         keepId: target,
         runtimeId: targetRuntimeId,
         onBlocked: () => showRuntimeRunBlocked("closing other tabs"),
+        commitViews,
         closeOthers: closeOthersInRuntime,
       });
     },
@@ -774,6 +798,7 @@ function PageWorkspace({
         tabs: tabs.tabs,
         runtimeId,
         onBlocked: () => showRuntimeRunBlocked("closing all tabs"),
+        commitViews,
         closeAll: closeAllInRuntime,
       });
     },
@@ -1150,6 +1175,8 @@ function PageWorkspace({
               onToggleSidebar={handleToggleSidebar}
               lifecycleHost={paneLifecycleHost}
               mutationRevision={mutationRevision}
+              commitView={commitView}
+              onViewCommitScopeReady={handleViewCommitScopeReady}
               onThreadStateChange={handleThreadStateChange}
               toolbarSlot={<UpdateIndicator />}
             />

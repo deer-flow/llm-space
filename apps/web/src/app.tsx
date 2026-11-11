@@ -1,5 +1,6 @@
 import type { ThreadConnector } from "@llm-space/core";
 import { createGistConnector, GIST_CONNECTOR_ID } from "@llm-space/core/storage";
+import { MessageVirtualizationProvider } from "@llm-space/ui/components/message-virtualization-provider";
 import { ModelProvider } from "@llm-space/ui/components/model-provider";
 import { ThemeProvider } from "@llm-space/ui/components/theme-provider";
 import { HostServicesProvider } from "@llm-space/ui/host";
@@ -42,22 +43,24 @@ function SharedThreadRoute() {
 export function App() {
   return (
     <ThemeProvider>
-      <ModelProvider client={webModelClient}>
-        <HostServicesProvider value={webHost}>
-          <TooltipProvider delayDuration={800}>
-            <I18nProvider>
-              <Routes>
-                <Route
-                  path="/shared/:connectorId/threads/:threadId"
-                  element={<SharedThreadRoute />}
-                />
-                <Route path="/shared/*" element={<NotFound />} />
-                <Route path="*" element={<Landing />} />
-              </Routes>
-            </I18nProvider>
-          </TooltipProvider>
-        </HostServicesProvider>
-      </ModelProvider>
+      <MessageVirtualizationProvider totalMemoryBytes={null}>
+        <ModelProvider client={webModelClient}>
+          <HostServicesProvider value={webHost}>
+            <TooltipProvider delayDuration={800}>
+              <I18nProvider>
+                <Routes>
+                  <Route
+                    path="/shared/:connectorId/threads/:threadId"
+                    element={<SharedThreadRoute />}
+                  />
+                  <Route path="/shared/*" element={<NotFound />} />
+                  <Route path="*" element={<Landing />} />
+                </Routes>
+              </I18nProvider>
+            </TooltipProvider>
+          </HostServicesProvider>
+        </ModelProvider>
+      </MessageVirtualizationProvider>
     </ThemeProvider>
   );
 }

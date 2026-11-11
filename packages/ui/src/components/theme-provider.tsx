@@ -27,11 +27,10 @@ export const DEFAULT_PRIMARY = "#5e80ee";
 
 /**
  * How richly the message list renders. `"rich"` (default) uses full CodeMirror
- * editors; `"lite"` downgrades the right-side message list to plain `<pre>` text
- * to keep large threads scrollable on the native WebKit renderer, where mounting
- * one CodeMirror per message makes scroll cost scale with message count.
+ * editors; `"on-demand"` starts with static highlighted text and mounts an
+ * editor only after interaction; `"lite"` uses plain text for the lowest cost.
  */
-export type RenderingFidelity = "rich" | "lite";
+export type RenderingFidelity = "rich" | "on-demand" | "lite";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -78,9 +77,8 @@ function _readStoredPrimary(): string {
 }
 
 function _readStoredFidelity(): RenderingFidelity {
-  return readLocalStorage(LOCAL_STORAGE_KEYS.renderingFidelity) === "lite"
-    ? "lite"
-    : "rich";
+  const stored = readLocalStorage(LOCAL_STORAGE_KEYS.renderingFidelity);
+  return stored === "lite" || stored === "on-demand" ? stored : "rich";
 }
 
 /** Pick a readable foreground for an arbitrary accent (WCAG relative luminance). */

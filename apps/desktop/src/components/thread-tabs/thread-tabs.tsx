@@ -1,6 +1,7 @@
 "use client";
 
 import type { Thread } from "@llm-space/core";
+import type { EditorCommitScopeHandle } from "@llm-space/ui/components/code-editor/editor-commit-scope";
 import { useTheme } from "@llm-space/ui/components/theme-provider";
 import { Tooltip } from "@llm-space/ui/components/tooltip";
 import { cn } from "@llm-space/ui/lib/utils";
@@ -38,6 +39,7 @@ import { ShareThreadMenuItem } from "./share-thread-menu-item";
 import { ThreadTabPane } from "./thread-tab-pane";
 import { TraceTabPane } from "./trace-tab-pane";
 import { tabLabel, type AppTab } from "./use-thread-tabs";
+import { useViewCacheSize } from "./view-cache-size";
 
 const _isWindows =
   typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
@@ -91,6 +93,13 @@ interface ThreadTabsProps {
   onToggleSidebar?: () => void;
   lifecycleHost: PaneLifecycleHost;
   mutationRevision: number;
+  /** Commit editor-local drafts before a Thread or Trace View is evicted. */
+  commitView: (paneId: string) => void;
+  /** Publish each disposable runtime View's current commit boundary. */
+  onViewCommitScopeReady: (
+    paneId: string,
+    handle: EditorCommitScopeHandle | null
+  ) => void;
   onThreadStateChange?: (tabId: string, thread: Thread | null) => void;
   /** Extra content pinned at the right end of the tab strip, before "+". */
   toolbarSlot?: ReactNode;
@@ -122,6 +131,8 @@ export function ThreadTabs({
   onToggleSidebar,
   lifecycleHost,
   mutationRevision,
+  commitView,
+  onViewCommitScopeReady,
   onThreadStateChange,
   toolbarSlot,
 }: ThreadTabsProps) {
@@ -232,6 +243,7 @@ export function ThreadTabs({
   // over the strip can't leak into a later gesture and close the wrong tab.
   // preventDefault also disables middle-click autoscroll on Windows/Linux.
   const middlePressedTabIdRef = useRef<string | null>(null);
+  const [viewCacheSize] = useViewCacheSize();
   const handleMouseDownCapture = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (event.button !== 1) return;
@@ -276,6 +288,7 @@ export function ThreadTabs({
           onClose={close}
           consumeDiscardedPane={consumeDiscardedPane}
           onThreadStateChange={onThreadStateChange}
+          onViewCommitScopeReady={onViewCommitScopeReady}
         />
       ) : (
         <TraceTabPane
@@ -289,6 +302,7 @@ export function ThreadTabs({
           refreshNonce={tab.refreshNonce ?? 0}
           onClose={close}
           onRenameTitle={onTraceTitleChange}
+          onViewCommitScopeReady={onViewCommitScopeReady}
         />
       ),
     [
@@ -300,6 +314,7 @@ export function ThreadTabs({
       onMove,
       onThreadStateChange,
       onTraceTitleChange,
+      onViewCommitScopeReady,
     ]
   );
 
@@ -459,6 +474,8 @@ export function ThreadTabs({
           tabs={paneTabs}
           activeId={activeId}
           getPaneKey={_getPaneKey}
+          maxMountedPanes={viewCacheSize}
+          onBeforeViewUnmount={commitView}
           renderPane={renderPane}
         />
       </div>

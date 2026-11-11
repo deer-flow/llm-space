@@ -1,12 +1,14 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { RuntimeId } from "@/shared/runtime";
 
-import { retainRecentPaneKeys } from "./retain-recent-pane-keys";
-
-const MAX_MOUNTED_PANE_VIEWS = 5;
+import {
+  reconcileRecentPaneKeys,
+  retainRecentPaneKeys,
+} from "./retain-recent-pane-keys";
+import { DEFAULT_VIEW_CACHE_SIZE } from "./view-cache-size";
 
 interface RuntimePane {
   id: string;
@@ -33,42 +35,54 @@ export function RuntimePaneHost<T extends RuntimePane>({
   tabs,
   activeId,
   getPaneKey,
-  maxMountedPanes = MAX_MOUNTED_PANE_VIEWS,
+  maxMountedPanes = DEFAULT_VIEW_CACHE_SIZE,
+  onBeforeViewUnmount,
   renderPane,
 }: {
   tabs: readonly T[];
   activeId: string | null;
   getPaneKey: (tab: T) => string;
   maxMountedPanes?: number;
+  onBeforeViewUnmount?: (paneKey: string) => void;
   renderPane: (tab: T, active: boolean, viewMounted: boolean) => ReactNode;
 }) {
-  const [recentPaneKeys, setRecentPaneKeys] = useState<string[]>([]);
   const paneKeys = useMemo(() => tabs.map(getPaneKey), [getPaneKey, tabs]);
   const activeTab = tabs.find((tab) => tab.id === activeId);
   const activePaneKey = activeTab ? getPaneKey(activeTab) : null;
-  const retainedPaneKeys = useMemo(
-    () =>
-      retainRecentPaneKeys(
-        recentPaneKeys,
-        paneKeys,
-        activePaneKey,
-        maxMountedPanes
-      ),
-    [activePaneKey, maxMountedPanes, paneKeys, recentPaneKeys]
+  const [retainedPaneKeys, setRetainedPaneKeys] = useState(() =>
+    retainRecentPaneKeys([], paneKeys, activePaneKey, maxMountedPanes)
   );
   const retainedPaneKeySet = useMemo(
     () => new Set(retainedPaneKeys),
     [retainedPaneKeys]
   );
 
-  useEffect(() => {
-    setRecentPaneKeys((current) =>
-      current.length === retainedPaneKeys.length &&
-      current.every((key, index) => key === retainedPaneKeys[index])
-        ? current
-        : retainedPaneKeys
-    );
-  }, [retainedPaneKeys]);
+  useLayoutEffect(() => {
+    const transition = reconcileRecentPaneKeys({
+      previousKeys: retainedPaneKeys,
+      availableKeys: paneKeys,
+      activeKey: activePaneKey,
+      limit: maxMountedPanes,
+    });
+    if (
+      transition.retained.length === retainedPaneKeys.length &&
+      transition.retained.every(
+        (key, index) => key === retainedPaneKeys[index]
+      )
+    ) {
+      return;
+    }
+    for (const paneKey of transition.evicted) {
+      onBeforeViewUnmount?.(paneKey);
+    }
+    setRetainedPaneKeys(transition.retained);
+  }, [
+    activePaneKey,
+    maxMountedPanes,
+    onBeforeViewUnmount,
+    paneKeys,
+    retainedPaneKeys,
+  ]);
 
   return tabs.map((tab) => (
     <RuntimePane
@@ -76,7 +90,10 @@ export function RuntimePaneHost<T extends RuntimePane>({
       active={tab.id === activeId}
       renderPane={renderPane}
       tab={tab}
-      viewMounted={retainedPaneKeySet.has(getPaneKey(tab))}
+      viewMounted={
+        getPaneKey(tab) === activePaneKey ||
+        retainedPaneKeySet.has(getPaneKey(tab))
+      }
     />
   ));
 }

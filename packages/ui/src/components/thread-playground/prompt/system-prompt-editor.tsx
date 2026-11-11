@@ -13,7 +13,7 @@ import { GeneratePopoverButton } from "../generate-popover-button";
 import { usePlaygroundLabels } from "../playground-labels";
 import { useThreadStore, useThreadStoreActions } from "../stores";
 import { useStreamText } from "../use-stream-text";
-import { usePromptVariableExtension } from "../variable/use-prompt-variable-extension";
+import { usePromptSyntaxEnhancements } from "../variable/use-prompt-syntax-enhancements";
 
 interface SystemPromptEditorProps {
   className?: string;
@@ -35,7 +35,9 @@ function _SystemPromptEditor({
   const seedHost = useHostServices();
   const { presentational } = seedHost;
   const { updateSystemPrompt } = useThreadStoreActions();
-  const variableExtension = usePromptVariableExtension(SYSTEM_PROMPT_PLACE_KEY);
+  const promptSyntaxEnhancements = usePromptSyntaxEnhancements(
+    SYSTEM_PROMPT_PLACE_KEY
+  );
   const handleChange = useCallback(
     (value: string) => {
       updateSystemPrompt(value);
@@ -141,7 +143,7 @@ function _SystemPromptEditor({
         language="markdown"
         readonly={readonly || streaming}
         placeholder={dialogs.toolEditor.systemPromptPlaceholder}
-        extraExtensions={variableExtension}
+        enhancements={promptSyntaxEnhancements}
         onChange={handleChange}
       />
     </div>
