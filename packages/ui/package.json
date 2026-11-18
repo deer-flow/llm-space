@@ -11,6 +11,7 @@
     "./components/thread-playground": "./src/components/thread-playground/index.tsx",
     "./components/thread-playground/playground-labels": "./src/components/thread-playground/playground-labels.tsx",
     "./components/thread-playground/examples/prompts": "./src/components/thread-playground/examples/prompts.ts",
+    "./components/thread-playground/message/process-groups": "./src/components/thread-playground/message/process-groups.ts",
     "./components/code-editor": "./src/components/code-editor/index.tsx",
     "./components/*": "./src/components/*.tsx",
     "./styles/globals.css": "./src/styles/globals.css",

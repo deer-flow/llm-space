@@ -116,6 +116,13 @@ export interface ThreadState {
   /** Auto-executing tool calls for in-flight UI feedback; never persisted. */
   executingToolCallIds: string[];
   collapsedMessageIds: string[];
+  /**
+   * Cross-message process groups (see `process-groups.ts`) the user manually
+   * expanded; a group id is its first member message id. Groups are collapsed
+   * by default once their run finishes, so this only ever holds expanded ids.
+   * Store-only; never persisted.
+   */
+  expandedProcessGroupIds: string[];
   runValidationIssue: RunValidationIssue | null;
   /**
    * Id of the message whose editor should grab focus on mount — set only by
@@ -196,6 +203,7 @@ export interface ThreadState {
   removeTool(name: string): void;
   toggleMessageRole(id: string): void;
   toggleMessageCollapsed(id: string): void;
+  toggleProcessGroupExpanded(groupId: string): void;
   abort(): void;
 }
 
@@ -678,6 +686,7 @@ export function createThreadStore(
         activeRunId: null,
         executingToolCallIds: [],
         collapsedMessageIds: [],
+        expandedProcessGroupIds: [],
         runValidationIssue: null,
         autoFocusMessageId: null,
         changeHistory: createInitialHistory(normalizedInitialThread),
@@ -738,12 +747,20 @@ export function createThreadStore(
         },
         removeMessage(id: string) {
           updateMessages((messages) => messages.filter((m) => m.id !== id));
-          const { collapsedMessageIds } = get();
-          if (collapsedMessageIds.includes(id)) {
+          const { collapsedMessageIds, expandedProcessGroupIds } = get();
+          const nextCollapsed = collapsedMessageIds.includes(id)
+            ? collapsedMessageIds.filter((cid) => cid !== id)
+            : collapsedMessageIds;
+          const nextExpanded = expandedProcessGroupIds.includes(id)
+            ? expandedProcessGroupIds.filter((gid) => gid !== id)
+            : expandedProcessGroupIds;
+          if (
+            nextCollapsed !== collapsedMessageIds ||
+            nextExpanded !== expandedProcessGroupIds
+          ) {
             set({
-              collapsedMessageIds: collapsedMessageIds.filter(
-                (cid) => cid !== id
-              ),
+              collapsedMessageIds: nextCollapsed,
+              expandedProcessGroupIds: nextExpanded,
             });
           }
         },
@@ -1073,6 +1090,14 @@ export function createThreadStore(
             collapsedMessageIds: collapsedMessageIds.includes(id)
               ? collapsedMessageIds.filter((i) => i !== id)
               : [...collapsedMessageIds, id],
+          });
+        },
+        toggleProcessGroupExpanded(groupId: string) {
+          const { expandedProcessGroupIds } = get();
+          set({
+            expandedProcessGroupIds: expandedProcessGroupIds.includes(groupId)
+              ? expandedProcessGroupIds.filter((id) => id !== groupId)
+              : [...expandedProcessGroupIds, groupId],
           });
         },
         async run(fromMessageId?: string) {
@@ -1864,6 +1889,7 @@ const selectActions = (s: ThreadState) => ({
   removeTool: s.removeTool,
   toggleMessageRole: s.toggleMessageRole,
   toggleMessageCollapsed: s.toggleMessageCollapsed,
+  toggleProcessGroupExpanded: s.toggleProcessGroupExpanded,
 });
 export function useThreadStoreActions() {
   return useStore(useThreadStoreApi(), useShallow(selectActions));
