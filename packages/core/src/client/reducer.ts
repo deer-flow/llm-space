@@ -59,9 +59,13 @@ export function reduceMessages(
         content
       );
     case "message_end": {
-      const message = streamingMessage!;
       const providerMessage =
         event.message.role === "assistant" ? event.message : undefined;
+      if (!streamingMessage && !providerMessage) {
+        return null;
+      }
+      const message: AssistantMessage =
+        streamingMessage ?? { id: uuid(), role: "assistant", content: [] };
       const usage = _normalizeUsage(providerMessage?.usage);
       const providerText = Array.isArray(providerMessage?.content)
         ? providerMessage.content
@@ -101,8 +105,11 @@ export function reduceMessages(
       };
     }
     case "tool_execution_end":
+      if (!streamingMessage) {
+        return null;
+      }
       return _createUpdateMessageEvent(
-        _replaceToolCall(streamingMessage!, event.toolCallId, (toolCall) => ({
+        _replaceToolCall(streamingMessage, event.toolCallId, (toolCall) => ({
           ...toolCall,
           output: event.result as ToolCallOutput,
         })),
@@ -196,6 +203,18 @@ function _createUpdateMessageEvent(
   return { type: "message_update", message, content };
 }
 
+/**
+ * Project the accumulated stream blocks onto the message's text-only content
+ * list. Providers interleave text with thinking or tool-call blocks, so every
+ * text block is kept in stream order. Blocks are copied so published messages
+ * stay decoupled from the in-place mutated stream state.
+ */
+function _textBlocks(content: ReducedMessageContent[]): TextContent[] {
+  return content
+    .filter((block): block is TextContent => block.type === "text")
+    .map((block) => ({ ...block }));
+}
+
 /** Replace the tool call with the given id, leaving the others untouched. */
 function _replaceToolCall(
   message: AssistantMessage,
@@ -215,7 +234,10 @@ function _reduceAssistantMessageEvent(
   streamingMessage: AssistantMessage | null,
   content: ReducedMessageContent[]
 ): ReduceResult | null {
-  const message = streamingMessage!;
+  if (!streamingMessage) {
+    return null;
+  }
+  const message = streamingMessage;
   switch (event.type) {
     case "thinking_start": {
       content[event.contentIndex] = { type: "thinking", thinking: "" };
@@ -233,7 +255,7 @@ function _reduceAssistantMessageEvent(
       const textContent: TextContent = { type: "text", text: "" };
       content[event.contentIndex] = textContent;
       return _createUpdateMessageEvent(
-        { ...message, content: [textContent] },
+        { ...message, content: _textBlocks(content) },
         content
       );
     }
@@ -241,12 +263,7 @@ function _reduceAssistantMessageEvent(
       const textContent = content[event.contentIndex] as TextContent;
       textContent.text += event.delta;
       return _createUpdateMessageEvent(
-        {
-          ...message,
-          content: message.content.map((c) =>
-            c.type === "text" ? { ...textContent } : c
-          ),
-        },
+        { ...message, content: _textBlocks(content) },
         content
       );
     }
