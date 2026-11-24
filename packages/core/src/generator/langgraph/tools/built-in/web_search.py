@@ -5,6 +5,7 @@ from langchain.tools import tool
 
 FIRECRAWL_BASE_URL = "https://api.firecrawl.dev"
 TAVILY_BASE_URL = "https://api.tavily.com"
+SPECSTREAM_BASE_URL = "https://api.specstream.ai"
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 
 
@@ -46,6 +47,37 @@ def _firecrawl_search(query: str, limit: int, include_content: bool) -> list[dic
                 "snippet": item.get("description"),
                 "content": _truncate_text(markdown, 2_000)
                 if include_content and markdown
+                else None,
+            }
+        )
+    return results
+
+
+
+def _specstream_search(query: str, limit: int, include_content: bool) -> list[dict]:
+    """SpecStream live web search. Requires ``SPECSTREAM_API_KEY``."""
+    api_key = os.environ.get("SPECSTREAM_API_KEY")
+    if not api_key:
+        raise RuntimeError("SpecStream API key is not configured. Set SPECSTREAM_API_KEY.")
+
+    res = requests.post(
+        f"{SPECSTREAM_BASE_URL}/v1/web-search",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        json={"q": query, "num": limit, "passages": include_content},
+    )
+    if not res.ok:
+        raise RuntimeError(f"web_search failed: {res.status_code}")
+
+    results = []
+    for item in res.json().get("sources") or []:
+        excerpt = item.get("excerpt") or item.get("snippet")
+        results.append(
+            {
+                "title": item.get("title") or "Untitled",
+                "url": item.get("url") or "",
+                "snippet": item.get("snippet") or item.get("excerpt"),
+                "content": _truncate_text(excerpt, 2_000)
+                if include_content and excerpt
                 else None,
             }
         )
@@ -151,6 +183,8 @@ def web_search(query: str, limit: int = 5, includeContent: bool = False) -> list
     provider = os.environ.get("SEARCH_PROVIDER", "firecrawl").strip().lower()
     if provider == "tavily":
         return _tavily_search(query, limit, includeContent)
+    if provider == "specstream":
+        return _specstream_search(query, limit, includeContent)
     if provider == "brave":
         return _brave_search(query, limit, includeContent)
     return _firecrawl_search(query, limit, includeContent)

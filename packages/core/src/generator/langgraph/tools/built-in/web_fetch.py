@@ -5,6 +5,7 @@ from langchain.tools import tool
 
 FIRECRAWL_BASE_URL = "https://api.firecrawl.dev"
 TAVILY_BASE_URL = "https://api.tavily.com"
+SPECSTREAM_BASE_URL = "https://api.specstream.ai"
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -38,6 +39,36 @@ def _firecrawl_fetch(url: str) -> dict:
         "title": title if isinstance(title, str) else None,
         "content": _truncate_text(data.get("markdown") or data.get("html") or "", 20_000),
         "metadata": metadata,
+    }
+
+
+
+def _specstream_fetch(url: str) -> dict:
+    """Extract one page via SpecStream Extract API. Requires ``SPECSTREAM_API_KEY``."""
+    api_key = os.environ.get("SPECSTREAM_API_KEY")
+    if not api_key:
+        raise RuntimeError("SpecStream API key is not configured. Set SPECSTREAM_API_KEY.")
+
+    res = requests.post(
+        f"{SPECSTREAM_BASE_URL}/v1/extract",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        json={"urls": [url]},
+    )
+    if not res.ok:
+        raise RuntimeError(f"web_fetch failed: {res.status_code}")
+
+    json_body = res.json()
+    result = (json_body.get("results") or [None])[0]
+    body = (result.get("markdown") or result.get("text")) if isinstance(result, dict) else None
+    if not result or result.get("ok") is False or not body:
+        message = result.get("error") if isinstance(result, dict) else None
+        raise RuntimeError(message or f"web_fetch failed: could not extract {url}")
+
+    return {
+        "url": result.get("url") or url,
+        "title": result.get("title"),
+        "content": _truncate_text(body, 20_000),
+        "metadata": {},
     }
 
 
@@ -88,6 +119,8 @@ def web_fetch(url: str) -> dict:
     provider = os.environ.get("SEARCH_PROVIDER", "firecrawl").strip().lower()
     if provider == "tavily":
         return _tavily_fetch(url)
+    if provider == "specstream":
+        return _specstream_fetch(url)
     # `brave` has no extraction endpoint, so it delegates to Firecrawl (matching
     # the desktop behavior, which avoids fetching arbitrary URLs from the trusted
     # process and widening the SSRF surface).

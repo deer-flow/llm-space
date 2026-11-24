@@ -295,6 +295,8 @@ SEARCH_PROVIDER=${search.provider}
 FIRECRAWL_API_KEY=${key(search.firecrawlApiKey)}
 # Required only when SEARCH_PROVIDER=tavily.
 TAVILY_API_KEY=${key(search.tavilyApiKey)}
+# Required only when SEARCH_PROVIDER=specstream.
+SPECSTREAM_API_KEY=${key(search.specstreamApiKey)}
 # Required only when SEARCH_PROVIDER=brave.
 BRAVE_API_KEY=${key(search.braveApiKey)}
 `;

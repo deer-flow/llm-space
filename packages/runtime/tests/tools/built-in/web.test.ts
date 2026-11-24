@@ -44,6 +44,7 @@ describe("Brave Search provider", () => {
         braveApiKey: "brave-key",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
@@ -84,6 +85,7 @@ describe("Brave Search provider", () => {
         braveApiKey: "$BRAVE_SEARCH_API_KEY",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
@@ -127,6 +129,7 @@ describe("Brave Search provider", () => {
         braveApiKey: "invalid-brave-key",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
@@ -175,6 +178,7 @@ describe("Brave Search provider", () => {
         braveApiKey: "brave-key",
         firecrawlApiKey: "firecrawl-key",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         exaApiKey: "",
         anysearchApiKey: "",
         zhihuAccessSecret: "",
@@ -282,6 +286,7 @@ describe("Exa MCP provider", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         exaApiKey: "exa-key",
       }),
@@ -351,6 +356,7 @@ describe("AnySearch MCP provider", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         anysearchApiKey: "$ANYSEARCH_API_KEY",
       }),
@@ -409,6 +415,7 @@ describe("AnySearch MCP provider", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         anysearchApiKey: "$ANYSEARCH_API_KEY",
       }),
@@ -428,6 +435,7 @@ describe("Zhihu MCP provider", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",
       }),
@@ -510,6 +518,7 @@ describe("Zhihu MCP provider", () => {
         braveApiKey: "",
         firecrawlApiKey: "",
         tavilyApiKey: "",
+        specstreamApiKey: "",
         ...NEW_SETTINGS_FIELDS,
         zhihuAccessSecret: "zhihu-secret",
       }),
@@ -552,3 +561,140 @@ describe("Zhihu MCP provider", () => {
     ]);
   });
 });
+
+
+describe("SpecStream provider", () => {
+  test("calls /v1/web-search with bearer auth and maps sources", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return new Response(
+        JSON.stringify({
+          sources: [
+            {
+              title: "SpecStream Docs",
+              url: "https://specstream.ai/docs",
+              snippet: "Short snippet",
+              excerpt: "Full verified excerpt",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }) as typeof fetch;
+
+    try {
+      const search = createWebBuiltInTools({
+        env: {},
+        getSearchSettings: () => ({
+          provider: "specstream",
+          braveApiKey: "",
+          firecrawlApiKey: "",
+          tavilyApiKey: "",
+          specstreamApiKey: "ss-test-key",
+          exaApiKey: "",
+          anysearchApiKey: "",
+          zhihuAccessSecret: "",
+        }),
+      }).find((entry) => entry.tool.name === "web_search");
+      const results = await search?.execute({
+        query: "live web data",
+        limit: 5,
+        includeContent: true,
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.url).toBe("https://api.specstream.ai/v1/web-search");
+      expect((calls[0]?.init?.headers as Record<string, string>)?.Authorization).toBe(
+        "Bearer ss-test-key"
+      );
+      expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+        q: "live web data",
+        num: 5,
+        passages: true,
+      });
+      expect(results).toEqual([
+        {
+          title: "SpecStream Docs",
+          url: "https://specstream.ai/docs",
+          snippet: "Short snippet",
+          content: "Full verified excerpt",
+        },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("calls /v1/extract for web_fetch and returns page content", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return new Response(
+        JSON.stringify({
+          results: [
+            {
+              url: "https://example.com/page",
+              ok: true,
+              title: "Example Page",
+              text: "Clean extracted body.",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }) as typeof fetch;
+
+    try {
+      const fetchTool = createWebBuiltInTools({
+        env: {},
+        getSearchSettings: () => ({
+          provider: "specstream",
+          braveApiKey: "",
+          firecrawlApiKey: "",
+          tavilyApiKey: "",
+          specstreamApiKey: "ss-test-key",
+          exaApiKey: "",
+          anysearchApiKey: "",
+          zhihuAccessSecret: "",
+        }),
+      }).find((entry) => entry.tool.name === "web_fetch");
+      const fetched = await fetchTool?.execute({
+        url: "https://example.com/page",
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.url).toBe("https://api.specstream.ai/v1/extract");
+      expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+        urls: ["https://example.com/page"],
+      });
+      expect(fetched).toEqual({
+        url: "https://example.com/page",
+        title: "Example Page",
+        content: "Clean extracted body.",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("requires a configured SpecStream API key", async () => {
+    const search = createWebBuiltInTools({
+      env: {},
+      getSearchSettings: () => ({
+        provider: "specstream",
+        braveApiKey: "",
+        firecrawlApiKey: "",
+        tavilyApiKey: "",
+        specstreamApiKey: "",
+        exaApiKey: "",
+        anysearchApiKey: "",
+        zhihuAccessSecret: "",
+      }),
+    }).find((entry) => entry.tool.name === "web_search");
+    await expect(
+      search?.execute({ query: "test", limit: 3, includeContent: false })
+    ).rejects.toThrow("SpecStream API key is not configured");
+  });
+});
+

@@ -434,6 +434,7 @@ export function GenerateProjectButton({
         for (const raw of [
           search.firecrawlApiKey,
           search.tavilyApiKey,
+          search.specstreamApiKey,
           search.braveApiKey,
         ]) {
           if (raw?.startsWith("$")) {
@@ -453,6 +454,7 @@ export function GenerateProjectButton({
             provider: search.provider,
             firecrawlApiKey: resolveKey(search.firecrawlApiKey),
             tavilyApiKey: resolveKey(search.tavilyApiKey),
+            specstreamApiKey: resolveKey(search.specstreamApiKey),
             braveApiKey: resolveKey(search.braveApiKey),
             exaApiKey: resolveKey(search.exaApiKey),
             anysearchApiKey: resolveKey(search.anysearchApiKey),
