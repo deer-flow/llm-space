@@ -16,6 +16,7 @@ const VALID_PROVIDERS: readonly SearchProviderId[] = [
   "brave",
   "firecrawl",
   "tavily",
+  "specstream",
   "exa",
   "anysearch",
   "zhihu",
@@ -26,6 +27,7 @@ const SearchSettingsFileSchema = z.object({
   braveApiKey: z.string().optional(),
   firecrawlApiKey: z.string().optional(),
   tavilyApiKey: z.string().optional(),
+  specstreamApiKey: z.string().optional(),
   exaApiKey: z.string().optional(),
   anysearchApiKey: z.string().optional(),
   zhihuAccessSecret: z.string().optional(),
@@ -94,6 +96,10 @@ export class SearchSettingsManager {
         typeof input.tavilyApiKey === "string"
           ? input.tavilyApiKey
           : DEFAULT_SEARCH_SETTINGS.tavilyApiKey,
+      specstreamApiKey:
+        typeof input.specstreamApiKey === "string"
+          ? input.specstreamApiKey
+          : DEFAULT_SEARCH_SETTINGS.specstreamApiKey,
       exaApiKey:
         typeof input.exaApiKey === "string"
           ? input.exaApiKey

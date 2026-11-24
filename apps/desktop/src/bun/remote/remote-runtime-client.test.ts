@@ -196,6 +196,7 @@ describe("RemoteRuntimeClient", () => {
           braveApiKey: "",
           firecrawlApiKey: "key",
           tavilyApiKey: "",
+          specstreamApiKey: "",
           exaApiKey: "",
           anysearchApiKey: "",
           zhihuAccessSecret: "",

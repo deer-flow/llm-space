@@ -3,6 +3,7 @@ export type SearchProviderId =
   | "brave"
   | "firecrawl"
   | "tavily"
+  | "specstream"
   | "exa"
   | "anysearch"
   | "zhihu";
@@ -22,6 +23,7 @@ export interface SearchSettings {
   braveApiKey: string;
   firecrawlApiKey: string;
   tavilyApiKey: string;
+  specstreamApiKey: string;
   exaApiKey: string;
   anysearchApiKey: string;
   zhihuAccessSecret: string;
@@ -32,6 +34,7 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   braveApiKey: "$BRAVE_SEARCH_API_KEY",
   firecrawlApiKey: "$FIRECRAWL_API_KEY",
   tavilyApiKey: "$TAVILY_API_KEY",
+  specstreamApiKey: "$SPECSTREAM_API_KEY",
   exaApiKey: "$EXA_API_KEY",
   anysearchApiKey: "$ANYSEARCH_API_KEY",
   zhihuAccessSecret: "$ZHIHU_ACCESS_SECRET",

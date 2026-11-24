@@ -51,6 +51,7 @@ function createRuntime(): RuntimeClient {
       braveApiKey: "",
       firecrawlApiKey: "",
       tavilyApiKey: "",
+      specstreamApiKey: "",
       exaApiKey: "",
       anysearchApiKey: "",
       zhihuAccessSecret: "",

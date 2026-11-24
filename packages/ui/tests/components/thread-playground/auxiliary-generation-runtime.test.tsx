@@ -211,6 +211,7 @@ describe("auxiliary generation runtime ownership", () => {
           braveApiKey: "",
           firecrawlApiKey: "",
           tavilyApiKey: "",
+          specstreamApiKey: "",
         };
       },
       resolveEnv: async (_providerId, _envNames, options) => {

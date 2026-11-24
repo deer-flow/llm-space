@@ -91,7 +91,7 @@ function _hasLiteralSecret(
   if (!search) {
     return false;
   }
-  return [search.firecrawlApiKey, search.tavilyApiKey, search.braveApiKey].some(
+  return [search.firecrawlApiKey, search.tavilyApiKey, search.specstreamApiKey, search.braveApiKey].some(
     (v) => v && !v.startsWith("$")
   );
 }

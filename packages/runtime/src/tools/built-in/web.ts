@@ -9,6 +9,7 @@ export interface WebBuiltInToolsDependencies {
 
 const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev";
 const TAVILY_BASE_URL = "https://api.tavily.com";
+const SPECSTREAM_BASE_URL = "https://api.specstream.ai";
 const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
 const ANYSEARCH_MCP_URL = "https://api.anysearch.com/mcp";
@@ -202,6 +203,105 @@ class FirecrawlSearchProvider implements SearchProvider {
       content:
         includeContent && item.markdown
           ? _truncateText(item.markdown, 2_000)
+          : undefined,
+    }));
+  }
+}
+
+
+interface SpecStreamSearchResponse {
+  sources?: Array<{
+    title?: string;
+    url?: string;
+    snippet?: string;
+    excerpt?: string;
+  }>;
+}
+
+interface SpecStreamExtractResponse {
+  results?: Array<{
+    url?: string;
+    ok?: boolean;
+    title?: string;
+    text?: string;
+    markdown?: string;
+    error?: string;
+  }>;
+}
+
+/** SpecStream live web search and page extract provider. Requires SPECSTREAM_API_KEY. */
+class SpecStreamSearchProvider implements SearchProvider {
+  constructor(private readonly _apiKey: string) {
+    if (!_apiKey) {
+      throw new Error(
+        "SpecStream API key is not configured. Add one in Settings → Search."
+      );
+    }
+  }
+
+  private _headers(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this._apiKey}`,
+    };
+  }
+
+  async fetch(url: string): Promise<WebFetchResult> {
+    const res = await fetch(`${SPECSTREAM_BASE_URL}/v1/extract`, {
+      method: "POST",
+      headers: this._headers(),
+      body: JSON.stringify({ urls: [url] }),
+    });
+
+    const json = (await res.json()) as SpecStreamExtractResponse;
+
+    if (!res.ok) {
+      throw new Error(`web_fetch failed: ${res.status}`);
+    }
+
+    const result = json.results?.[0];
+    const body = result?.markdown ?? result?.text;
+    if (!result || result.ok === false || !body) {
+      throw new Error(
+        result?.error ?? `web_fetch failed: could not extract ${url}`
+      );
+    }
+
+    return {
+      url: result.url ?? url,
+      title: result.title,
+      content: _truncateText(body, 20_000),
+    };
+  }
+
+  async search(
+    query: string,
+    limit: number,
+    includeContent: boolean
+  ): Promise<WebSearchResult[]> {
+    const res = await fetch(`${SPECSTREAM_BASE_URL}/v1/web-search`, {
+      method: "POST",
+      headers: this._headers(),
+      body: JSON.stringify({
+        q: query,
+        num: limit,
+        passages: includeContent,
+      }),
+    });
+
+    const json = (await res.json()) as SpecStreamSearchResponse;
+
+    if (!res.ok) {
+      throw new Error(`web_search failed: ${res.status}`);
+    }
+
+    return (json.sources ?? []).map((item) => ({
+      title: item.title ?? "Untitled",
+      url: item.url ?? "",
+      snippet: item.snippet ?? item.excerpt,
+      content:
+        includeContent && (item.excerpt ?? item.snippet)
+          ? _truncateText(item.excerpt ?? item.snippet ?? "", 2_000)
           : undefined,
     }));
   }
@@ -851,6 +951,9 @@ function _getSearchProvider({
   }
   if (settings.provider === "tavily") {
     return new TavilySearchProvider(_resolveApiKey(settings.tavilyApiKey, env));
+  }
+  if (settings.provider === "specstream") {
+    return new SpecStreamSearchProvider(_resolveApiKey(settings.specstreamApiKey, env));
   }
   // MCP-backed providers keep `web_fetch` on Firecrawl's safe extraction path.
   const fetchViaFirecrawl = (url: string) =>

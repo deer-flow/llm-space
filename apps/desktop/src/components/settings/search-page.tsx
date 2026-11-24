@@ -22,6 +22,7 @@ const PROVIDER_ORDER: readonly SearchProviderId[] = [
   "brave",
   "firecrawl",
   "tavily",
+  "specstream",
   "exa",
   "anysearch",
   "zhihu",
@@ -32,6 +33,7 @@ const FAVICON_DOMAINS: Record<SearchProviderId, string> = {
   brave: "search.brave.com",
   firecrawl: "firecrawl.dev",
   tavily: "tavily.com",
+  specstream: "specstream.ai",
   exa: "exa.ai",
   anysearch: "anysearch.com",
   zhihu: "zhihu.com",
@@ -41,6 +43,7 @@ const GET_KEY_URLS: Record<SearchProviderId, string> = {
   brave: "https://api-dashboard.search.brave.com/app/keys",
   firecrawl: "https://www.firecrawl.dev/app/api-keys",
   tavily: "https://app.tavily.com/home",
+  specstream: "https://specstream.ai",
   exa: "https://dashboard.exa.ai/api-keys",
   anysearch: "https://www.anysearch.com/console/api-keys",
   zhihu: "https://developer.zhihu.com/",
@@ -235,6 +238,7 @@ function _settingsKeyFor(
   | "braveApiKey"
   | "firecrawlApiKey"
   | "tavilyApiKey"
+  | "specstreamApiKey"
   | "exaApiKey"
   | "anysearchApiKey"
   | "zhihuAccessSecret" {
